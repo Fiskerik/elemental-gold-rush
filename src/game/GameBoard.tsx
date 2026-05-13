@@ -2,8 +2,11 @@ import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { ELEMENTS } from "./elements";
 import { LEVELS, getLevelById, getNextLevel } from "./levels";
 import {
-  Grid,
-  createEmptyGrid,
+  Ball,
+  Board,
+  Geo,
+  createEmptyBoard,
+  nextBallId,
   placeAndMerge,
   generateInitialQueue,
   generateQueueElement,
@@ -29,7 +32,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
   const { recordDiscovery, addScore, setHighestElement, unlockLevel, soundEnabled, hapticsEnabled, discoveredElements } =
     useProgress();
 
-  const [grid, setGrid] = useState<Grid>(() => createEmptyGrid(level.gridRows, level.gridCols));
+  const [balls, setBalls] = useState<Board>(() => createEmptyBoard());
   const [queue, setQueue] = useState<number[]>(() => generateInitialQueue(level.maxQueueElement, QUEUE_SIZE));
   const [score, setScore] = useState(0);
   const [highest, setHighest] = useState(1);
@@ -39,8 +42,8 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
   const [gameOver, setGameOver] = useState(false);
   const [won, setWon] = useState(false);
   const [discoveryEl, setDiscoveryEl] = useState<number | null>(null);
-  const [highlightCell, setHighlightCell] = useState<{ r: number; c: number } | null>(null);
-  const [wiggleCells, setWiggleCells] = useState<Set<string>>(new Set());
+  const [highlightId, setHighlightId] = useState<number | null>(null);
+  const [wiggleIds, setWiggleIds] = useState<Set<number>>(new Set());
   const [projectile, setProjectile] = useState<{ x: number; y: number } | null>(null);
   const popupId = useRef(0);
 
@@ -52,15 +55,15 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
   const haptic = (ms: number | number[]) => { if (hapticsEnabled) vibrate(ms); };
 
   useEffect(() => {
-    setGrid(createEmptyGrid(level.gridRows, level.gridCols));
+    setBalls(createEmptyBoard());
     setQueue(generateInitialQueue(level.maxQueueElement, QUEUE_SIZE));
     setScore(0);
     setHighest(1);
     setGameOver(false);
     setWon(false);
     setDiscoveryEl(null);
-    setHighlightCell(null);
-    setWiggleCells(new Set());
+    setHighlightId(null);
+    setWiggleIds(new Set());
     setProjectile(null);
     setBusy(false);
     setAimDeg(0);
@@ -87,67 +90,86 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
   }, []);
   const cellSize = useMemo(() => Math.floor((boardW - 8) / level.gridCols), [boardW, level.gridCols]);
   const ballSize = Math.floor(cellSize * 0.86);
-  const gridPxW = cellSize * level.gridCols;
-  const gridPxH = cellSize * level.gridRows;
-  const gridLeft = (boardW - gridPxW) / 2; // x offset of grid inside board
+  const R = ballSize / 2;
   const launcherX = boardW / 2;
   const launcherY = boardH - 8; // near bottom of board
+  const TOP_PAD = 6;
+  const SIDE_PAD = 4;
+
+  const geo: Geo = useMemo(() => ({
+    width: boardW,
+    height: boardH,
+    radius: R,
+    leftPad: SIDE_PAD,
+    rightPad: SIDE_PAD,
+    topPad: TOP_PAD,
+    // danger line: just above launcher row
+    dangerY: boardH - 8 - ballSize - 8,
+  }), [boardW, boardH, R, ballSize]);
 
   /**
-   * Ray-cast the projectile from launcher through the grid at the given aim angle.
-   * Returns the cell where it lands, or null if it misses.
-   * Bounces off left/right walls.
+   * Ray-cast a projectile from the launcher at `angleDeg`. Walks pixel steps
+   * and stops when it hits the ceiling or any existing ball. Resolves the
+   * landing position so the new ball just touches whatever it hit.
    */
-  function castRay(angleDeg: number): { row: number; col: number; path: { x: number; y: number }[] } | null {
+  function castRay(angleDeg: number): { x: number; y: number; path: { x: number; y: number }[] } | null {
     const rad = (angleDeg * Math.PI) / 180;
     let dx = Math.sin(rad);
     let dy = -Math.cos(rad);
     let x = launcherX;
     let y = launcherY;
-    const step = Math.max(2, Math.floor(cellSize / 8));
+    const step = Math.max(1, R / 4);
     const path: { x: number; y: number }[] = [{ x, y }];
-    let lastCell: { row: number; col: number } | null = null;
-    const maxIter = 4000;
+    const minX = SIDE_PAD + R;
+    const maxX = boardW - SIDE_PAD - R;
+    const ceilingY = TOP_PAD + R;
+    const maxIter = 6000;
     for (let i = 0; i < maxIter; i++) {
       x += dx * step;
       y += dy * step;
-      // bounce off left/right of grid area
-      if (x < gridLeft) { x = gridLeft + (gridLeft - x); dx = -dx; }
-      if (x > gridLeft + gridPxW) { x = gridLeft + gridPxW - (x - (gridLeft + gridPxW)); dx = -dx; }
-      // out the bottom (shouldn't happen since we shoot up)
-      if (y > boardH) return null;
+      // bounce off side walls
+      if (x < minX) { x = minX + (minX - x); dx = -dx; }
+      if (x > maxX) { x = maxX - (x - maxX); dx = -dx; }
       // hit ceiling
-      if (y < 4) {
-        // land in row 0 of current column
-        const col = Math.max(0, Math.min(level.gridCols - 1, Math.floor((x - gridLeft) / cellSize)));
-        if (grid[0][col] !== null) {
-          // ceiling column already full at top — try to find row of last empty
-          for (let r = 0; r < level.gridRows; r++) {
-            if (grid[r][col] === null) return { row: r, col, path };
+      if (y <= ceilingY) {
+        const lx = Math.max(minX, Math.min(maxX, x));
+        path.push({ x: lx, y: ceilingY });
+        return { x: lx, y: ceilingY, path };
+      }
+      // off the bottom
+      if (y > boardH) return null;
+
+      // collision with existing balls
+      let hitIdx = -1;
+      let bestT = Infinity;
+      for (let b = 0; b < balls.length; b++) {
+        const ddx = x - balls[b].x;
+        const ddy = y - balls[b].y;
+        if (ddx * ddx + ddy * ddy < (2 * R) * (2 * R)) {
+          // back-track along (dx, dy) so |pos - ball| = 2R
+          // pos = (x,y) - t*(dx,dy)
+          const ox = x - balls[b].x;
+          const oy = y - balls[b].y;
+          const bcoef = -2 * (ox * dx + oy * dy);
+          const ccoef = ox * ox + oy * oy - 4 * R * R;
+          const disc = bcoef * bcoef - 4 * ccoef;
+          let t = 0;
+          if (disc >= 0) {
+            const sq = Math.sqrt(disc);
+            const t1 = (-bcoef - sq) / 2;
+            const t2 = (-bcoef + sq) / 2;
+            t = t1 >= 0 ? t1 : (t2 >= 0 ? t2 : 0);
           }
-          return null;
+          if (t < bestT) { bestT = t; hitIdx = b; }
         }
-        return { row: 0, col, path };
       }
-      // determine cell
-      const col = Math.floor((x - gridLeft) / cellSize);
-      const rowFromTop = Math.floor((y - 4) / cellSize);
-      if (col < 0 || col >= level.gridCols) continue;
-      if (rowFromTop < 0 || rowFromTop >= level.gridRows) continue;
+      if (hitIdx >= 0) {
+        const lx = Math.max(minX, Math.min(maxX, x - bestT * dx));
+        const ly = Math.max(ceilingY, y - bestT * dy);
+        path.push({ x: lx, y: ly });
+        return { x: lx, y: ly, path };
+      }
       path.push({ x, y });
-      // collision with existing ball
-      if (grid[rowFromTop][col] !== null) {
-        // place in lastCell (the cell we were just in before entering this one)
-        if (lastCell && grid[lastCell.row][lastCell.col] === null) {
-          return { row: lastCell.row, col: lastCell.col, path };
-        }
-        // fallback: try cell directly adjacent (one row toward launcher)
-        if (rowFromTop + 1 < level.gridRows && grid[rowFromTop + 1][col] === null) {
-          return { row: rowFromTop + 1, col, path };
-        }
-        return null;
-      }
-      lastCell = { row: rowFromTop, col };
     }
     return null;
   }
@@ -171,49 +193,44 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
       if (i >= path.length) {
         clearInterval(interval);
         setProjectile(null);
-        triggerImpact(hit.row, hit.col);
+        triggerImpact(hit.x, hit.y);
       } else {
         setProjectile(path[i]);
       }
     }, stepMs);
   }
 
-  function triggerImpact(row: number, col: number) {
-    // Find neighbors of landing cell that match the incoming atom — they'll wiggle then merge.
-    const matches: string[] = [];
-    const rows = grid.length;
-    const cols = grid[0].length;
-    const neighbors: [number, number][] = [
-      [row - 1, col], [row + 1, col], [row, col - 1], [row, col + 1],
-    ];
-    for (const [r, c] of neighbors) {
-      if (r < 0 || r >= rows || c < 0 || c >= cols) continue;
-      if (grid[r][c] === current) matches.push(`${r}-${c}`);
+  function triggerImpact(x: number, y: number) {
+    // Wiggle nearby same-type balls before placing.
+    const ADJ = 2 * R * 1.4;
+    const matches: number[] = [];
+    for (const b of balls) {
+      if (b.atom !== current) continue;
+      if (Math.hypot(b.x - x, b.y - y) <= ADJ) matches.push(b.id);
     }
     if (matches.length === 0) {
-      finalizePlacement(row, col);
+      finalizePlacement(x, y);
       return;
     }
-    // Also wiggle the landing cell itself for the impact bump.
-    matches.push(`${row}-${col}`);
-    setWiggleCells(new Set(matches));
+    setWiggleIds(new Set(matches));
     haptic(20);
     setTimeout(() => {
-      setWiggleCells(new Set());
-      finalizePlacement(row, col);
+      setWiggleIds(new Set());
+      finalizePlacement(x, y);
     }, 220);
   }
 
-  function finalizePlacement(row: number, col: number) {
-    const result = placeAndMerge(grid, row, col, current, target, 118);
+  function finalizePlacement(x: number, y: number) {
+    const newBall: Ball = { id: nextBallId(), x, y, atom: current };
+    const result = placeAndMerge(balls, newBall, geo, target, 118);
 
     const newAtoms = new Set<number>([current]);
     result.merges.forEach((m) => newAtoms.add(m.resultAtomicNumber));
     const undiscovered = Array.from(newAtoms).filter((n) => !discoveredElements.includes(n));
     if (undiscovered.length > 0) recordDiscovery(undiscovered);
 
-    setGrid(result.grid);
-    setHighlightCell({ r: result.finalRow, c: result.finalCol });
+    setBalls(result.balls);
+    setHighlightId(result.finalBallId);
     if (result.merges.length > 0) {
       result.merges.forEach((m, i) => {
         setTimeout(() => {
@@ -234,7 +251,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     const firstDiscovery = undiscovered.sort((a, b) => b - a)[0];
 
     setTimeout(() => {
-      setHighlightCell(null);
+      setHighlightId(null);
       if (result.levelComplete) {
         setWon(true);
         sfx(playWinSound);
@@ -247,7 +264,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
       }
       // Advance queue (functional update — guarantees fresh state)
       setQueue((q) => [...q.slice(1), generateQueueElement(level.maxQueueElement)]);
-      if (checkGameOver(result.grid)) {
+      if (checkGameOver(result.balls, geo)) {
         setGameOver(true);
         haptic([50, 80, 50, 80, 200]);
       }
@@ -275,7 +292,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     const r = castRay(aimDeg);
     return r?.path ?? [];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [aimDeg, grid, busy, gameOver, won, boardW, boardH, cellSize]);
+  }, [aimDeg, balls, busy, gameOver, won, boardW, boardH, cellSize]);
 
   const progressPct = Math.min(100, (highest / target) * 100);
 
@@ -354,8 +371,8 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
           <div style={{
             position: "absolute",
             left: 4, right: 4,
-            bottom: 4 + ballSize + 4,
-            height: cellSize * DANGER_ROWS_FROM_BOTTOM,
+            top: geo.dangerY,
+            bottom: 4,
             background: "linear-gradient(0deg, var(--danger-glow), transparent)",
             borderTop: "1px dashed var(--destructive)",
             borderRadius: 4,
@@ -363,37 +380,22 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
             zIndex: 0,
           }} />
 
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: `repeat(${level.gridCols}, ${cellSize}px)`,
-            gridTemplateRows: `repeat(${level.gridRows}, ${cellSize}px)`,
-            justifyContent: "center",
-            position: "relative",
-            zIndex: 1,
-            pointerEvents: "none",
-          }}>
-            {grid.map((row, r) =>
-              row.map((cell, c) => (
-                <div key={`${r}-${c}`}
-                  style={{
-                    width: cellSize, height: cellSize,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    borderLeft: c === 0 ? "1px dashed var(--grid-line)" : undefined,
-                    borderRight: "1px dashed var(--grid-line)",
-                    borderBottom: r === level.gridRows - 1 ? "1px dashed var(--grid-line)" : undefined,
-                  }}
-                >
-                  {cell !== null && (
-                    <ElementBall
-                      atomicNumber={cell}
-                      size={ballSize}
-                      highlight={highlightCell?.r === r && highlightCell?.c === c}
-                      wiggle={wiggleCells.has(`${r}-${c}`)}
-                    />
-                  )}
-                </div>
-              ))
-            )}
+          {/* BALLS — absolutely positioned in pixel space */}
+          <div style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 1 }}>
+            {balls.map((b) => (
+              <div key={b.id} style={{
+                position: "absolute",
+                left: b.x - ballSize / 2,
+                top: b.y - ballSize / 2,
+              }}>
+                <ElementBall
+                  atomicNumber={b.atom}
+                  size={ballSize}
+                  highlight={highlightId === b.id}
+                  wiggle={wiggleIds.has(b.id)}
+                />
+              </div>
+            ))}
           </div>
 
           {/* AIM TRAJECTORY (dotted line) */}
