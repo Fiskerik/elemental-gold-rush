@@ -22,32 +22,68 @@ export function Collection({ onBack }: { onBack: () => void }) {
           </div>
         </div>
 
-        {/* Periodic-ish grid (8 cols, scrollable rows) */}
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(8, 1fr)",
-          gap: 4,
-        }}>
-          {ELEMENTS.map((e) => {
-            const isFound = found.has(e.atomicNumber);
-            return (
-              <button key={e.atomicNumber} onClick={() => setSelected(e.atomicNumber)}
-                style={{
-                  aspectRatio: "1 / 1",
-                  border: `1px solid ${isFound ? e.color : "var(--border)"}`,
-                  borderRadius: 6,
-                  background: isFound ? `${e.color}33` : "var(--surface)",
-                  color: isFound ? "var(--foreground)" : "var(--muted-foreground)",
-                  display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-                  cursor: "pointer",
-                  fontSize: 10,
-                  padding: 0,
-                }}>
-                <div style={{ fontSize: 8, opacity: 0.7 }}>{e.atomicNumber}</div>
-                <div style={{ fontSize: 12, fontWeight: 800 }}>{isFound ? e.symbol : "?"}</div>
-              </button>
-            );
-          })}
+        {/* Real periodic-table layout: 18 columns × 7 periods + lanthanide/actinide rows */}
+        <div style={{ overflowX: "auto", paddingBottom: 8 }}>
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(18, minmax(22px, 1fr))",
+            gridAutoRows: "1fr",
+            gap: 3,
+            minWidth: 520,
+          }}>
+            {ELEMENTS.map((e) => {
+              const isFound = found.has(e.atomicNumber);
+              // Place lanthanides (57–71) and actinides (89–103) in their own rows below.
+              let row: number;
+              let col: number;
+              if (e.atomicNumber >= 57 && e.atomicNumber <= 71) {
+                row = 9; // lanthanide row
+                col = 3 + (e.atomicNumber - 57); // cols 3..17
+              } else if (e.atomicNumber >= 89 && e.atomicNumber <= 103) {
+                row = 10; // actinide row
+                col = 3 + (e.atomicNumber - 89);
+              } else {
+                row = e.period;
+                col = e.group ?? 1;
+              }
+              return (
+                <button key={e.atomicNumber} onClick={() => setSelected(e.atomicNumber)}
+                  style={{
+                    gridColumn: col,
+                    gridRow: row,
+                    aspectRatio: "1 / 1",
+                    border: `1px solid ${isFound ? e.color : "var(--border)"}`,
+                    borderRadius: 4,
+                    background: isFound ? `${e.color}33` : "var(--surface)",
+                    color: isFound ? "var(--foreground)" : "var(--muted-foreground)",
+                    display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                    cursor: "pointer",
+                    padding: 0,
+                    minWidth: 0,
+                  }}>
+                  <div style={{ fontSize: 7, opacity: 0.7, lineHeight: 1 }}>{e.atomicNumber}</div>
+                  <div style={{ fontSize: 10, fontWeight: 800, lineHeight: 1.1 }}>{isFound ? e.symbol : "?"}</div>
+                </button>
+              );
+            })}
+            {/* Placeholder markers in main table for lanthanide/actinide series */}
+            <div style={{
+              gridColumn: 3, gridRow: 6,
+              aspectRatio: "1 / 1",
+              border: "1px dashed var(--border)",
+              borderRadius: 4,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 8, color: "var(--muted-foreground)",
+            }}>57–71</div>
+            <div style={{
+              gridColumn: 3, gridRow: 7,
+              aspectRatio: "1 / 1",
+              border: "1px dashed var(--border)",
+              borderRadius: 4,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 8, color: "var(--muted-foreground)",
+            }}>89–103</div>
+          </div>
         </div>
 
         {/* Category legend */}
