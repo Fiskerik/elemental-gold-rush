@@ -12,7 +12,6 @@ import {
   generateQueueElement,
   checkGameOver,
   formatScore,
-  DANGER_ROWS_FROM_BOTTOM,
 } from "./logic";
 import { ElementBall } from "./ElementBall";
 import { useProgress } from "./store";
