@@ -111,9 +111,11 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
 
   // === Stone obstacle ===
   // After STONE_NO_MERGE_TRIGGER shots in a row that produce no merges, a
-  // large indestructible-but-breakable Stone appears on the board.
+  // large indestructible-but-breakable Stone gets loaded into the launcher,
+  // and the player launches it like any other shot.
   const [noMergeStreak, setNoMergeStreak] = useState(0);
   const [stoneHitIds, setStoneHitIds] = useState<Set<number>>(new Set());
+  const [pendingStone, setPendingStone] = useState(false);
 
   // === Combo bar for Grab power-up ===
   // Every successful merge counts +1 (shimmer atoms count +2). When the bar
