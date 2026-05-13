@@ -63,25 +63,35 @@
 
 :root {
   --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.129 0.042 264.695);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.129 0.042 264.695);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.129 0.042 264.695);
-  --primary: oklch(0.208 0.042 265.755);
-  --primary-foreground: oklch(0.984 0.003 247.858);
-  --secondary: oklch(0.968 0.007 247.896);
-  --secondary-foreground: oklch(0.208 0.042 265.755);
-  --muted: oklch(0.968 0.007 247.896);
-  --muted-foreground: oklch(0.554 0.046 257.417);
-  --accent: oklch(0.968 0.007 247.896);
-  --accent-foreground: oklch(0.208 0.042 265.755);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.984 0.003 247.858);
-  --border: oklch(0.929 0.013 255.508);
-  --input: oklch(0.929 0.013 255.508);
-  --ring: oklch(0.704 0.04 256.788);
+  /* Elemental Gold Rush — dark science theme (from theme.ts) */
+  --background: oklch(0.13 0.04 275);          /* #0A0A1A */
+  --foreground: oklch(1 0 0);
+  --surface: oklch(0.18 0.05 275);             /* #111128 */
+  --surface-elevated: oklch(0.23 0.06 275);    /* #1A1A35 */
+  --surface-high: oklch(0.28 0.07 275);        /* #222244 */
+  --card: oklch(0.18 0.05 275);
+  --card-foreground: oklch(1 0 0);
+  --popover: oklch(0.23 0.06 275);
+  --popover-foreground: oklch(1 0 0);
+  --primary: oklch(0.78 0.13 230);             /* #4FC3F7 */
+  --primary-foreground: oklch(0.13 0.04 275);
+  --primary-glow: oklch(0.78 0.13 230 / 0.45);
+  --secondary: oklch(0.78 0.1 305);            /* #B39DDB */
+  --secondary-foreground: oklch(0.13 0.04 275);
+  --muted: oklch(0.28 0.07 275);
+  --muted-foreground: oklch(0.75 0.02 250);    /* #B0BEC5 */
+  --accent: oklch(0.86 0.18 95);               /* #FFD600 gold */
+  --accent-foreground: oklch(0.13 0.04 275);
+  --accent-glow: oklch(0.86 0.18 95 / 0.55);
+  --success: oklch(0.84 0.18 155);             /* #69F0AE */
+  --warning: oklch(0.86 0.17 95);
+  --destructive: oklch(0.68 0.22 25);          /* #FF5252 */
+  --destructive-foreground: oklch(1 0 0);
+  --danger-glow: oklch(0.68 0.22 25 / 0.45);
+  --border: oklch(0.32 0.07 275);              /* #2A2A55 */
+  --input: oklch(0.28 0.07 275);
+  --ring: oklch(0.78 0.13 230);
+  --grid-line: oklch(0.78 0.13 230 / 0.12);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -140,5 +150,59 @@
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+      "Helvetica Neue", Arial, sans-serif;
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
   }
+  html, body, #root {
+    height: 100%;
+  }
+}
+
+/* App-level utilities */
+.app-shell {
+  min-height: 100dvh;
+  background:
+    radial-gradient(ellipse at top, oklch(0.23 0.06 275) 0%, oklch(0.13 0.04 275) 60%) no-repeat,
+    var(--background);
+  color: var(--foreground);
+  position: relative;
+  overflow: hidden;
+}
+.app-shell::before {
+  content: "";
+  position: absolute; inset: 0;
+  background-image:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: 32px 32px;
+  pointer-events: none;
+  mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+}
+
+@keyframes pop-in {
+  0% { transform: scale(0.4); opacity: 0; }
+  60% { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1); }
+}
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 12px var(--primary-glow); }
+  50% { box-shadow: 0 0 26px var(--primary-glow), 0 0 40px var(--primary-glow); }
+}
+@keyframes float-up {
+  0% { transform: translateY(0); opacity: 1; }
+  100% { transform: translateY(-40px); opacity: 0; }
+}
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.gold-text {
+  background: linear-gradient(90deg, #FFD600, #FFF59D, #FFA000, #FFD600);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer 3s linear infinite;
 }
