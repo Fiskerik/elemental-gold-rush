@@ -26,7 +26,7 @@ interface Props {
 const QUEUE_SIZE = 4;
 const MAX_AIM_DEG = 75;
 const SHIMMER_MIN_LEVEL = 5;
-const GRAB_MIN_LEVEL = 7;
+const GRAB_MIN_LEVEL = 5;
 const STONE_MAX_HP = 8;
 
 function StoneVisual({ size, hp, maxHp }: { size: number; hp: number; maxHp: number }) {
