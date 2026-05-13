@@ -1241,10 +1241,6 @@ function formatTime(ms: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-function DiscoveryModal({ atomicNumber, onClose }: { atomicNumber: number; onClose: () => void }) {
-
-}
-
 function FeatureTip({
   title,
   body,
@@ -1314,7 +1310,7 @@ function FeatureTip({
   );
 }
 
-function _DiscoveryModal_Original({ atomicNumber, onClose }: { atomicNumber: number; onClose: () => void }) {
+function DiscoveryModal({ atomicNumber, onClose }: { atomicNumber: number; onClose: () => void }) {
   const el = ELEMENTS[atomicNumber - 1];
   if (!el) return null;
   return (
