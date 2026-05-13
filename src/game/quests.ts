@@ -5,7 +5,8 @@ export type DailyQuestType =
   | "discover_elements"
   | "reach_category"
   | "clear_level"
-  | "chain_merge";
+  | "chain_merge"
+  | "earn_stars";
 
 export interface DailyQuest {
   id: string;
@@ -24,6 +25,7 @@ export interface QuestProgressEvent {
   reachedAtomicNumbers?: number[];
   levelCleared?: boolean;
   maxChainDepth?: number;
+  starsEarned?: number;
 }
 
 export function getTodayQuestDate(date = new Date()): string {
@@ -32,9 +34,12 @@ export function getTodayQuestDate(date = new Date()): string {
 
 export function createDailyQuests(dateKey = getTodayQuestDate()): DailyQuest[] {
   const seed = dateKey.split("").reduce((sum, char) => sum + char.charCodeAt(0), 0);
-  const categoryPool = ["noble-gas", "transition-metal", "alkali-metal", "metalloid"];
-  const category = categoryPool[seed % categoryPool.length];
-  const categoryLabel = category.replace(/-/g, " ");
+  const approachableElementGoals = [
+    { atomicNumber: 2, label: "Reach Helium" },
+    { atomicNumber: 3, label: "Reach Lithium" },
+    { atomicNumber: 4, label: "Reach Beryllium" },
+  ];
+  const elementGoal = approachableElementGoals[seed % approachableElementGoals.length];
 
   return [
     {
@@ -56,14 +61,23 @@ export function createDailyQuests(dateKey = getTodayQuestDate()): DailyQuest[] {
       completed: false,
     },
     {
-      id: `${dateKey}-reach-category`,
+      id: `${dateKey}-reach-element`,
       type: "reach_category",
-      title: `Reach a ${categoryLabel}`,
-      description: "Fuse your way into today's featured category.",
-      target: 1,
+      title: elementGoal.label,
+      description: "Fuse your way to an early element achievable in 1–2 games.",
+      target: elementGoal.atomicNumber,
       progress: 0,
       completed: false,
-      category,
+      category: `element-${elementGoal.atomicNumber}`,
+    },
+    {
+      id: `${dateKey}-earn-stars`,
+      type: "earn_stars",
+      title: "Earn 3 total stars",
+      description: "Clear levels and collect three stars across today’s runs.",
+      target: 3,
+      progress: 0,
+      completed: false,
     },
     {
       id: `${dateKey}-clear-level`,
@@ -116,11 +130,17 @@ export function applyQuestProgress(quests: DailyQuest[], event: QuestProgressEve
     }
 
     if (quest.type === "reach_category" && event.reachedAtomicNumbers) {
-      const reachedCategory = event.reachedAtomicNumbers.some((atomicNumber) => {
-        const element = ELEMENTS[atomicNumber - 1];
-        return element?.category === quest.category;
-      });
-      if (reachedCategory) progress = Math.max(progress, 1);
+      if (quest.category?.startsWith("element-")) {
+        const targetAtomicNumber = Number(quest.category.replace("element-", ""));
+        const highestReached = Math.max(0, ...event.reachedAtomicNumbers);
+        progress = Math.max(progress, Math.min(highestReached, targetAtomicNumber));
+      } else {
+        const reachedCategory = event.reachedAtomicNumbers.some((atomicNumber) => {
+          const element = ELEMENTS[atomicNumber - 1];
+          return element?.category === quest.category;
+        });
+        if (reachedCategory) progress = Math.max(progress, 1);
+      }
     }
 
     if (quest.type === "clear_level" && event.levelCleared) {
@@ -129,6 +149,10 @@ export function applyQuestProgress(quests: DailyQuest[], event: QuestProgressEve
 
     if (quest.type === "chain_merge" && event.maxChainDepth !== undefined) {
       progress = Math.max(progress, event.maxChainDepth);
+    }
+
+    if (quest.type === "earn_stars" && event.starsEarned) {
+      progress += event.starsEarned;
     }
 
     const cappedProgress = Math.min(progress, quest.target);

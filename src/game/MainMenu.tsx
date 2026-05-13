@@ -3,6 +3,7 @@ import { LEVELS } from "./levels";
 import { useProgress } from "./store";
 import { formatScore } from "./logic";
 import { ELEMENTS } from "./elements";
+import { trackMenuAction } from "./analytics";
 
 interface Props {
   onPlay: () => void;
@@ -10,9 +11,19 @@ interface Props {
   onCollection: () => void;
   onSettings: () => void;
   onShop: () => void;
+  onLab: () => void;
+  onLibrary: () => void;
 }
 
-export function MainMenu({ onPlay, onLevels, onCollection, onSettings, onShop }: Props) {
+export function MainMenu({
+  onPlay,
+  onLevels,
+  onCollection,
+  onSettings,
+  onShop,
+  onLab,
+  onLibrary,
+}: Props) {
   const {
     unlockedLevel,
     highestElement,
@@ -84,6 +95,43 @@ export function MainMenu({ onPlay, onLevels, onCollection, onSettings, onShop }:
           <Stat label="Score" value={formatScore(totalScore)} sub="total" />
           <Stat label="Combo" value={`${bestCombo}`} sub="best" />
         </div>
+
+        <section
+          style={{
+            background: "linear-gradient(135deg, var(--surface-elevated), var(--surface))",
+            border: "1px solid var(--border)",
+            borderRadius: 16,
+            padding: 14,
+            boxShadow: "0 8px 24px rgba(0,0,0,0.25)",
+          }}
+        >
+          <div
+            style={{
+              fontSize: 11,
+              letterSpacing: 2,
+              color: "var(--accent)",
+              fontWeight: 800,
+              marginBottom: 8,
+            }}
+          >
+            QUICK TUTORIAL
+          </div>
+          <div
+            style={{
+              display: "grid",
+              gap: 8,
+              fontSize: 12,
+              color: "var(--muted-foreground)",
+              lineHeight: 1.45,
+            }}
+          >
+            <div>🎯 Aim from the launcher, release to shoot, and bounce shots off walls.</div>
+            <div>⚛️ Match touching atoms with the same element to fuse into the next element.</div>
+            <div>
+              🚧 Keep atoms above the red danger zone and use power-ups to rescue crowded boards.
+            </div>
+          </div>
+        </section>
 
         <section
           style={{
@@ -159,7 +207,13 @@ export function MainMenu({ onPlay, onLevels, onCollection, onSettings, onShop }:
         </section>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <BigButton primary onClick={onPlay}>
+          <BigButton
+            primary
+            onClick={() => {
+              trackMenuAction("continue");
+              onPlay();
+            }}
+          >
             <div style={{ fontSize: 11, opacity: 0.7, letterSpacing: 2 }}>CONTINUE</div>
             <div style={{ fontSize: 18, fontWeight: 800 }}>
               Level {unlockedLevel} — {nextLevel?.name}
@@ -169,12 +223,58 @@ export function MainMenu({ onPlay, onLevels, onCollection, onSettings, onShop }:
             </div>
           </BigButton>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <BigButton onClick={onLevels}>Levels</BigButton>
-            <BigButton onClick={onCollection}>Collection</BigButton>
+            <BigButton
+              onClick={() => {
+                trackMenuAction("levels");
+                onLevels();
+              }}
+            >
+              Levels
+            </BigButton>
+            <BigButton
+              onClick={() => {
+                trackMenuAction("collection");
+                onCollection();
+              }}
+            >
+              Collection
+            </BigButton>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <BigButton onClick={onShop}>{hasProPack ? "Pro Lab Active" : "Shop"}</BigButton>
-            <BigButton onClick={onSettings}>Settings</BigButton>
+            <BigButton
+              onClick={() => {
+                trackMenuAction("lab");
+                onLab();
+              }}
+            >
+              Lab Modes
+            </BigButton>
+            <BigButton
+              onClick={() => {
+                trackMenuAction("library");
+                onLibrary();
+              }}
+            >
+              Power-Up Library
+            </BigButton>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <BigButton
+              onClick={() => {
+                trackMenuAction("shop");
+                onShop();
+              }}
+            >
+              {hasProPack ? "Pro Lab Active" : "Shop"}
+            </BigButton>
+            <BigButton
+              onClick={() => {
+                trackMenuAction("settings");
+                onSettings();
+              }}
+            >
+              Settings
+            </BigButton>
           </div>
         </div>
 
