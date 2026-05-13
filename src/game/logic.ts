@@ -8,6 +8,8 @@ export interface Ball {
   x: number;
   y: number;
   atom: number;
+  /** Visual+collision radius in px (matches the rendered ball edge). */
+  r: number;
 }
 export type Board = Ball[];
 
@@ -26,11 +28,11 @@ export function nextBallId(): number { return ++_ballId; }
 
 export function createEmptyBoard(): Board { return []; }
 
-/** Two balls are considered adjacent (mergeable) when centers are within ~2R. */
+/** Two balls touch (or nearly touch) when centers are within ~sum of radii. */
 const ADJ_FACTOR = 1.15;
 
-function withinAdj(a: Ball, b: Ball, R: number): boolean {
-  return Math.hypot(a.x - b.x, a.y - b.y) <= 2 * R * ADJ_FACTOR;
+function withinAdj(a: Ball, b: Ball): boolean {
+  return Math.hypot(a.x - b.x, a.y - b.y) <= (a.r + b.r) * ADJ_FACTOR;
 }
 
 export interface MergeEvent {
@@ -75,7 +77,7 @@ export function placeAndMerge(
       if (list[i].atom >= maxElement) continue;
       for (let j = i + 1; j < list.length && !changed; j++) {
         if (list[j].atom !== list[i].atom) continue;
-        if (!withinAdj(list[i], list[j], geo.radius)) continue;
+        if (!withinAdj(list[i], list[j])) continue;
         // Survivor: always the upper ball (smaller y); tiebreak smaller x.
         let s = i, a = j;
         if (list[j].y < list[i].y || (list[j].y === list[i].y && list[j].x < list[i].x)) {
