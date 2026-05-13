@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { ELEMENTS } from "./elements";
 import { LEVELS, getLevelById, getNextLevel } from "./levels";
 import {
   Grid,
   createEmptyGrid,
-  findPlacementRow,
   placeAndMerge,
   generateInitialQueue,
   generateQueueElement,
@@ -22,6 +21,7 @@ interface Props {
 }
 
 const QUEUE_SIZE = 4;
+const MAX_AIM_DEG = 75;
 
 export function GameBoard({ levelId, onExit, onWin }: Props) {
   const level = getLevelById(levelId) ?? LEVELS[0];
@@ -32,13 +32,14 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
   const [queue, setQueue] = useState<number[]>(() => generateInitialQueue(level.maxQueueElement, QUEUE_SIZE));
   const [score, setScore] = useState(0);
   const [highest, setHighest] = useState(1);
-  const [hoverCol, setHoverCol] = useState<number | null>(null);
+  const [aimDeg, setAimDeg] = useState(0); // 0 = straight up, negative = left
   const [popups, setPopups] = useState<{ id: number; text: string; x: number; y: number }[]>([]);
   const [busy, setBusy] = useState(false);
   const [gameOver, setGameOver] = useState(false);
   const [won, setWon] = useState(false);
   const [discoveryEl, setDiscoveryEl] = useState<number | null>(null);
   const [highlightCell, setHighlightCell] = useState<{ r: number; c: number } | null>(null);
+  const [projectile, setProjectile] = useState<{ x: number; y: number } | null>(null);
   const popupId = useRef(0);
 
   const target = level.targetElement;
@@ -49,7 +50,6 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
   const haptic = (ms: number | number[]) => { if (hapticsEnabled) vibrate(ms); };
 
   useEffect(() => {
-    // Reset on level change
     setGrid(createEmptyGrid(level.gridRows, level.gridCols));
     setQueue(generateInitialQueue(level.maxQueueElement, QUEUE_SIZE));
     setScore(0);
@@ -58,6 +58,9 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     setWon(false);
     setDiscoveryEl(null);
     setHighlightCell(null);
+    setProjectile(null);
+    setBusy(false);
+    setAimDeg(0);
   }, [levelId, level.gridRows, level.gridCols, level.maxQueueElement]);
 
   function spawnPopup(text: string) {
@@ -66,25 +69,120 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     setTimeout(() => setPopups((p) => p.filter((x) => x.id !== id)), 900);
   }
 
-  function handleColumn(col: number) {
+  // === sizing ===
+  const boardRef = useRef<HTMLDivElement>(null);
+  const [boardW, setBoardW] = useState(360);
+  const [boardH, setBoardH] = useState(480);
+  useEffect(() => {
+    const update = () => {
+      setBoardW(boardRef.current?.clientWidth ?? 360);
+      setBoardH(boardRef.current?.clientHeight ?? 480);
+    };
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
+  const cellSize = useMemo(() => Math.floor((boardW - 8) / level.gridCols), [boardW, level.gridCols]);
+  const ballSize = Math.floor(cellSize * 0.86);
+  const gridPxW = cellSize * level.gridCols;
+  const gridPxH = cellSize * level.gridRows;
+  const gridLeft = (boardW - gridPxW) / 2; // x offset of grid inside board
+  const launcherX = boardW / 2;
+  const launcherY = boardH - 8; // near bottom of board
+
+  /**
+   * Ray-cast the projectile from launcher through the grid at the given aim angle.
+   * Returns the cell where it lands, or null if it misses.
+   * Bounces off left/right walls.
+   */
+  function castRay(angleDeg: number): { row: number; col: number; path: { x: number; y: number }[] } | null {
+    const rad = (angleDeg * Math.PI) / 180;
+    let dx = Math.sin(rad);
+    let dy = -Math.cos(rad);
+    let x = launcherX;
+    let y = launcherY;
+    const step = Math.max(2, Math.floor(cellSize / 8));
+    const path: { x: number; y: number }[] = [{ x, y }];
+    let lastCell: { row: number; col: number } | null = null;
+    const maxIter = 4000;
+    for (let i = 0; i < maxIter; i++) {
+      x += dx * step;
+      y += dy * step;
+      // bounce off left/right of grid area
+      if (x < gridLeft) { x = gridLeft + (gridLeft - x); dx = -dx; }
+      if (x > gridLeft + gridPxW) { x = gridLeft + gridPxW - (x - (gridLeft + gridPxW)); dx = -dx; }
+      // out the bottom (shouldn't happen since we shoot up)
+      if (y > boardH) return null;
+      // hit ceiling
+      if (y < 4) {
+        // land in row 0 of current column
+        const col = Math.max(0, Math.min(level.gridCols - 1, Math.floor((x - gridLeft) / cellSize)));
+        if (grid[0][col] !== null) {
+          // ceiling column already full at top — try to find row of last empty
+          for (let r = 0; r < level.gridRows; r++) {
+            if (grid[r][col] === null) return { row: r, col, path };
+          }
+          return null;
+        }
+        return { row: 0, col, path };
+      }
+      // determine cell
+      const col = Math.floor((x - gridLeft) / cellSize);
+      const rowFromTop = Math.floor((y - 4) / cellSize);
+      if (col < 0 || col >= level.gridCols) continue;
+      if (rowFromTop < 0 || rowFromTop >= level.gridRows) continue;
+      path.push({ x, y });
+      // collision with existing ball
+      if (grid[rowFromTop][col] !== null) {
+        // place in lastCell (the cell we were just in before entering this one)
+        if (lastCell && grid[lastCell.row][lastCell.col] === null) {
+          return { row: lastCell.row, col: lastCell.col, path };
+        }
+        // fallback: try cell directly adjacent (one row toward launcher)
+        if (rowFromTop + 1 < level.gridRows && grid[rowFromTop + 1][col] === null) {
+          return { row: rowFromTop + 1, col, path };
+        }
+        return null;
+      }
+      lastCell = { row: rowFromTop, col };
+    }
+    return null;
+  }
+
+  function shoot() {
     if (busy || gameOver || won) return;
-    const row = findPlacementRow(grid, col);
-    if (row < 0) return; // column full
+    const hit = castRay(aimDeg);
+    if (!hit) return;
     setBusy(true);
     sfx(playShootSound);
     haptic(15);
 
+    // animate projectile along path
+    const path = hit.path;
+    const totalMs = Math.min(360, 60 + path.length * 4);
+    const stepMs = totalMs / path.length;
+    let i = 0;
+    setProjectile(path[0]);
+    const interval = setInterval(() => {
+      i++;
+      if (i >= path.length) {
+        clearInterval(interval);
+        setProjectile(null);
+        finalizePlacement(hit.row, hit.col);
+      } else {
+        setProjectile(path[i]);
+      }
+    }, stepMs);
+  }
+
+  function finalizePlacement(row: number, col: number) {
     const result = placeAndMerge(grid, row, col, current, target, 118);
 
-    // record any newly discovered elements (from merges)
     const newAtoms = new Set<number>([current]);
     result.merges.forEach((m) => newAtoms.add(m.resultAtomicNumber));
     const undiscovered = Array.from(newAtoms).filter((n) => !discoveredElements.includes(n));
-    if (undiscovered.length > 0) {
-      recordDiscovery(undiscovered);
-    }
+    if (undiscovered.length > 0) recordDiscovery(undiscovered);
 
-    // Animate by stepping through merges visually
     setGrid(result.grid);
     setHighlightCell({ r: result.finalRow, c: result.finalCol });
     if (result.merges.length > 0) {
@@ -104,7 +202,6 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     setScore((s) => s + gained);
     addScore(gained);
 
-    // Show first-discovery popup for the highest new atom
     const firstDiscovery = undiscovered.sort((a, b) => b - a)[0];
 
     setTimeout(() => {
@@ -119,10 +216,8 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
       if (firstDiscovery && firstDiscovery > 1) {
         setDiscoveryEl(firstDiscovery);
       }
-      // advance queue
-      const nextQueue = [...queue.slice(1), generateQueueElement(level.maxQueueElement)];
-      setQueue(nextQueue);
-      // game over check
+      // Advance queue (functional update — guarantees fresh state)
+      setQueue((q) => [...q.slice(1), generateQueueElement(level.maxQueueElement)]);
       if (checkGameOver(result.grid)) {
         setGameOver(true);
         haptic([50, 80, 50, 80, 200]);
@@ -131,20 +226,27 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     }, 200 + result.merges.length * 120);
   }
 
-  // === sizing ===
-  const boardRef = useRef<HTMLDivElement>(null);
-  const [boardW, setBoardW] = useState(360);
-  useEffect(() => {
-    const update = () => {
-      const w = boardRef.current?.clientWidth ?? 360;
-      setBoardW(w);
-    };
-    update();
-    window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
-  }, []);
-  const cellSize = useMemo(() => Math.floor((boardW - 8) / level.gridCols), [boardW, level.gridCols]);
-  const ballSize = Math.floor(cellSize * 0.86);
+  // === aim handling ===
+  const updateAimFromPointer = useCallback((clientX: number, clientY: number) => {
+    if (!boardRef.current) return;
+    const rect = boardRef.current.getBoundingClientRect();
+    const px = clientX - rect.left;
+    const py = clientY - rect.top;
+    const dx = px - launcherX;
+    const dy = py - launcherY;
+    if (dy >= -2) return; // pointer below launcher — ignore
+    const angle = Math.atan2(dx, -dy) * 180 / Math.PI;
+    const clamped = Math.max(-MAX_AIM_DEG, Math.min(MAX_AIM_DEG, angle));
+    setAimDeg(clamped);
+  }, [launcherX, launcherY]);
+
+  // preview trajectory (recomputed every render based on aimDeg)
+  const previewPath = useMemo(() => {
+    if (busy || gameOver || won) return [];
+    const r = castRay(aimDeg);
+    return r?.path ?? [];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aimDeg, grid, busy, gameOver, won, boardW, boardH, cellSize]);
 
   const progressPct = Math.min(100, (highest / target) * 100);
 
@@ -187,6 +289,22 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
         {/* BOARD */}
         <div
           ref={boardRef}
+          onPointerDown={(e) => {
+            (e.target as Element).setPointerCapture?.(e.pointerId);
+            updateAimFromPointer(e.clientX, e.clientY);
+          }}
+          onPointerMove={(e) => {
+            if (e.buttons === 0 && e.pointerType === "mouse") {
+              // hover-aim with mouse
+              updateAimFromPointer(e.clientX, e.clientY);
+              return;
+            }
+            updateAimFromPointer(e.clientX, e.clientY);
+          }}
+          onPointerUp={(e) => {
+            updateAimFromPointer(e.clientX, e.clientY);
+            shoot();
+          }}
           style={{
             position: "relative",
             background: "linear-gradient(180deg, oklch(0.18 0.05 275), oklch(0.13 0.04 275))",
@@ -194,9 +312,13 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
             border: "1px solid var(--border)",
             padding: 4,
             flex: 1,
+            minHeight: 360,
             boxShadow: "inset 0 0 30px rgba(79, 195, 247, 0.08)",
             display: "flex",
             flexDirection: "column",
+            touchAction: "none",
+            cursor: "crosshair",
+            userSelect: "none",
           }}
         >
           {/* danger zone shading at top */}
@@ -213,6 +335,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
             justifyContent: "center",
             position: "relative",
             zIndex: 1,
+            pointerEvents: "none",
           }}>
             {grid.map((row, r) =>
               row.map((cell, c) => (
@@ -220,7 +343,6 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
                   style={{
                     width: cellSize, height: cellSize,
                     display: "flex", alignItems: "center", justifyContent: "center",
-                    background: hoverCol === c ? "rgba(79, 195, 247, 0.06)" : "transparent",
                     borderLeft: c === 0 ? "1px dashed var(--grid-line)" : undefined,
                     borderRight: "1px dashed var(--grid-line)",
                     borderBottom: r === level.gridRows - 1 ? "1px dashed var(--grid-line)" : undefined,
@@ -238,38 +360,56 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
             )}
           </div>
 
-          {/* COLUMN TAP TARGETS */}
-          <div style={{
-            position: "absolute", inset: 4, display: "grid",
-            gridTemplateColumns: `repeat(${level.gridCols}, 1fr)`, gap: 0,
-            zIndex: 2,
-          }}>
-            {Array.from({ length: level.gridCols }).map((_, c) => (
-              <div
-                key={c}
-                onPointerEnter={() => setHoverCol(c)}
-                onPointerLeave={() => setHoverCol((h) => (h === c ? null : h))}
-                onClick={() => handleColumn(c)}
-                style={{ cursor: "pointer" }}
+          {/* AIM TRAJECTORY (dotted line) */}
+          {!busy && !gameOver && !won && previewPath.length > 1 && (
+            <svg
+              style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 3 }}
+              width={boardW}
+              height={boardH}
+            >
+              <polyline
+                points={previewPath.map(p => `${p.x},${p.y}`).join(" ")}
+                fill="none"
+                stroke="var(--primary)"
+                strokeWidth={2}
+                strokeDasharray="4 6"
+                opacity={0.6}
               />
-            ))}
-          </div>
+              {/* landing target marker */}
+              {(() => {
+                const last = previewPath[previewPath.length - 1];
+                return (
+                  <circle cx={last.x} cy={last.y} r={ballSize / 2.4} fill="none" stroke="var(--accent)" strokeWidth={2} opacity={0.7} />
+                );
+              })()}
+            </svg>
+          )}
 
-          {/* HOVER TRAJECTORY */}
-          {hoverCol !== null && !busy && !gameOver && !won && (
+          {/* PROJECTILE */}
+          {projectile && (
             <div style={{
               position: "absolute",
-              top: 4,
-              left: 4 + hoverCol * cellSize,
-              width: cellSize,
-              bottom: 4,
-              background: "linear-gradient(180deg, transparent, rgba(79, 195, 247, 0.15))",
-              borderLeft: "1px solid var(--primary)",
-              borderRight: "1px solid var(--primary)",
+              left: projectile.x - ballSize / 2,
+              top: projectile.y - ballSize / 2,
               pointerEvents: "none",
-              zIndex: 1,
-            }} />
+              zIndex: 4,
+            }}>
+              <ElementBall atomicNumber={current} size={ballSize} glow />
+            </div>
           )}
+
+          {/* LAUNCHER */}
+          <div style={{
+            position: "absolute",
+            left: launcherX - ballSize / 2,
+            top: launcherY - ballSize / 2,
+            zIndex: 2,
+            pointerEvents: "none",
+            transform: `rotate(${aimDeg}deg)`,
+            transformOrigin: "center center",
+          }}>
+            {!projectile && <ElementBall atomicNumber={current} size={ballSize} glow />}
+          </div>
 
           {/* SCORE POPUPS */}
           {popups.map((p) => (
@@ -288,29 +428,22 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
           ))}
         </div>
 
-        {/* SHOOTER / QUEUE */}
+        {/* QUEUE BAR */}
         <div style={{ marginTop: 10, padding: 10, background: "var(--surface)", borderRadius: 14, border: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ position: "relative" }}>
-            <div style={{ fontSize: 9, letterSpacing: 1.5, color: "var(--muted-foreground)", textAlign: "center", marginBottom: 4 }}>SHOOTER</div>
-            <ElementBall atomicNumber={current} size={56} glow />
+          <div style={{ fontSize: 9, letterSpacing: 1.5, color: "var(--muted-foreground)" }}>NEXT →</div>
+          <div style={{ display: "flex", gap: 6, flex: 1 }}>
+            {queue.slice(1).map((n, i) => (
+              <ElementBall key={i} atomicNumber={n} size={32 - i * 3} />
+            ))}
           </div>
-          <div style={{ width: 1, height: 50, background: "var(--border)" }} />
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 9, letterSpacing: 1.5, color: "var(--muted-foreground)", marginBottom: 4 }}>NEXT</div>
-            <div style={{ display: "flex", gap: 6 }}>
-              {queue.slice(1).map((n, i) => (
-                <ElementBall key={i} atomicNumber={n} size={32 - i * 3} />
-              ))}
-            </div>
+          <div style={{ fontSize: 10, color: "var(--muted-foreground)", textAlign: "right", lineHeight: 1.3 }}>
+            Drag to aim<br/>Tap to shoot
           </div>
         </div>
 
-        {/* DISCOVERY MODAL */}
         {discoveryEl !== null && (
           <DiscoveryModal atomicNumber={discoveryEl} onClose={() => setDiscoveryEl(null)} />
         )}
-
-        {/* WIN MODAL */}
         {won && (
           <ResultModal
             title="LEVEL COMPLETE"
@@ -321,7 +454,6 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
             onNext={() => onWin(getNextLevel(levelId)?.id ?? null)}
           />
         )}
-        {/* GAME OVER */}
         {gameOver && !won && (
           <ResultModal
             title="GAME OVER"
