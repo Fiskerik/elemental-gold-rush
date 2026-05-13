@@ -679,6 +679,57 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
           const m = moved.get(b.id);
           return m ? { ...b, x: m.x, y: m.y } : b;
         });
+        // Stones take damage from any collision wave that reaches them
+        // (primary, secondary, or tertiary pushes).
+        const stones = nudged.filter((b) => b.stoneHp != null);
+        if (stones.length > 0) {
+          const stoneDamage = new Map<number, number>();
+          for (const [movedId] of moved) {
+            const mb = nudged.find((b) => b.id === movedId);
+            if (!mb || mb.stoneHp != null) continue;
+            for (const st of stones) {
+              const d = Math.hypot(mb.x - st.x, mb.y - st.y);
+              if (d < (mb.r + st.r) * 1.15) {
+                stoneDamage.set(st.id, (stoneDamage.get(st.id) ?? 0) + 1);
+              }
+            }
+          }
+          if (stoneDamage.size > 0) {
+            const hitSet = new Set<number>();
+            let totalBonus = 0;
+            const initialR = (ballSize / 2) * (1 + (8 - 4) * 0.11);
+            nudged = nudged
+              .map((b) => {
+                if (b.stoneHp == null) return b;
+                const dmg = stoneDamage.get(b.id) ?? 0;
+                if (dmg <= 0) return b;
+                hitSet.add(b.id);
+                const newHp = (b.stoneHp ?? STONE_MAX_HP) - dmg;
+                const maxHp = b.stoneMaxHp ?? STONE_MAX_HP;
+                if (newHp <= 0) {
+                  totalBonus += Math.floor(maxHp * 250 * level.scoreMultiplier);
+                  return null;
+                }
+                const newR = Math.max(initialR * 0.35, initialR * (newHp / maxHp));
+                return { ...b, stoneHp: newHp, r: newR };
+              })
+              .filter((b): b is Ball => b !== null);
+            if (hitSet.size > 0) {
+              setStoneHitIds(hitSet);
+              setTimeout(() => setStoneHitIds(new Set()), 380);
+              haptic([20, 30, 30]);
+            }
+            if (totalBonus > 0) {
+              setScore((s) => s + totalBonus);
+              addScore(totalBonus);
+              spawnPopup(`⛰ +${formatScore(totalBonus)}`);
+              haptic([40, 60, 40, 60, 100]);
+            } else {
+              spawnPopup(`💥 stone hit`);
+            }
+            setNoMergeStreak(0);
+          }
+        }
       }
     }
     if (matches.length === 0) {
