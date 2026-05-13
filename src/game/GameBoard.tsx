@@ -568,6 +568,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
                   position: "absolute",
                   left: b.x - ballSize / 2,
                   top: b.y - ballSize / 2,
+                  transition: "left 180ms ease-out, top 180ms ease-out",
                 }}
               >
                 <ElementBall
