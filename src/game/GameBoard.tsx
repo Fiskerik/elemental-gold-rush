@@ -221,18 +221,18 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     startTimeRef.current = Date.now();
     setElapsedMs(0);
     // Per-level intro tooltips for newly unlocked features.
-    if (level.id === SHIMMER_MIN_LEVEL) {
+    if (level.id >= SHIMMER_MIN_LEVEL) {
       showTip(
         "feature-shimmer-unlock",
         "✦ Shimmering atoms unlocked",
         "Some atoms in your queue now shimmer with a rainbow halo. Land a successful merge with one to score 2× points and fill the Grab combo bar twice as fast.",
       );
     }
-    if (level.id === GRAB_MIN_LEVEL) {
+    if (level.id >= GRAB_MIN_LEVEL) {
       showTip(
         "feature-grab-unlock",
-        "🤚 Grab power-up unlocked",
-        "Fill the Grab combo bar by merging atoms in a row. Once charged, tap Grab and drag any atom on the board to a new spot — neighbors will move out of the way.",
+        "🤚 Grab power-up unlocked!",
+        "Build the Grab combo bar by merging atoms back-to-back. When it fills, tap the Grab button (bottom-right), then drag any atom on the board to a new position — surrounding atoms slide out of the way to make room. Use it to set up huge merge chains.",
       );
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
