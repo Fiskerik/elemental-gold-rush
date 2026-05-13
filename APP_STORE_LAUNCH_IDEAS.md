@@ -43,7 +43,7 @@ Suggested quest types:
 
 1. Merge 25 atoms.
 2. Discover 1 new element.
-3. Reach a specific category, such as noble gas or transition metal.
+3. Reach an early element milestone, such as Helium, Lithium, or Beryllium, so the quest is achievable in 1–2 games.
 4. Clear a level without game over.
 5. Trigger a 3-step chain merge.
 
@@ -74,12 +74,12 @@ Extend `src/game/GameBoard.tsx` so each shot tracks the number of merge events r
 
 Display combo labels near the board:
 
-| Merge Count | Combo Label |
-| --- | --- |
-| 2 merges | Catalyst! |
-| 3 merges | Reaction Chain! |
-| 4+ merges | Atomic Cascade! |
-| 6+ merges | Nuclear Rush! |
+| Merge Count | Combo Label     |
+| ----------- | --------------- |
+| 2 merges    | Catalyst!       |
+| 3 merges    | Reaction Chain! |
+| 4+ merges   | Atomic Cascade! |
+| 6+ merges   | Nuclear Rush!   |
 
 Use the existing popup pattern in `src/game/GameBoard.tsx` for combo feedback.
 
@@ -149,7 +149,7 @@ The chemistry theme supports special rules that make the board feel fresh withou
 
 #### Implementation direction
 
-Create challenge mode configuration in a new file such as `src/game/challenges.ts`.
+Create challenge mode configuration in a new file such as `src/game/challenges.ts`. Keep challenge-mode scores separate from campaign progression.
 
 Suggested challenge modifiers:
 
@@ -356,8 +356,18 @@ Create `src/game/analytics.ts` with functions such as:
 export function trackGameStart(levelId: number): void;
 export function trackShot(levelId: number, atom: number, aimDeg: number): void;
 export function trackMerge(levelId: number, resultAtomicNumber: number, chainDepth: number): void;
-export function trackLevelWin(levelId: number, score: number, shots: number, highestElement: number): void;
-export function trackGameOver(levelId: number, score: number, shots: number, highestElement: number): void;
+export function trackLevelWin(
+  levelId: number,
+  score: number,
+  shots: number,
+  highestElement: number,
+): void;
+export function trackGameOver(
+  levelId: number,
+  score: number,
+  shots: number,
+  highestElement: number,
+): void;
 export function trackPurchaseStarted(productId: string): void;
 export function trackPurchaseCompleted(productId: string): void;
 ```

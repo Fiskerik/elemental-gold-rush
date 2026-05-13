@@ -17,11 +17,14 @@ import {
 import { ElementBall } from "./ElementBall";
 import { useProgress } from "./store";
 import { playMergeSound, playShootSound, playWinSound, vibrate } from "./audio";
+import { GameModeId, getGameMode, getModeLevelLabel } from "./challenges";
+import { trackGameOver, trackGameStart, trackLevelWin, trackMerge, trackShot } from "./analytics";
 
 interface Props {
   levelId: number;
   onExit: () => void;
   onWin: (nextId: number | null) => void;
+  mode?: GameModeId;
 }
 
 const QUEUE_SIZE = 4;
@@ -150,8 +153,9 @@ function calculateStars(
   return 1;
 }
 
-export function GameBoard({ levelId, onExit, onWin }: Props) {
+export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) {
   const level = getLevelById(levelId) ?? LEVELS[0];
+  const gameMode = getGameMode(mode);
   const shimmerEnabled = level.id >= SHIMMER_MIN_LEVEL;
   const grabEnabled = level.id >= GRAB_MIN_LEVEL;
   const eGunEnabled = level.id >= EGUN_MIN_LEVEL;
@@ -167,6 +171,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     reportQuestProgress,
     setBestCombo,
     setLevelStars,
+    setChallengeBestScore,
     seenTips,
     markTipSeen,
   } = useProgress();
@@ -207,7 +212,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
   const eGunCooldownSlots = useRef(0);
 
   // === Grab power-up ===
-  // Earned by making 10 merges in a row.
+  // Earned by making 8 merge progress in a row.
   const [grabs, setGrabs] = useState(0);
   const [grabMode, setGrabMode] = useState(false);
   const [grabbing, setGrabbing] = useState<{ id: number; x: number; y: number } | null>(null);
@@ -223,9 +228,9 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
 
   // === Combo bar for Grab power-up ===
   // Every successful merge counts toward the current streak (shimmer atoms
-  // count +2). A missed shot resets progress, so Grab requires 10 merges in
-  // a row.
-  const GRAB_THRESHOLD = 10;
+  // count +2). A missed shot resets progress, so Grab requires 8 merge progress
+  // in a row.
+  const GRAB_THRESHOLD = 8;
   const [grabProgress, setGrabProgress] = useState(0);
 
   // === Gravity and Emission power-ups ===
@@ -289,7 +294,11 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
 
   useEffect(() => {
     setBalls(createEmptyBoard());
-    const initialQueue = generateInitialQueue(level.maxQueueElement, QUEUE_SIZE, level.queueDecay);
+    const initialQueue = generateInitialQueue(
+      level.maxQueueElement,
+      QUEUE_SIZE,
+      mode === "pure-hydrogen" ? 0.18 : level.queueDecay,
+    );
     const initialEGun = Array.from({ length: QUEUE_SIZE }, () => false);
     const initialBlank = initialEGun.map(
       (isEGun) => !isEGun && blankEnabled && Math.random() < BLANK_ATOM_CHANCE,
@@ -339,6 +348,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     eGunCooldownSlots.current = 0;
     startTimeRef.current = Date.now();
     setElapsedMs(0);
+    trackGameStart(levelId, mode);
     // Per-level intro tooltips for newly unlocked features.
     if (level.id >= SHIMMER_MIN_LEVEL) {
       showTip(
@@ -351,14 +361,14 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
       showTip(
         "feature-grab-unlock",
         "🤚 Grab power-up unlocked!",
-        "Build the Grab combo bar by making 10 merges in a row. When it fills, tap the Grab button (bottom-right), then drag any atom on the board to a new position — surrounding atoms slide out of the way to make room. Use it to set up huge merge chains.",
+        "Build the Grab combo bar by making 8 merge progress in a row. When it fills, tap the Grab button (bottom-right), then drag any atom on the board to a new position — surrounding atoms slide out of the way to make room. Use it to set up huge merge chains.",
       );
     }
     if (level.id >= EGUN_MIN_LEVEL) {
       showTip(
         "feature-egun-unlock",
         "⚡ E-gun unlocked!",
-        "Rare E-gun shots fire a straight beam to the far edge without bouncing. Every non-Hydrogen atom in the beam drops by 1 tier.",
+        "Rare E-gun shots fire a straight beam to the far edge without bouncing. Every atom in the beam upgrades by 1 tier.",
       );
     }
     if (level.id >= BLANK_MIN_LEVEL) {
@@ -369,7 +379,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
       );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [levelId, level.gridRows, level.gridCols, level.maxQueueElement]);
+  }, [levelId, level.gridRows, level.gridCols, level.maxQueueElement, mode]);
 
   // Show a one-time tooltip the first time a shimmer atom appears in the queue.
   useEffect(() => {
@@ -392,6 +402,15 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     }, 500);
     return () => clearInterval(id);
   }, [gameOver, won, levelId]);
+
+  useEffect(() => {
+    if (mode !== "gold-rush-timer" || gameOver || won) return;
+    const limitMs = (gameMode.timerSec ?? 180) * 1000;
+    if (elapsedMs < limitMs) return;
+    trackGameOver(levelId, score, shots, highest, mode);
+    setGameOver(true);
+    spawnPopup("⏱ TIME UP");
+  }, [elapsedMs, gameMode.timerSec, gameOver, highest, levelId, mode, score, shots, won]);
 
   useEffect(() => {
     if (gameOver || won) return;
@@ -460,7 +479,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     const shimmer = !eGun && !blank && shimmerEnabled && Math.random() < POWER_UP_CHANCE;
     const atom = shimmer
       ? randomAvailableElement(maxElement)
-      : generateQueueElement(maxElement, level.queueDecay);
+      : generateQueueElement(maxElement, mode === "pure-hydrogen" ? 0.18 : level.queueDecay);
     return {
       atom: applyEmissionBoost(atom),
       shimmer,
@@ -524,7 +543,11 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     continuingPastTarget && continueStartedElapsedMs != null
       ? Math.max(0, Math.floor((elapsedMs - continueStartedElapsedMs) / 30_000))
       : 0;
-  const dangerZonePct = Math.min(0.85, 0.2 + stoneSpawnCount * 0.1 + continuePressureSteps * 0.03);
+  const survivalPressurePct = mode === "survival" ? Math.floor(elapsedMs / 60_000) * 0.05 : 0;
+  const dangerZonePct = Math.min(
+    0.85,
+    0.2 + stoneSpawnCount * 0.1 + continuePressureSteps * 0.03 + survivalPressurePct,
+  );
   const dangerY = Math.max(TOP_PAD + ballSize, boardH * (1 - dangerZonePct));
 
   const geo: Geo = useMemo(
@@ -739,6 +762,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
 
   function shoot() {
     if (busy || gameOver || won) return;
+    trackShot(levelId, pendingStone ? -1 : currentIsEGun ? 0 : current, aimDeg, mode);
     if (currentIsEGun && !pendingStone) {
       const beam = castStraightRay(aimDeg);
       if (!beam) return;
@@ -793,14 +817,14 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     const start = path[0];
     const end = path[path.length - 1];
     const hitIds = new Set<number>();
-    const reducedAtoms = new Set<number>();
+    const upgradedAtoms = new Set<number>();
     const updated = balls.map((b) => {
-      if (b.stoneHp != null || b.atom <= 1) return b;
+      if (b.stoneHp != null || b.atom >= 118) return b;
       if (distanceToSegment(b.x, b.y, start.x, start.y, end.x, end.y) > b.r + eGunR * 0.35)
         return b;
       hitIds.add(b.id);
-      const atom = Math.max(1, b.atom - 1);
-      reducedAtoms.add(atom);
+      const atom = Math.min(118, b.atom + 1);
+      upgradedAtoms.add(atom);
       return { ...b, atom, r: radiusFor(atom) };
     });
     const nextShots = shots + 1;
@@ -809,9 +833,14 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     setWiggleIds(hitIds);
     setTimeout(() => setWiggleIds(new Set()), 380);
     setNoMergeStreak(0);
-    if (reducedAtoms.size > 0)
-      reportQuestProgress({ reachedAtomicNumbers: Array.from(reducedAtoms) });
-    spawnPopup(hitIds.size > 0 ? `⚡ E-GUN −${hitIds.size}` : "⚡ E-GUN");
+    if (upgradedAtoms.size > 0) {
+      const discoveries = Array.from(upgradedAtoms).filter((n) => !discoveredElements.includes(n));
+      if (discoveries.length > 0) recordDiscovery(discoveries);
+      reportQuestProgress({ discoveries, reachedAtomicNumbers: Array.from(upgradedAtoms) });
+      setHighestElement(Math.max(highest, ...Array.from(upgradedAtoms)));
+      setHighest((h) => Math.max(h, ...Array.from(upgradedAtoms)));
+    }
+    spawnPopup(hitIds.size > 0 ? `⚡ E-GUN +${hitIds.size}` : "⚡ E-GUN");
     haptic(hitIds.size > 0 ? [20, 40, 20] : 20);
     const nextSlot = makeNextQueueSlot(dynamicMaxQueue(updated.length));
     setQueue((q) => [...q.slice(1), nextSlot.atom]);
@@ -819,10 +848,47 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     setEGunQueue((e) => [...e.slice(1), nextSlot.eGun]);
     setBlankQueue((b) => [...b.slice(1), nextSlot.blank]);
     if (checkGameOver(updated, geo)) {
+      trackGameOver(levelId, score, nextShots, highest, mode);
       setGameOver(true);
       haptic([50, 80, 50, 80, 200]);
     }
     setBusy(false);
+  }
+
+  function isNobleGasLocked(atom: number): boolean {
+    return mode === "noble-gas-lock" && ELEMENTS[atom - 1]?.category === "noble-gas";
+  }
+
+  function applyShotModeEffects(source: Board, nextShots: number): Board {
+    let updated = source;
+    if (mode === "isotope-decay" && nextShots > 0 && nextShots % 10 === 0) {
+      updated = updated.map((b) => {
+        if (b.stoneHp != null || b.atom <= 1) return b;
+        const atom = b.atom - 1;
+        return { ...b, atom, r: radiusFor(atom) };
+      });
+      spawnPopup("🧪 ISOTOPE DECAY −1");
+      haptic([20, 35, 20]);
+    }
+    if (mode === "unstable-isotopes" && nextShots > 0 && nextShots % 6 === 0) {
+      let remaining = 3;
+      updated = updated.map((b) => {
+        if (remaining <= 0 || b.stoneHp != null || b.atom <= 1 || Math.random() > 0.45) return b;
+        remaining -= 1;
+        const atom = b.atom - 1;
+        return { ...b, atom, r: radiusFor(atom) };
+      });
+      spawnPopup("☢ UNSTABLE DECAY");
+    }
+    if (mode === "gravity-surge" && nextShots > 0 && nextShots % 5 === 0) {
+      updated = updated.map((b) => ({
+        ...b,
+        y: Math.min(geo.dangerY - b.r - 2, b.y + Math.max(8, ballSize * 0.22)),
+      }));
+      spawnPopup("🌀 GRAVITY SURGE");
+      haptic([25, 25, 45]);
+    }
+    return updated;
   }
 
   function triggerImpact(
@@ -1225,7 +1291,13 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
       r: radiusFor(atomOverride),
     };
     if (currentBalls !== balls) setBalls(currentBalls);
-    let result = placeAndMerge(currentBalls, newBall, geo, target, 118);
+    let result = placeAndMerge(
+      currentBalls,
+      newBall,
+      geo,
+      target,
+      isNobleGasLocked(atomOverride) ? atomOverride : 118,
+    );
     const nextShots = shots + 1;
     setShots(nextShots);
 
@@ -1253,6 +1325,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
       haptic([20, 30, 30]);
     }
 
+    result = { ...result, balls: applyShotModeEffects(result.balls, nextShots) };
     // Refresh radii on any merged survivors (their atom changed).
     setBalls(result.balls.map((b) => (b.stoneHp != null ? b : { ...b, r: radiusFor(b.atom) })));
     setHighlightId(result.finalBallId);
@@ -1264,6 +1337,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
       grantGravityForCombo(result.merges.length);
       setRunBestCombo((best) => Math.max(best, result.merges.length));
       setBestCombo(result.merges.length);
+      result.merges.forEach((m) => trackMerge(levelId, m.resultAtomicNumber, m.chainDepth, mode));
       result.merges.forEach((m, i) => {
         setTimeout(
           () => {
@@ -1286,7 +1360,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
           showTip(
             "feature-grab-first-contact",
             "🤚 Grab is ready!",
-            "You earned Grab by chaining 10 merges in a row. Tap the Grab button (bottom-right), then drag any atom to reposition it and set up your next big reaction chain.",
+            "You earned Grab by chaining 8 merge progress in a row. Tap the Grab button (bottom-right), then drag any atom to reposition it and set up your next big reaction chain.",
           );
         }
         return total % GRAB_THRESHOLD;
@@ -1338,11 +1412,13 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
           const stars = calculateStars(level, nextScore, nextShots, nextBestCombo, timeSec);
           setEarnedStars(stars);
           setLevelStars(levelId, stars);
-          reportQuestProgress({ levelCleared: true });
+          reportQuestProgress({ levelCleared: true, starsEarned: stars });
           unlockLevel(levelId + 1);
           sfx(playWinSound);
           haptic([30, 60, 30, 60, 80]);
           // Offer a choice — claim the win or keep playing for score.
+          trackLevelWin(levelId, nextScore, nextShots, nextHighest, mode);
+          if (mode !== "campaign") setChallengeBestScore(mode, nextScore);
           setWinChoice({
             stars,
             score: nextScore,
@@ -1368,6 +1444,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
         setEGunQueue((e) => [...e.slice(1), nextSlot.eGun]);
         setBlankQueue((b) => [...b.slice(1), nextSlot.blank]);
         if (checkGameOver(result.balls, geo)) {
+          trackGameOver(levelId, nextScore, nextShots, nextHighest, mode);
           setGameOver(true);
           haptic([50, 80, 50, 80, 200]);
         }
@@ -1516,7 +1593,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
           );
           setEarnedStars(stars);
           setLevelStars(levelId, stars);
-          reportQuestProgress({ levelCleared: true });
+          reportQuestProgress({ levelCleared: true, starsEarned: stars });
           unlockLevel(levelId + 1);
           setWinChoice({
             stars,
@@ -1586,7 +1663,13 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     }
     // Re-add grabbed at drop position (new id so placeAndMerge treats it as new)
     const placed: Ball = { id: nextBallId(), x: nx, y: ny, atom: grabbed.atom, r: grabbed.r };
-    let result = placeAndMerge(others, placed, geo, target, 118);
+    let result = placeAndMerge(
+      others,
+      placed,
+      geo,
+      target,
+      isNobleGasLocked(grabbed.atom) ? grabbed.atom : 118,
+    );
 
     const newAtoms = new Set<number>([grabbed.atom]);
     result.merges.forEach((m) => newAtoms.add(m.resultAtomicNumber));
@@ -1653,10 +1736,11 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
       const stars = calculateStars(level, nextScore, shots, nextBestCombo, timeSec);
       setEarnedStars(stars);
       setLevelStars(levelId, stars);
-      reportQuestProgress({ levelCleared: true });
+      reportQuestProgress({ levelCleared: true, starsEarned: stars });
       unlockLevel(levelId + 1);
       sfx(playWinSound);
       haptic([30, 60, 30, 60, 80]);
+      if (mode !== "campaign") setChallengeBestScore(mode, nextScore);
       setWinChoice({
         stars,
         score: nextScore,
@@ -1815,9 +1899,11 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
           </button>
           <div style={{ textAlign: "center" }}>
             <div style={{ fontSize: 10, letterSpacing: 2, color: "var(--muted-foreground)" }}>
-              LEVEL {level.id}
+              {getModeLevelLabel(gameMode, level)}
             </div>
-            <div style={{ fontSize: 14, fontWeight: 700 }}>{level.name}</div>
+            <div style={{ fontSize: 14, fontWeight: 700 }}>
+              {gameMode.id === "campaign" ? level.name : `${gameMode.emoji} ${gameMode.name}`}
+            </div>
             <div
               style={{
                 fontSize: 11,
@@ -1827,7 +1913,9 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
                 fontVariantNumeric: "tabular-nums",
               }}
             >
-              ⏱ {formatTime(elapsedMs)}
+              {mode === "gold-rush-timer"
+                ? `⏱ ${formatTime(Math.max(0, (gameMode.timerSec ?? 180) * 1000 - elapsedMs))}`
+                : `⏱ ${formatTime(elapsedMs)}`}
             </div>
           </div>
           <div style={{ ...iconBtn, cursor: "default", minWidth: 74, textAlign: "right" }}>

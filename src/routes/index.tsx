@@ -6,6 +6,9 @@ import { LevelSelect } from "@/game/LevelSelect";
 import { Collection } from "@/game/Collection";
 import { Settings } from "@/game/Settings";
 import { Shop } from "@/game/Shop";
+import { LabModes } from "@/game/LabModes";
+import { PowerUpLibrary } from "@/game/PowerUpLibrary";
+import { GameModeId } from "@/game/challenges";
 import { useProgress } from "@/game/store";
 
 export const Route = createFileRoute("/")({
@@ -31,9 +34,11 @@ export const Route = createFileRoute("/")({
 type Screen =
   | { name: "menu" }
   | { name: "levels" }
-  | { name: "game"; levelId: number }
+  | { name: "game"; levelId: number; mode?: GameModeId }
   | { name: "collection" }
   | { name: "shop" }
+  | { name: "lab" }
+  | { name: "library" }
   | { name: "settings" };
 
 function Index() {
@@ -49,6 +54,8 @@ function Index() {
           onCollection={() => setScreen({ name: "collection" })}
           onSettings={() => setScreen({ name: "settings" })}
           onShop={() => setScreen({ name: "shop" })}
+          onLab={() => setScreen({ name: "lab" })}
+          onLibrary={() => setScreen({ name: "library" })}
         />
       );
     case "levels":
@@ -62,6 +69,7 @@ function Index() {
       return (
         <GameBoard
           levelId={screen.levelId}
+          mode={screen.mode}
           onExit={() => setScreen({ name: "menu" })}
           onWin={(nextId) => {
             if (nextId) setScreen({ name: "game", levelId: nextId });
@@ -73,6 +81,15 @@ function Index() {
       return <Collection onBack={() => setScreen({ name: "menu" })} />;
     case "shop":
       return <Shop onBack={() => setScreen({ name: "menu" })} />;
+    case "lab":
+      return (
+        <LabModes
+          onBack={() => setScreen({ name: "menu" })}
+          onStart={(mode, levelId) => setScreen({ name: "game", levelId, mode })}
+        />
+      );
+    case "library":
+      return <PowerUpLibrary onBack={() => setScreen({ name: "menu" })} />;
     case "settings":
       return <Settings onBack={() => setScreen({ name: "menu" })} />;
   }

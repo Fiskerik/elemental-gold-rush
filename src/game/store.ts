@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { GameModeId } from "./challenges";
 import { persist } from "zustand/middleware";
 import { getEarnedBadgeIds } from "./badges";
 import {
@@ -25,6 +26,7 @@ interface ProgressState {
   bestCombo: number;
   earnedBadges: string[];
   levelStars: Record<number, number>;
+  challengeBestScores: Partial<Record<GameModeId, number>>;
   hasProPack: boolean;
   seenTips: string[];
   markTipSeen: (id: string) => void;
@@ -37,6 +39,7 @@ interface ProgressState {
   claimDailyReward: () => void;
   setBestCombo: (combo: number) => void;
   setLevelStars: (levelId: number, stars: number) => void;
+  setChallengeBestScore: (mode: GameModeId, score: number) => void;
   grantProPack: () => void;
   toggleSound: () => void;
   toggleHaptics: () => void;
@@ -62,6 +65,7 @@ export const useProgress = create<ProgressState>()(
       bestCombo: 0,
       earnedBadges: [],
       levelStars: {},
+      challengeBestScores: {},
       hasProPack: false,
       seenTips: [],
       markTipSeen: (id) =>
@@ -118,6 +122,13 @@ export const useProgress = create<ProgressState>()(
             [levelId]: Math.max(s.levelStars[levelId] ?? 0, stars),
           },
         })),
+      setChallengeBestScore: (mode, score) =>
+        set((s) => ({
+          challengeBestScores: {
+            ...s.challengeBestScores,
+            [mode]: Math.max(s.challengeBestScores[mode] ?? 0, score),
+          },
+        })),
       grantProPack: () => set({ hasProPack: true }),
       toggleSound: () => set((s) => ({ soundEnabled: !s.soundEnabled })),
       toggleHaptics: () => set((s) => ({ hapticsEnabled: !s.hapticsEnabled })),
@@ -134,6 +145,7 @@ export const useProgress = create<ProgressState>()(
           bestCombo: 0,
           earnedBadges: [],
           levelStars: {},
+          challengeBestScores: {},
           hasProPack: false,
           seenTips: [],
         }),
@@ -153,6 +165,7 @@ export const useProgress = create<ProgressState>()(
           bestCombo: persistedState?.bestCombo ?? current.bestCombo,
           earnedBadges: getEarnedBadgeIds(discoveredElements),
           levelStars: persistedState?.levelStars ?? current.levelStars,
+          challengeBestScores: persistedState?.challengeBestScores ?? current.challengeBestScores,
           hasProPack: persistedState?.hasProPack ?? current.hasProPack,
           seenTips: persistedState?.seenTips ?? current.seenTips,
         } as ProgressState;
