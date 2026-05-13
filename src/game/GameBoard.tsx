@@ -189,6 +189,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     setWinChoice(null);
     setNoMergeStreak(0);
     setStoneHitIds(new Set());
+    setPendingStone(false);
     startTimeRef.current = Date.now();
     setElapsedMs(0);
     // Per-level intro tooltips for newly unlocked features.
