@@ -991,7 +991,8 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     setHighest(nextHighest);
     setHighestElement(nextHighest);
     const gained = Math.floor(result.scoreGained * level.scoreMultiplier);
-    setScore((s) => s + gained);
+    const nextScore = score + gained;
+    setScore(nextScore);
     addScore(gained);
     reportQuestProgress({
       merges: result.merges.length,
@@ -1000,6 +1001,25 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
       maxChainDepth: result.merges.length,
     });
     setTimeout(() => setHighlightId(null), 200 + result.merges.length * 120);
+    // Grabbed-and-merged into the target element? Trigger the same win flow
+    // a regular shot does so the level actually clears.
+    if (result.levelComplete && !continuingPastTarget) {
+      const timeSec = (Date.now() - startTimeRef.current) / 1000;
+      const nextBestCombo = Math.max(runBestCombo, result.merges.length);
+      const stars = calculateStars(level, nextScore, shots, nextBestCombo, timeSec);
+      setEarnedStars(stars);
+      setLevelStars(levelId, stars);
+      reportQuestProgress({ levelCleared: true });
+      unlockLevel(levelId + 1);
+      sfx(playWinSound);
+      haptic([30, 60, 30, 60, 80]);
+      setWinChoice({
+        stars,
+        score: nextScore,
+        shots,
+        bestCombo: nextBestCombo,
+      });
+    }
   }
 
   // Spawn a Stone obstacle near the top of the board, pushing nearby balls
