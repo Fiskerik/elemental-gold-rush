@@ -26,6 +26,8 @@ interface ProgressState {
   earnedBadges: string[];
   levelStars: Record<number, number>;
   hasProPack: boolean;
+  seenTips: string[];
+  markTipSeen: (id: string) => void;
   unlockLevel: (id: number) => void;
   recordDiscovery: (atomicNumbers: number[]) => void;
   addScore: (n: number) => void;
@@ -61,6 +63,9 @@ export const useProgress = create<ProgressState>()(
       earnedBadges: [],
       levelStars: {},
       hasProPack: false,
+      seenTips: [],
+      markTipSeen: (id) =>
+        set((s) => (s.seenTips.includes(id) ? s : { seenTips: [...s.seenTips, id] })),
       unlockLevel: (id) => set((s) => ({ unlockedLevel: Math.max(s.unlockedLevel, id) })),
       recordDiscovery: (nums) =>
         set((s) => {
@@ -130,6 +135,7 @@ export const useProgress = create<ProgressState>()(
           earnedBadges: [],
           levelStars: {},
           hasProPack: false,
+          seenTips: [],
         }),
     }),
     {
@@ -148,6 +154,7 @@ export const useProgress = create<ProgressState>()(
           earnedBadges: getEarnedBadgeIds(discoveredElements),
           levelStars: persistedState?.levelStars ?? current.levelStars,
           hasProPack: persistedState?.hasProPack ?? current.hasProPack,
+          seenTips: persistedState?.seenTips ?? current.seenTips,
         } as ProgressState;
       },
     },
