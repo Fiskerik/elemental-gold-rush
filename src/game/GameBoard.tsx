@@ -807,6 +807,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
         </div>
 
         {/* GRAB COMBO BAR */}
+        {grabEnabled && (
         <div
           style={{
             display: "flex",
@@ -857,7 +858,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
               />
             </div>
           </div>
-        </div>
+        )}
 
         {/* BOARD */}
         <div
