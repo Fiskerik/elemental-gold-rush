@@ -402,6 +402,70 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
   }
 
   function triggerImpact(x: number, y: number, hitId: number | null, dirX: number, dirY: number) {
+    // === Stone hit branch ===
+    // Hitting a Stone deals 1 damage, shoves neighbors with 5× force, and
+    // shrinks the stone. If destroyed, awards a big score bonus.
+    if (hitId !== null) {
+      const stone = balls.find((b) => b.id === hitId && b.stoneHp != null);
+      if (stone) {
+        const projR = radiusFor(current);
+        const projPeriod = Math.max(1, Math.min(8, ELEMENTS[current - 1]?.period ?? 4));
+        const NUDGE = projR * (0.15 + projPeriod * 0.12) * STONE_NUDGE_MULT;
+        const moved = new Map<number, { x: number; y: number }>();
+        for (const o of balls) {
+          if (o.id === stone.id) continue;
+          if (o.stoneHp != null) continue;
+          const dxs = o.x - stone.x;
+          const dys = o.y - stone.y;
+          const d = Math.hypot(dxs, dys);
+          const reach = stone.r + o.r * 2.2;
+          if (d < reach) {
+            const ux = d > 0.001 ? dxs / d : dirX;
+            const uy = d > 0.001 ? dys / d : dirY;
+            const oMinX = SIDE_PAD + o.r;
+            const oMaxX = boardW - SIDE_PAD - o.r;
+            const oCeil = TOP_PAD + o.r;
+            let ox = o.x + ux * NUDGE;
+            let oy = o.y + uy * NUDGE;
+            ox = Math.max(oMinX, Math.min(oMaxX, ox));
+            oy = Math.max(oCeil, oy);
+            moved.set(o.id, { x: ox, y: oy });
+          }
+        }
+        const newHp = (stone.stoneHp ?? STONE_MAX_HP) - 1;
+        const maxHp = stone.stoneMaxHp ?? STONE_MAX_HP;
+        const initialR = (ballSize / 2) * (1 + (8 - 4) * 0.11);
+        const newR = Math.max(initialR * 0.35, initialR * (newHp / maxHp));
+        const updated: Board = balls
+          .map((b) => {
+            if (b.id === stone.id) {
+              if (newHp <= 0) return null;
+              return { ...b, stoneHp: newHp, r: newR };
+            }
+            const m = moved.get(b.id);
+            return m ? { ...b, x: m.x, y: m.y } : b;
+          })
+          .filter((b): b is Ball => b !== null);
+        // Crackle anim on the stone
+        setStoneHitIds(new Set([stone.id]));
+        setTimeout(() => setStoneHitIds(new Set()), 380);
+        haptic([20, 30, 30]);
+        sfx(playShootSound);
+        if (newHp <= 0) {
+          const bonus = Math.floor(maxHp * 250 * level.scoreMultiplier);
+          setScore((s) => s + bonus);
+          addScore(bonus);
+          spawnPopup(`⛰ +${formatScore(bonus)}`);
+          haptic([40, 60, 40, 60, 100]);
+        } else {
+          spawnPopup(`💥 ${newHp}/${maxHp}`);
+        }
+        // Hitting a stone breaks the no-merge streak so we don't pile them up.
+        setNoMergeStreak(0);
+        finalizePlacement(x, y, updated);
+        return;
+      }
+    }
     // Wiggle nearby same-type balls before placing.
     const projR = radiusFor(current);
     const ADJ_F = 1.4;
