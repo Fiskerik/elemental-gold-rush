@@ -76,12 +76,9 @@ export function placeAndMerge(
       for (let j = i + 1; j < list.length && !changed; j++) {
         if (list[j].atom !== list[i].atom) continue;
         if (!withinAdj(list[i], list[j], geo.radius)) continue;
-        // Survivor: prefer the tracked one (so chain follows the player's shot);
-        // else the upper ball (smaller y), tiebreak smaller x.
+        // Survivor: always the upper ball (smaller y); tiebreak smaller x.
         let s = i, a = j;
-        if (list[i].id === survivorId) { s = i; a = j; }
-        else if (list[j].id === survivorId) { s = j; a = i; }
-        else if (list[j].y < list[i].y || (list[j].y === list[i].y && list[j].x < list[i].x)) {
+        if (list[j].y < list[i].y || (list[j].y === list[i].y && list[j].x < list[i].x)) {
           s = j; a = i;
         }
         const next = list[s].atom + 1;
