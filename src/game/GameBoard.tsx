@@ -703,12 +703,13 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     }
 
     // === Stone spawn check ===
-    // Track shots that produce zero merges. After 3 in a row, spawn a Stone.
+    // Track shots that produce zero merges. After 3 in a row, load the
+    // launcher with a Stone projectile that the player must shoot.
     if (result.merges.length === 0) {
       setNoMergeStreak((s) => {
         const next = s + 1;
         if (next >= STONE_NO_MERGE_TRIGGER) {
-          setTimeout(() => spawnStoneOnBoard(), 220);
+          setTimeout(() => loadStoneIntoLauncher(), 220);
           return 0;
         }
         return next;
