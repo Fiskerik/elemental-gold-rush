@@ -119,11 +119,11 @@ export function checkGameOver(balls: Board, geo: Geo): boolean {
   return false;
 }
 
-export function generateQueueElement(maxElement: number): number {
+export function generateQueueElement(maxElement: number, decay: number = 0.65): number {
   const weights: number[] = [];
   let totalWeight = 0;
   for (let n = 1; n <= maxElement; n++) {
-    const w = Math.pow(0.65, n - 1);
+    const w = Math.pow(decay, n - 1);
     weights.push(w);
     totalWeight += w;
   }
@@ -135,8 +135,8 @@ export function generateQueueElement(maxElement: number): number {
   return 1;
 }
 
-export function generateInitialQueue(maxElement: number, count = 3): number[] {
-  return Array.from({ length: count }, () => generateQueueElement(maxElement));
+export function generateInitialQueue(maxElement: number, count = 3, decay: number = 0.65): number[] {
+  return Array.from({ length: count }, () => generateQueueElement(maxElement, decay));
 }
 
 export function formatScore(score: number): string {

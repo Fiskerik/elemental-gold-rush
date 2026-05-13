@@ -13,6 +13,12 @@ export interface Level {
   targetElement: number;
   /** Highest atomic number that can appear in the initial queue */
   maxQueueElement: number;
+  /**
+   * Geometric decay used to weight the queue distribution. Lower values bias
+   * very strongly toward Hydrogen / low-tier atoms. Default 0.65.
+   * Used in early levels to prevent finishing in 1-2 shots.
+   */
+  queueDecay?: number;
   /** Grid dimensions for this level */
   gridCols: number;
   gridRows: number;
@@ -20,6 +26,8 @@ export interface Level {
   scoreMultiplier: number;
   /** Suggested number of shots for mastery */
   parShots?: number;
+  /** Suggested completion time in seconds (used for star rating) */
+  parTimeSec?: number;
   /** Score target for mastery */
   scoreGoal?: number;
   /** Best combo target for mastery */
@@ -36,10 +44,12 @@ export const LEVELS: Level[] = [
     lore: "In the beginning, there was hydrogen. This is the first fusion — the reaction that powers every star in the universe.",
     targetElement: 2, // Helium
     maxQueueElement: 1, // Only Hydrogen
+    queueDecay: 0.3,
     gridCols: 8,
     gridRows: 10,
     scoreMultiplier: 1.0,
     parShots: 13,
+    parTimeSec: 60,
     scoreGoal: 580,
     comboGoal: 2,
     milestoneFact:
@@ -52,10 +62,12 @@ export const LEVELS: Level[] = [
     lore: "Lithium — the first metal, the lightest solid element, and the heart of your phone's battery.",
     targetElement: 3, // Lithium
     maxQueueElement: 2, // H and He
+    queueDecay: 0.32,
     gridCols: 8,
     gridRows: 10,
     scoreMultiplier: 1.0,
     parShots: 16,
+    parTimeSec: 80,
     scoreGoal: 1020,
     comboGoal: 2,
   },
@@ -66,10 +78,12 @@ export const LEVELS: Level[] = [
     lore: "Beryllium is rarer than gold in Earth's crust. NASA uses it in spacecraft mirrors for its rigidity.",
     targetElement: 4,
     maxQueueElement: 2,
+    queueDecay: 0.35,
     gridCols: 8,
     gridRows: 10,
     scoreMultiplier: 1.1,
     parShots: 19,
+    parTimeSec: 100,
     scoreGoal: 1460,
     comboGoal: 2,
   },
@@ -80,10 +94,12 @@ export const LEVELS: Level[] = [
     lore: "Every living thing is carbon-based. You are mostly carbon. So are diamonds, graphite, and the ink in this sentence.",
     targetElement: 6,
     maxQueueElement: 3,
+    queueDecay: 0.4,
     gridCols: 8,
     gridRows: 10,
     scoreMultiplier: 1.2,
     parShots: 23,
+    parTimeSec: 120,
     scoreGoal: 2040,
     comboGoal: 2,
     milestoneFact:
@@ -96,10 +112,12 @@ export const LEVELS: Level[] = [
     lore: "Every breath you take is mostly nitrogen, but it's oxygen your cells crave. Without oxygen, you have 4 minutes.",
     targetElement: 8,
     maxQueueElement: 4,
+    queueDecay: 0.45,
     gridCols: 8,
     gridRows: 11,
     scoreMultiplier: 1.3,
     parShots: 26,
+    parTimeSec: 140,
     scoreGoal: 2620,
     comboGoal: 2,
   },
@@ -110,10 +128,12 @@ export const LEVELS: Level[] = [
     lore: "Neon has never bonded with another element. It glows in tubes, illuminates cities, and makes up trace amounts of the air you breathe.",
     targetElement: 10,
     maxQueueElement: 5,
+    queueDecay: 0.5,
     gridCols: 8,
     gridRows: 11,
     scoreMultiplier: 1.4,
     parShots: 29,
+    parTimeSec: 160,
     scoreGoal: 3200,
     comboGoal: 3,
     milestoneFact:
