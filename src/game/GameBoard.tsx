@@ -317,7 +317,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     let dy = -Math.cos(rad);
     let x = launcherX;
     let y = launcherY;
-    const projR = radiusFor(current);
+    const projR = projShotR;
     const step = Math.max(1, projR / 4);
     const path: { x: number; y: number }[] = [{ x, y }];
     const minX = SIDE_PAD + projR;
