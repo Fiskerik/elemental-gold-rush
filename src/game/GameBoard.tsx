@@ -67,6 +67,11 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
   const [queue, setQueue] = useState<number[]>(() =>
     generateInitialQueue(level.maxQueueElement, QUEUE_SIZE),
   );
+  // Parallel array — true means that queued atom is "shimmering" and will give
+  // 2× score and 2× grab-combo progress on a successful merge.
+  const [shimmerQueue, setShimmerQueue] = useState<boolean[]>(() =>
+    Array.from({ length: QUEUE_SIZE }, () => Math.random() < 0.12),
+  );
   const [score, setScore] = useState(0);
   const [highest, setHighest] = useState(1);
   const [shots, setShots] = useState(0);
@@ -90,8 +95,20 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
   const [grabbing, setGrabbing] = useState<{ id: number; x: number; y: number } | null>(null);
 
   // === Combo bar for Grab power-up ===
+  // Every successful merge counts +1 (shimmer atoms count +2). When the bar
+  // fills to GRAB_THRESHOLD it grants a Grab and rolls over.
   const GRAB_THRESHOLD = 5;
-  const [lastChain, setLastChain] = useState(0);
+  const [grabProgress, setGrabProgress] = useState(0);
+
+  // === Continue past target ===
+  // When the player reaches the target element, we offer a choice: claim the
+  // win, or keep playing for score. While `continuingPastTarget` is true we
+  // suppress further win prompts.
+  const [continuingPastTarget, setContinuingPastTarget] = useState(false);
+  const [winChoice, setWinChoice] = useState<
+    | { stars: number; score: number; shots: number; bestCombo: number }
+    | null
+  >(null);
 
   // === Run timer ===
   const [elapsedMs, setElapsedMs] = useState(0);
@@ -111,6 +128,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
   useEffect(() => {
     setBalls(createEmptyBoard());
     setQueue(generateInitialQueue(level.maxQueueElement, QUEUE_SIZE));
+    setShimmerQueue(Array.from({ length: QUEUE_SIZE }, () => Math.random() < 0.12));
     setScore(0);
     setHighest(1);
     setShots(0);
@@ -127,7 +145,9 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     setGrabs(0);
     setGrabMode(false);
     setGrabbing(null);
-    setLastChain(0);
+    setGrabProgress(0);
+    setContinuingPastTarget(false);
+    setWinChoice(null);
     startTimeRef.current = Date.now();
     setElapsedMs(0);
   }, [levelId, level.gridRows, level.gridCols, level.maxQueueElement]);
