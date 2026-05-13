@@ -33,19 +33,6 @@ function withinAdj(a: Ball, b: Ball, R: number): boolean {
   return Math.hypot(a.x - b.x, a.y - b.y) <= 2 * R * ADJ_FACTOR;
 }
 
-/**
- * Find the row where a newly dropped element lands in column `col`.
- * Bottom-up gravity: row = rows-1 is the floor.
- * Returns -1 if the column is full.
- */
-export function findPlacementRow(grid: Grid, col: number): number {
-  // Top-down: first empty row from the ceiling.
-  for (let row = 0; row < grid.length; row++) {
-    if (grid[row][col] === null) return row;
-  }
-  return -1;
-}
-
 export interface MergeEvent {
   resultAtomicNumber: number;
   chainDepth: number;
