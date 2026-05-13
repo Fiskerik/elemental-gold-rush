@@ -85,14 +85,17 @@ export function placeAndMerge(
           s = j; a = i;
         }
         const next = list[s].atom + 1;
-        list[s] = { ...list[s], atom: next };
+        const survivor = { ...list[s], atom: next };
+        list[s] = survivor;
         list.splice(a, 1);
-        merges.push({ resultAtomicNumber: next, chainDepth, x: list[s].x, y: list[s].y });
+        // After splice, survivor index shifts if a < s
+        const newS = a < s ? s - 1 : s;
+        merges.push({ resultAtomicNumber: next, chainDepth, x: list[newS].x, y: list[newS].y });
         score += next * 10 * Math.pow(2, chainDepth);
         highest = Math.max(highest, next);
         if (next >= targetElement) levelComplete = true;
         chainDepth++;
-        survivorId = list[s].id;
+        survivorId = list[newS].id;
         changed = true;
       }
     }
