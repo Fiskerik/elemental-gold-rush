@@ -27,9 +27,13 @@ export interface Geo {
 }
 
 let _ballId = 0;
-export function nextBallId(): number { return ++_ballId; }
+export function nextBallId(): number {
+  return ++_ballId;
+}
 
-export function createEmptyBoard(): Board { return []; }
+export function createEmptyBoard(): Board {
+  return [];
+}
 
 /** Two balls touch (or nearly touch) when centers are within ~sum of radii. */
 const ADJ_FACTOR = 1.15;
@@ -54,24 +58,22 @@ export interface MergeResult {
   finalBallId: number | null;
 }
 
-/**
- * Place a new ball into the board and run cascading merges.
- * Adjacency is by circle distance — no row/column quantization.
- */
-export function placeAndMerge(
-  balls: Board,
-  newBall: Ball,
-  geo: Geo,
+function resolveAdjacentMerges(
+  source: Board,
   targetElement: number,
-  maxElement: number = 118,
+  maxElement: number,
+  initialScore: number,
+  initialHighest: number,
+  initialLevelComplete: boolean,
+  initialSurvivorId: number | null,
 ): MergeResult {
-  const list: Ball[] = [...balls, { ...newBall }];
+  const list: Ball[] = source.map((b) => ({ ...b }));
   const merges: MergeEvent[] = [];
-  let highest = newBall.atom;
-  let score = newBall.atom * 10;
-  let levelComplete = newBall.atom >= targetElement;
+  let highest = initialHighest;
+  let score = initialScore;
+  let levelComplete = initialLevelComplete;
   let chainDepth = 0;
-  let survivorId: number | null = newBall.id;
+  let survivorId: number | null = initialSurvivorId;
 
   let changed = true;
   while (changed) {
@@ -84,9 +86,11 @@ export function placeAndMerge(
         if (list[j].atom !== list[i].atom) continue;
         if (!withinAdj(list[i], list[j])) continue;
         // Survivor: always the upper ball (smaller y); tiebreak smaller x.
-        let s = i, a = j;
+        let s = i,
+          a = j;
         if (list[j].y < list[i].y || (list[j].y === list[i].y && list[j].x < list[i].x)) {
-          s = j; a = i;
+          s = j;
+          a = i;
         }
         const next = list[s].atom + 1;
         const survivor = { ...list[s], atom: next };
@@ -115,11 +119,52 @@ export function placeAndMerge(
   };
 }
 
+/**
+ * Place a new ball into the board and run cascading merges.
+ * Adjacency is by circle distance — no row/column quantization.
+ */
+export function placeAndMerge(
+  balls: Board,
+  newBall: Ball,
+  geo: Geo,
+  targetElement: number,
+  maxElement: number = 118,
+): MergeResult {
+  return resolveAdjacentMerges(
+    [...balls, { ...newBall }],
+    targetElement,
+    maxElement,
+    newBall.atom * 10,
+    newBall.atom,
+    newBall.atom >= targetElement,
+    newBall.id,
+  );
+}
+
+/** Run cascading merges on an already-positioned board. */
+export function mergeSettledBoard(
+  balls: Board,
+  geo: Geo,
+  targetElement: number,
+  maxElement: number = 118,
+): MergeResult {
+  void geo;
+  return resolveAdjacentMerges(
+    balls,
+    targetElement,
+    maxElement,
+    0,
+    getHighestOnBoard(balls),
+    false,
+    null,
+  );
+}
+
 export const DANGER_ROWS_FROM_BOTTOM = 1;
 
 export function checkGameOver(balls: Board, geo: Geo): boolean {
   for (const b of balls) {
-    if (b.y + geo.radius >= geo.dangerY) return true;
+    if (b.y + b.r >= geo.dangerY) return true;
   }
   return false;
 }
@@ -140,7 +185,11 @@ export function generateQueueElement(maxElement: number, decay: number = 0.65): 
   return 1;
 }
 
-export function generateInitialQueue(maxElement: number, count = 3, decay: number = 0.65): number[] {
+export function generateInitialQueue(
+  maxElement: number,
+  count = 3,
+  decay: number = 0.65,
+): number[] {
   return Array.from({ length: count }, () => generateQueueElement(maxElement, decay));
 }
 
