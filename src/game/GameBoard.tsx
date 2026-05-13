@@ -83,6 +83,12 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
   const [projectile, setProjectile] = useState<{ x: number; y: number } | null>(null);
   const popupId = useRef(0);
 
+  // === Grab power-up ===
+  // Earned when a single shot triggers a 10+ merge chain.
+  const [grabs, setGrabs] = useState(0);
+  const [grabMode, setGrabMode] = useState(false);
+  const [grabbing, setGrabbing] = useState<{ id: number; x: number; y: number } | null>(null);
+
   const target = level.targetElement;
   const targetEl = ELEMENTS[target - 1];
   const current = queue[0];
@@ -110,6 +116,9 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     setProjectile(null);
     setBusy(false);
     setAimDeg(0);
+    setGrabs(0);
+    setGrabMode(false);
+    setGrabbing(null);
   }, [levelId, level.gridRows, level.gridCols, level.maxQueueElement]);
 
   function spawnPopup(text: string) {
@@ -347,6 +356,10 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
       if (comboLabel) spawnPopup(comboLabel);
       setRunBestCombo((best) => Math.max(best, result.merges.length));
       setBestCombo(result.merges.length);
+      if (result.merges.length >= 10) {
+        setGrabs((g) => g + 1);
+        spawnPopup("🤚 GRAB UNLOCKED!");
+      }
       result.merges.forEach((m, i) => {
         setTimeout(
           () => {
@@ -404,6 +417,100 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
       },
       200 + result.merges.length * 120,
     );
+  }
+
+  // === Grab drop: place grabbed ball at (tx,ty), pushing neighbors outward ===
+  function dropGrabbed(tx: number, ty: number) {
+    if (!grabbing) return;
+    const grabbed = balls.find((b) => b.id === grabbing.id);
+    if (!grabbed) return;
+    const others = balls.filter((b) => b.id !== grabbed.id).map((b) => ({ ...b }));
+    const minX = SIDE_PAD + grabbed.r;
+    const maxX = boardW - SIDE_PAD - grabbed.r;
+    const ceilingY = TOP_PAD + grabbed.r;
+    const floorY = geo.dangerY - grabbed.r - 2;
+    const nx = Math.max(minX, Math.min(maxX, tx));
+    const ny = Math.max(ceilingY, Math.min(floorY, ty));
+    // Relax: push other balls away from drop point and resolve overlaps.
+    for (let iter = 0; iter < 12; iter++) {
+      let moved = false;
+      for (const o of others) {
+        const dx = o.x - nx;
+        const dy = o.y - ny;
+        const d = Math.hypot(dx, dy) || 0.001;
+        const min = grabbed.r + o.r;
+        if (d < min) {
+          const push = min - d + 0.5;
+          o.x += (dx / d) * push;
+          o.y += (dy / d) * push;
+          moved = true;
+        }
+      }
+      for (let i = 0; i < others.length; i++) {
+        for (let j = i + 1; j < others.length; j++) {
+          const a = others[i];
+          const b = others[j];
+          const dx = b.x - a.x;
+          const dy = b.y - a.y;
+          const d = Math.hypot(dx, dy) || 0.001;
+          const min = a.r + b.r;
+          if (d < min) {
+            const push = (min - d) / 2 + 0.25;
+            a.x -= (dx / d) * push;
+            a.y -= (dy / d) * push;
+            b.x += (dx / d) * push;
+            b.y += (dy / d) * push;
+            moved = true;
+          }
+        }
+      }
+      // clamp inside board
+      for (const o of others) {
+        o.x = Math.max(SIDE_PAD + o.r, Math.min(boardW - SIDE_PAD - o.r, o.x));
+        o.y = Math.max(TOP_PAD + o.r, o.y);
+      }
+      if (!moved) break;
+    }
+    // Re-add grabbed at drop position (new id so placeAndMerge treats it as new)
+    const placed: Ball = { id: nextBallId(), x: nx, y: ny, atom: grabbed.atom, r: grabbed.r };
+    const result = placeAndMerge(others, placed, geo, target, 118);
+
+    const newAtoms = new Set<number>([grabbed.atom]);
+    result.merges.forEach((m) => newAtoms.add(m.resultAtomicNumber));
+    const undiscovered = Array.from(newAtoms).filter((n) => !discoveredElements.includes(n));
+    if (undiscovered.length > 0) recordDiscovery(undiscovered);
+
+    setBalls(result.balls.map((b) => ({ ...b, r: radiusFor(b.atom) })));
+    setHighlightId(result.finalBallId);
+    if (result.merges.length > 0) {
+      const comboLabel = getComboLabel(result.merges.length);
+      if (comboLabel) spawnPopup(comboLabel);
+      setRunBestCombo((best) => Math.max(best, result.merges.length));
+      setBestCombo(result.merges.length);
+      result.merges.forEach((m, i) => {
+        setTimeout(
+          () => {
+            sfx(() => playMergeSound(m.chainDepth));
+            haptic([10, 20, 10]);
+            spawnPopup(`+${ELEMENTS[m.resultAtomicNumber - 1]?.symbol ?? "?"}`);
+          },
+          80 + i * 120,
+        );
+      });
+    }
+    const nextHighest = Math.max(highest, result.highestElement);
+    setHighest(nextHighest);
+    setHighestElement(nextHighest);
+    const gained = Math.floor(result.scoreGained * level.scoreMultiplier);
+    setScore((s) => s + gained);
+    addScore(gained);
+    reportQuestProgress({
+      merges: result.merges.length,
+      discoveries: undiscovered,
+      reachedAtomicNumbers: Array.from(newAtoms),
+      maxChainDepth: result.merges.length,
+    });
+    setTimeout(() => setHighlightId(null), 200 + result.merges.length * 120);
   }
 
   // === aim handling ===
@@ -532,9 +639,37 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
           ref={boardRef}
           onPointerDown={(e) => {
             (e.target as Element).setPointerCapture?.(e.pointerId);
+            if (grabMode && grabs > 0 && !grabbing) {
+              const rect = boardRef.current!.getBoundingClientRect();
+              const px = e.clientX - rect.left;
+              const py = e.clientY - rect.top;
+              let hit: Ball | null = null;
+              for (let i = balls.length - 1; i >= 0; i--) {
+                const b = balls[i];
+                if (Math.hypot(px - b.x, py - b.y) <= b.r) {
+                  hit = b;
+                  break;
+                }
+              }
+              if (hit) {
+                setGrabbing({ id: hit.id, x: px, y: py });
+                setGrabs((g) => g - 1);
+              }
+              return;
+            }
             updateAimFromPointer(e.clientX, e.clientY);
           }}
           onPointerMove={(e) => {
+            if (grabbing) {
+              const rect = boardRef.current!.getBoundingClientRect();
+              setGrabbing({
+                id: grabbing.id,
+                x: e.clientX - rect.left,
+                y: e.clientY - rect.top,
+              });
+              return;
+            }
+            if (grabMode) return;
             if (e.buttons === 0 && e.pointerType === "mouse") {
               // hover-aim with mouse
               updateAimFromPointer(e.clientX, e.clientY);
@@ -543,6 +678,14 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
             updateAimFromPointer(e.clientX, e.clientY);
           }}
           onPointerUp={(e) => {
+            if (grabbing) {
+              const rect = boardRef.current!.getBoundingClientRect();
+              dropGrabbed(e.clientX - rect.left, e.clientY - rect.top);
+              setGrabbing(null);
+              setGrabMode(false);
+              return;
+            }
+            if (grabMode) return;
             updateAimFromPointer(e.clientX, e.clientY);
             shoot();
           }}
@@ -580,25 +723,85 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
 
           {/* BALLS — absolutely positioned in pixel space */}
           <div style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 1 }}>
-            {balls.map((b) => (
-              <div
-                key={b.id}
-                style={{
-                  position: "absolute",
-                  left: b.x - b.r,
-                  top: b.y - b.r,
-                  transition: "left 180ms ease-out, top 180ms ease-out",
-                }}
-              >
-                <ElementBall
-                  atomicNumber={b.atom}
-                  size={ballSize}
-                  highlight={highlightId === b.id}
-                  wiggle={wiggleIds.has(b.id)}
-                />
-              </div>
-            ))}
+            {balls.map((b) => {
+              const isDrag = grabbing?.id === b.id;
+              const x = isDrag ? grabbing!.x : b.x;
+              const y = isDrag ? grabbing!.y : b.y;
+              return (
+                <div
+                  key={b.id}
+                  style={{
+                    position: "absolute",
+                    left: x - b.r,
+                    top: y - b.r,
+                    transition: isDrag ? "none" : "left 180ms ease-out, top 180ms ease-out",
+                    zIndex: isDrag ? 5 : undefined,
+                    filter: isDrag ? "drop-shadow(0 6px 12px rgba(0,0,0,0.5))" : undefined,
+                  }}
+                >
+                  <ElementBall
+                    atomicNumber={b.atom}
+                    size={ballSize}
+                    highlight={highlightId === b.id}
+                    wiggle={wiggleIds.has(b.id)}
+                    glow={isDrag}
+                  />
+                </div>
+              );
+            })}
           </div>
+
+          {/* GRAB BUTTON */}
+          {grabs > 0 && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setGrabMode((g) => !g);
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              onPointerUp={(e) => e.stopPropagation()}
+              style={{
+                position: "absolute",
+                top: 8,
+                right: 8,
+                zIndex: 6,
+                padding: "8px 12px",
+                borderRadius: 12,
+                border: `1px solid ${grabMode ? "var(--accent)" : "var(--border)"}`,
+                background: grabMode
+                  ? "linear-gradient(135deg, var(--accent), var(--primary))"
+                  : "var(--surface-elevated)",
+                color: grabMode ? "var(--primary-foreground)" : "var(--foreground)",
+                fontSize: 12,
+                fontWeight: 800,
+                letterSpacing: 1,
+                cursor: "pointer",
+                boxShadow: grabMode ? "0 0 16px var(--accent-glow)" : undefined,
+              }}
+            >
+              🤚 GRAB ×{grabs}
+            </button>
+          )}
+          {grabMode && (
+            <div
+              style={{
+                position: "absolute",
+                top: 8,
+                left: 8,
+                zIndex: 6,
+                padding: "6px 10px",
+                borderRadius: 10,
+                background: "var(--surface-elevated)",
+                border: "1px solid var(--accent)",
+                fontSize: 11,
+                color: "var(--accent)",
+                fontWeight: 700,
+                pointerEvents: "none",
+              }}
+            >
+              Drag any atom to a new spot
+            </div>
+          )}
 
           {/* AIM TRAJECTORY (dotted line) */}
           {!busy && !gameOver && !won && previewPath.length > 1 && (
