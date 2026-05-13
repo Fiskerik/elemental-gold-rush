@@ -89,6 +89,14 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
   const [grabMode, setGrabMode] = useState(false);
   const [grabbing, setGrabbing] = useState<{ id: number; x: number; y: number } | null>(null);
 
+  // === Combo bar for Grab power-up ===
+  const GRAB_THRESHOLD = 5;
+  const [lastChain, setLastChain] = useState(0);
+
+  // === Run timer ===
+  const [elapsedMs, setElapsedMs] = useState(0);
+  const startTimeRef = useRef<number>(Date.now());
+
   const target = level.targetElement;
   const targetEl = ELEMENTS[target - 1];
   const current = queue[0];
@@ -119,7 +127,28 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     setGrabs(0);
     setGrabMode(false);
     setGrabbing(null);
+    setLastChain(0);
+    startTimeRef.current = Date.now();
+    setElapsedMs(0);
   }, [levelId, level.gridRows, level.gridCols, level.maxQueueElement]);
+
+  // Tick the run timer every second while the level is active.
+  useEffect(() => {
+    if (gameOver || won) return;
+    const id = setInterval(() => {
+      setElapsedMs(Date.now() - startTimeRef.current);
+    }, 500);
+    return () => clearInterval(id);
+  }, [gameOver, won, levelId]);
+
+  // Dynamic queue cap: as the board fills, unlock higher-tier atoms in the
+  // shooting queue. Adds +1 tier at 15 atoms on board, +2 at 25, etc.
+  // Capped at target-1 so we never spawn the literal target element.
+  function dynamicMaxQueue(boardCount: number): number {
+    const tierBonus = Math.max(0, Math.floor((boardCount - 5) / 10));
+    const cap = Math.max(level.maxQueueElement, target - 1);
+    return Math.min(level.maxQueueElement + tierBonus, cap);
+  }
 
   function spawnPopup(text: string) {
     const id = ++popupId.current;
@@ -356,7 +385,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
       if (comboLabel) spawnPopup(comboLabel);
       setRunBestCombo((best) => Math.max(best, result.merges.length));
       setBestCombo(result.merges.length);
-      if (result.merges.length >= 10) {
+      if (result.merges.length >= GRAB_THRESHOLD) {
         setGrabs((g) => g + 1);
         spawnPopup("🤚 GRAB UNLOCKED!");
       }
@@ -371,6 +400,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
         );
       });
     }
+    setLastChain(result.merges.length);
 
     const nextHighest = Math.max(highest, result.highestElement);
     setHighest(nextHighest);
@@ -408,7 +438,10 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
           setDiscoveryEl(firstDiscovery);
         }
         // Advance queue (functional update — guarantees fresh state)
-        setQueue((q) => [...q.slice(1), generateQueueElement(level.maxQueueElement)]);
+        setQueue((q) => [
+          ...q.slice(1),
+          generateQueueElement(dynamicMaxQueue(result.balls.length)),
+        ]);
         if (checkGameOver(result.balls, geo)) {
           setGameOver(true);
           haptic([50, 80, 50, 80, 200]);
@@ -574,6 +607,17 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
               LEVEL {level.id}
             </div>
             <div style={{ fontSize: 14, fontWeight: 700 }}>{level.name}</div>
+            <div
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                color: "var(--accent)",
+                marginTop: 2,
+                fontVariantNumeric: "tabular-nums",
+              }}
+            >
+              ⏱ {formatTime(elapsedMs)}
+            </div>
           </div>
           <div style={{ ...iconBtn, cursor: "default", minWidth: 74, textAlign: "right" }}>
             <div style={{ fontSize: 10, color: "var(--muted-foreground)" }}>SCORE</div>
@@ -632,6 +676,59 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
             </div>
           </div>
           <ElementBall atomicNumber={target} size={36} glow />
+        </div>
+
+        {/* GRAB COMBO BAR */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "6px 10px",
+            background: "var(--surface)",
+            borderRadius: 10,
+            border: "1px solid var(--border)",
+            marginBottom: 10,
+          }}
+        >
+          <div style={{ fontSize: 14 }}>🤚</div>
+          <div style={{ flex: 1 }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                fontSize: 10,
+                color: "var(--muted-foreground)",
+              }}
+            >
+              <span>Grab combo</span>
+              <span>
+                {Math.min(lastChain, GRAB_THRESHOLD)}/{GRAB_THRESHOLD}
+                {grabs > 0 ? `  •  ×${grabs} ready` : ""}
+              </span>
+            </div>
+            <div
+              style={{
+                height: 6,
+                background: "var(--surface-high)",
+                borderRadius: 3,
+                marginTop: 4,
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  width: `${Math.min(100, (lastChain / GRAB_THRESHOLD) * 100)}%`,
+                  height: "100%",
+                  background:
+                    lastChain >= GRAB_THRESHOLD
+                      ? "linear-gradient(90deg, var(--accent), var(--success, var(--accent)))"
+                      : "linear-gradient(90deg, var(--primary), var(--accent))",
+                  transition: "width 0.4s ease",
+                }}
+              />
+            </div>
+          </div>
         </div>
 
         {/* BOARD */}
@@ -969,6 +1066,13 @@ const iconBtn: React.CSSProperties = {
   cursor: "pointer",
   minWidth: 64,
 };
+
+function formatTime(ms: number): string {
+  const total = Math.floor(ms / 1000);
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
 
 function DiscoveryModal({ atomicNumber, onClose }: { atomicNumber: number; onClose: () => void }) {
   const el = ELEMENTS[atomicNumber - 1];
