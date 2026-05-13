@@ -27,6 +27,9 @@ const QUEUE_SIZE = 4;
 const MAX_AIM_DEG = 75;
 const SHIMMER_MIN_LEVEL = 5;
 const GRAB_MIN_LEVEL = 7;
+const STONE_MAX_HP = 8;
+const STONE_NO_MERGE_TRIGGER = 3;
+const STONE_NUDGE_MULT = 5;
 
 function getComboLabel(mergeCount: number): string | null {
   if (mergeCount >= 6) return "Nuclear Rush!";
@@ -106,6 +109,12 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
   const [grabMode, setGrabMode] = useState(false);
   const [grabbing, setGrabbing] = useState<{ id: number; x: number; y: number } | null>(null);
 
+  // === Stone obstacle ===
+  // After STONE_NO_MERGE_TRIGGER shots in a row that produce no merges, a
+  // large indestructible-but-breakable Stone appears on the board.
+  const [noMergeStreak, setNoMergeStreak] = useState(0);
+  const [stoneHitIds, setStoneHitIds] = useState<Set<number>>(new Set());
+
   // === Combo bar for Grab power-up ===
   // Every successful merge counts +1 (shimmer atoms count +2). When the bar
   // fills to GRAB_THRESHOLD it grants a Grab and rolls over.
@@ -176,6 +185,8 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     setGrabProgress(0);
     setContinuingPastTarget(false);
     setWinChoice(null);
+    setNoMergeStreak(0);
+    setStoneHitIds(new Set());
     startTimeRef.current = Date.now();
     setElapsedMs(0);
     // Per-level intro tooltips for newly unlocked features.
