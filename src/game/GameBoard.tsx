@@ -163,10 +163,10 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
    */
   function castRay(
     angleDeg: number,
-  ): { x: number; y: number; path: { x: number; y: number }[] } | null {
+  ): { x: number; y: number; path: { x: number; y: number }[]; hitId: number | null; dx: number; dy: number } | null {
     const rad = (angleDeg * Math.PI) / 180;
     let dx = Math.sin(rad);
-    const dy = -Math.cos(rad);
+    let dy = -Math.cos(rad);
     let x = launcherX;
     let y = launcherY;
     const step = Math.max(1, R / 4);
@@ -191,7 +191,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
       if (y <= ceilingY) {
         const lx = Math.max(minX, Math.min(maxX, x));
         path.push({ x: lx, y: ceilingY });
-        return { x: lx, y: ceilingY, path };
+        return { x: lx, y: ceilingY, path, hitId: null, dx, dy };
       }
       // off the bottom
       if (y > boardH) return null;
@@ -227,7 +227,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
         const lx = Math.max(minX, Math.min(maxX, x - bestT * dx));
         const ly = Math.max(ceilingY, y - bestT * dy);
         path.push({ x: lx, y: ly });
-        return { x: lx, y: ly, path };
+        return { x: lx, y: ly, path, hitId: balls[hitIdx].id, dx, dy };
       }
       path.push({ x, y });
     }
@@ -253,14 +253,14 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
       if (i >= path.length) {
         clearInterval(interval);
         setProjectile(null);
-        triggerImpact(hit.x, hit.y);
+        triggerImpact(hit.x, hit.y, hit.hitId, hit.dx, hit.dy);
       } else {
         setProjectile(path[i]);
       }
     }, stepMs);
   }
 
-  function triggerImpact(x: number, y: number) {
+  function triggerImpact(x: number, y: number, hitId: number | null, dirX: number, dirY: number) {
     // Wiggle nearby same-type balls before placing.
     const ADJ = 2 * R * 1.4;
     const matches: number[] = [];
@@ -268,21 +268,51 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
       if (b.atom !== current) continue;
       if (Math.hypot(b.x - x, b.y - y) <= ADJ) matches.push(b.id);
     }
+    // Tactical nudge: if we hit an existing ball that won't fuse with us,
+    // push it slightly along the projectile trajectory so it can drift
+    // toward a same-type neighbor.
+    let nudged = balls;
+    if (hitId !== null) {
+      const hb = balls.find((b) => b.id === hitId);
+      if (hb && hb.atom !== current) {
+        const NUDGE = R * 0.35;
+        const minX = SIDE_PAD + R;
+        const maxX = boardW - SIDE_PAD - R;
+        const ceilingY = TOP_PAD + R;
+        let nx = hb.x + dirX * NUDGE;
+        let ny = hb.y + dirY * NUDGE;
+        // avoid overlapping other balls
+        for (const o of balls) {
+          if (o.id === hb.id) continue;
+          const dd = Math.hypot(nx - o.x, ny - o.y);
+          const min = 2 * R;
+          if (dd < min && dd > 0.001) {
+            const push = (min - dd) + 0.5;
+            nx += ((nx - o.x) / dd) * push;
+            ny += ((ny - o.y) / dd) * push;
+          }
+        }
+        nx = Math.max(minX, Math.min(maxX, nx));
+        ny = Math.max(ceilingY, ny);
+        nudged = balls.map((b) => (b.id === hitId ? { ...b, x: nx, y: ny } : b));
+      }
+    }
     if (matches.length === 0) {
-      finalizePlacement(x, y);
+      finalizePlacement(x, y, nudged);
       return;
     }
     setWiggleIds(new Set(matches));
     haptic(20);
     setTimeout(() => {
       setWiggleIds(new Set());
-      finalizePlacement(x, y);
+      finalizePlacement(x, y, nudged);
     }, 220);
   }
 
-  function finalizePlacement(x: number, y: number) {
+  function finalizePlacement(x: number, y: number, currentBalls: Board = balls) {
     const newBall: Ball = { id: nextBallId(), x, y, atom: current };
-    const result = placeAndMerge(balls, newBall, geo, target, 118);
+    if (currentBalls !== balls) setBalls(currentBalls);
+    const result = placeAndMerge(currentBalls, newBall, geo, target, 118);
     const nextShots = shots + 1;
     setShots(nextShots);
 
@@ -538,6 +568,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
                   position: "absolute",
                   left: b.x - ballSize / 2,
                   top: b.y - ballSize / 2,
+                  transition: "left 180ms ease-out, top 180ms ease-out",
                 }}
               >
                 <ElementBall
