@@ -749,7 +749,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
             >
               <span>Grab combo</span>
               <span>
-                {Math.min(lastChain, GRAB_THRESHOLD)}/{GRAB_THRESHOLD}
+                {grabProgress}/{GRAB_THRESHOLD}
                 {grabs > 0 ? `  •  ×${grabs} ready` : ""}
               </span>
             </div>
@@ -764,10 +764,10 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
             >
               <div
                 style={{
-                  width: `${Math.min(100, (lastChain / GRAB_THRESHOLD) * 100)}%`,
+                  width: `${Math.min(100, (grabProgress / GRAB_THRESHOLD) * 100)}%`,
                   height: "100%",
                   background:
-                    lastChain >= GRAB_THRESHOLD
+                    grabs > 0
                       ? "linear-gradient(90deg, var(--accent), var(--success, var(--accent)))"
                       : "linear-gradient(90deg, var(--primary), var(--accent))",
                   transition: "width 0.4s ease",
