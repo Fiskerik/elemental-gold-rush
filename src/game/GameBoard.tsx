@@ -1165,6 +1165,13 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
         {discoveryEl !== null && (
           <DiscoveryModal atomicNumber={discoveryEl} onClose={() => setDiscoveryEl(null)} />
         )}
+        {activeTip && (
+          <FeatureTip
+            title={activeTip.title}
+            body={activeTip.body}
+            onClose={() => setActiveTip(null)}
+          />
+        )}
         {winChoice && !won && !gameOver && (
           <ContinueChoiceModal
             level={level}
