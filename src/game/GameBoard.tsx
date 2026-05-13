@@ -137,6 +137,19 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
   );
   const ballSize = Math.floor(cellSize * 0.86);
   const R = ballSize / 2;
+  // Per-element scaling — keep in sync with ElementBall's periodScale.
+  const periodScaleFor = useCallback((atom: number) => {
+    const p = Math.max(1, Math.min(8, ELEMENTS[atom - 1]?.period ?? 4));
+    return 1 + (p - 4) * 0.11;
+  }, []);
+  const radiusFor = useCallback(
+    (atom: number) => (ballSize / 2) * periodScaleFor(atom),
+    [ballSize, periodScaleFor],
+  );
+  const sizeFor = useCallback(
+    (atom: number) => ballSize * periodScaleFor(atom),
+    [ballSize, periodScaleFor],
+  );
   const launcherX = boardW / 2;
   const launcherY = boardH - 8; // near bottom of board
   const TOP_PAD = 6;
@@ -169,11 +182,12 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     let dy = -Math.cos(rad);
     let x = launcherX;
     let y = launcherY;
-    const step = Math.max(1, R / 4);
+    const projR = radiusFor(current);
+    const step = Math.max(1, projR / 4);
     const path: { x: number; y: number }[] = [{ x, y }];
-    const minX = SIDE_PAD + R;
-    const maxX = boardW - SIDE_PAD - R;
-    const ceilingY = TOP_PAD + R;
+    const minX = SIDE_PAD + projR;
+    const maxX = boardW - SIDE_PAD - projR;
+    const ceilingY = TOP_PAD + projR;
     const maxIter = 6000;
     for (let i = 0; i < maxIter; i++) {
       x += dx * step;
@@ -200,15 +214,16 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
       let hitIdx = -1;
       let bestT = Infinity;
       for (let b = 0; b < balls.length; b++) {
+        const sumR = projR + balls[b].r;
         const ddx = x - balls[b].x;
         const ddy = y - balls[b].y;
-        if (ddx * ddx + ddy * ddy < 2 * R * (2 * R)) {
-          // back-track along (dx, dy) so |pos - ball| = 2R
+        if (ddx * ddx + ddy * ddy < sumR * sumR) {
+          // back-track along (dx, dy) so |pos - ball| = sumR
           // pos = (x,y) - t*(dx,dy)
           const ox = x - balls[b].x;
           const oy = y - balls[b].y;
           const bcoef = -2 * (ox * dx + oy * dy);
-          const ccoef = ox * ox + oy * oy - 4 * R * R;
+          const ccoef = ox * ox + oy * oy - sumR * sumR;
           const disc = bcoef * bcoef - 4 * ccoef;
           let t = 0;
           if (disc >= 0) {
@@ -262,11 +277,12 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
 
   function triggerImpact(x: number, y: number, hitId: number | null, dirX: number, dirY: number) {
     // Wiggle nearby same-type balls before placing.
-    const ADJ = 2 * R * 1.4;
+    const projR = radiusFor(current);
+    const ADJ_F = 1.4;
     const matches: number[] = [];
     for (const b of balls) {
       if (b.atom !== current) continue;
-      if (Math.hypot(b.x - x, b.y - y) <= ADJ) matches.push(b.id);
+      if (Math.hypot(b.x - x, b.y - y) <= (projR + b.r) * ADJ_F) matches.push(b.id);
     }
     // Tactical nudge: if we hit an existing ball that won't fuse with us,
     // push it slightly along the projectile trajectory so it can drift
@@ -277,17 +293,17 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
       if (hb && hb.atom !== current) {
         // Heavier elements (lower in the periodic table) hit harder.
         const projPeriod = Math.max(1, Math.min(8, ELEMENTS[current - 1]?.period ?? 4));
-        const NUDGE = R * (0.15 + projPeriod * 0.12); // row1≈0.27R … row8≈1.11R
-        const minX = SIDE_PAD + R;
-        const maxX = boardW - SIDE_PAD - R;
-        const ceilingY = TOP_PAD + R;
+        const NUDGE = projR * (0.15 + projPeriod * 0.12);
+        const minX = SIDE_PAD + hb.r;
+        const maxX = boardW - SIDE_PAD - hb.r;
+        const ceilingY = TOP_PAD + hb.r;
         let nx = hb.x + dirX * NUDGE;
         let ny = hb.y + dirY * NUDGE;
         // avoid overlapping other balls
         for (const o of balls) {
           if (o.id === hb.id) continue;
           const dd = Math.hypot(nx - o.x, ny - o.y);
-          const min = 2 * R;
+          const min = hb.r + o.r;
           if (dd < min && dd > 0.001) {
             const push = (min - dd) + 0.5;
             nx += ((nx - o.x) / dd) * push;
@@ -312,7 +328,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
   }
 
   function finalizePlacement(x: number, y: number, currentBalls: Board = balls) {
-    const newBall: Ball = { id: nextBallId(), x, y, atom: current };
+    const newBall: Ball = { id: nextBallId(), x, y, atom: current, r: radiusFor(current) };
     if (currentBalls !== balls) setBalls(currentBalls);
     const result = placeAndMerge(currentBalls, newBall, geo, target, 118);
     const nextShots = shots + 1;
@@ -323,7 +339,8 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     const undiscovered = Array.from(newAtoms).filter((n) => !discoveredElements.includes(n));
     if (undiscovered.length > 0) recordDiscovery(undiscovered);
 
-    setBalls(result.balls);
+    // Refresh radii on any merged survivors (their atom changed).
+    setBalls(result.balls.map((b) => ({ ...b, r: radiusFor(b.atom) })));
     setHighlightId(result.finalBallId);
     if (result.merges.length > 0) {
       const comboLabel = getComboLabel(result.merges.length);
@@ -568,8 +585,8 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
                 key={b.id}
                 style={{
                   position: "absolute",
-                  left: b.x - ballSize / 2,
-                  top: b.y - ballSize / 2,
+                  left: b.x - b.r,
+                  top: b.y - b.r,
                   transition: "left 180ms ease-out, top 180ms ease-out",
                 }}
               >
@@ -621,8 +638,8 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
             <div
               style={{
                 position: "absolute",
-                left: projectile.x - ballSize / 2,
-                top: projectile.y - ballSize / 2,
+                left: projectile.x - sizeFor(current) / 2,
+                top: projectile.y - sizeFor(current) / 2,
                 pointerEvents: "none",
                 zIndex: 4,
               }}
@@ -635,8 +652,8 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
           <div
             style={{
               position: "absolute",
-              left: launcherX - ballSize / 2,
-              top: launcherY - ballSize / 2,
+              left: launcherX - sizeFor(current) / 2,
+              top: launcherY - sizeFor(current) / 2,
               zIndex: 2,
               pointerEvents: "none",
               transform: `rotate(${aimDeg}deg)`,
