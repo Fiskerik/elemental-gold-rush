@@ -256,3 +256,75 @@
   100% { transform: translate(0, 0) rotate(0deg); }
 }
 .stone-hit { animation: stone-crackle 360ms ease-out; }
+
+/* === Gravity power-up FX === */
+@keyframes gravity-core-pop {
+  0% { transform: translate(-50%, -50%) scale(0.35) rotate(0deg); opacity: 0; }
+  35% { opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(1.7) rotate(540deg); opacity: 0; }
+}
+@keyframes gravity-ring-pulse {
+  0% { transform: translate(-50%, -50%) scale(0.2); opacity: 0; }
+  25% { opacity: 0.85; }
+  100% { transform: translate(-50%, -50%) scale(1.45); opacity: 0; }
+}
+@keyframes gravity-stream-rise {
+  0% { transform: translateY(65%) scaleY(0.2); opacity: 0; }
+  20% { opacity: 0.75; }
+  100% { transform: translateY(-120%) scaleY(1); opacity: 0; }
+}
+@keyframes gravity-atom-lift {
+  0% { transform: translateY(0) scale(1); filter: none; }
+  35% { transform: translateY(-10px) scale(1.08); filter: drop-shadow(0 0 14px var(--primary-glow)); }
+  100% { transform: translateY(0) scale(1); filter: none; }
+}
+.gravity-fx {
+  overflow: hidden;
+  border-radius: 16px;
+  background: radial-gradient(circle at 50% 75%, oklch(0.78 0.13 230 / 0.22), transparent 42%);
+}
+.gravity-fx-core {
+  position: absolute;
+  left: 50%;
+  top: 70%;
+  font-size: 54px;
+  filter: drop-shadow(0 0 18px var(--primary-glow));
+  animation: gravity-core-pop 950ms ease-out forwards;
+}
+.gravity-fx-ring {
+  position: absolute;
+  left: 50%;
+  top: 70%;
+  width: 70%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 2px solid var(--primary);
+  box-shadow: 0 0 24px var(--primary-glow), inset 0 0 24px var(--primary-glow);
+  animation: gravity-ring-pulse 950ms ease-out forwards;
+}
+.gravity-fx-ring-b {
+  animation-delay: 160ms;
+  border-color: var(--accent);
+}
+.gravity-fx-stream {
+  position: absolute;
+  bottom: -20%;
+  width: 3px;
+  height: 70%;
+  border-radius: 999px;
+  background: linear-gradient(0deg, transparent, var(--primary), var(--accent), transparent);
+  box-shadow: 0 0 16px var(--primary-glow);
+  animation: gravity-stream-rise 900ms ease-out forwards;
+}
+.gravity-atom-lift {
+  animation: gravity-atom-lift 700ms ease-out;
+}
+
+/* === Blank atom wildcard === */
+@keyframes blank-atom-pulse {
+  0%, 100% { filter: brightness(1) drop-shadow(0 0 7px oklch(1 0 0 / 0.45)); }
+  50% { filter: brightness(1.25) drop-shadow(0 0 16px oklch(1 0 0 / 0.8)); }
+}
+.blank-atom {
+  animation: blank-atom-pulse 1.6s ease-in-out infinite;
+}
