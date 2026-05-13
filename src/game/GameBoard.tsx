@@ -26,7 +26,9 @@ interface Props {
 const QUEUE_SIZE = 4;
 const MAX_AIM_DEG = 75;
 const SHIMMER_MIN_LEVEL = 5;
-const GRAB_MIN_LEVEL = 5;
+const GRAB_MIN_LEVEL = 4;
+const EGUN_MIN_LEVEL = 6;
+const POWER_UP_CHANCE = 0.05;
 const STONE_MAX_HP = 8;
 
 function StoneVisual({ size, hp, maxHp }: { size: number; hp: number; maxHp: number }) {
@@ -52,7 +54,34 @@ function StoneVisual({ size, hp, maxHp }: { size: number; hp: number; maxHp: num
     >
       <div style={{ fontSize: Math.max(10, size * 0.16), opacity: 0.85, lineHeight: 1 }}>⛰</div>
       <div style={{ fontSize: Math.max(14, size * 0.32), lineHeight: 1.05 }}>{hp}</div>
-      <div style={{ fontSize: Math.max(8, size * 0.12), opacity: 0.7, lineHeight: 1 }}>/ {maxHp}</div>
+      <div style={{ fontSize: Math.max(8, size * 0.12), opacity: 0.7, lineHeight: 1 }}>
+        / {maxHp}
+      </div>
+    </div>
+  );
+}
+
+function EGunVisual({ size }: { size: number }) {
+  return (
+    <div
+      style={{
+        width: size,
+        height: size,
+        borderRadius: "50%",
+        background:
+          "radial-gradient(circle at 35% 25%, oklch(0.95 0.15 95), oklch(0.76 0.18 85) 42%, oklch(0.34 0.1 265))",
+        boxShadow: "0 0 16px oklch(0.82 0.18 85 / 0.8), inset 0 -6px 10px rgba(0,0,0,0.35)",
+        border: "2px solid oklch(0.9 0.17 90)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: "oklch(0.14 0.06 265)",
+        fontWeight: 1000,
+        fontSize: Math.max(13, size * 0.42),
+        textShadow: "0 1px 4px rgba(255,255,255,0.65)",
+      }}
+    >
+      ⚡
     </div>
   );
 }
@@ -91,6 +120,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
   const level = getLevelById(levelId) ?? LEVELS[0];
   const shimmerEnabled = level.id >= SHIMMER_MIN_LEVEL;
   const grabEnabled = level.id >= GRAB_MIN_LEVEL;
+  const eGunEnabled = level.id >= EGUN_MIN_LEVEL;
   const {
     recordDiscovery,
     addScore,
@@ -113,7 +143,11 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
   // Parallel array — true means that queued atom is "shimmering" and will give
   // 2× score and 2× grab-combo progress on a successful merge.
   const [shimmerQueue, setShimmerQueue] = useState<boolean[]>(() =>
-    Array.from({ length: QUEUE_SIZE }, () => shimmerEnabled && Math.random() < 0.05),
+    Array.from({ length: QUEUE_SIZE }, () => shimmerEnabled && Math.random() < POWER_UP_CHANCE),
+  );
+  // Parallel array — true means this queue slot fires the E-gun instead of an atom.
+  const [eGunQueue, setEGunQueue] = useState<boolean[]>(() =>
+    Array.from({ length: QUEUE_SIZE }, () => eGunEnabled && Math.random() < POWER_UP_CHANCE),
   );
   const [score, setScore] = useState(0);
   const [highest, setHighest] = useState(1);
@@ -158,10 +192,12 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
   // win, or keep playing for score. While `continuingPastTarget` is true we
   // suppress further win prompts.
   const [continuingPastTarget, setContinuingPastTarget] = useState(false);
-  const [winChoice, setWinChoice] = useState<
-    | { stars: number; score: number; shots: number; bestCombo: number }
-    | null
-  >(null);
+  const [winChoice, setWinChoice] = useState<{
+    stars: number;
+    score: number;
+    shots: number;
+    bestCombo: number;
+  } | null>(null);
 
   // === Run timer ===
   const [elapsedMs, setElapsedMs] = useState(0);
@@ -171,6 +207,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
   const targetEl = ELEMENTS[target - 1];
   const current = queue[0];
   const currentIsShimmer = shimmerQueue[0] ?? false;
+  const currentIsEGun = eGunQueue[0] ?? false;
 
   const sfx = (fn: () => void) => {
     if (soundEnabled && hasStoneSpawned) fn();
@@ -194,10 +231,21 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
 
   useEffect(() => {
     setBalls(createEmptyBoard());
-    setQueue(generateInitialQueue(level.maxQueueElement, QUEUE_SIZE, level.queueDecay));
-    setShimmerQueue(
-      Array.from({ length: QUEUE_SIZE }, () => shimmerEnabled && Math.random() < 0.05),
+    const initialQueue = generateInitialQueue(level.maxQueueElement, QUEUE_SIZE, level.queueDecay);
+    const initialEGun = Array.from(
+      { length: QUEUE_SIZE },
+      () => eGunEnabled && Math.random() < POWER_UP_CHANCE,
     );
+    const initialShimmer = initialEGun.map(
+      (isEGun) => !isEGun && shimmerEnabled && Math.random() < POWER_UP_CHANCE,
+    );
+    setQueue(
+      initialQueue.map((atom, i) =>
+        initialShimmer[i] ? randomAvailableElement(level.maxQueueElement) : atom,
+      ),
+    );
+    setShimmerQueue(initialShimmer);
+    setEGunQueue(initialEGun);
     setScore(0);
     setHighest(1);
     setShots(0);
@@ -238,7 +286,14 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
         "Build the Grab combo bar by making 10 merges in a row. When it fills, tap the Grab button (bottom-right), then drag any atom on the board to a new position — surrounding atoms slide out of the way to make room. Use it to set up huge merge chains.",
       );
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (level.id >= EGUN_MIN_LEVEL) {
+      showTip(
+        "feature-egun-unlock",
+        "⚡ E-gun unlocked!",
+        "Rare E-gun shots fire a straight beam to the far edge without bouncing. Every non-Hydrogen atom in the beam drops by 1 tier.",
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [levelId, level.gridRows, level.gridCols, level.maxQueueElement]);
 
   // Show a one-time tooltip the first time a shimmer atom appears in the queue.
@@ -251,7 +306,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
         "The glowing rainbow atom in your queue scores double and pumps your Grab combo bar by 2 per merge.",
       );
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shimmerQueue, shimmerEnabled]);
 
   // Tick the run timer every second while the level is active.
@@ -270,6 +325,26 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     const tierBonus = Math.max(0, Math.floor((boardCount - 5) / 10));
     const cap = Math.max(level.maxQueueElement, target - 1);
     return Math.min(level.maxQueueElement + tierBonus, cap);
+  }
+
+  function randomAvailableElement(maxElement: number): number {
+    return Math.max(1, Math.min(118, Math.floor(Math.random() * maxElement) + 1));
+  }
+
+  function makeNextQueueSlot(maxElement: number): {
+    atom: number;
+    shimmer: boolean;
+    eGun: boolean;
+  } {
+    const eGun = eGunEnabled && Math.random() < POWER_UP_CHANCE;
+    const shimmer = !eGun && shimmerEnabled && Math.random() < POWER_UP_CHANCE;
+    return {
+      atom: shimmer
+        ? randomAvailableElement(maxElement)
+        : generateQueueElement(maxElement, level.queueDecay),
+      shimmer,
+      eGun,
+    };
   }
 
   function spawnPopup(text: string) {
@@ -314,8 +389,10 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
   const stoneR = (ballSize / 2) * (1 + (8 - 4) * 0.11);
   const stoneSize = stoneR * 2;
   // Effective projectile radius/size — uses stone dims when a stone is loaded.
-  const projShotR = pendingStone ? stoneR : radiusFor(current);
-  const projShotSize = pendingStone ? stoneSize : sizeFor(current);
+  const eGunR = Math.max(12, ballSize * 0.34);
+  const eGunSize = eGunR * 2;
+  const projShotR = pendingStone ? stoneR : currentIsEGun ? eGunR : radiusFor(current);
+  const projShotSize = pendingStone ? stoneSize : currentIsEGun ? eGunSize : sizeFor(current);
   const launcherX = boardW / 2;
   const launcherY = boardH - 8; // near bottom of board
   const TOP_PAD = 6;
@@ -340,12 +417,17 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
    * and stops when it hits the ceiling or any existing ball. Resolves the
    * landing position so the new ball just touches whatever it hit.
    */
-  function castRay(
-    angleDeg: number,
-  ): { x: number; y: number; path: { x: number; y: number }[]; hitId: number | null; dx: number; dy: number } | null {
+  function castRay(angleDeg: number): {
+    x: number;
+    y: number;
+    path: { x: number; y: number }[];
+    hitId: number | null;
+    dx: number;
+    dy: number;
+  } | null {
     const rad = (angleDeg * Math.PI) / 180;
     let dx = Math.sin(rad);
-    let dy = -Math.cos(rad);
+    const dy = -Math.cos(rad);
     let x = launcherX;
     let y = launcherY;
     const projR = projShotR;
@@ -415,8 +497,76 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     return null;
   }
 
+  function castStraightRay(
+    angleDeg: number,
+  ): { path: { x: number; y: number }[]; dx: number; dy: number } | null {
+    const rad = (angleDeg * Math.PI) / 180;
+    const dx = Math.sin(rad);
+    const dy = -Math.cos(rad);
+    const minX = SIDE_PAD + eGunR;
+    const maxX = boardW - SIDE_PAD - eGunR;
+    const minY = TOP_PAD + eGunR;
+    const candidates: number[] = [];
+    if (dx < -0.001) candidates.push((minX - launcherX) / dx);
+    if (dx > 0.001) candidates.push((maxX - launcherX) / dx);
+    if (dy < -0.001) candidates.push((minY - launcherY) / dy);
+    const distance = candidates.filter((t) => t > 0).sort((a, b) => a - b)[0];
+    if (!distance) return null;
+    const end = {
+      x: Math.max(minX, Math.min(maxX, launcherX + dx * distance)),
+      y: Math.max(minY, launcherY + dy * distance),
+    };
+    const steps = Math.max(8, Math.ceil(distance / Math.max(8, eGunR)));
+    const path = Array.from({ length: steps + 1 }, (_, i) => ({
+      x: launcherX + (end.x - launcherX) * (i / steps),
+      y: launcherY + (end.y - launcherY) * (i / steps),
+    }));
+    return { path, dx, dy };
+  }
+
+  function distanceToSegment(
+    px: number,
+    py: number,
+    ax: number,
+    ay: number,
+    bx: number,
+    by: number,
+  ): number {
+    const vx = bx - ax;
+    const vy = by - ay;
+    const wx = px - ax;
+    const wy = py - ay;
+    const lenSq = vx * vx + vy * vy;
+    const t = lenSq === 0 ? 0 : Math.max(0, Math.min(1, (wx * vx + wy * vy) / lenSq));
+    const cx = ax + vx * t;
+    const cy = ay + vy * t;
+    return Math.hypot(px - cx, py - cy);
+  }
+
   function shoot() {
     if (busy || gameOver || won) return;
+    if (currentIsEGun && !pendingStone) {
+      const beam = castStraightRay(aimDeg);
+      if (!beam) return;
+      setBusy(true);
+      sfx(playShootSound);
+      haptic(15);
+      setProjectile(beam.path[0]);
+      const totalMs = Math.min(220, 50 + beam.path.length * 3);
+      const stepMs = totalMs / beam.path.length;
+      let i = 0;
+      const interval = setInterval(() => {
+        i++;
+        if (i >= beam.path.length) {
+          clearInterval(interval);
+          setProjectile(null);
+          fireEGun(beam.path);
+        } else {
+          setProjectile(beam.path[i]);
+        }
+      }, stepMs);
+      return;
+    }
     const hit = castRay(aimDeg);
     if (!hit) return;
     setBusy(true);
@@ -441,6 +591,42 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
         setProjectile(path[i]);
       }
     }, stepMs);
+  }
+
+  function fireEGun(path: { x: number; y: number }[]) {
+    const start = path[0];
+    const end = path[path.length - 1];
+    const hitIds = new Set<number>();
+    const reducedAtoms = new Set<number>();
+    const updated = balls.map((b) => {
+      if (b.stoneHp != null || b.atom <= 1) return b;
+      if (distanceToSegment(b.x, b.y, start.x, start.y, end.x, end.y) > b.r + eGunR * 0.35)
+        return b;
+      hitIds.add(b.id);
+      const atom = Math.max(1, b.atom - 1);
+      reducedAtoms.add(atom);
+      return { ...b, atom, r: radiusFor(atom) };
+    });
+    const nextShots = shots + 1;
+    setShots(nextShots);
+    setBalls(updated);
+    setWiggleIds(hitIds);
+    setTimeout(() => setWiggleIds(new Set()), 380);
+    setGrabProgress(0);
+    setNoMergeStreak(0);
+    if (reducedAtoms.size > 0)
+      reportQuestProgress({ reachedAtomicNumbers: Array.from(reducedAtoms) });
+    spawnPopup(hitIds.size > 0 ? `⚡ E-GUN −${hitIds.size}` : "⚡ E-GUN");
+    haptic(hitIds.size > 0 ? [20, 40, 20] : 20);
+    const nextSlot = makeNextQueueSlot(dynamicMaxQueue(updated.length));
+    setQueue((q) => [...q.slice(1), nextSlot.atom]);
+    setShimmerQueue((s) => [...s.slice(1), nextSlot.shimmer]);
+    setEGunQueue((e) => [...e.slice(1), nextSlot.eGun]);
+    if (checkGameOver(updated, geo)) {
+      setGameOver(true);
+      haptic([50, 80, 50, 80, 200]);
+    }
+    setBusy(false);
   }
 
   function triggerImpact(x: number, y: number, hitId: number | null, dirX: number, dirY: number) {
@@ -785,11 +971,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     if (undiscovered.length > 0) recordDiscovery(undiscovered);
 
     // Refresh radii on any merged survivors (their atom changed).
-    setBalls(
-      result.balls.map((b) =>
-        b.stoneHp != null ? b : { ...b, r: radiusFor(b.atom) },
-      ),
-    );
+    setBalls(result.balls.map((b) => (b.stoneHp != null ? b : { ...b, r: radiusFor(b.atom) })));
     setHighlightId(result.finalBallId);
     const shimmerHit = currentIsShimmer && result.merges.length > 0;
     const grabAdd = result.merges.length * (shimmerHit ? 2 : 1);
@@ -849,9 +1031,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     const nextHighest = Math.max(highest, result.highestElement);
     setHighest(nextHighest);
     setHighestElement(nextHighest);
-    const gained = Math.floor(
-      result.scoreGained * level.scoreMultiplier * (shimmerHit ? 2 : 1),
-    );
+    const gained = Math.floor(result.scoreGained * level.scoreMultiplier * (shimmerHit ? 2 : 1));
     const nextScore = score + gained;
     const nextBestCombo = Math.max(runBestCombo, result.merges.length);
     setScore(nextScore);
@@ -886,11 +1066,10 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
             bestCombo: nextBestCombo,
           });
           // Advance the queue so play can resume if the user keeps going.
-          setQueue((q) => [
-            ...q.slice(1),
-            generateQueueElement(dynamicMaxQueue(result.balls.length), level.queueDecay),
-          ]);
-          setShimmerQueue((s) => [...s.slice(1), shimmerEnabled && Math.random() < 0.05]);
+          const nextSlot = makeNextQueueSlot(dynamicMaxQueue(result.balls.length));
+          setQueue((q) => [...q.slice(1), nextSlot.atom]);
+          setShimmerQueue((s) => [...s.slice(1), nextSlot.shimmer]);
+          setEGunQueue((e) => [...e.slice(1), nextSlot.eGun]);
           setBusy(false);
           return;
         }
@@ -898,11 +1077,10 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
           setDiscoveryEl(firstDiscovery);
         }
         // Advance queue (functional update — guarantees fresh state)
-        setQueue((q) => [
-          ...q.slice(1),
-          generateQueueElement(dynamicMaxQueue(result.balls.length), level.queueDecay),
-        ]);
-        setShimmerQueue((s) => [...s.slice(1), shimmerEnabled && Math.random() < 0.05]);
+        const nextSlot = makeNextQueueSlot(dynamicMaxQueue(result.balls.length));
+        setQueue((q) => [...q.slice(1), nextSlot.atom]);
+        setShimmerQueue((s) => [...s.slice(1), nextSlot.shimmer]);
+        setEGunQueue((e) => [...e.slice(1), nextSlot.eGun]);
         if (checkGameOver(result.balls, geo)) {
           setGameOver(true);
           haptic([50, 80, 50, 80, 200]);
@@ -974,11 +1152,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     const undiscovered = Array.from(newAtoms).filter((n) => !discoveredElements.includes(n));
     if (undiscovered.length > 0) recordDiscovery(undiscovered);
 
-    setBalls(
-      result.balls.map((b) =>
-        b.stoneHp != null ? b : { ...b, r: radiusFor(b.atom) },
-      ),
-    );
+    setBalls(result.balls.map((b) => (b.stoneHp != null ? b : { ...b, r: radiusFor(b.atom) })));
     setHighlightId(result.finalBallId);
     if (result.merges.length > 0) {
       const comboLabel = getComboLabel(result.merges.length);
@@ -1246,57 +1420,57 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
 
         {/* GRAB COMBO BAR */}
         {grabEnabled && (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "6px 10px",
-            background: "var(--surface)",
-            borderRadius: 10,
-            border: "1px solid var(--border)",
-            marginBottom: 10,
-          }}
-        >
-          <div style={{ fontSize: 14 }}>🤚</div>
-          <div style={{ flex: 1 }}>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                fontSize: 10,
-                color: "var(--muted-foreground)",
-              }}
-            >
-              <span>Grab combo</span>
-              <span>
-                {grabProgress}/{GRAB_THRESHOLD}
-                {grabs > 0 ? `  •  ×${grabs} ready` : ""}
-              </span>
-            </div>
-            <div
-              style={{
-                height: 6,
-                background: "var(--surface-high)",
-                borderRadius: 3,
-                marginTop: 4,
-                overflow: "hidden",
-              }}
-            >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "6px 10px",
+              background: "var(--surface)",
+              borderRadius: 10,
+              border: "1px solid var(--border)",
+              marginBottom: 10,
+            }}
+          >
+            <div style={{ fontSize: 14 }}>🤚</div>
+            <div style={{ flex: 1 }}>
               <div
                 style={{
-                  width: `${Math.min(100, (grabProgress / GRAB_THRESHOLD) * 100)}%`,
-                  height: "100%",
-                  background:
-                    grabs > 0
-                      ? "linear-gradient(90deg, var(--accent), var(--success, var(--accent)))"
-                      : "linear-gradient(90deg, var(--primary), var(--accent))",
-                  transition: "width 0.4s ease",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  fontSize: 10,
+                  color: "var(--muted-foreground)",
                 }}
-              />
+              >
+                <span>Grab combo</span>
+                <span>
+                  {grabProgress}/{GRAB_THRESHOLD}
+                  {grabs > 0 ? `  •  ×${grabs} ready` : ""}
+                </span>
+              </div>
+              <div
+                style={{
+                  height: 6,
+                  background: "var(--surface-high)",
+                  borderRadius: 3,
+                  marginTop: 4,
+                  overflow: "hidden",
+                }}
+              >
+                <div
+                  style={{
+                    width: `${Math.min(100, (grabProgress / GRAB_THRESHOLD) * 100)}%`,
+                    height: "100%",
+                    background:
+                      grabs > 0
+                        ? "linear-gradient(90deg, var(--accent), var(--success, var(--accent)))"
+                        : "linear-gradient(90deg, var(--primary), var(--accent))",
+                    transition: "width 0.4s ease",
+                  }}
+                />
+              </div>
             </div>
           </div>
-        </div>
         )}
 
         {/* BOARD */}
@@ -1426,13 +1600,17 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
                       textShadow: "0 1px 2px rgba(0,0,0,0.7)",
                     }}
                   >
-                    <div style={{ fontSize: Math.max(10, size * 0.16), opacity: 0.85, lineHeight: 1 }}>
+                    <div
+                      style={{ fontSize: Math.max(10, size * 0.16), opacity: 0.85, lineHeight: 1 }}
+                    >
                       ⛰
                     </div>
                     <div style={{ fontSize: Math.max(14, size * 0.32), lineHeight: 1.05 }}>
                       {hp}
                     </div>
-                    <div style={{ fontSize: Math.max(8, size * 0.12), opacity: 0.7, lineHeight: 1 }}>
+                    <div
+                      style={{ fontSize: Math.max(8, size * 0.12), opacity: 0.7, lineHeight: 1 }}
+                    >
                       / {maxHp}
                     </div>
                   </div>
@@ -1560,8 +1738,15 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
             >
               {pendingStone ? (
                 <StoneVisual size={projShotSize} hp={STONE_MAX_HP} maxHp={STONE_MAX_HP} />
+              ) : currentIsEGun ? (
+                <EGunVisual size={projShotSize} />
               ) : (
-                <ElementBall atomicNumber={current} size={ballSize} glow shimmer={currentIsShimmer} />
+                <ElementBall
+                  atomicNumber={current}
+                  size={ballSize}
+                  glow
+                  shimmer={currentIsShimmer}
+                />
               )}
             </div>
           )}
@@ -1578,9 +1763,11 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
               transformOrigin: "center center",
             }}
           >
-            {!projectile && (
-              pendingStone ? (
+            {!projectile &&
+              (pendingStone ? (
                 <StoneVisual size={projShotSize} hp={STONE_MAX_HP} maxHp={STONE_MAX_HP} />
+              ) : currentIsEGun ? (
+                <EGunVisual size={projShotSize} />
               ) : (
                 <ElementBall
                   atomicNumber={current}
@@ -1588,8 +1775,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
                   glow
                   shimmer={currentIsShimmer}
                 />
-              )
-            )}
+              ))}
           </div>
 
           {/* SCORE POPUPS */}
@@ -1631,14 +1817,20 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
             NEXT →
           </div>
           <div style={{ display: "flex", gap: 6, flex: 1 }}>
-            {queue.slice(1).map((n, i) => (
-              <ElementBall
-                key={i}
-                atomicNumber={n}
-                size={32 - i * 3}
-                shimmer={shimmerQueue[i + 1]}
-              />
-            ))}
+            {queue
+              .slice(1)
+              .map((n, i) =>
+                eGunQueue[i + 1] ? (
+                  <EGunVisual key={i} size={32 - i * 3} />
+                ) : (
+                  <ElementBall
+                    key={i}
+                    atomicNumber={n}
+                    size={32 - i * 3}
+                    shimmer={shimmerQueue[i + 1]}
+                  />
+                ),
+              )}
           </div>
           <div
             style={{
@@ -1778,9 +1970,7 @@ function FeatureTip({
         >
           {title}
         </div>
-        <div style={{ fontSize: 12, color: "var(--foreground)", lineHeight: 1.45 }}>
-          {body}
-        </div>
+        <div style={{ fontSize: 12, color: "var(--foreground)", lineHeight: 1.45 }}>{body}</div>
         <button
           onClick={onClose}
           style={{
@@ -1868,8 +2058,8 @@ function ContinueChoiceModal({
           margin: "0 0 14px",
         }}
       >
-        Claim your stars now, or keep playing to chase a higher score. The level
-        is already complete either way.
+        Claim your stars now, or keep playing to chase a higher score. The level is already complete
+        either way.
       </p>
       {stars > 0 && (
         <div
