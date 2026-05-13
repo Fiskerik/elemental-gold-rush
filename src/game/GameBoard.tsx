@@ -9,6 +9,7 @@ import {
   generateQueueElement,
   checkGameOver,
   formatScore,
+  DANGER_ROWS_FROM_BOTTOM,
 } from "./logic";
 import { ElementBall } from "./ElementBall";
 import { useProgress } from "./store";
@@ -321,11 +322,17 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
             userSelect: "none",
           }}
         >
-          {/* danger zone shading at top */}
+          {/* danger zone shading near the launcher (bottom) */}
           <div style={{
-            position: "absolute", top: 4, left: 4, right: 4, height: cellSize * 1.5,
-            background: "linear-gradient(180deg, var(--danger-glow), transparent)",
-            borderRadius: 12, pointerEvents: "none",
+            position: "absolute",
+            left: 4, right: 4,
+            bottom: 4 + ballSize + 4,
+            height: cellSize * DANGER_ROWS_FROM_BOTTOM,
+            background: "linear-gradient(0deg, var(--danger-glow), transparent)",
+            borderTop: "1px dashed var(--destructive)",
+            borderRadius: 4,
+            pointerEvents: "none",
+            zIndex: 0,
           }} />
 
           <div style={{
