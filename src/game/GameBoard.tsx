@@ -1242,6 +1242,79 @@ function formatTime(ms: number): string {
 }
 
 function DiscoveryModal({ atomicNumber, onClose }: { atomicNumber: number; onClose: () => void }) {
+
+}
+
+function FeatureTip({
+  title,
+  body,
+  onClose,
+}: {
+  title: string;
+  body: string;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      style={{
+        position: "fixed",
+        left: 12,
+        right: 12,
+        bottom: 96,
+        zIndex: 90,
+        display: "flex",
+        justifyContent: "center",
+        pointerEvents: "none",
+      }}
+    >
+      <div
+        style={{
+          maxWidth: 360,
+          width: "100%",
+          background: "var(--surface-elevated)",
+          border: "1px solid var(--accent)",
+          borderRadius: 14,
+          padding: "12px 14px",
+          boxShadow: "0 10px 30px rgba(0,0,0,0.5), 0 0 24px var(--accent-glow)",
+          pointerEvents: "auto",
+          animation: "pop-in 220ms ease-out",
+        }}
+      >
+        <div
+          style={{
+            fontSize: 13,
+            fontWeight: 800,
+            color: "var(--accent)",
+            marginBottom: 4,
+          }}
+        >
+          {title}
+        </div>
+        <div style={{ fontSize: 12, color: "var(--foreground)", lineHeight: 1.45 }}>
+          {body}
+        </div>
+        <button
+          onClick={onClose}
+          style={{
+            marginTop: 10,
+            padding: "6px 12px",
+            borderRadius: 8,
+            border: "none",
+            background: "linear-gradient(135deg, var(--primary), var(--accent))",
+            color: "var(--primary-foreground)",
+            fontWeight: 700,
+            fontSize: 12,
+            cursor: "pointer",
+          }}
+        >
+          Got it
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function _DiscoveryModal_Original({ atomicNumber, onClose }: { atomicNumber: number; onClose: () => void }) {
   const el = ELEMENTS[atomicNumber - 1];
   if (!el) return null;
   return (
