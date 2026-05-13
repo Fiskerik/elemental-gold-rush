@@ -555,9 +555,9 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
           // Advance the queue so play can resume if the user keeps going.
           setQueue((q) => [
             ...q.slice(1),
-            generateQueueElement(dynamicMaxQueue(result.balls.length)),
+            generateQueueElement(dynamicMaxQueue(result.balls.length), level.queueDecay),
           ]);
-          setShimmerQueue((s) => [...s.slice(1), Math.random() < 0.05]);
+          setShimmerQueue((s) => [...s.slice(1), shimmerEnabled && Math.random() < 0.05]);
           setBusy(false);
           return;
         }
@@ -567,9 +567,9 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
         // Advance queue (functional update — guarantees fresh state)
         setQueue((q) => [
           ...q.slice(1),
-          generateQueueElement(dynamicMaxQueue(result.balls.length)),
+          generateQueueElement(dynamicMaxQueue(result.balls.length), level.queueDecay),
         ]);
-        setShimmerQueue((s) => [...s.slice(1), Math.random() < 0.05]);
+        setShimmerQueue((s) => [...s.slice(1), shimmerEnabled && Math.random() < 0.05]);
         if (checkGameOver(result.balls, geo)) {
           setGameOver(true);
           haptic([50, 80, 50, 80, 200]);
