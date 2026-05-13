@@ -28,7 +28,7 @@ export function ElementBall({
   // Scale ball slightly based on periodic-table row.
   // Row 4 is the baseline (1.0×); rows above shrink, rows below grow.
   const period = Math.max(1, Math.min(8, el.period ?? 4));
-  const periodScale = 1 + (period - 4) * 0.07; // row1=0.79 … row8=1.28
+  const periodScale = 1 + (period - 4) * 0.11; // row1=0.67 … row8=1.44
   size = size * periodScale;
   const symbolSize = Math.max(10, size * 0.42);
   const numberSize = Math.max(8, size * 0.22);
