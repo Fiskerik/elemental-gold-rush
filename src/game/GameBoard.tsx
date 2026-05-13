@@ -89,6 +89,14 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
   const [grabMode, setGrabMode] = useState(false);
   const [grabbing, setGrabbing] = useState<{ id: number; x: number; y: number } | null>(null);
 
+  // === Combo bar for Grab power-up ===
+  const GRAB_THRESHOLD = 5;
+  const [lastChain, setLastChain] = useState(0);
+
+  // === Run timer ===
+  const [elapsedMs, setElapsedMs] = useState(0);
+  const startTimeRef = useRef<number>(Date.now());
+
   const target = level.targetElement;
   const targetEl = ELEMENTS[target - 1];
   const current = queue[0];
@@ -119,7 +127,28 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     setGrabs(0);
     setGrabMode(false);
     setGrabbing(null);
+    setLastChain(0);
+    startTimeRef.current = Date.now();
+    setElapsedMs(0);
   }, [levelId, level.gridRows, level.gridCols, level.maxQueueElement]);
+
+  // Tick the run timer every second while the level is active.
+  useEffect(() => {
+    if (gameOver || won) return;
+    const id = setInterval(() => {
+      setElapsedMs(Date.now() - startTimeRef.current);
+    }, 500);
+    return () => clearInterval(id);
+  }, [gameOver, won, levelId]);
+
+  // Dynamic queue cap: as the board fills, unlock higher-tier atoms in the
+  // shooting queue. Adds +1 tier at 15 atoms on board, +2 at 25, etc.
+  // Capped at target-1 so we never spawn the literal target element.
+  function dynamicMaxQueue(boardCount: number): number {
+    const tierBonus = Math.max(0, Math.floor((boardCount - 5) / 10));
+    const cap = Math.max(level.maxQueueElement, target - 1);
+    return Math.min(level.maxQueueElement + tierBonus, cap);
+  }
 
   function spawnPopup(text: string) {
     const id = ++popupId.current;
