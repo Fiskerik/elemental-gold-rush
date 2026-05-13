@@ -858,6 +858,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
               />
             </div>
           </div>
+        </div>
         )}
 
         {/* BOARD */}
