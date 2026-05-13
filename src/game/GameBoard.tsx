@@ -905,7 +905,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
               onPointerUp={(e) => e.stopPropagation()}
               style={{
                 position: "absolute",
-                top: 8,
+                bottom: 8,
                 right: 8,
                 zIndex: 6,
                 padding: "8px 12px",
@@ -990,7 +990,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
                 zIndex: 4,
               }}
             >
-              <ElementBall atomicNumber={current} size={ballSize} glow />
+              <ElementBall atomicNumber={current} size={ballSize} glow shimmer={currentIsShimmer} />
             </div>
           )}
 
@@ -1006,7 +1006,14 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
               transformOrigin: "center center",
             }}
           >
-            {!projectile && <ElementBall atomicNumber={current} size={ballSize} glow />}
+            {!projectile && (
+              <ElementBall
+                atomicNumber={current}
+                size={ballSize}
+                glow
+                shimmer={currentIsShimmer}
+              />
+            )}
           </div>
 
           {/* SCORE POPUPS */}
@@ -1049,7 +1056,12 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
           </div>
           <div style={{ display: "flex", gap: 6, flex: 1 }}>
             {queue.slice(1).map((n, i) => (
-              <ElementBall key={i} atomicNumber={n} size={32 - i * 3} />
+              <ElementBall
+                key={i}
+                atomicNumber={n}
+                size={32 - i * 3}
+                shimmer={shimmerQueue[i + 1]}
+              />
             ))}
           </div>
           <div
@@ -1068,6 +1080,24 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
 
         {discoveryEl !== null && (
           <DiscoveryModal atomicNumber={discoveryEl} onClose={() => setDiscoveryEl(null)} />
+        )}
+        {winChoice && !won && !gameOver && (
+          <ContinueChoiceModal
+            level={level}
+            score={winChoice.score}
+            shots={winChoice.shots}
+            bestCombo={winChoice.bestCombo}
+            stars={winChoice.stars}
+            onClaim={() => {
+              setWon(true);
+              setWinChoice(null);
+            }}
+            onContinue={() => {
+              setContinuingPastTarget(true);
+              setWinChoice(null);
+              spawnPopup("Keep going! Score mode 🚀");
+            }}
+          />
         )}
         {won && (
           <ResultModal
