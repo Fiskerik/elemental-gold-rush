@@ -34,7 +34,7 @@ const EGUN_MIN_SHOT_GAP = 10;
 const GRAVITY_UNLOCK_TIMES_MS = [5, 10, 15].map((minutes) => minutes * 60 * 1000);
 const STONE_MAX_HP = 8;
 
-function StoneVisual({ size, hp, maxHp }: { size: number; hp: number; maxHp: number }) {
+function StoneVisual({ size, hp }: { size: number; hp: number }) {
   return (
     <div
       style={{
@@ -57,9 +57,6 @@ function StoneVisual({ size, hp, maxHp }: { size: number; hp: number; maxHp: num
     >
       <div style={{ fontSize: Math.max(10, size * 0.16), opacity: 0.85, lineHeight: 1 }}>⛰</div>
       <div style={{ fontSize: Math.max(14, size * 0.32), lineHeight: 1.05 }}>{hp}</div>
-      <div style={{ fontSize: Math.max(8, size * 0.12), opacity: 0.7, lineHeight: 1 }}>
-        / {maxHp}
-      </div>
     </div>
   );
 }
@@ -183,6 +180,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
   const [stoneHitIds, setStoneHitIds] = useState<Set<number>>(new Set());
   const [pendingStone, setPendingStone] = useState(false);
   const [hasStoneSpawned, setHasStoneSpawned] = useState(false);
+  const [stoneSpawnCount, setStoneSpawnCount] = useState(0);
 
   // === Combo bar for Grab power-up ===
   // Every successful merge counts toward the current streak (shimmer atoms
@@ -276,6 +274,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     setStoneHitIds(new Set());
     setPendingStone(false);
     setHasStoneSpawned(false);
+    setStoneSpawnCount(0);
     setGravityCharges(0);
     setGravityUnlockIndex(0);
     eGunCooldownSlots.current = 0;
@@ -426,6 +425,13 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
   const TOP_PAD = 6;
   const SIDE_PAD = 4;
 
+  const baseDangerY = boardH - 8 - ballSize - 8;
+  const halfBoardDangerY = boardH / 2;
+  const dangerY = Math.max(
+    halfBoardDangerY,
+    baseDangerY - ((baseDangerY - halfBoardDangerY) * Math.min(stoneSpawnCount, 5)) / 5,
+  );
+
   const geo: Geo = useMemo(
     () => ({
       width: boardW,
@@ -434,10 +440,10 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
       leftPad: SIDE_PAD,
       rightPad: SIDE_PAD,
       topPad: TOP_PAD,
-      // danger line: just above launcher row
-      dangerY: boardH - 8 - ballSize - 8,
+      // danger line rises as Stones spawn; after 5 Stones it reaches half the board.
+      dangerY,
     }),
-    [boardW, boardH, R, ballSize],
+    [boardW, boardH, R, dangerY],
   );
 
   /**
@@ -698,7 +704,6 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     setBalls(updated);
     setWiggleIds(hitIds);
     setTimeout(() => setWiggleIds(new Set()), 380);
-    setGrabProgress(0);
     setNoMergeStreak(0);
     if (reducedAtoms.size > 0)
       reportQuestProgress({ reachedAtomicNumbers: Array.from(reducedAtoms) });
@@ -823,6 +828,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
       });
       setPendingStone(false);
       setHasStoneSpawned(true);
+      setStoneSpawnCount((count) => count + 1);
       setNoMergeStreak(0);
       spawnPopup("⛰ STONE!");
       haptic([30, 50, 30]);
@@ -914,7 +920,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
           spawnPopup(`⛰ +${formatScore(directStoneBonus)}`);
           haptic([40, 60, 40, 60, 100]);
         } else {
-          spawnPopup(`💥 ${newHp}/${maxHp}`);
+          spawnPopup(`💥 ${newHp}`);
         }
         // Hitting a stone breaks the no-merge streak so we don't pile them up.
         setNoMergeStreak(0);
@@ -1547,6 +1553,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
       return [...others, stone];
     });
     setHasStoneSpawned(true);
+    setStoneSpawnCount((count) => count + 1);
     spawnPopup("⛰ STONE!");
     haptic([30, 50, 30]);
     showTip(
@@ -1839,7 +1846,6 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
               const y = isDrag ? grabbing!.y : b.y;
               if (b.stoneHp != null) {
                 const hp = b.stoneHp;
-                const maxHp = b.stoneMaxHp ?? STONE_MAX_HP;
                 const isHit = stoneHitIds.has(b.id);
                 const size = b.r * 2;
                 return (
@@ -1878,11 +1884,6 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
                     <div style={{ fontSize: Math.max(14, size * 0.32), lineHeight: 1.05 }}>
                       {hp}
                     </div>
-                    <div
-                      style={{ fontSize: Math.max(8, size * 0.12), opacity: 0.7, lineHeight: 1 }}
-                    >
-                      / {maxHp}
-                    </div>
                   </div>
                 );
               }
@@ -1910,69 +1911,6 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
             })}
           </div>
 
-          {/* GRAVITY BUTTON */}
-          {gravityCharges > 0 && (
-            <button
-              title="Gravity: make all atoms fall upward. Combos count toward Grab progress."
-              onClick={(e) => {
-                e.stopPropagation();
-                triggerGravityPowerUp();
-              }}
-              onPointerDown={(e) => e.stopPropagation()}
-              onPointerUp={(e) => e.stopPropagation()}
-              style={{
-                position: "absolute",
-                bottom: grabs > 0 ? 54 : 8,
-                right: 8,
-                zIndex: 6,
-                padding: "8px 12px",
-                borderRadius: 12,
-                border: "1px solid var(--accent)",
-                background: "linear-gradient(135deg, oklch(0.55 0.16 260), var(--primary))",
-                color: "var(--primary-foreground)",
-                fontSize: 12,
-                fontWeight: 800,
-                letterSpacing: 1,
-                cursor: busy ? "not-allowed" : "pointer",
-                boxShadow: "0 0 16px var(--accent-glow)",
-                opacity: busy ? 0.65 : 1,
-              }}
-            >
-              🌀 GRAVITY ×{gravityCharges}
-            </button>
-          )}
-
-          {/* GRAB BUTTON */}
-          {grabs > 0 && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setGrabMode((g) => !g);
-              }}
-              onPointerDown={(e) => e.stopPropagation()}
-              onPointerUp={(e) => e.stopPropagation()}
-              style={{
-                position: "absolute",
-                bottom: 8,
-                right: 8,
-                zIndex: 6,
-                padding: "8px 12px",
-                borderRadius: 12,
-                border: `1px solid ${grabMode ? "var(--accent)" : "var(--border)"}`,
-                background: grabMode
-                  ? "linear-gradient(135deg, var(--accent), var(--primary))"
-                  : "var(--surface-elevated)",
-                color: grabMode ? "var(--primary-foreground)" : "var(--foreground)",
-                fontSize: 12,
-                fontWeight: 800,
-                letterSpacing: 1,
-                cursor: "pointer",
-                boxShadow: grabMode ? "0 0 16px var(--accent-glow)" : undefined,
-              }}
-            >
-              🤚 GRAB ×{grabs}
-            </button>
-          )}
           {grabMode && (
             <div
               style={{
@@ -2039,7 +1977,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
               }}
             >
               {pendingStone ? (
-                <StoneVisual size={projShotSize} hp={STONE_MAX_HP} maxHp={STONE_MAX_HP} />
+                <StoneVisual size={projShotSize} hp={STONE_MAX_HP} />
               ) : currentIsEGun ? (
                 <EGunVisual size={projShotSize} />
               ) : (
@@ -2067,7 +2005,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
           >
             {!projectile &&
               (pendingStone ? (
-                <StoneVisual size={projShotSize} hp={STONE_MAX_HP} maxHp={STONE_MAX_HP} />
+                <StoneVisual size={projShotSize} hp={STONE_MAX_HP} />
               ) : currentIsEGun ? (
                 <EGunVisual size={projShotSize} />
               ) : (
@@ -2136,15 +2074,54 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
           </div>
           <div
             style={{
-              fontSize: 10,
-              color: "var(--muted-foreground)",
-              textAlign: "right",
-              lineHeight: 1.3,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "flex-end",
+              gap: 6,
+              minWidth: 74,
             }}
           >
-            Drag to aim
-            <br />
-            Tap to shoot
+            {gravityCharges > 0 && (
+              <button
+                type="button"
+                title="Gravity: make all atoms fall upward. Combos count toward Grab progress."
+                aria-label={`Use Gravity power-up (${gravityCharges} available)`}
+                onClick={triggerGravityPowerUp}
+                disabled={busy}
+                style={{
+                  ...powerUpIconBtn,
+                  border: "1px solid var(--accent)",
+                  background: "linear-gradient(135deg, oklch(0.55 0.16 260), var(--primary))",
+                  color: "var(--primary-foreground)",
+                  boxShadow: "0 0 14px var(--accent-glow)",
+                  opacity: busy ? 0.65 : 1,
+                  cursor: busy ? "not-allowed" : "pointer",
+                }}
+              >
+                <span aria-hidden="true">🌀</span>
+                <span style={powerUpCount}>{gravityCharges}</span>
+              </button>
+            )}
+            {grabs > 0 && (
+              <button
+                type="button"
+                title="Grab: drag any atom on the board to a new position."
+                aria-label={`Toggle Grab power-up (${grabs} available)`}
+                onClick={() => setGrabMode((g) => !g)}
+                style={{
+                  ...powerUpIconBtn,
+                  border: `1px solid ${grabMode ? "var(--accent)" : "var(--border)"}`,
+                  background: grabMode
+                    ? "linear-gradient(135deg, var(--accent), var(--primary))"
+                    : "var(--surface-elevated)",
+                  color: grabMode ? "var(--primary-foreground)" : "var(--foreground)",
+                  boxShadow: grabMode ? "0 0 14px var(--accent-glow)" : undefined,
+                }}
+              >
+                <span aria-hidden="true">🤚</span>
+                <span style={powerUpCount}>{grabs}</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -2207,6 +2184,36 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     </div>
   );
 }
+
+const powerUpIconBtn: React.CSSProperties = {
+  position: "relative",
+  width: 40,
+  height: 40,
+  borderRadius: 12,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  fontSize: 20,
+  fontWeight: 900,
+  cursor: "pointer",
+};
+
+const powerUpCount: React.CSSProperties = {
+  position: "absolute",
+  right: -4,
+  bottom: -4,
+  minWidth: 16,
+  height: 16,
+  padding: "0 4px",
+  borderRadius: 999,
+  background: "var(--surface)",
+  border: "1px solid var(--border)",
+  color: "var(--foreground)",
+  fontSize: 10,
+  lineHeight: "14px",
+  fontWeight: 900,
+  fontVariantNumeric: "tabular-nums",
+};
 
 const iconBtn: React.CSSProperties = {
   background: "var(--surface)",
