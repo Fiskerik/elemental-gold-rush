@@ -450,8 +450,46 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
       const sy = Math.max(TOP_PAD + sR, y);
       setBalls((prev) => {
         const others = prev.map((b) => ({ ...b }));
+        // Shockwave: stone shoves nearby atoms with 5× reach and force,
+        // and those primary-pushed atoms cascade into secondary collisions.
+        const SHOCK_REACH = sR * 1.6 * STONE_NUDGE_MULT;
+        const SHOCK_FORCE = sR * 0.25 * STONE_NUDGE_MULT;
+        const primaryIds = new Set<number>();
+        for (const o of others) {
+          if (o.stoneHp != null) continue;
+          const dxs = o.x - sx;
+          const dys = o.y - sy;
+          const d = Math.hypot(dxs, dys) || 0.001;
+          if (d < SHOCK_REACH) {
+            const falloff = 1 - d / SHOCK_REACH;
+            o.x += (dxs / d) * SHOCK_FORCE * falloff;
+            o.y += (dys / d) * SHOCK_FORCE * falloff;
+            primaryIds.add(o.id);
+          }
+        }
+        // Secondary cascade: anyone touching a primary-pushed atom gets a
+        // weaker push along the same outward direction.
+        const SECONDARY = 0.4;
+        for (const a of others) {
+          if (!primaryIds.has(a.id)) continue;
+          const ax = a.x - sx;
+          const ay = a.y - sy;
+          const ad = Math.hypot(ax, ay) || 0.001;
+          const ux = ax / ad;
+          const uy = ay / ad;
+          for (const b of others) {
+            if (b.id === a.id) continue;
+            if (primaryIds.has(b.id)) continue;
+            if (b.stoneHp != null) continue;
+            const dd = Math.hypot(b.x - a.x, b.y - a.y);
+            if (dd < (a.r + b.r) * 1.4) {
+              b.x += ux * SHOCK_FORCE * SECONDARY;
+              b.y += uy * SHOCK_FORCE * SECONDARY;
+            }
+          }
+        }
         // Push existing balls outward and resolve overlaps so the stone fits.
-        for (let iter = 0; iter < 18; iter++) {
+        for (let iter = 0; iter < 30; iter++) {
           let moved = false;
           for (const o of others) {
             const dxs = o.x - sx;
