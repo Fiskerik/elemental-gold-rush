@@ -179,7 +179,6 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
   const [noMergeStreak, setNoMergeStreak] = useState(0);
   const [stoneHitIds, setStoneHitIds] = useState<Set<number>>(new Set());
   const [pendingStone, setPendingStone] = useState(false);
-  const [hasStoneSpawned, setHasStoneSpawned] = useState(false);
   const [stoneSpawnCount, setStoneSpawnCount] = useState(0);
 
   // === Combo bar for Grab power-up ===
@@ -218,7 +217,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
   const currentIsEGun = eGunQueue[0] ?? false;
 
   const sfx = (fn: () => void) => {
-    if (soundEnabled && hasStoneSpawned) fn();
+    if (soundEnabled) fn();
   };
   const haptic = (ms: number | number[]) => {
     if (hapticsEnabled) vibrate(ms);
@@ -273,7 +272,6 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     setNoMergeStreak(0);
     setStoneHitIds(new Set());
     setPendingStone(false);
-    setHasStoneSpawned(false);
     setStoneSpawnCount(0);
     setGravityCharges(0);
     setGravityUnlockIndex(0);
@@ -827,7 +825,6 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
         return [...others, stone];
       });
       setPendingStone(false);
-      setHasStoneSpawned(true);
       setStoneSpawnCount((count) => count + 1);
       setNoMergeStreak(0);
       spawnPopup("⛰ STONE!");
@@ -1552,7 +1549,6 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
       };
       return [...others, stone];
     });
-    setHasStoneSpawned(true);
     setStoneSpawnCount((count) => count + 1);
     spawnPopup("⛰ STONE!");
     haptic([30, 50, 30]);
