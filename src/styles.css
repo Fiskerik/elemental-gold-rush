@@ -214,42 +214,34 @@
   color: transparent;
   animation: shimmer 3s linear infinite;
 }
-@keyframes sparkle-spin {
-  0% { transform: rotate(0deg); opacity: 0.55; }
-  50% { opacity: 1; }
-  100% { transform: rotate(360deg); opacity: 0.55; }
+@keyframes rainbow-hue {
+  0%   { filter: hue-rotate(0deg); }
+  100% { filter: hue-rotate(360deg); }
+}
+@keyframes rainbow-spin {
+  0%   { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 .shimmer-atom {
   position: relative;
   border-radius: 50%;
 }
+/* Rotating rainbow ring just outside the atom edge. */
 .shimmer-atom::before {
   content: "";
   position: absolute;
-  inset: -6%;
+  inset: -10%;
   border-radius: 50%;
-  background: conic-gradient(from 0deg,
-    rgba(255,255,255,0) 0%,
-    rgba(255, 245, 157, 0.95) 12%,
-    rgba(255, 214, 0, 0.85) 22%,
-    rgba(255,255,255,0) 38%,
-    rgba(255,255,255,0) 60%,
-    rgba(186, 230, 253, 0.85) 72%,
-    rgba(255, 245, 157, 0.95) 82%,
-    rgba(255,255,255,0) 100%);
-  filter: blur(2px);
-  animation: sparkle-spin 1.6s linear infinite;
+  padding: 8%;
+  background: conic-gradient(
+    from 0deg,
+    #ff004d, #ff8a00, #ffe600, #14ff7a,
+    #00d4ff, #4d5bff, #b400ff, #ff00a8, #ff004d
+  );
+  -webkit-mask: radial-gradient(circle, transparent 58%, black 60%, black 100%);
+          mask: radial-gradient(circle, transparent 58%, black 60%, black 100%);
+  animation: rainbow-spin 2.4s linear infinite, rainbow-hue 3s linear infinite;
+  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.55));
   pointer-events: none;
-  z-index: -1;
-}
-.shimmer-atom::after {
-  content: "✦";
-  position: absolute;
-  top: -10%;
-  right: -10%;
-  font-size: 65%;
-  color: #FFF59D;
-  text-shadow: 0 0 6px #FFD600, 0 0 10px #FFA000;
-  animation: pulse-glow 1.2s ease-in-out infinite;
-  pointer-events: none;
+  z-index: 0;
 }
