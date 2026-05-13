@@ -275,7 +275,9 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     if (hitId !== null) {
       const hb = balls.find((b) => b.id === hitId);
       if (hb && hb.atom !== current) {
-        const NUDGE = R * 0.35;
+        // Heavier elements (lower in the periodic table) hit harder.
+        const projPeriod = Math.max(1, Math.min(8, ELEMENTS[current - 1]?.period ?? 4));
+        const NUDGE = R * (0.15 + projPeriod * 0.12); // row1≈0.27R … row8≈1.11R
         const minX = SIDE_PAD + R;
         const maxX = boardW - SIDE_PAD - R;
         const ceilingY = TOP_PAD + R;
