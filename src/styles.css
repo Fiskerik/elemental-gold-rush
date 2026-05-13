@@ -198,6 +198,14 @@
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
 }
+@keyframes wiggle {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  15% { transform: translate(-2px, 1px) rotate(-6deg); }
+  30% { transform: translate(2px, -1px) rotate(6deg); }
+  45% { transform: translate(-2px, 0) rotate(-4deg); }
+  60% { transform: translate(2px, 1px) rotate(4deg); }
+  80% { transform: translate(-1px, 0) rotate(-2deg); }
+}
 .gold-text {
   background: linear-gradient(90deg, #FFD600, #FFF59D, #FFA000, #FFD600);
   background-size: 200% 100%;
