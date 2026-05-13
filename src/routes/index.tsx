@@ -5,15 +5,24 @@ import { GameBoard } from "@/game/GameBoard";
 import { LevelSelect } from "@/game/LevelSelect";
 import { Collection } from "@/game/Collection";
 import { Settings } from "@/game/Settings";
+import { Shop } from "@/game/Shop";
 import { useProgress } from "@/game/store";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "Elemental Gold Rush — Periodic Table Merge Puzzle" },
-      { name: "description", content: "Fuse atoms, climb the periodic table, and chase Gold in this addictive merge puzzle game. 118 elements with real chemistry facts." },
+      {
+        name: "description",
+        content:
+          "Fuse atoms, climb the periodic table, and chase Gold in this addictive merge puzzle game. 118 elements with real chemistry facts.",
+      },
       { property: "og:title", content: "Elemental Gold Rush" },
-      { property: "og:description", content: "Merge hydrogen into helium, helium into lithium... all the way to gold and beyond." },
+      {
+        property: "og:description",
+        content:
+          "Merge hydrogen into helium, helium into lithium... all the way to gold and beyond.",
+      },
     ],
   }),
   component: Index,
@@ -24,6 +33,7 @@ type Screen =
   | { name: "levels" }
   | { name: "game"; levelId: number }
   | { name: "collection" }
+  | { name: "shop" }
   | { name: "settings" };
 
 function Index() {
@@ -38,6 +48,7 @@ function Index() {
           onLevels={() => setScreen({ name: "levels" })}
           onCollection={() => setScreen({ name: "collection" })}
           onSettings={() => setScreen({ name: "settings" })}
+          onShop={() => setScreen({ name: "shop" })}
         />
       );
     case "levels":
@@ -60,6 +71,8 @@ function Index() {
       );
     case "collection":
       return <Collection onBack={() => setScreen({ name: "menu" })} />;
+    case "shop":
+      return <Shop onBack={() => setScreen({ name: "menu" })} />;
     case "settings":
       return <Settings onBack={() => setScreen({ name: "menu" })} />;
   }
