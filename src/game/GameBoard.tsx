@@ -954,7 +954,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
             <div
               style={{
                 position: "absolute",
-                top: 8,
+                bottom: 8,
                 left: 8,
                 zIndex: 6,
                 padding: "6px 10px",
