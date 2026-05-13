@@ -422,7 +422,9 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
 
     // animate projectile along path
     const path = hit.path;
-    const totalMs = Math.min(360, 60 + path.length * 4);
+    const baseMs = Math.min(360, 60 + path.length * 4);
+    // Stones fly twice as fast.
+    const totalMs = pendingStone ? baseMs / 2 : baseMs;
     const stepMs = totalMs / path.length;
     let i = 0;
     setProjectile(path[0]);
