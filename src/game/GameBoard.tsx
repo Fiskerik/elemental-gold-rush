@@ -28,6 +28,34 @@ const MAX_AIM_DEG = 75;
 const SHIMMER_MIN_LEVEL = 5;
 const GRAB_MIN_LEVEL = 7;
 const STONE_MAX_HP = 8;
+
+function StoneVisual({ size, hp, maxHp }: { size: number; hp: number; maxHp: number }) {
+  return (
+    <div
+      style={{
+        width: size,
+        height: size,
+        borderRadius: "50%",
+        background:
+          "radial-gradient(circle at 30% 28%, oklch(0.55 0.02 60), oklch(0.32 0.02 60) 60%, oklch(0.18 0.02 60))",
+        boxShadow:
+          "0 6px 14px rgba(0,0,0,0.55), inset 0 -8px 14px rgba(0,0,0,0.45), inset 0 6px 12px rgba(255,255,255,0.12)",
+        border: "2px solid oklch(0.25 0.02 60)",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        color: "oklch(0.95 0.02 60)",
+        fontWeight: 900,
+        textShadow: "0 1px 2px rgba(0,0,0,0.7)",
+      }}
+    >
+      <div style={{ fontSize: Math.max(10, size * 0.16), opacity: 0.85, lineHeight: 1 }}>⛰</div>
+      <div style={{ fontSize: Math.max(14, size * 0.32), lineHeight: 1.05 }}>{hp}</div>
+      <div style={{ fontSize: Math.max(8, size * 0.12), opacity: 0.7, lineHeight: 1 }}>/ {maxHp}</div>
+    </div>
+  );
+}
 const STONE_NO_MERGE_TRIGGER = 3;
 const STONE_NUDGE_MULT = 5;
 
