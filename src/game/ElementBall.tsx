@@ -9,6 +9,7 @@ interface Props {
   style?: React.CSSProperties;
   showMass?: boolean;
   highlight?: boolean;
+  wiggle?: boolean;
 }
 
 export function ElementBall({
@@ -20,6 +21,7 @@ export function ElementBall({
   style,
   showMass,
   highlight,
+  wiggle,
 }: Props) {
   const el = ELEMENTS[atomicNumber - 1];
   if (!el) return null;
@@ -47,7 +49,11 @@ export function ElementBall({
         cursor: onClick ? "pointer" : "default",
         userSelect: "none",
         textShadow: "0 1px 0 rgba(255,255,255,0.4)",
-        animation: highlight ? "pop-in 320ms ease-out, pulse-glow 1.6s ease-in-out infinite 320ms" : undefined,
+        animation: wiggle
+          ? "wiggle 360ms ease-in-out"
+          : highlight
+            ? "pop-in 320ms ease-out, pulse-glow 1.6s ease-in-out infinite 320ms"
+            : undefined,
         ...style,
       }}
     >
