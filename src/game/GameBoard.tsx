@@ -117,6 +117,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
   const target = level.targetElement;
   const targetEl = ELEMENTS[target - 1];
   const current = queue[0];
+  const currentIsShimmer = shimmerQueue[0] ?? false;
 
   const sfx = (fn: () => void) => {
     if (soundEnabled) fn();
@@ -400,15 +401,13 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     // Refresh radii on any merged survivors (their atom changed).
     setBalls(result.balls.map((b) => ({ ...b, r: radiusFor(b.atom) })));
     setHighlightId(result.finalBallId);
+    const shimmerHit = currentIsShimmer && result.merges.length > 0;
+    const grabAdd = result.merges.length * (shimmerHit ? 2 : 1);
     if (result.merges.length > 0) {
       const comboLabel = getComboLabel(result.merges.length);
       if (comboLabel) spawnPopup(comboLabel);
       setRunBestCombo((best) => Math.max(best, result.merges.length));
       setBestCombo(result.merges.length);
-      if (result.merges.length >= GRAB_THRESHOLD) {
-        setGrabs((g) => g + 1);
-        spawnPopup("🤚 GRAB UNLOCKED!");
-      }
       result.merges.forEach((m, i) => {
         setTimeout(
           () => {
@@ -420,12 +419,25 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
         );
       });
     }
-    setLastChain(result.merges.length);
+    if (shimmerHit) spawnPopup("✦ SHIMMER ×2 ✦");
+    if (grabAdd > 0) {
+      setGrabProgress((p) => {
+        const total = p + grabAdd;
+        const earned = Math.floor(total / GRAB_THRESHOLD);
+        if (earned > 0) {
+          setGrabs((g) => g + earned);
+          spawnPopup(`🤚 GRAB UNLOCKED${earned > 1 ? ` ×${earned}` : ""}!`);
+        }
+        return total % GRAB_THRESHOLD;
+      });
+    }
 
     const nextHighest = Math.max(highest, result.highestElement);
     setHighest(nextHighest);
     setHighestElement(nextHighest);
-    const gained = Math.floor(result.scoreGained * level.scoreMultiplier);
+    const gained = Math.floor(
+      result.scoreGained * level.scoreMultiplier * (shimmerHit ? 2 : 1),
+    );
     const nextScore = score + gained;
     const nextBestCombo = Math.max(runBestCombo, result.merges.length);
     setScore(nextScore);
@@ -443,15 +455,28 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     setTimeout(
       () => {
         setHighlightId(null);
-        if (result.levelComplete) {
+        if (result.levelComplete && !continuingPastTarget) {
           const stars = calculateStars(level, nextScore, nextShots, nextBestCombo);
           setEarnedStars(stars);
           setLevelStars(levelId, stars);
           reportQuestProgress({ levelCleared: true });
-          setWon(true);
+          unlockLevel(levelId + 1);
           sfx(playWinSound);
           haptic([30, 60, 30, 60, 80]);
-          unlockLevel(levelId + 1);
+          // Offer a choice — claim the win or keep playing for score.
+          setWinChoice({
+            stars,
+            score: nextScore,
+            shots: nextShots,
+            bestCombo: nextBestCombo,
+          });
+          // Advance the queue so play can resume if the user keeps going.
+          setQueue((q) => [
+            ...q.slice(1),
+            generateQueueElement(dynamicMaxQueue(result.balls.length)),
+          ]);
+          setShimmerQueue((s) => [...s.slice(1), Math.random() < 0.12]);
+          setBusy(false);
           return;
         }
         if (firstDiscovery && firstDiscovery > 1) {
@@ -462,6 +487,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
           ...q.slice(1),
           generateQueueElement(dynamicMaxQueue(result.balls.length)),
         ]);
+        setShimmerQueue((s) => [...s.slice(1), Math.random() < 0.12]);
         if (checkGameOver(result.balls, geo)) {
           setGameOver(true);
           haptic([50, 80, 50, 80, 200]);
