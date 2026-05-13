@@ -10,6 +10,9 @@ export interface Ball {
   atom: number;
   /** Visual+collision radius in px (matches the rendered ball edge). */
   r: number;
+  /** When set, this ball is a Stone obstacle — never merges. */
+  stoneHp?: number;
+  stoneMaxHp?: number;
 }
 export type Board = Ball[];
 
@@ -74,8 +77,10 @@ export function placeAndMerge(
   while (changed) {
     changed = false;
     for (let i = 0; i < list.length && !changed; i++) {
+      if (list[i].stoneHp != null) continue;
       if (list[i].atom >= maxElement) continue;
       for (let j = i + 1; j < list.length && !changed; j++) {
+        if (list[j].stoneHp != null) continue;
         if (list[j].atom !== list[i].atom) continue;
         if (!withinAdj(list[i], list[j])) continue;
         // Survivor: always the upper ball (smaller y); tiebreak smaller x.

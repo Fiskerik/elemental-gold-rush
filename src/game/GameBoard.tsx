@@ -27,6 +27,9 @@ const QUEUE_SIZE = 4;
 const MAX_AIM_DEG = 75;
 const SHIMMER_MIN_LEVEL = 5;
 const GRAB_MIN_LEVEL = 7;
+const STONE_MAX_HP = 8;
+const STONE_NO_MERGE_TRIGGER = 3;
+const STONE_NUDGE_MULT = 5;
 
 function getComboLabel(mergeCount: number): string | null {
   if (mergeCount >= 6) return "Nuclear Rush!";
@@ -106,6 +109,12 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
   const [grabMode, setGrabMode] = useState(false);
   const [grabbing, setGrabbing] = useState<{ id: number; x: number; y: number } | null>(null);
 
+  // === Stone obstacle ===
+  // After STONE_NO_MERGE_TRIGGER shots in a row that produce no merges, a
+  // large indestructible-but-breakable Stone appears on the board.
+  const [noMergeStreak, setNoMergeStreak] = useState(0);
+  const [stoneHitIds, setStoneHitIds] = useState<Set<number>>(new Set());
+
   // === Combo bar for Grab power-up ===
   // Every successful merge counts +1 (shimmer atoms count +2). When the bar
   // fills to GRAB_THRESHOLD it grants a Grab and rolls over.
@@ -176,6 +185,8 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     setGrabProgress(0);
     setContinuingPastTarget(false);
     setWinChoice(null);
+    setNoMergeStreak(0);
+    setStoneHitIds(new Set());
     startTimeRef.current = Date.now();
     setElapsedMs(0);
     // Per-level intro tooltips for newly unlocked features.
@@ -391,6 +402,70 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
   }
 
   function triggerImpact(x: number, y: number, hitId: number | null, dirX: number, dirY: number) {
+    // === Stone hit branch ===
+    // Hitting a Stone deals 1 damage, shoves neighbors with 5× force, and
+    // shrinks the stone. If destroyed, awards a big score bonus.
+    if (hitId !== null) {
+      const stone = balls.find((b) => b.id === hitId && b.stoneHp != null);
+      if (stone) {
+        const projR = radiusFor(current);
+        const projPeriod = Math.max(1, Math.min(8, ELEMENTS[current - 1]?.period ?? 4));
+        const NUDGE = projR * (0.15 + projPeriod * 0.12) * STONE_NUDGE_MULT;
+        const moved = new Map<number, { x: number; y: number }>();
+        for (const o of balls) {
+          if (o.id === stone.id) continue;
+          if (o.stoneHp != null) continue;
+          const dxs = o.x - stone.x;
+          const dys = o.y - stone.y;
+          const d = Math.hypot(dxs, dys);
+          const reach = stone.r + o.r * 2.2;
+          if (d < reach) {
+            const ux = d > 0.001 ? dxs / d : dirX;
+            const uy = d > 0.001 ? dys / d : dirY;
+            const oMinX = SIDE_PAD + o.r;
+            const oMaxX = boardW - SIDE_PAD - o.r;
+            const oCeil = TOP_PAD + o.r;
+            let ox = o.x + ux * NUDGE;
+            let oy = o.y + uy * NUDGE;
+            ox = Math.max(oMinX, Math.min(oMaxX, ox));
+            oy = Math.max(oCeil, oy);
+            moved.set(o.id, { x: ox, y: oy });
+          }
+        }
+        const newHp = (stone.stoneHp ?? STONE_MAX_HP) - 1;
+        const maxHp = stone.stoneMaxHp ?? STONE_MAX_HP;
+        const initialR = (ballSize / 2) * (1 + (8 - 4) * 0.11);
+        const newR = Math.max(initialR * 0.35, initialR * (newHp / maxHp));
+        const updated: Board = balls
+          .map((b) => {
+            if (b.id === stone.id) {
+              if (newHp <= 0) return null;
+              return { ...b, stoneHp: newHp, r: newR };
+            }
+            const m = moved.get(b.id);
+            return m ? { ...b, x: m.x, y: m.y } : b;
+          })
+          .filter((b): b is Ball => b !== null);
+        // Crackle anim on the stone
+        setStoneHitIds(new Set([stone.id]));
+        setTimeout(() => setStoneHitIds(new Set()), 380);
+        haptic([20, 30, 30]);
+        sfx(playShootSound);
+        if (newHp <= 0) {
+          const bonus = Math.floor(maxHp * 250 * level.scoreMultiplier);
+          setScore((s) => s + bonus);
+          addScore(bonus);
+          spawnPopup(`⛰ +${formatScore(bonus)}`);
+          haptic([40, 60, 40, 60, 100]);
+        } else {
+          spawnPopup(`💥 ${newHp}/${maxHp}`);
+        }
+        // Hitting a stone breaks the no-merge streak so we don't pile them up.
+        setNoMergeStreak(0);
+        finalizePlacement(x, y, updated);
+        return;
+      }
+    }
     // Wiggle nearby same-type balls before placing.
     const projR = radiusFor(current);
     const ADJ_F = 1.4;
@@ -477,7 +552,11 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     if (undiscovered.length > 0) recordDiscovery(undiscovered);
 
     // Refresh radii on any merged survivors (their atom changed).
-    setBalls(result.balls.map((b) => ({ ...b, r: radiusFor(b.atom) })));
+    setBalls(
+      result.balls.map((b) =>
+        b.stoneHp != null ? b : { ...b, r: radiusFor(b.atom) },
+      ),
+    );
     setHighlightId(result.finalBallId);
     const shimmerHit = currentIsShimmer && result.merges.length > 0;
     const grabAdd = result.merges.length * (shimmerHit ? 2 : 1);
@@ -511,6 +590,21 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     } else {
       // Missed shot — atom didn't merge with anything. Cool the combo bar.
       setGrabProgress((p) => Math.max(0, p - 1));
+    }
+
+    // === Stone spawn check ===
+    // Track shots that produce zero merges. After 3 in a row, spawn a Stone.
+    if (result.merges.length === 0) {
+      setNoMergeStreak((s) => {
+        const next = s + 1;
+        if (next >= STONE_NO_MERGE_TRIGGER) {
+          setTimeout(() => spawnStoneOnBoard(), 220);
+          return 0;
+        }
+        return next;
+      });
+    } else {
+      setNoMergeStreak(0);
     }
 
     const nextHighest = Math.max(highest, result.highestElement);
@@ -641,7 +735,11 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     const undiscovered = Array.from(newAtoms).filter((n) => !discoveredElements.includes(n));
     if (undiscovered.length > 0) recordDiscovery(undiscovered);
 
-    setBalls(result.balls.map((b) => ({ ...b, r: radiusFor(b.atom) })));
+    setBalls(
+      result.balls.map((b) =>
+        b.stoneHp != null ? b : { ...b, r: radiusFor(b.atom) },
+      ),
+    );
     setHighlightId(result.finalBallId);
     if (result.merges.length > 0) {
       const comboLabel = getComboLabel(result.merges.length);
@@ -672,6 +770,73 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
       maxChainDepth: result.merges.length,
     });
     setTimeout(() => setHighlightId(null), 200 + result.merges.length * 120);
+  }
+
+  // Spawn a Stone obstacle near the top of the board, pushing nearby balls
+  // outward to make room.
+  function spawnStoneOnBoard() {
+    const stoneR = (ballSize / 2) * (1 + (8 - 4) * 0.11);
+    const sx = boardW / 2;
+    const sy = TOP_PAD + stoneR + 6;
+    setBalls((prev) => {
+      const others = prev.map((b) => ({ ...b }));
+      for (let iter = 0; iter < 18; iter++) {
+        let moved = false;
+        for (const o of others) {
+          const dxs = o.x - sx;
+          const dys = o.y - sy;
+          const d = Math.hypot(dxs, dys) || 0.001;
+          const min = stoneR + o.r;
+          if (d < min) {
+            const push = min - d + 0.5;
+            o.x += (dxs / d) * push;
+            o.y += (dys / d) * push;
+            moved = true;
+          }
+        }
+        for (let i = 0; i < others.length; i++) {
+          for (let j = i + 1; j < others.length; j++) {
+            const a = others[i];
+            const b = others[j];
+            if (a.stoneHp != null && b.stoneHp != null) continue;
+            const dx = b.x - a.x;
+            const dy = b.y - a.y;
+            const d = Math.hypot(dx, dy) || 0.001;
+            const min = a.r + b.r;
+            if (d < min) {
+              const push = (min - d) / 2 + 0.25;
+              a.x -= (dx / d) * push;
+              a.y -= (dy / d) * push;
+              b.x += (dx / d) * push;
+              b.y += (dy / d) * push;
+              moved = true;
+            }
+          }
+        }
+        for (const o of others) {
+          o.x = Math.max(SIDE_PAD + o.r, Math.min(boardW - SIDE_PAD - o.r, o.x));
+          o.y = Math.max(TOP_PAD + o.r, o.y);
+        }
+        if (!moved) break;
+      }
+      const stone: Ball = {
+        id: nextBallId(),
+        x: sx,
+        y: sy,
+        atom: -1,
+        r: stoneR,
+        stoneHp: STONE_MAX_HP,
+        stoneMaxHp: STONE_MAX_HP,
+      };
+      return [...others, stone];
+    });
+    spawnPopup("⛰ STONE!");
+    haptic([30, 50, 30]);
+    showTip(
+      "feature-stone",
+      "⛰ A Stone appeared!",
+      "Stones don't merge with anything. Hit one with atoms to crack it — each impact shoves nearby atoms 5× harder than usual. Destroy it after 8 hits for a big score bonus.",
+    );
   }
 
   // === aim handling ===
@@ -873,6 +1038,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
               let hit: Ball | null = null;
               for (let i = balls.length - 1; i >= 0; i--) {
                 const b = balls[i];
+                if (b.stoneHp != null) continue;
                 if (Math.hypot(px - b.x, py - b.y) <= b.r) {
                   hit = b;
                   break;
@@ -954,6 +1120,51 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
               const isDrag = grabbing?.id === b.id;
               const x = isDrag ? grabbing!.x : b.x;
               const y = isDrag ? grabbing!.y : b.y;
+              if (b.stoneHp != null) {
+                const hp = b.stoneHp;
+                const maxHp = b.stoneMaxHp ?? STONE_MAX_HP;
+                const isHit = stoneHitIds.has(b.id);
+                const size = b.r * 2;
+                return (
+                  <div
+                    key={b.id}
+                    className={isHit ? "stone-hit" : undefined}
+                    style={{
+                      position: "absolute",
+                      left: x - b.r,
+                      top: y - b.r,
+                      width: size,
+                      height: size,
+                      borderRadius: "50%",
+                      background:
+                        "radial-gradient(circle at 30% 28%, oklch(0.55 0.02 60), oklch(0.32 0.02 60) 60%, oklch(0.18 0.02 60))",
+                      boxShadow:
+                        "0 6px 14px rgba(0,0,0,0.55), inset 0 -8px 14px rgba(0,0,0,0.45), inset 0 6px 12px rgba(255,255,255,0.12)",
+                      border: "2px solid oklch(0.25 0.02 60)",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "oklch(0.95 0.02 60)",
+                      fontWeight: 900,
+                      transition: isHit
+                        ? "left 180ms ease-out, top 180ms ease-out, width 220ms ease-out, height 220ms ease-out"
+                        : "left 180ms ease-out, top 180ms ease-out, width 220ms ease-out, height 220ms ease-out",
+                      textShadow: "0 1px 2px rgba(0,0,0,0.7)",
+                    }}
+                  >
+                    <div style={{ fontSize: Math.max(10, size * 0.16), opacity: 0.85, lineHeight: 1 }}>
+                      ⛰
+                    </div>
+                    <div style={{ fontSize: Math.max(14, size * 0.32), lineHeight: 1.05 }}>
+                      {hp}
+                    </div>
+                    <div style={{ fontSize: Math.max(8, size * 0.12), opacity: 0.7, lineHeight: 1 }}>
+                      / {maxHp}
+                    </div>
+                  </div>
+                );
+              }
               return (
                 <div
                   key={b.id}
