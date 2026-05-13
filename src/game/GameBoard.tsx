@@ -241,6 +241,8 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
   // win, or keep playing for score. While `continuingPastTarget` is true we
   // suppress further win prompts.
   const [continuingPastTarget, setContinuingPastTarget] = useState(false);
+  const [continueStartedElapsedMs, setContinueStartedElapsedMs] = useState<number | null>(null);
+  const [continueClaimPromptOpen, setContinueClaimPromptOpen] = useState(false);
   const [winChoice, setWinChoice] = useState<{
     stars: number;
     score: number;
@@ -323,6 +325,8 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     setGrabbing(null);
     setGrabProgress(0);
     setContinuingPastTarget(false);
+    setContinueStartedElapsedMs(null);
+    setContinueClaimPromptOpen(false);
     setWinChoice(null);
     setNoMergeStreak(0);
     setStoneHitIds(new Set());
@@ -516,7 +520,11 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
   const TOP_PAD = 6;
   const SIDE_PAD = 4;
 
-  const dangerZonePct = Math.min(0.7, 0.2 + stoneSpawnCount * 0.1);
+  const continuePressureSteps =
+    continuingPastTarget && continueStartedElapsedMs != null
+      ? Math.max(0, Math.floor((elapsedMs - continueStartedElapsedMs) / 30_000))
+      : 0;
+  const dangerZonePct = Math.min(0.85, 0.2 + stoneSpawnCount * 0.1 + continuePressureSteps * 0.03);
   const dangerY = Math.max(TOP_PAD + ballSize, boardH * (1 - dangerZonePct));
 
   const geo: Geo = useMemo(
@@ -527,7 +535,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
       leftPad: SIDE_PAD,
       rightPad: SIDE_PAD,
       topPad: TOP_PAD,
-      // danger line starts at a 20% red zone and rises by 10% per Stone.
+      // danger line starts at a 20% red zone, rises by 10% per Stone, and rises during score-mode continuation.
       dangerY,
     }),
     [boardW, boardH, R, dangerY],
@@ -1767,6 +1775,14 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
   }, [aimDeg, balls, busy, gameOver, won, boardW, boardH, cellSize]);
 
   const progressPct = Math.min(100, (highest / target) * 100);
+  const continueChoiceStats = continueClaimPromptOpen
+    ? {
+        stars: earnedStars || 1,
+        score,
+        shots,
+        bestCombo: runBestCombo,
+      }
+    : winChoice;
 
   return (
     <div
@@ -1870,7 +1886,29 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
               />
             </div>
           </div>
-          <ElementBall atomicNumber={target} size={36} glow />
+          <button
+            type="button"
+            className={continuingPastTarget ? "target-claim-flash" : undefined}
+            title={
+              continuingPastTarget
+                ? "Target reached — tap to finish the level or keep playing."
+                : `Target: ${targetEl?.symbol ?? "?"}`
+            }
+            aria-label="Open target completion options"
+            onClick={() => {
+              if (!continuingPastTarget) return;
+              setContinueClaimPromptOpen(true);
+            }}
+            style={{
+              border: "none",
+              background: "transparent",
+              padding: 0,
+              borderRadius: "50%",
+              cursor: continuingPastTarget ? "pointer" : "default",
+            }}
+          >
+            <ElementBall atomicNumber={target} size={36} glow />
+          </button>
         </div>
 
         {/* GRAB COMBO BAR */}
@@ -2362,20 +2400,24 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
             onClose={() => setActiveTip(null)}
           />
         )}
-        {winChoice && !won && !gameOver && (
+        {continueChoiceStats && !won && !gameOver && (
           <ContinueChoiceModal
             level={level}
-            score={winChoice.score}
-            shots={winChoice.shots}
-            bestCombo={winChoice.bestCombo}
-            stars={winChoice.stars}
+            score={continueChoiceStats.score}
+            shots={continueChoiceStats.shots}
+            bestCombo={continueChoiceStats.bestCombo}
+            stars={continueChoiceStats.stars}
+            isContinuing={continuingPastTarget}
             onClaim={() => {
               setWon(true);
               setWinChoice(null);
+              setContinueClaimPromptOpen(false);
             }}
             onContinue={() => {
               setContinuingPastTarget(true);
+              setContinueStartedElapsedMs((startedAt) => startedAt ?? elapsedMs);
               setWinChoice(null);
+              setContinueClaimPromptOpen(false);
               spawnPopup("Keep going! Score mode 🚀");
             }}
           />
@@ -2567,6 +2609,7 @@ function ContinueChoiceModal({
   shots,
   bestCombo,
   stars,
+  isContinuing = false,
   onClaim,
   onContinue,
 }: {
@@ -2575,6 +2618,7 @@ function ContinueChoiceModal({
   shots: number;
   bestCombo: number;
   stars: number;
+  isContinuing?: boolean;
   onClaim: () => void;
   onContinue: () => void;
 }) {
@@ -2589,10 +2633,12 @@ function ContinueChoiceModal({
           marginBottom: 8,
         }}
       >
-        TARGET REACHED
+        {isContinuing ? "FINISH LEVEL?" : "TARGET REACHED"}
       </div>
       <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 6 }}>
-        {ELEMENTS[level.targetElement - 1]?.name ?? "?"} unlocked!
+        {isContinuing
+          ? "Ready to claim?"
+          : `${ELEMENTS[level.targetElement - 1]?.name ?? "?"} unlocked!`}
       </div>
       <p
         style={{
@@ -2602,8 +2648,9 @@ function ContinueChoiceModal({
           margin: "0 0 14px",
         }}
       >
-        Claim your stars now, or keep playing to chase a higher score. The level is already complete
-        either way.
+        {isContinuing
+          ? "You can finish the level now, or close this popup and keep chasing a higher score. The danger zone will keep rising every 30 seconds."
+          : "Claim your stars now, or keep playing to chase a higher score. The level is already complete either way."}
       </p>
       {stars > 0 && (
         <div
@@ -2627,10 +2674,10 @@ function ContinueChoiceModal({
           onClick={onContinue}
           style={{ ...modalBtn, background: "var(--surface-high)", color: "var(--foreground)" }}
         >
-          Keep Playing
+          {isContinuing ? "Continue" : "Keep Playing"}
         </button>
         <button onClick={onClaim} style={modalBtn}>
-          Claim Victory
+          Finish Level
         </button>
       </div>
     </Modal>

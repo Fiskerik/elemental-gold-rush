@@ -328,3 +328,12 @@
 .blank-atom {
   animation: blank-atom-pulse 1.6s ease-in-out infinite;
 }
+
+/* === Continue-after-target prompt === */
+@keyframes target-claim-flash {
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 8px var(--accent-glow)); }
+  50% { transform: scale(1.12); filter: drop-shadow(0 0 22px var(--accent-glow)); }
+}
+.target-claim-flash {
+  animation: target-claim-flash 1.1s ease-in-out infinite;
+}
