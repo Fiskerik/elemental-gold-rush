@@ -1175,6 +1175,82 @@ function DiscoveryModal({ atomicNumber, onClose }: { atomicNumber: number; onClo
   );
 }
 
+function ContinueChoiceModal({
+  level,
+  score,
+  shots,
+  bestCombo,
+  stars,
+  onClaim,
+  onContinue,
+}: {
+  level: (typeof LEVELS)[0];
+  score: number;
+  shots: number;
+  bestCombo: number;
+  stars: number;
+  onClaim: () => void;
+  onContinue: () => void;
+}) {
+  return (
+    <Modal>
+      <div
+        style={{
+          fontSize: 12,
+          letterSpacing: 3,
+          color: "var(--success, var(--accent))",
+          fontWeight: 800,
+          marginBottom: 8,
+        }}
+      >
+        TARGET REACHED
+      </div>
+      <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 6 }}>
+        {ELEMENTS[level.targetElement - 1]?.name ?? "?"} unlocked!
+      </div>
+      <p
+        style={{
+          fontSize: 13,
+          color: "var(--muted-foreground)",
+          lineHeight: 1.5,
+          margin: "0 0 14px",
+        }}
+      >
+        Claim your stars now, or keep playing to chase a higher score. The level
+        is already complete either way.
+      </p>
+      {stars > 0 && (
+        <div
+          style={{
+            textAlign: "center",
+            fontSize: 30,
+            letterSpacing: 4,
+            marginBottom: 12,
+            color: "var(--accent)",
+          }}
+        >
+          {Array.from({ length: 3 }, (_, i) => (i < stars ? "★" : "☆")).join("")}
+        </div>
+      )}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 4 }}>
+        <ResultStat label="Score" value={formatScore(score)} color="var(--accent)" />
+        <ResultStat label="Shots" value={`${shots}`} color="var(--foreground)" />
+      </div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <button
+          onClick={onContinue}
+          style={{ ...modalBtn, background: "var(--surface-high)", color: "var(--foreground)" }}
+        >
+          Keep Playing
+        </button>
+        <button onClick={onClaim} style={modalBtn}>
+          Claim Victory
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
 function ResultModal({
   title,
   accent,
