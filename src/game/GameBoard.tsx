@@ -132,7 +132,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
   const popupId = useRef(0);
 
   // === Grab power-up ===
-  // Earned when a single shot triggers a 10+ merge chain.
+  // Earned by making 10 merges in a row.
   const [grabs, setGrabs] = useState(0);
   const [grabMode, setGrabMode] = useState(false);
   const [grabbing, setGrabbing] = useState<{ id: number; x: number; y: number } | null>(null);
@@ -144,11 +144,13 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
   const [noMergeStreak, setNoMergeStreak] = useState(0);
   const [stoneHitIds, setStoneHitIds] = useState<Set<number>>(new Set());
   const [pendingStone, setPendingStone] = useState(false);
+  const [hasStoneSpawned, setHasStoneSpawned] = useState(false);
 
   // === Combo bar for Grab power-up ===
-  // Every successful merge counts +1 (shimmer atoms count +2). When the bar
-  // fills to GRAB_THRESHOLD it grants a Grab and rolls over.
-  const GRAB_THRESHOLD = 5;
+  // Every successful merge counts toward the current streak (shimmer atoms
+  // count +2). A missed shot resets progress, so Grab requires 10 merges in
+  // a row.
+  const GRAB_THRESHOLD = 10;
   const [grabProgress, setGrabProgress] = useState(0);
 
   // === Continue past target ===
@@ -171,7 +173,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
   const currentIsShimmer = shimmerQueue[0] ?? false;
 
   const sfx = (fn: () => void) => {
-    if (soundEnabled) fn();
+    if (soundEnabled && hasStoneSpawned) fn();
   };
   const haptic = (ms: number | number[]) => {
     if (hapticsEnabled) vibrate(ms);
@@ -218,6 +220,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     setNoMergeStreak(0);
     setStoneHitIds(new Set());
     setPendingStone(false);
+    setHasStoneSpawned(false);
     startTimeRef.current = Date.now();
     setElapsedMs(0);
     // Per-level intro tooltips for newly unlocked features.
@@ -232,7 +235,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
       showTip(
         "feature-grab-unlock",
         "🤚 Grab power-up unlocked!",
-        "Build the Grab combo bar by merging atoms back-to-back. When it fills, tap the Grab button (bottom-right), then drag any atom on the board to a new position — surrounding atoms slide out of the way to make room. Use it to set up huge merge chains.",
+        "Build the Grab combo bar by making 10 merges in a row. When it fills, tap the Grab button (bottom-right), then drag any atom on the board to a new position — surrounding atoms slide out of the way to make room. Use it to set up huge merge chains.",
       );
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -540,6 +543,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
         return [...others, stone];
       });
       setPendingStone(false);
+      setHasStoneSpawned(true);
       setNoMergeStreak(0);
       spawnPopup("⛰ STONE!");
       haptic([30, 50, 30]);
@@ -813,12 +817,17 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
         if (earned > 0) {
           setGrabs((g) => g + earned);
           spawnPopup(`🤚 GRAB UNLOCKED${earned > 1 ? ` ×${earned}` : ""}!`);
+          showTip(
+            "feature-grab-first-contact",
+            "🤚 Grab is ready!",
+            "You earned Grab by chaining 10 merges in a row. Tap the Grab button (bottom-right), then drag any atom to reposition it and set up your next big reaction chain.",
+          );
         }
         return total % GRAB_THRESHOLD;
       });
     } else {
-      // Missed shot — atom didn't merge with anything. Cool the combo bar.
-      setGrabProgress((p) => Math.max(0, p - 1));
+      // Missed shot — atom didn't merge with anything, so the streak resets.
+      setGrabProgress(0);
     }
 
     // === Stone spawn check ===
@@ -1093,6 +1102,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
       };
       return [...others, stone];
     });
+    setHasStoneSpawned(true);
     spawnPopup("⛰ STONE!");
     haptic([30, 50, 30]);
     showTip(
