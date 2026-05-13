@@ -1038,6 +1038,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
               let hit: Ball | null = null;
               for (let i = balls.length - 1; i >= 0; i--) {
                 const b = balls[i];
+                if (b.stoneHp != null) continue;
                 if (Math.hypot(px - b.x, py - b.y) <= b.r) {
                   hit = b;
                   break;
@@ -1119,6 +1120,51 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
               const isDrag = grabbing?.id === b.id;
               const x = isDrag ? grabbing!.x : b.x;
               const y = isDrag ? grabbing!.y : b.y;
+              if (b.stoneHp != null) {
+                const hp = b.stoneHp;
+                const maxHp = b.stoneMaxHp ?? STONE_MAX_HP;
+                const isHit = stoneHitIds.has(b.id);
+                const size = b.r * 2;
+                return (
+                  <div
+                    key={b.id}
+                    className={isHit ? "stone-hit" : undefined}
+                    style={{
+                      position: "absolute",
+                      left: x - b.r,
+                      top: y - b.r,
+                      width: size,
+                      height: size,
+                      borderRadius: "50%",
+                      background:
+                        "radial-gradient(circle at 30% 28%, oklch(0.55 0.02 60), oklch(0.32 0.02 60) 60%, oklch(0.18 0.02 60))",
+                      boxShadow:
+                        "0 6px 14px rgba(0,0,0,0.55), inset 0 -8px 14px rgba(0,0,0,0.45), inset 0 6px 12px rgba(255,255,255,0.12)",
+                      border: "2px solid oklch(0.25 0.02 60)",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "oklch(0.95 0.02 60)",
+                      fontWeight: 900,
+                      transition: isHit
+                        ? "left 180ms ease-out, top 180ms ease-out, width 220ms ease-out, height 220ms ease-out"
+                        : "left 180ms ease-out, top 180ms ease-out, width 220ms ease-out, height 220ms ease-out",
+                      textShadow: "0 1px 2px rgba(0,0,0,0.7)",
+                    }}
+                  >
+                    <div style={{ fontSize: Math.max(10, size * 0.16), opacity: 0.85, lineHeight: 1 }}>
+                      ⛰
+                    </div>
+                    <div style={{ fontSize: Math.max(14, size * 0.32), lineHeight: 1.05 }}>
+                      {hp}
+                    </div>
+                    <div style={{ fontSize: Math.max(8, size * 0.12), opacity: 0.7, lineHeight: 1 }}>
+                      / {maxHp}
+                    </div>
+                  </div>
+                );
+              }
               return (
                 <div
                   key={b.id}
