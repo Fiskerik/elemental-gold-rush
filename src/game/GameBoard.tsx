@@ -358,20 +358,42 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
         const ceilingY = TOP_PAD + hb.r;
         let nx = hb.x + dirX * NUDGE;
         let ny = hb.y + dirY * NUDGE;
-        // avoid overlapping other balls
+        nx = Math.max(minX, Math.min(maxX, nx));
+        ny = Math.max(ceilingY, ny);
+
+        // Secondary collisions: any ball the primary now overlaps gets a
+        // weaker push along the same trajectory (~40% force), and overlaps
+        // are resolved geometrically.
+        const SECONDARY_FACTOR = 0.4;
+        const moved = new Map<number, { x: number; y: number }>();
+        moved.set(hb.id, { x: nx, y: ny });
         for (const o of balls) {
           if (o.id === hb.id) continue;
           const dd = Math.hypot(nx - o.x, ny - o.y);
           const min = hb.r + o.r;
-          if (dd < min && dd > 0.001) {
-            const push = (min - dd) + 0.5;
-            nx += ((nx - o.x) / dd) * push;
-            ny += ((ny - o.y) / dd) * push;
+          if (dd < min) {
+            const oMinX = SIDE_PAD + o.r;
+            const oMaxX = boardW - SIDE_PAD - o.r;
+            const oCeil = TOP_PAD + o.r;
+            // start with directional shove
+            let ox = o.x + dirX * NUDGE * SECONDARY_FACTOR;
+            let oy = o.y + dirY * NUDGE * SECONDARY_FACTOR;
+            // resolve residual overlap with the primary
+            const ndd = Math.hypot(ox - nx, oy - ny) || 0.001;
+            if (ndd < min) {
+              const push = min - ndd + 0.5;
+              ox += ((ox - nx) / ndd) * push;
+              oy += ((oy - ny) / ndd) * push;
+            }
+            ox = Math.max(oMinX, Math.min(oMaxX, ox));
+            oy = Math.max(oCeil, oy);
+            moved.set(o.id, { x: ox, y: oy });
           }
         }
-        nx = Math.max(minX, Math.min(maxX, nx));
-        ny = Math.max(ceilingY, ny);
-        nudged = balls.map((b) => (b.id === hitId ? { ...b, x: nx, y: ny } : b));
+        nudged = balls.map((b) => {
+          const m = moved.get(b.id);
+          return m ? { ...b, x: m.x, y: m.y } : b;
+        });
       }
     }
     if (matches.length === 0) {
