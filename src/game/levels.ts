@@ -13,6 +13,12 @@ export interface Level {
   targetElement: number;
   /** Highest atomic number that can appear in the initial queue */
   maxQueueElement: number;
+  /**
+   * Geometric decay used to weight the queue distribution. Lower values bias
+   * very strongly toward Hydrogen / low-tier atoms. Default 0.65.
+   * Used in early levels to prevent finishing in 1-2 shots.
+   */
+  queueDecay?: number;
   /** Grid dimensions for this level */
   gridCols: number;
   gridRows: number;
@@ -20,6 +26,8 @@ export interface Level {
   scoreMultiplier: number;
   /** Suggested number of shots for mastery */
   parShots?: number;
+  /** Suggested completion time in seconds (used for star rating) */
+  parTimeSec?: number;
   /** Score target for mastery */
   scoreGoal?: number;
   /** Best combo target for mastery */
