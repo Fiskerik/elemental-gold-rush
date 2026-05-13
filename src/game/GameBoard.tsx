@@ -28,6 +28,34 @@ const MAX_AIM_DEG = 75;
 const SHIMMER_MIN_LEVEL = 5;
 const GRAB_MIN_LEVEL = 7;
 const STONE_MAX_HP = 8;
+
+function StoneVisual({ size, hp, maxHp }: { size: number; hp: number; maxHp: number }) {
+  return (
+    <div
+      style={{
+        width: size,
+        height: size,
+        borderRadius: "50%",
+        background:
+          "radial-gradient(circle at 30% 28%, oklch(0.55 0.02 60), oklch(0.32 0.02 60) 60%, oklch(0.18 0.02 60))",
+        boxShadow:
+          "0 6px 14px rgba(0,0,0,0.55), inset 0 -8px 14px rgba(0,0,0,0.45), inset 0 6px 12px rgba(255,255,255,0.12)",
+        border: "2px solid oklch(0.25 0.02 60)",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        color: "oklch(0.95 0.02 60)",
+        fontWeight: 900,
+        textShadow: "0 1px 2px rgba(0,0,0,0.7)",
+      }}
+    >
+      <div style={{ fontSize: Math.max(10, size * 0.16), opacity: 0.85, lineHeight: 1 }}>⛰</div>
+      <div style={{ fontSize: Math.max(14, size * 0.32), lineHeight: 1.05 }}>{hp}</div>
+      <div style={{ fontSize: Math.max(8, size * 0.12), opacity: 0.7, lineHeight: 1 }}>/ {maxHp}</div>
+    </div>
+  );
+}
 const STONE_NO_MERGE_TRIGGER = 3;
 const STONE_NUDGE_MULT = 5;
 
@@ -111,9 +139,11 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
 
   // === Stone obstacle ===
   // After STONE_NO_MERGE_TRIGGER shots in a row that produce no merges, a
-  // large indestructible-but-breakable Stone appears on the board.
+  // large indestructible-but-breakable Stone gets loaded into the launcher,
+  // and the player launches it like any other shot.
   const [noMergeStreak, setNoMergeStreak] = useState(0);
   const [stoneHitIds, setStoneHitIds] = useState<Set<number>>(new Set());
+  const [pendingStone, setPendingStone] = useState(false);
 
   // === Combo bar for Grab power-up ===
   // Every successful merge counts +1 (shimmer atoms count +2). When the bar
@@ -187,21 +217,22 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     setWinChoice(null);
     setNoMergeStreak(0);
     setStoneHitIds(new Set());
+    setPendingStone(false);
     startTimeRef.current = Date.now();
     setElapsedMs(0);
     // Per-level intro tooltips for newly unlocked features.
-    if (level.id === SHIMMER_MIN_LEVEL) {
+    if (level.id >= SHIMMER_MIN_LEVEL) {
       showTip(
         "feature-shimmer-unlock",
         "✦ Shimmering atoms unlocked",
         "Some atoms in your queue now shimmer with a rainbow halo. Land a successful merge with one to score 2× points and fill the Grab combo bar twice as fast.",
       );
     }
-    if (level.id === GRAB_MIN_LEVEL) {
+    if (level.id >= GRAB_MIN_LEVEL) {
       showTip(
         "feature-grab-unlock",
-        "🤚 Grab power-up unlocked",
-        "Fill the Grab combo bar by merging atoms in a row. Once charged, tap Grab and drag any atom on the board to a new spot — neighbors will move out of the way.",
+        "🤚 Grab power-up unlocked!",
+        "Build the Grab combo bar by merging atoms back-to-back. When it fills, tap the Grab button (bottom-right), then drag any atom on the board to a new position — surrounding atoms slide out of the way to make room. Use it to set up huge merge chains.",
       );
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -276,6 +307,12 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     (atom: number) => ballSize * periodScaleFor(atom),
     [ballSize, periodScaleFor],
   );
+  // Stone projectile geometry (matches a period-8 ball).
+  const stoneR = (ballSize / 2) * (1 + (8 - 4) * 0.11);
+  const stoneSize = stoneR * 2;
+  // Effective projectile radius/size — uses stone dims when a stone is loaded.
+  const projShotR = pendingStone ? stoneR : radiusFor(current);
+  const projShotSize = pendingStone ? stoneSize : sizeFor(current);
   const launcherX = boardW / 2;
   const launcherY = boardH - 8; // near bottom of board
   const TOP_PAD = 6;
@@ -308,7 +345,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     let dy = -Math.cos(rad);
     let x = launcherX;
     let y = launcherY;
-    const projR = radiusFor(current);
+    const projR = projShotR;
     const step = Math.max(1, projR / 4);
     const path: { x: number; y: number }[] = [{ x, y }];
     const minX = SIDE_PAD + projR;
@@ -402,6 +439,83 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
   }
 
   function triggerImpact(x: number, y: number, hitId: number | null, dirX: number, dirY: number) {
+    // === Pending-stone projectile branch ===
+    // The launcher is loaded with a Stone — drop it at the landing point,
+    // shove neighbors aside, and finish without consuming the atom queue.
+    if (pendingStone) {
+      const sR = stoneR;
+      const sx = Math.max(SIDE_PAD + sR, Math.min(boardW - SIDE_PAD - sR, x));
+      const sy = Math.max(TOP_PAD + sR, y);
+      setBalls((prev) => {
+        const others = prev.map((b) => ({ ...b }));
+        // Push existing balls outward and resolve overlaps so the stone fits.
+        for (let iter = 0; iter < 18; iter++) {
+          let moved = false;
+          for (const o of others) {
+            const dxs = o.x - sx;
+            const dys = o.y - sy;
+            const d = Math.hypot(dxs, dys) || 0.001;
+            const min = sR + o.r;
+            if (d < min) {
+              const push = min - d + 0.5;
+              o.x += (dxs / d) * push;
+              o.y += (dys / d) * push;
+              moved = true;
+            }
+          }
+          for (let i = 0; i < others.length; i++) {
+            for (let j = i + 1; j < others.length; j++) {
+              const a = others[i];
+              const b = others[j];
+              if (a.stoneHp != null && b.stoneHp != null) continue;
+              const dx = b.x - a.x;
+              const dy = b.y - a.y;
+              const d = Math.hypot(dx, dy) || 0.001;
+              const min = a.r + b.r;
+              if (d < min) {
+                const push = (min - d) / 2 + 0.25;
+                a.x -= (dx / d) * push;
+                a.y -= (dy / d) * push;
+                b.x += (dx / d) * push;
+                b.y += (dy / d) * push;
+                moved = true;
+              }
+            }
+          }
+          for (const o of others) {
+            o.x = Math.max(SIDE_PAD + o.r, Math.min(boardW - SIDE_PAD - o.r, o.x));
+            o.y = Math.max(TOP_PAD + o.r, o.y);
+          }
+          if (!moved) break;
+        }
+        const stone: Ball = {
+          id: nextBallId(),
+          x: sx,
+          y: sy,
+          atom: -1,
+          r: sR,
+          stoneHp: STONE_MAX_HP,
+          stoneMaxHp: STONE_MAX_HP,
+        };
+        return [...others, stone];
+      });
+      setPendingStone(false);
+      setNoMergeStreak(0);
+      spawnPopup("⛰ STONE!");
+      haptic([30, 50, 30]);
+      // Game-over check after the relax pass settles.
+      setTimeout(() => {
+        setBalls((prev) => {
+          if (checkGameOver(prev, geo)) {
+            setGameOver(true);
+            haptic([50, 80, 50, 80, 200]);
+          }
+          return prev;
+        });
+        setBusy(false);
+      }, 220);
+      return;
+    }
     // === Stone hit branch ===
     // Hitting a Stone deals 1 damage, shoves neighbors with 5× force, and
     // shrinks the stone. If destroyed, awards a big score bonus.
@@ -617,12 +731,13 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     }
 
     // === Stone spawn check ===
-    // Track shots that produce zero merges. After 3 in a row, spawn a Stone.
+    // Track shots that produce zero merges. After 3 in a row, load the
+    // launcher with a Stone projectile that the player must shoot.
     if (result.merges.length === 0) {
       setNoMergeStreak((s) => {
         const next = s + 1;
         if (next >= STONE_NO_MERGE_TRIGGER) {
-          setTimeout(() => spawnStoneOnBoard(), 220);
+          setTimeout(() => loadStoneIntoLauncher(), 220);
           return 0;
         }
         return next;
@@ -798,6 +913,19 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
 
   // Spawn a Stone obstacle near the top of the board, pushing nearby balls
   // outward to make room.
+  function loadStoneIntoLauncher() {
+    setPendingStone(true);
+    spawnPopup("⛰ STONE LOADED");
+    haptic([20, 30, 20]);
+    showTip(
+      "feature-stone",
+      "⛰ A Stone is loaded!",
+      "Your next shot is a giant Stone. Aim it at clusters — it won't merge, but it shoves nearby atoms 5× harder than usual and takes 8 hits to crack for a big score bonus.",
+    );
+  }
+
+  // Legacy: drop a stone directly onto the board (no longer used by the
+  // no-merge trigger; kept for potential future power-ups).
   function spawnStoneOnBoard() {
     const stoneR = (ballSize / 2) * (1 + (8 - 4) * 0.11);
     const sx = boardW / 2;
@@ -1303,13 +1431,17 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
             <div
               style={{
                 position: "absolute",
-                left: projectile.x - sizeFor(current) / 2,
-                top: projectile.y - sizeFor(current) / 2,
+                left: projectile.x - projShotSize / 2,
+                top: projectile.y - projShotSize / 2,
                 pointerEvents: "none",
                 zIndex: 4,
               }}
             >
-              <ElementBall atomicNumber={current} size={ballSize} glow shimmer={currentIsShimmer} />
+              {pendingStone ? (
+                <StoneVisual size={projShotSize} hp={STONE_MAX_HP} maxHp={STONE_MAX_HP} />
+              ) : (
+                <ElementBall atomicNumber={current} size={ballSize} glow shimmer={currentIsShimmer} />
+              )}
             </div>
           )}
 
@@ -1317,8 +1449,8 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
           <div
             style={{
               position: "absolute",
-              left: launcherX - sizeFor(current) / 2,
-              top: launcherY - sizeFor(current) / 2,
+              left: launcherX - projShotSize / 2,
+              top: launcherY - projShotSize / 2,
               zIndex: 2,
               pointerEvents: "none",
               transform: `rotate(${aimDeg}deg)`,
@@ -1326,12 +1458,16 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
             }}
           >
             {!projectile && (
-              <ElementBall
-                atomicNumber={current}
-                size={ballSize}
-                glow
-                shimmer={currentIsShimmer}
-              />
+              pendingStone ? (
+                <StoneVisual size={projShotSize} hp={STONE_MAX_HP} maxHp={STONE_MAX_HP} />
+              ) : (
+                <ElementBall
+                  atomicNumber={current}
+                  size={ballSize}
+                  glow
+                  shimmer={currentIsShimmer}
+                />
+              )
             )}
           </div>
 
