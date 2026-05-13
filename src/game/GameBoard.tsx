@@ -452,6 +452,9 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
         }
         return total % GRAB_THRESHOLD;
       });
+    } else {
+      // Missed shot — atom didn't merge with anything. Cool the combo bar.
+      setGrabProgress((p) => Math.max(0, p - 1));
     }
 
     const nextHighest = Math.max(highest, result.highestElement);
