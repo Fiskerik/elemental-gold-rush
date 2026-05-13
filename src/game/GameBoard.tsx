@@ -25,6 +25,8 @@ interface Props {
 
 const QUEUE_SIZE = 4;
 const MAX_AIM_DEG = 75;
+const SHIMMER_MIN_LEVEL = 5;
+const GRAB_MIN_LEVEL = 7;
 
 function getComboLabel(mergeCount: number): string | null {
   if (mergeCount >= 6) return "Nuclear Rush!";
@@ -39,17 +41,25 @@ function calculateStars(
   score: number,
   shots: number,
   bestCombo: number,
+  timeSec: number,
 ): number {
-  const metScore = level.scoreGoal === undefined || score >= level.scoreGoal;
-  const metPar = level.parShots === undefined || shots <= level.parShots;
-  const metCombo = level.comboGoal === undefined || bestCombo >= level.comboGoal;
-  if (metScore && metPar && metCombo) return 3;
-  if (metScore || metPar) return 2;
+  // New star formula: pure performance based on shots + time vs par.
+  // 3★ = at or under both par shots AND par time
+  // 2★ = within 1.3× of both
+  // 1★ = completed
+  const par = level.parShots ?? 30;
+  const parTime = level.parTimeSec ?? par * 5;
+  const shotsRatio = shots / par;
+  const timeRatio = timeSec / parTime;
+  if (shotsRatio <= 1 && timeRatio <= 1) return 3;
+  if (shotsRatio <= 1.3 && timeRatio <= 1.3) return 2;
   return 1;
 }
 
 export function GameBoard({ levelId, onExit, onWin }: Props) {
   const level = getLevelById(levelId) ?? LEVELS[0];
+  const shimmerEnabled = level.id >= SHIMMER_MIN_LEVEL;
+  const grabEnabled = level.id >= GRAB_MIN_LEVEL;
   const {
     recordDiscovery,
     addScore,
@@ -61,16 +71,18 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     reportQuestProgress,
     setBestCombo,
     setLevelStars,
+    seenTips,
+    markTipSeen,
   } = useProgress();
 
   const [balls, setBalls] = useState<Board>(() => createEmptyBoard());
   const [queue, setQueue] = useState<number[]>(() =>
-    generateInitialQueue(level.maxQueueElement, QUEUE_SIZE),
+    generateInitialQueue(level.maxQueueElement, QUEUE_SIZE, level.queueDecay),
   );
   // Parallel array — true means that queued atom is "shimmering" and will give
   // 2× score and 2× grab-combo progress on a successful merge.
   const [shimmerQueue, setShimmerQueue] = useState<boolean[]>(() =>
-    Array.from({ length: QUEUE_SIZE }, () => Math.random() < 0.05),
+    Array.from({ length: QUEUE_SIZE }, () => shimmerEnabled && Math.random() < 0.05),
   );
   const [score, setScore] = useState(0);
   const [highest, setHighest] = useState(1);
@@ -126,10 +138,25 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     if (hapticsEnabled) vibrate(ms);
   };
 
+  // Tooltip queue — small dismissable boxes that explain new mechanics.
+  const [activeTip, setActiveTip] = useState<null | {
+    id: string;
+    title: string;
+    body: string;
+  }>(null);
+
+  function showTip(id: string, title: string, body: string) {
+    if (seenTips.includes(id)) return;
+    markTipSeen(id);
+    setActiveTip({ id, title, body });
+  }
+
   useEffect(() => {
     setBalls(createEmptyBoard());
-    setQueue(generateInitialQueue(level.maxQueueElement, QUEUE_SIZE));
-    setShimmerQueue(Array.from({ length: QUEUE_SIZE }, () => Math.random() < 0.05));
+    setQueue(generateInitialQueue(level.maxQueueElement, QUEUE_SIZE, level.queueDecay));
+    setShimmerQueue(
+      Array.from({ length: QUEUE_SIZE }, () => shimmerEnabled && Math.random() < 0.05),
+    );
     setScore(0);
     setHighest(1);
     setShots(0);
@@ -151,7 +178,36 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     setWinChoice(null);
     startTimeRef.current = Date.now();
     setElapsedMs(0);
+    // Per-level intro tooltips for newly unlocked features.
+    if (level.id === SHIMMER_MIN_LEVEL) {
+      showTip(
+        "feature-shimmer-unlock",
+        "✦ Shimmering atoms unlocked",
+        "Some atoms in your queue now shimmer with a rainbow halo. Land a successful merge with one to score 2× points and fill the Grab combo bar twice as fast.",
+      );
+    }
+    if (level.id === GRAB_MIN_LEVEL) {
+      showTip(
+        "feature-grab-unlock",
+        "🤚 Grab power-up unlocked",
+        "Fill the Grab combo bar by merging atoms in a row. Once charged, tap Grab and drag any atom on the board to a new spot — neighbors will move out of the way.",
+      );
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [levelId, level.gridRows, level.gridCols, level.maxQueueElement]);
+
+  // Show a one-time tooltip the first time a shimmer atom appears in the queue.
+  useEffect(() => {
+    if (!shimmerEnabled) return;
+    if (shimmerQueue.some(Boolean)) {
+      showTip(
+        "feature-shimmer-spawn",
+        "✦ A shimmering atom appeared!",
+        "The glowing rainbow atom in your queue scores double and pumps your Grab combo bar by 2 per merge.",
+      );
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shimmerQueue, shimmerEnabled]);
 
   // Tick the run timer every second while the level is active.
   useEffect(() => {
