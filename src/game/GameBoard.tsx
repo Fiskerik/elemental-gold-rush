@@ -40,6 +40,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
   const [won, setWon] = useState(false);
   const [discoveryEl, setDiscoveryEl] = useState<number | null>(null);
   const [highlightCell, setHighlightCell] = useState<{ r: number; c: number } | null>(null);
+  const [wiggleCells, setWiggleCells] = useState<Set<string>>(new Set());
   const [projectile, setProjectile] = useState<{ x: number; y: number } | null>(null);
   const popupId = useRef(0);
 
@@ -59,6 +60,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     setWon(false);
     setDiscoveryEl(null);
     setHighlightCell(null);
+    setWiggleCells(new Set());
     setProjectile(null);
     setBusy(false);
     setAimDeg(0);
@@ -169,11 +171,37 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
       if (i >= path.length) {
         clearInterval(interval);
         setProjectile(null);
-        finalizePlacement(hit.row, hit.col);
+        triggerImpact(hit.row, hit.col);
       } else {
         setProjectile(path[i]);
       }
     }, stepMs);
+  }
+
+  function triggerImpact(row: number, col: number) {
+    // Find neighbors of landing cell that match the incoming atom — they'll wiggle then merge.
+    const matches: string[] = [];
+    const rows = grid.length;
+    const cols = grid[0].length;
+    const neighbors: [number, number][] = [
+      [row - 1, col], [row + 1, col], [row, col - 1], [row, col + 1],
+    ];
+    for (const [r, c] of neighbors) {
+      if (r < 0 || r >= rows || c < 0 || c >= cols) continue;
+      if (grid[r][c] === current) matches.push(`${r}-${c}`);
+    }
+    if (matches.length === 0) {
+      finalizePlacement(row, col);
+      return;
+    }
+    // Also wiggle the landing cell itself for the impact bump.
+    matches.push(`${row}-${col}`);
+    setWiggleCells(new Set(matches));
+    haptic(20);
+    setTimeout(() => {
+      setWiggleCells(new Set());
+      finalizePlacement(row, col);
+    }, 220);
   }
 
   function finalizePlacement(row: number, col: number) {
@@ -360,6 +388,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
                       atomicNumber={cell}
                       size={ballSize}
                       highlight={highlightCell?.r === r && highlightCell?.c === c}
+                      wiggle={wiggleCells.has(`${r}-${c}`)}
                     />
                   )}
                 </div>
