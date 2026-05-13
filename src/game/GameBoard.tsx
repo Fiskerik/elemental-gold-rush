@@ -537,7 +537,8 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
       () => {
         setHighlightId(null);
         if (result.levelComplete && !continuingPastTarget) {
-          const stars = calculateStars(level, nextScore, nextShots, nextBestCombo);
+          const timeSec = (Date.now() - startTimeRef.current) / 1000;
+          const stars = calculateStars(level, nextScore, nextShots, nextBestCombo, timeSec);
           setEarnedStars(stars);
           setLevelStars(levelId, stars);
           reportQuestProgress({ levelCleared: true });
