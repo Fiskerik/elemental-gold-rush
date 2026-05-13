@@ -607,6 +607,17 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
               LEVEL {level.id}
             </div>
             <div style={{ fontSize: 14, fontWeight: 700 }}>{level.name}</div>
+            <div
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                color: "var(--accent)",
+                marginTop: 2,
+                fontVariantNumeric: "tabular-nums",
+              }}
+            >
+              ⏱ {formatTime(elapsedMs)}
+            </div>
           </div>
           <div style={{ ...iconBtn, cursor: "default", minWidth: 74, textAlign: "right" }}>
             <div style={{ fontSize: 10, color: "var(--muted-foreground)" }}>SCORE</div>
@@ -665,6 +676,59 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
             </div>
           </div>
           <ElementBall atomicNumber={target} size={36} glow />
+        </div>
+
+        {/* GRAB COMBO BAR */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "6px 10px",
+            background: "var(--surface)",
+            borderRadius: 10,
+            border: "1px solid var(--border)",
+            marginBottom: 10,
+          }}
+        >
+          <div style={{ fontSize: 14 }}>🤚</div>
+          <div style={{ flex: 1 }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                fontSize: 10,
+                color: "var(--muted-foreground)",
+              }}
+            >
+              <span>Grab combo</span>
+              <span>
+                {Math.min(lastChain, GRAB_THRESHOLD)}/{GRAB_THRESHOLD}
+                {grabs > 0 ? `  •  ×${grabs} ready` : ""}
+              </span>
+            </div>
+            <div
+              style={{
+                height: 6,
+                background: "var(--surface-high)",
+                borderRadius: 3,
+                marginTop: 4,
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  width: `${Math.min(100, (lastChain / GRAB_THRESHOLD) * 100)}%`,
+                  height: "100%",
+                  background:
+                    lastChain >= GRAB_THRESHOLD
+                      ? "linear-gradient(90deg, var(--accent), var(--success, var(--accent)))"
+                      : "linear-gradient(90deg, var(--primary), var(--accent))",
+                  transition: "width 0.4s ease",
+                }}
+              />
+            </div>
+          </div>
         </div>
 
         {/* BOARD */}
