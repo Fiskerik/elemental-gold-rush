@@ -1067,6 +1067,13 @@ const iconBtn: React.CSSProperties = {
   minWidth: 64,
 };
 
+function formatTime(ms: number): string {
+  const total = Math.floor(ms / 1000);
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
 function DiscoveryModal({ atomicNumber, onClose }: { atomicNumber: number; onClose: () => void }) {
   const el = ELEMENTS[atomicNumber - 1];
   if (!el) return null;
