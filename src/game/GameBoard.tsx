@@ -67,6 +67,11 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
   const [queue, setQueue] = useState<number[]>(() =>
     generateInitialQueue(level.maxQueueElement, QUEUE_SIZE),
   );
+  // Parallel array — true means that queued atom is "shimmering" and will give
+  // 2× score and 2× grab-combo progress on a successful merge.
+  const [shimmerQueue, setShimmerQueue] = useState<boolean[]>(() =>
+    Array.from({ length: QUEUE_SIZE }, () => Math.random() < 0.12),
+  );
   const [score, setScore] = useState(0);
   const [highest, setHighest] = useState(1);
   const [shots, setShots] = useState(0);
@@ -90,8 +95,20 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
   const [grabbing, setGrabbing] = useState<{ id: number; x: number; y: number } | null>(null);
 
   // === Combo bar for Grab power-up ===
+  // Every successful merge counts +1 (shimmer atoms count +2). When the bar
+  // fills to GRAB_THRESHOLD it grants a Grab and rolls over.
   const GRAB_THRESHOLD = 5;
-  const [lastChain, setLastChain] = useState(0);
+  const [grabProgress, setGrabProgress] = useState(0);
+
+  // === Continue past target ===
+  // When the player reaches the target element, we offer a choice: claim the
+  // win, or keep playing for score. While `continuingPastTarget` is true we
+  // suppress further win prompts.
+  const [continuingPastTarget, setContinuingPastTarget] = useState(false);
+  const [winChoice, setWinChoice] = useState<
+    | { stars: number; score: number; shots: number; bestCombo: number }
+    | null
+  >(null);
 
   // === Run timer ===
   const [elapsedMs, setElapsedMs] = useState(0);
@@ -100,6 +117,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
   const target = level.targetElement;
   const targetEl = ELEMENTS[target - 1];
   const current = queue[0];
+  const currentIsShimmer = shimmerQueue[0] ?? false;
 
   const sfx = (fn: () => void) => {
     if (soundEnabled) fn();
@@ -111,6 +129,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
   useEffect(() => {
     setBalls(createEmptyBoard());
     setQueue(generateInitialQueue(level.maxQueueElement, QUEUE_SIZE));
+    setShimmerQueue(Array.from({ length: QUEUE_SIZE }, () => Math.random() < 0.12));
     setScore(0);
     setHighest(1);
     setShots(0);
@@ -127,7 +146,9 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     setGrabs(0);
     setGrabMode(false);
     setGrabbing(null);
-    setLastChain(0);
+    setGrabProgress(0);
+    setContinuingPastTarget(false);
+    setWinChoice(null);
     startTimeRef.current = Date.now();
     setElapsedMs(0);
   }, [levelId, level.gridRows, level.gridCols, level.maxQueueElement]);
@@ -380,15 +401,13 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     // Refresh radii on any merged survivors (their atom changed).
     setBalls(result.balls.map((b) => ({ ...b, r: radiusFor(b.atom) })));
     setHighlightId(result.finalBallId);
+    const shimmerHit = currentIsShimmer && result.merges.length > 0;
+    const grabAdd = result.merges.length * (shimmerHit ? 2 : 1);
     if (result.merges.length > 0) {
       const comboLabel = getComboLabel(result.merges.length);
       if (comboLabel) spawnPopup(comboLabel);
       setRunBestCombo((best) => Math.max(best, result.merges.length));
       setBestCombo(result.merges.length);
-      if (result.merges.length >= GRAB_THRESHOLD) {
-        setGrabs((g) => g + 1);
-        spawnPopup("🤚 GRAB UNLOCKED!");
-      }
       result.merges.forEach((m, i) => {
         setTimeout(
           () => {
@@ -400,12 +419,25 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
         );
       });
     }
-    setLastChain(result.merges.length);
+    if (shimmerHit) spawnPopup("✦ SHIMMER ×2 ✦");
+    if (grabAdd > 0) {
+      setGrabProgress((p) => {
+        const total = p + grabAdd;
+        const earned = Math.floor(total / GRAB_THRESHOLD);
+        if (earned > 0) {
+          setGrabs((g) => g + earned);
+          spawnPopup(`🤚 GRAB UNLOCKED${earned > 1 ? ` ×${earned}` : ""}!`);
+        }
+        return total % GRAB_THRESHOLD;
+      });
+    }
 
     const nextHighest = Math.max(highest, result.highestElement);
     setHighest(nextHighest);
     setHighestElement(nextHighest);
-    const gained = Math.floor(result.scoreGained * level.scoreMultiplier);
+    const gained = Math.floor(
+      result.scoreGained * level.scoreMultiplier * (shimmerHit ? 2 : 1),
+    );
     const nextScore = score + gained;
     const nextBestCombo = Math.max(runBestCombo, result.merges.length);
     setScore(nextScore);
@@ -423,15 +455,28 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     setTimeout(
       () => {
         setHighlightId(null);
-        if (result.levelComplete) {
+        if (result.levelComplete && !continuingPastTarget) {
           const stars = calculateStars(level, nextScore, nextShots, nextBestCombo);
           setEarnedStars(stars);
           setLevelStars(levelId, stars);
           reportQuestProgress({ levelCleared: true });
-          setWon(true);
+          unlockLevel(levelId + 1);
           sfx(playWinSound);
           haptic([30, 60, 30, 60, 80]);
-          unlockLevel(levelId + 1);
+          // Offer a choice — claim the win or keep playing for score.
+          setWinChoice({
+            stars,
+            score: nextScore,
+            shots: nextShots,
+            bestCombo: nextBestCombo,
+          });
+          // Advance the queue so play can resume if the user keeps going.
+          setQueue((q) => [
+            ...q.slice(1),
+            generateQueueElement(dynamicMaxQueue(result.balls.length)),
+          ]);
+          setShimmerQueue((s) => [...s.slice(1), Math.random() < 0.12]);
+          setBusy(false);
           return;
         }
         if (firstDiscovery && firstDiscovery > 1) {
@@ -442,6 +487,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
           ...q.slice(1),
           generateQueueElement(dynamicMaxQueue(result.balls.length)),
         ]);
+        setShimmerQueue((s) => [...s.slice(1), Math.random() < 0.12]);
         if (checkGameOver(result.balls, geo)) {
           setGameOver(true);
           haptic([50, 80, 50, 80, 200]);
@@ -703,7 +749,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
             >
               <span>Grab combo</span>
               <span>
-                {Math.min(lastChain, GRAB_THRESHOLD)}/{GRAB_THRESHOLD}
+                {grabProgress}/{GRAB_THRESHOLD}
                 {grabs > 0 ? `  •  ×${grabs} ready` : ""}
               </span>
             </div>
@@ -718,10 +764,10 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
             >
               <div
                 style={{
-                  width: `${Math.min(100, (lastChain / GRAB_THRESHOLD) * 100)}%`,
+                  width: `${Math.min(100, (grabProgress / GRAB_THRESHOLD) * 100)}%`,
                   height: "100%",
                   background:
-                    lastChain >= GRAB_THRESHOLD
+                    grabs > 0
                       ? "linear-gradient(90deg, var(--accent), var(--success, var(--accent)))"
                       : "linear-gradient(90deg, var(--primary), var(--accent))",
                   transition: "width 0.4s ease",
@@ -859,7 +905,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
               onPointerUp={(e) => e.stopPropagation()}
               style={{
                 position: "absolute",
-                top: 8,
+                bottom: 8,
                 right: 8,
                 zIndex: 6,
                 padding: "8px 12px",
@@ -944,7 +990,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
                 zIndex: 4,
               }}
             >
-              <ElementBall atomicNumber={current} size={ballSize} glow />
+              <ElementBall atomicNumber={current} size={ballSize} glow shimmer={currentIsShimmer} />
             </div>
           )}
 
@@ -960,7 +1006,14 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
               transformOrigin: "center center",
             }}
           >
-            {!projectile && <ElementBall atomicNumber={current} size={ballSize} glow />}
+            {!projectile && (
+              <ElementBall
+                atomicNumber={current}
+                size={ballSize}
+                glow
+                shimmer={currentIsShimmer}
+              />
+            )}
           </div>
 
           {/* SCORE POPUPS */}
@@ -1003,7 +1056,12 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
           </div>
           <div style={{ display: "flex", gap: 6, flex: 1 }}>
             {queue.slice(1).map((n, i) => (
-              <ElementBall key={i} atomicNumber={n} size={32 - i * 3} />
+              <ElementBall
+                key={i}
+                atomicNumber={n}
+                size={32 - i * 3}
+                shimmer={shimmerQueue[i + 1]}
+              />
             ))}
           </div>
           <div
@@ -1022,6 +1080,24 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
 
         {discoveryEl !== null && (
           <DiscoveryModal atomicNumber={discoveryEl} onClose={() => setDiscoveryEl(null)} />
+        )}
+        {winChoice && !won && !gameOver && (
+          <ContinueChoiceModal
+            level={level}
+            score={winChoice.score}
+            shots={winChoice.shots}
+            bestCombo={winChoice.bestCombo}
+            stars={winChoice.stars}
+            onClaim={() => {
+              setWon(true);
+              setWinChoice(null);
+            }}
+            onContinue={() => {
+              setContinuingPastTarget(true);
+              setWinChoice(null);
+              spawnPopup("Keep going! Score mode 🚀");
+            }}
+          />
         )}
         {won && (
           <ResultModal
@@ -1095,6 +1171,82 @@ function DiscoveryModal({ atomicNumber, onClose }: { atomicNumber: number; onClo
       <button onClick={onClose} style={modalBtn}>
         Continue
       </button>
+    </Modal>
+  );
+}
+
+function ContinueChoiceModal({
+  level,
+  score,
+  shots,
+  bestCombo,
+  stars,
+  onClaim,
+  onContinue,
+}: {
+  level: (typeof LEVELS)[0];
+  score: number;
+  shots: number;
+  bestCombo: number;
+  stars: number;
+  onClaim: () => void;
+  onContinue: () => void;
+}) {
+  return (
+    <Modal>
+      <div
+        style={{
+          fontSize: 12,
+          letterSpacing: 3,
+          color: "var(--success, var(--accent))",
+          fontWeight: 800,
+          marginBottom: 8,
+        }}
+      >
+        TARGET REACHED
+      </div>
+      <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 6 }}>
+        {ELEMENTS[level.targetElement - 1]?.name ?? "?"} unlocked!
+      </div>
+      <p
+        style={{
+          fontSize: 13,
+          color: "var(--muted-foreground)",
+          lineHeight: 1.5,
+          margin: "0 0 14px",
+        }}
+      >
+        Claim your stars now, or keep playing to chase a higher score. The level
+        is already complete either way.
+      </p>
+      {stars > 0 && (
+        <div
+          style={{
+            textAlign: "center",
+            fontSize: 30,
+            letterSpacing: 4,
+            marginBottom: 12,
+            color: "var(--accent)",
+          }}
+        >
+          {Array.from({ length: 3 }, (_, i) => (i < stars ? "★" : "☆")).join("")}
+        </div>
+      )}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 4 }}>
+        <ResultStat label="Score" value={formatScore(score)} color="var(--accent)" />
+        <ResultStat label="Shots" value={`${shots}`} color="var(--foreground)" />
+      </div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <button
+          onClick={onContinue}
+          style={{ ...modalBtn, background: "var(--surface-high)", color: "var(--foreground)" }}
+        >
+          Keep Playing
+        </button>
+        <button onClick={onClaim} style={modalBtn}>
+          Claim Victory
+        </button>
+      </div>
     </Modal>
   );
 }

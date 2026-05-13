@@ -10,6 +10,7 @@ interface Props {
   showMass?: boolean;
   highlight?: boolean;
   wiggle?: boolean;
+  shimmer?: boolean;
 }
 
 export function ElementBall({
@@ -22,6 +23,7 @@ export function ElementBall({
   showMass,
   highlight,
   wiggle,
+  shimmer,
 }: Props) {
   const el = ELEMENTS[atomicNumber - 1];
   if (!el) return null;
@@ -35,7 +37,7 @@ export function ElementBall({
   return (
     <div
       onClick={onClick}
-      className={className}
+      className={[className, shimmer ? "shimmer-atom" : ""].filter(Boolean).join(" ")}
       style={{
         width: size,
         height: size,
