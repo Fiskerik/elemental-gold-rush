@@ -885,6 +885,19 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
 
   // Spawn a Stone obstacle near the top of the board, pushing nearby balls
   // outward to make room.
+  function loadStoneIntoLauncher() {
+    setPendingStone(true);
+    spawnPopup("⛰ STONE LOADED");
+    haptic([20, 30, 20]);
+    showTip(
+      "feature-stone",
+      "⛰ A Stone is loaded!",
+      "Your next shot is a giant Stone. Aim it at clusters — it won't merge, but it shoves nearby atoms 5× harder than usual and takes 8 hits to crack for a big score bonus.",
+    );
+  }
+
+  // Legacy: drop a stone directly onto the board (no longer used by the
+  // no-merge trigger; kept for potential future power-ups).
   function spawnStoneOnBoard() {
     const stoneR = (ballSize / 2) * (1 + (8 - 4) * 0.11);
     const sx = boardW / 2;
