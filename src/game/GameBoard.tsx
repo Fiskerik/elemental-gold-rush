@@ -531,11 +531,35 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
       finalizePlacement(x, y, nudged);
       return;
     }
+    // Pull placement toward the closest matching atom so adjacency is
+    // guaranteed at the stricter merge threshold (placeAndMerge uses ~1.15,
+    // we matched at 1.4). Otherwise the wiggle plays but nothing merges.
+    let placeX = x;
+    let placeY = y;
+    {
+      let closest: { b: Ball; d: number } | null = null;
+      for (const id of matches) {
+        const b = nudged.find((bb) => bb.id === id);
+        if (!b) continue;
+        const d = Math.hypot(b.x - x, b.y - y);
+        if (!closest || d < closest.d) closest = { b, d };
+      }
+      if (closest) {
+        const need = (projR + closest.b.r) * 1.1;
+        if (closest.d > need) {
+          const ux = (closest.b.x - x) / (closest.d || 1);
+          const uy = (closest.b.y - y) / (closest.d || 1);
+          const move = closest.d - need;
+          placeX = Math.max(SIDE_PAD + projR, Math.min(boardW - SIDE_PAD - projR, x + ux * move));
+          placeY = Math.max(TOP_PAD + projR, y + uy * move);
+        }
+      }
+    }
     setWiggleIds(new Set(matches));
     haptic(20);
     setTimeout(() => {
       setWiggleIds(new Set());
-      finalizePlacement(x, y, nudged);
+      finalizePlacement(placeX, placeY, nudged);
     }, 220);
   }
 
