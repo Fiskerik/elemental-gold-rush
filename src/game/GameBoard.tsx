@@ -411,6 +411,83 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
   }
 
   function triggerImpact(x: number, y: number, hitId: number | null, dirX: number, dirY: number) {
+    // === Pending-stone projectile branch ===
+    // The launcher is loaded with a Stone — drop it at the landing point,
+    // shove neighbors aside, and finish without consuming the atom queue.
+    if (pendingStone) {
+      const sR = stoneR;
+      const sx = Math.max(SIDE_PAD + sR, Math.min(boardW - SIDE_PAD - sR, x));
+      const sy = Math.max(TOP_PAD + sR, y);
+      setBalls((prev) => {
+        const others = prev.map((b) => ({ ...b }));
+        // Push existing balls outward and resolve overlaps so the stone fits.
+        for (let iter = 0; iter < 18; iter++) {
+          let moved = false;
+          for (const o of others) {
+            const dxs = o.x - sx;
+            const dys = o.y - sy;
+            const d = Math.hypot(dxs, dys) || 0.001;
+            const min = sR + o.r;
+            if (d < min) {
+              const push = min - d + 0.5;
+              o.x += (dxs / d) * push;
+              o.y += (dys / d) * push;
+              moved = true;
+            }
+          }
+          for (let i = 0; i < others.length; i++) {
+            for (let j = i + 1; j < others.length; j++) {
+              const a = others[i];
+              const b = others[j];
+              if (a.stoneHp != null && b.stoneHp != null) continue;
+              const dx = b.x - a.x;
+              const dy = b.y - a.y;
+              const d = Math.hypot(dx, dy) || 0.001;
+              const min = a.r + b.r;
+              if (d < min) {
+                const push = (min - d) / 2 + 0.25;
+                a.x -= (dx / d) * push;
+                a.y -= (dy / d) * push;
+                b.x += (dx / d) * push;
+                b.y += (dy / d) * push;
+                moved = true;
+              }
+            }
+          }
+          for (const o of others) {
+            o.x = Math.max(SIDE_PAD + o.r, Math.min(boardW - SIDE_PAD - o.r, o.x));
+            o.y = Math.max(TOP_PAD + o.r, o.y);
+          }
+          if (!moved) break;
+        }
+        const stone: Ball = {
+          id: nextBallId(),
+          x: sx,
+          y: sy,
+          atom: -1,
+          r: sR,
+          stoneHp: STONE_MAX_HP,
+          stoneMaxHp: STONE_MAX_HP,
+        };
+        return [...others, stone];
+      });
+      setPendingStone(false);
+      setNoMergeStreak(0);
+      spawnPopup("⛰ STONE!");
+      haptic([30, 50, 30]);
+      // Game-over check after the relax pass settles.
+      setTimeout(() => {
+        setBalls((prev) => {
+          if (checkGameOver(prev, geo)) {
+            setGameOver(true);
+            haptic([50, 80, 50, 80, 200]);
+          }
+          return prev;
+        });
+        setBusy(false);
+      }, 220);
+      return;
+    }
     // === Stone hit branch ===
     // Hitting a Stone deals 1 damage, shoves neighbors with 5× force, and
     // shrinks the stone. If destroyed, awards a big score bonus.
