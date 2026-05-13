@@ -38,8 +38,8 @@ export function createEmptyBoard(): Board {
 /** Two balls touch (or nearly touch) when centers are within ~sum of radii. */
 const ADJ_FACTOR = 1.15;
 
-function withinAdj(a: Ball, b: Ball): boolean {
-  return Math.hypot(a.x - b.x, a.y - b.y) <= (a.r + b.r) * ADJ_FACTOR;
+function withinAdj(a: Ball, b: Ball, adjacencyFactor = ADJ_FACTOR): boolean {
+  return Math.hypot(a.x - b.x, a.y - b.y) <= (a.r + b.r) * adjacencyFactor;
 }
 
 export interface MergeEvent {
@@ -66,6 +66,8 @@ function resolveAdjacentMerges(
   initialHighest: number,
   initialLevelComplete: boolean,
   initialSurvivorId: number | null,
+  adjacencyFactor = ADJ_FACTOR,
+  fusionJump = false,
 ): MergeResult {
   const list: Ball[] = source.map((b) => ({ ...b }));
   const merges: MergeEvent[] = [];
@@ -74,6 +76,7 @@ function resolveAdjacentMerges(
   let levelComplete = initialLevelComplete;
   let chainDepth = 0;
   let survivorId: number | null = initialSurvivorId;
+  let jumpAvailable = fusionJump;
 
   let changed = true;
   while (changed) {
@@ -84,7 +87,7 @@ function resolveAdjacentMerges(
       for (let j = i + 1; j < list.length && !changed; j++) {
         if (list[j].stoneHp != null) continue;
         if (list[j].atom !== list[i].atom) continue;
-        if (!withinAdj(list[i], list[j])) continue;
+        if (!withinAdj(list[i], list[j], adjacencyFactor)) continue;
         // Survivor: always the upper ball (smaller y); tiebreak smaller x.
         let s = i,
           a = j;
@@ -92,7 +95,9 @@ function resolveAdjacentMerges(
           s = j;
           a = i;
         }
-        const next = list[s].atom + 1;
+        const mergeStep = jumpAvailable ? 2 : 1;
+        const next = Math.min(maxElement, list[s].atom + mergeStep);
+        jumpAvailable = false;
         const survivor = { ...list[s], atom: next };
         list[s] = survivor;
         list.splice(a, 1);
@@ -129,6 +134,8 @@ export function placeAndMerge(
   geo: Geo,
   targetElement: number,
   maxElement: number = 118,
+  adjacencyFactor = ADJ_FACTOR,
+  fusionJump = false,
 ): MergeResult {
   return resolveAdjacentMerges(
     [...balls, { ...newBall }],
@@ -138,6 +145,8 @@ export function placeAndMerge(
     newBall.atom,
     newBall.atom >= targetElement,
     newBall.id,
+    adjacencyFactor,
+    fusionJump,
   );
 }
 
@@ -147,6 +156,8 @@ export function mergeSettledBoard(
   geo: Geo,
   targetElement: number,
   maxElement: number = 118,
+  adjacencyFactor = ADJ_FACTOR,
+  fusionJump = false,
 ): MergeResult {
   void geo;
   return resolveAdjacentMerges(
@@ -157,6 +168,8 @@ export function mergeSettledBoard(
     getHighestOnBoard(balls),
     false,
     null,
+    adjacencyFactor,
+    fusionJump,
   );
 }
 

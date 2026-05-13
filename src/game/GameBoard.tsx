@@ -13,6 +13,7 @@ import {
   generateQueueElement,
   checkGameOver,
   formatScore,
+  getHighestOnBoard,
 } from "./logic";
 import { ElementBall } from "./ElementBall";
 import { useProgress } from "./store";
@@ -38,6 +39,15 @@ const POWER_UP_CHANCE = 0.05;
 const EGUN_MIN_SHOT_GAP = 10;
 const EMISSION_UNLOCK_INTERVAL_MS = 5 * 60 * 1000;
 const STONE_MAX_HP = 8;
+const SEEDED_BOARD_MIN_TARGET = 10;
+const SEEDED_BOARD_MIN_ATOMS = 3;
+const SEEDED_BOARD_MAX_ATOMS = 8;
+const SEEDED_BOARD_TARGET_OFFSET = 3;
+const TRANSMUTE_SHOT_INTERVAL = 30;
+const CATALYST_AURA_SHOTS = 5;
+const CATALYST_ADJ_FACTOR = 2.3;
+const DISCOVERY_DECAY_STEP = 5;
+const DISCOVERY_DECAY_BOOST = 0.04;
 
 function StoneVisual({ size, hp }: { size: number; hp: number }) {
   return (
@@ -240,6 +250,11 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
   const [emissionCharges, setEmissionCharges] = useState(0);
   const [emissionUnlockIndex, setEmissionUnlockIndex] = useState(0);
   const [emissionBoost, setEmissionBoost] = useState(0);
+  const [transmuteCharges, setTransmuteCharges] = useState(0);
+  const [fusionJumpCharges, setFusionJumpCharges] = useState(0);
+  const [fusionJumpArmed, setFusionJumpArmed] = useState(false);
+  const [catalystCharges, setCatalystCharges] = useState(0);
+  const [catalystShotsRemaining, setCatalystShotsRemaining] = useState(0);
 
   // === Continue past target ===
   // When the player reaches the target element, we offer a choice: claim the
@@ -293,11 +308,18 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
   }
 
   useEffect(() => {
-    setBalls(createEmptyBoard());
+    const initialBalls = createSeededBoard();
+    setBalls(initialBalls);
+    const initialHighest = Math.max(1, getHighestOnBoard(initialBalls));
+    if (initialHighest > 1) setHighestElement(initialHighest);
+    const initialDiscoveries = initialBalls
+      .map((b) => b.atom)
+      .filter((n, i, atoms) => n > 1 && atoms.indexOf(n) === i && !discoveredElements.includes(n));
+    if (initialDiscoveries.length > 0) recordDiscovery(initialDiscoveries);
     const initialQueue = generateInitialQueue(
       level.maxQueueElement,
       QUEUE_SIZE,
-      mode === "pure-hydrogen" ? 0.18 : level.queueDecay,
+      currentQueueDecay(),
     );
     const initialEGun = Array.from({ length: QUEUE_SIZE }, () => false);
     const initialBlank = initialEGun.map(
@@ -316,7 +338,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     setEGunQueue(initialEGun);
     setBlankQueue(initialBlank);
     setScore(0);
-    setHighest(1);
+    setHighest(initialHighest);
     setShots(0);
     setRunBestCombo(0);
     setEarnedStars(0);
@@ -345,6 +367,11 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     setEmissionCharges(0);
     setEmissionUnlockIndex(0);
     setEmissionBoost(0);
+    setTransmuteCharges(0);
+    setFusionJumpCharges(0);
+    setFusionJumpArmed(false);
+    setCatalystCharges(0);
+    setCatalystShotsRemaining(0);
     eGunCooldownSlots.current = 0;
     startTimeRef.current = Date.now();
     setElapsedMs(0);
@@ -440,6 +467,14 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     return Math.max(1, Math.min(118, Math.floor(Math.random() * maxElement) + 1));
   }
 
+  function currentQueueDecay(): number {
+    if (mode === "pure-hydrogen") return 0.18;
+    const discoveredBonus = Math.floor(
+      Math.max(0, discoveredElements.length - 1) / DISCOVERY_DECAY_STEP,
+    );
+    return Math.min(0.9, (level.queueDecay ?? 0.65) + discoveredBonus * DISCOVERY_DECAY_BOOST);
+  }
+
   function raiseAtomForEmission(atom: number): number {
     if (atom < 1) return atom;
     const raised = Math.min(118, atom + 1);
@@ -457,12 +492,43 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
   function grantGravityForCombo(mergeCount: number) {
     if (mergeCount < 4) return;
     setGravityCharges((g) => g + 1);
+    setCatalystCharges((g) => g + 1);
     spawnPopup("🌀 GRAVITY READY");
+    spawnPopup("🧪 CATALYST READY");
     showTip(
       "feature-gravity-powerup",
       "🌀 Gravity power-up ready!",
       "A 4× combo unlocks Gravity. Tap the Gravity button to make every atom fall upward; any combinations formed still count toward Grab progress and quest progress.",
     );
+    showTip(
+      "feature-catalyst-powerup",
+      "🧪 Catalyst Aura ready!",
+      "A 4× combo unlocked Catalyst Aura. Activate it to double fusion range for your next 5 shots.",
+    );
+  }
+
+  function grantFusionJump(count = 1) {
+    if (count <= 0) return;
+    setFusionJumpCharges((g) => g + count);
+    spawnPopup(count > 1 ? `⏭ FUSION JUMP ×${count}` : "⏭ FUSION JUMP READY");
+    showTip(
+      "feature-fusion-jump-powerup",
+      "⏭ Fusion Jump ready!",
+      "Breaking a Stone completely unlocks Fusion Jump. Arm it to make your next merge skip one element tier.",
+    );
+  }
+
+  function applyShotMilestones(nextShots: number) {
+    if (nextShots > 0 && nextShots % TRANSMUTE_SHOT_INTERVAL === 0) {
+      setTransmuteCharges((g) => g + 1);
+      spawnPopup("🔀 TRANSMUTE READY");
+      showTip(
+        "feature-transmute-powerup",
+        "🔀 Transmute Shot ready!",
+        "Every 30 shots earns Transmute. Activate it to reroll your queued atom into a higher-tier atom.",
+      );
+    }
+    setCatalystShotsRemaining((remaining) => Math.max(0, remaining - 1));
   }
 
   function makeNextQueueSlot(maxElement: number): {
@@ -479,7 +545,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     const shimmer = !eGun && !blank && shimmerEnabled && Math.random() < POWER_UP_CHANCE;
     const atom = shimmer
       ? randomAvailableElement(maxElement)
-      : generateQueueElement(maxElement, mode === "pure-hydrogen" ? 0.18 : level.queueDecay);
+      : generateQueueElement(maxElement, currentQueueDecay());
     return {
       atom: applyEmissionBoost(atom),
       shimmer,
@@ -563,6 +629,31 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     }),
     [boardW, boardH, R, dangerY],
   );
+
+  function createSeededBoard(): Board {
+    if (target < SEEDED_BOARD_MIN_TARGET) return createEmptyBoard();
+    const maxSeedAtom = Math.max(1, target - SEEDED_BOARD_TARGET_OFFSET);
+    const count =
+      SEEDED_BOARD_MIN_ATOMS +
+      Math.floor(Math.random() * (SEEDED_BOARD_MAX_ATOMS - SEEDED_BOARD_MIN_ATOMS + 1));
+    const seeded: Board = [];
+    const minAtomRadius = radiusFor(1);
+    const usableWidth = Math.max(minAtomRadius * 2, boardW - SIDE_PAD * 2 - minAtomRadius * 2);
+    for (let i = 0; i < count; i++) {
+      const atom = randomAvailableElement(maxSeedAtom);
+      const r = radiusFor(atom);
+      const laneX = SIDE_PAD + minAtomRadius + (usableWidth * (i + 0.5)) / count;
+      const jitter = (Math.random() - 0.5) * Math.max(0, usableWidth / count - r * 2);
+      seeded.push({
+        id: nextBallId(),
+        x: Math.max(SIDE_PAD + r, Math.min(boardW - SIDE_PAD - r, laneX + jitter)),
+        y: TOP_PAD + r + Math.random() * Math.max(4, r * 0.35),
+        atom,
+        r,
+      });
+    }
+    return seeded;
+  }
 
   /**
    * Ray-cast a projectile from the launcher at `angleDeg`. Walks pixel steps
@@ -721,10 +812,13 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
   function damageStones(
     source: Board,
     damageById: Map<number, number>,
-  ): { balls: Board; bonus: number; hitIds: Set<number> } {
-    if (damageById.size === 0) return { balls: source, bonus: 0, hitIds: new Set() };
+  ): { balls: Board; bonus: number; hitIds: Set<number>; destroyedCount: number } {
+    if (damageById.size === 0) {
+      return { balls: source, bonus: 0, hitIds: new Set(), destroyedCount: 0 };
+    }
     const hitIds = new Set<number>();
     let bonus = 0;
+    let destroyedCount = 0;
     const initialR = (ballSize / 2) * (1 + (8 - 4) * 0.11);
     const ballsAfterDamage = source
       .map((b) => {
@@ -735,13 +829,14 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
         const maxHp = b.stoneMaxHp ?? STONE_MAX_HP;
         const newHp = b.stoneHp - dmg;
         if (newHp <= 0) {
+          destroyedCount += 1;
           bonus += Math.floor(maxHp * 250 * level.scoreMultiplier);
           return null;
         }
         return { ...b, stoneHp: newHp, r: Math.max(initialR * 0.35, initialR * (newHp / maxHp)) };
       })
       .filter((b): b is Ball => b !== null);
-    return { balls: ballsAfterDamage, bonus, hitIds };
+    return { balls: ballsAfterDamage, bonus, hitIds, destroyedCount };
   }
 
   function stoneDamageFromMergeVicinity(
@@ -829,6 +924,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     });
     const nextShots = shots + 1;
     setShots(nextShots);
+    applyShotMilestones(nextShots);
     setBalls(updated);
     setWiggleIds(hitIds);
     setTimeout(() => setWiggleIds(new Set()), 380);
@@ -1029,6 +1125,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
       }
       if (damaged.bonus > 0) {
         impactStoneBonus = damaged.bonus;
+        grantFusionJump(damaged.destroyedCount);
         spawnPopup(`⛰ +${formatScore(damaged.bonus)}`);
       } else {
         spawnPopup("🪨 bounce hit");
@@ -1041,6 +1138,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
         const updated = impactBalls.filter((b) => b.id !== blankStone.id);
         const nextShots = shots + 1;
         setShots(nextShots);
+        applyShotMilestones(nextShots);
         setBalls(updated);
         setStoneHitIds(new Set([blankStone.id]));
         setTimeout(() => setStoneHitIds(new Set()), 380);
@@ -1109,6 +1207,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
         let directStoneBonus = 0;
         if (newHp <= 0) {
           directStoneBonus = Math.floor(maxHp * 250 * level.scoreMultiplier);
+          grantFusionJump();
           spawnPopup(`⛰ +${formatScore(directStoneBonus)}`);
           haptic([40, 60, 40, 60, 100]);
         } else {
@@ -1205,6 +1304,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
           if (stoneDamage.size > 0) {
             const hitSet = new Set<number>();
             let totalBonus = 0;
+            let destroyedCount = 0;
             const initialR = (ballSize / 2) * (1 + (8 - 4) * 0.11);
             nudged = nudged
               .map((b) => {
@@ -1215,6 +1315,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
                 const newHp = (b.stoneHp ?? STONE_MAX_HP) - dmg;
                 const maxHp = b.stoneMaxHp ?? STONE_MAX_HP;
                 if (newHp <= 0) {
+                  destroyedCount += 1;
                   totalBonus += Math.floor(maxHp * 250 * level.scoreMultiplier);
                   return null;
                 }
@@ -1228,6 +1329,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
               haptic([20, 30, 30]);
             }
             if (totalBonus > 0) {
+              grantFusionJump(destroyedCount);
               setScore((s) => s + totalBonus);
               addScore(totalBonus);
               spawnPopup(`⛰ +${formatScore(totalBonus)}`);
@@ -1297,9 +1399,13 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
       geo,
       target,
       isNobleGasLocked(atomOverride) ? atomOverride : 118,
+      catalystShotsRemaining > 0 ? CATALYST_ADJ_FACTOR : undefined,
+      fusionJumpArmed,
     );
+    if (fusionJumpArmed && result.merges.length > 0) setFusionJumpArmed(false);
     const nextShots = shots + 1;
     setShots(nextShots);
+    applyShotMilestones(nextShots);
 
     const newAtoms = new Set<number>([atomOverride]);
     result.merges.forEach((m) => newAtoms.add(m.resultAtomicNumber));
@@ -1319,6 +1425,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
         mergeStoneDamage.bonus > 0 ? `⛰ +${formatScore(mergeStoneDamage.bonus)}` : "💥 stone hit",
       );
       if (mergeStoneDamage.bonus > 0) {
+        grantFusionJump(mergeStoneDamage.destroyedCount);
         mergeStoneBonus = mergeStoneDamage.bonus;
         addScore(mergeStoneDamage.bonus);
       }
@@ -1454,6 +1561,37 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     );
   }
 
+  function triggerTransmutePowerUp() {
+    if (busy || gameOver || won || pendingStone || transmuteCharges <= 0) return;
+    if (currentIsEGun || currentIsBlank) return;
+    const maxTier = Math.min(118, Math.max(current + 1, target - 1));
+    if (current >= maxTier) return;
+    const atom = current + 1 + Math.floor(Math.random() * (maxTier - current));
+    setTransmuteCharges((g) => Math.max(0, g - 1));
+    setQueue((q) => [applyEmissionBoost(atom), ...q.slice(1)]);
+    setShimmerQueue((q) => [false, ...q.slice(1)]);
+    setEGunQueue((q) => [false, ...q.slice(1)]);
+    setBlankQueue((q) => [false, ...q.slice(1)]);
+    spawnPopup(`🔀 ${ELEMENTS[atom - 1]?.symbol ?? "?"}`);
+    haptic([20, 30, 20]);
+  }
+
+  function triggerFusionJumpPowerUp() {
+    if (busy || gameOver || won || fusionJumpCharges <= 0 || fusionJumpArmed) return;
+    setFusionJumpCharges((g) => Math.max(0, g - 1));
+    setFusionJumpArmed(true);
+    spawnPopup("⏭ JUMP ARMED");
+    haptic(20);
+  }
+
+  function triggerCatalystPowerUp() {
+    if (busy || gameOver || won || catalystCharges <= 0 || catalystShotsRemaining > 0) return;
+    setCatalystCharges((g) => Math.max(0, g - 1));
+    setCatalystShotsRemaining(CATALYST_AURA_SHOTS);
+    spawnPopup("🧪 AURA ×5");
+    haptic([20, 30, 20]);
+  }
+
   function triggerEmissionPowerUp() {
     if (busy || gameOver || won || emissionCharges <= 0) return;
     setBusy(true);
@@ -1527,6 +1665,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     if (mergeStoneDamage.hitIds.size > 0) {
       result = { ...result, balls: mergeStoneDamage.balls };
       mergeStoneBonus = mergeStoneDamage.bonus;
+      if (mergeStoneDamage.bonus > 0) grantFusionJump(mergeStoneDamage.destroyedCount);
       setStoneHitIds(mergeStoneDamage.hitIds);
       setTimeout(() => setStoneHitIds(new Set()), 380);
     }
@@ -1689,6 +1828,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
         mergeStoneDamage.bonus > 0 ? `⛰ +${formatScore(mergeStoneDamage.bonus)}` : "💥 stone hit",
       );
       if (mergeStoneDamage.bonus > 0) {
+        grantFusionJump(mergeStoneDamage.destroyedCount);
         mergeStoneBonus = mergeStoneDamage.bonus;
         addScore(mergeStoneDamage.bonus);
       }
@@ -2410,8 +2550,89 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
               justifyContent: "flex-end",
               gap: 6,
               minWidth: 120,
+              flexWrap: "wrap",
             }}
           >
+            {transmuteCharges > 0 && (
+              <button
+                type="button"
+                title="Transmute: reroll your current queued atom into a higher-tier atom."
+                aria-label={`Use Transmute Shot power-up (${transmuteCharges} available)`}
+                onClick={triggerTransmutePowerUp}
+                disabled={
+                  busy || pendingStone || currentIsEGun || currentIsBlank || current >= target - 1
+                }
+                style={{
+                  ...powerUpIconBtn,
+                  border: "1px solid oklch(0.76 0.18 305)",
+                  background: "linear-gradient(135deg, oklch(0.62 0.2 305), oklch(0.5 0.18 255))",
+                  color: "var(--primary-foreground)",
+                  boxShadow: "0 0 14px oklch(0.66 0.2 305 / 0.5)",
+                  opacity:
+                    busy || pendingStone || currentIsEGun || currentIsBlank || current >= target - 1
+                      ? 0.55
+                      : 1,
+                  cursor:
+                    busy || pendingStone || currentIsEGun || currentIsBlank || current >= target - 1
+                      ? "not-allowed"
+                      : "pointer",
+                }}
+              >
+                <span aria-hidden="true">🔀</span>
+                <span style={powerUpCount}>{transmuteCharges}</span>
+              </button>
+            )}
+            {(fusionJumpCharges > 0 || fusionJumpArmed) && (
+              <button
+                type="button"
+                title="Fusion Jump: arm your next merge to skip one element tier."
+                aria-label={`Arm Fusion Jump power-up (${fusionJumpCharges} available)`}
+                onClick={triggerFusionJumpPowerUp}
+                disabled={busy || fusionJumpArmed}
+                style={{
+                  ...powerUpIconBtn,
+                  border: `1px solid ${fusionJumpArmed ? "var(--accent)" : "oklch(0.72 0.16 150)"}`,
+                  background: fusionJumpArmed
+                    ? "linear-gradient(135deg, var(--accent), var(--success, var(--primary)))"
+                    : "linear-gradient(135deg, oklch(0.62 0.16 150), oklch(0.42 0.14 185))",
+                  color: "var(--primary-foreground)",
+                  boxShadow: fusionJumpArmed
+                    ? "0 0 16px var(--accent-glow)"
+                    : "0 0 14px oklch(0.62 0.16 150 / 0.45)",
+                  opacity: busy || fusionJumpArmed ? 0.65 : 1,
+                  cursor: busy || fusionJumpArmed ? "not-allowed" : "pointer",
+                }}
+              >
+                <span aria-hidden="true">⏭</span>
+                <span style={powerUpCount}>{fusionJumpCharges}</span>
+              </button>
+            )}
+            {(catalystCharges > 0 || catalystShotsRemaining > 0) && (
+              <button
+                type="button"
+                title="Catalyst Aura: double fusion radius for your next 5 shots."
+                aria-label={`Use Catalyst Aura power-up (${catalystCharges} available)`}
+                onClick={triggerCatalystPowerUp}
+                disabled={busy || catalystCharges <= 0 || catalystShotsRemaining > 0}
+                style={{
+                  ...powerUpIconBtn,
+                  border: `1px solid ${catalystShotsRemaining > 0 ? "var(--accent)" : "oklch(0.78 0.18 115)"}`,
+                  background:
+                    catalystShotsRemaining > 0
+                      ? "linear-gradient(135deg, var(--accent), oklch(0.68 0.18 115))"
+                      : "linear-gradient(135deg, oklch(0.72 0.18 115), oklch(0.48 0.14 150))",
+                  color: "var(--primary-foreground)",
+                  boxShadow: "0 0 14px oklch(0.72 0.18 115 / 0.5)",
+                  opacity: busy || catalystShotsRemaining > 0 ? 0.75 : 1,
+                  cursor: busy || catalystShotsRemaining > 0 ? "not-allowed" : "pointer",
+                }}
+              >
+                <span aria-hidden="true">🧪</span>
+                <span style={powerUpCount}>
+                  {catalystShotsRemaining > 0 ? catalystShotsRemaining : catalystCharges}
+                </span>
+              </button>
+            )}
             {emissionCharges > 0 && (
               <button
                 type="button"
