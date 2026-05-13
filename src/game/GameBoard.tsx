@@ -26,7 +26,7 @@ interface Props {
 const QUEUE_SIZE = 4;
 const MAX_AIM_DEG = 75;
 const SHIMMER_MIN_LEVEL = 5;
-const GRAB_MIN_LEVEL = 7;
+const GRAB_MIN_LEVEL = 5;
 const STONE_MAX_HP = 8;
 
 function StoneVisual({ size, hp, maxHp }: { size: number; hp: number; maxHp: number }) {
@@ -422,7 +422,9 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
 
     // animate projectile along path
     const path = hit.path;
-    const totalMs = Math.min(360, 60 + path.length * 4);
+    const baseMs = Math.min(360, 60 + path.length * 4);
+    // Stones fly twice as fast.
+    const totalMs = pendingStone ? baseMs / 2 : baseMs;
     const stepMs = totalMs / path.length;
     let i = 0;
     setProjectile(path[0]);
@@ -448,8 +450,46 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
       const sy = Math.max(TOP_PAD + sR, y);
       setBalls((prev) => {
         const others = prev.map((b) => ({ ...b }));
+        // Shockwave: stone shoves nearby atoms with 5× reach and force,
+        // and those primary-pushed atoms cascade into secondary collisions.
+        const SHOCK_REACH = sR * 1.6 * STONE_NUDGE_MULT;
+        const SHOCK_FORCE = sR * 0.25 * STONE_NUDGE_MULT;
+        const primaryIds = new Set<number>();
+        for (const o of others) {
+          if (o.stoneHp != null) continue;
+          const dxs = o.x - sx;
+          const dys = o.y - sy;
+          const d = Math.hypot(dxs, dys) || 0.001;
+          if (d < SHOCK_REACH) {
+            const falloff = 1 - d / SHOCK_REACH;
+            o.x += (dxs / d) * SHOCK_FORCE * falloff;
+            o.y += (dys / d) * SHOCK_FORCE * falloff;
+            primaryIds.add(o.id);
+          }
+        }
+        // Secondary cascade: anyone touching a primary-pushed atom gets a
+        // weaker push along the same outward direction.
+        const SECONDARY = 0.4;
+        for (const a of others) {
+          if (!primaryIds.has(a.id)) continue;
+          const ax = a.x - sx;
+          const ay = a.y - sy;
+          const ad = Math.hypot(ax, ay) || 0.001;
+          const ux = ax / ad;
+          const uy = ay / ad;
+          for (const b of others) {
+            if (b.id === a.id) continue;
+            if (primaryIds.has(b.id)) continue;
+            if (b.stoneHp != null) continue;
+            const dd = Math.hypot(b.x - a.x, b.y - a.y);
+            if (dd < (a.r + b.r) * 1.4) {
+              b.x += ux * SHOCK_FORCE * SECONDARY;
+              b.y += uy * SHOCK_FORCE * SECONDARY;
+            }
+          }
+        }
         // Push existing balls outward and resolve overlaps so the stone fits.
-        for (let iter = 0; iter < 18; iter++) {
+        for (let iter = 0; iter < 30; iter++) {
           let moved = false;
           for (const o of others) {
             const dxs = o.x - sx;
@@ -639,6 +679,57 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
           const m = moved.get(b.id);
           return m ? { ...b, x: m.x, y: m.y } : b;
         });
+        // Stones take damage from any collision wave that reaches them
+        // (primary, secondary, or tertiary pushes).
+        const stones = nudged.filter((b) => b.stoneHp != null);
+        if (stones.length > 0) {
+          const stoneDamage = new Map<number, number>();
+          for (const [movedId] of moved) {
+            const mb = nudged.find((b) => b.id === movedId);
+            if (!mb || mb.stoneHp != null) continue;
+            for (const st of stones) {
+              const d = Math.hypot(mb.x - st.x, mb.y - st.y);
+              if (d < (mb.r + st.r) * 1.15) {
+                stoneDamage.set(st.id, (stoneDamage.get(st.id) ?? 0) + 1);
+              }
+            }
+          }
+          if (stoneDamage.size > 0) {
+            const hitSet = new Set<number>();
+            let totalBonus = 0;
+            const initialR = (ballSize / 2) * (1 + (8 - 4) * 0.11);
+            nudged = nudged
+              .map((b) => {
+                if (b.stoneHp == null) return b;
+                const dmg = stoneDamage.get(b.id) ?? 0;
+                if (dmg <= 0) return b;
+                hitSet.add(b.id);
+                const newHp = (b.stoneHp ?? STONE_MAX_HP) - dmg;
+                const maxHp = b.stoneMaxHp ?? STONE_MAX_HP;
+                if (newHp <= 0) {
+                  totalBonus += Math.floor(maxHp * 250 * level.scoreMultiplier);
+                  return null;
+                }
+                const newR = Math.max(initialR * 0.35, initialR * (newHp / maxHp));
+                return { ...b, stoneHp: newHp, r: newR };
+              })
+              .filter((b): b is Ball => b !== null);
+            if (hitSet.size > 0) {
+              setStoneHitIds(hitSet);
+              setTimeout(() => setStoneHitIds(new Set()), 380);
+              haptic([20, 30, 30]);
+            }
+            if (totalBonus > 0) {
+              setScore((s) => s + totalBonus);
+              addScore(totalBonus);
+              spawnPopup(`⛰ +${formatScore(totalBonus)}`);
+              haptic([40, 60, 40, 60, 100]);
+            } else {
+              spawnPopup(`💥 stone hit`);
+            }
+            setNoMergeStreak(0);
+          }
+        }
       }
     }
     if (matches.length === 0) {
@@ -900,7 +991,8 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     setHighest(nextHighest);
     setHighestElement(nextHighest);
     const gained = Math.floor(result.scoreGained * level.scoreMultiplier);
-    setScore((s) => s + gained);
+    const nextScore = score + gained;
+    setScore(nextScore);
     addScore(gained);
     reportQuestProgress({
       merges: result.merges.length,
@@ -909,6 +1001,25 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
       maxChainDepth: result.merges.length,
     });
     setTimeout(() => setHighlightId(null), 200 + result.merges.length * 120);
+    // Grabbed-and-merged into the target element? Trigger the same win flow
+    // a regular shot does so the level actually clears.
+    if (result.levelComplete && !continuingPastTarget) {
+      const timeSec = (Date.now() - startTimeRef.current) / 1000;
+      const nextBestCombo = Math.max(runBestCombo, result.merges.length);
+      const stars = calculateStars(level, nextScore, shots, nextBestCombo, timeSec);
+      setEarnedStars(stars);
+      setLevelStars(levelId, stars);
+      reportQuestProgress({ levelCleared: true });
+      unlockLevel(levelId + 1);
+      sfx(playWinSound);
+      haptic([30, 60, 30, 60, 80]);
+      setWinChoice({
+        stars,
+        score: nextScore,
+        shots,
+        bestCombo: nextBestCombo,
+      });
+    }
   }
 
   // Spawn a Stone obstacle near the top of the board, pushing nearby balls
