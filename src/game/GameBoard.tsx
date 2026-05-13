@@ -279,6 +279,12 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     (atom: number) => ballSize * periodScaleFor(atom),
     [ballSize, periodScaleFor],
   );
+  // Stone projectile geometry (matches a period-8 ball).
+  const stoneR = (ballSize / 2) * (1 + (8 - 4) * 0.11);
+  const stoneSize = stoneR * 2;
+  // Effective projectile radius/size — uses stone dims when a stone is loaded.
+  const projShotR = pendingStone ? stoneR : radiusFor(current);
+  const projShotSize = pendingStone ? stoneSize : sizeFor(current);
   const launcherX = boardW / 2;
   const launcherY = boardH - 8; // near bottom of board
   const TOP_PAD = 6;
