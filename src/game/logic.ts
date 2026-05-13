@@ -46,10 +46,15 @@ function getNeighbors(grid: Grid, row: number, col: number): [number, number][] 
   const rows = grid.length;
   const cols = grid[0].length;
   const result: [number, number][] = [];
-  if (row > 0) result.push([row - 1, col]);
-  if (row < rows - 1) result.push([row + 1, col]);
-  if (col > 0) result.push([row, col - 1]);
-  if (col < cols - 1) result.push([row, col + 1]);
+  // 8-directional adjacency: horizontal, vertical, and diagonal.
+  for (let dr = -1; dr <= 1; dr++) {
+    for (let dc = -1; dc <= 1; dc++) {
+      if (dr === 0 && dc === 0) continue;
+      const r = row + dr;
+      const c = col + dc;
+      if (r >= 0 && r < rows && c >= 0 && c < cols) result.push([r, c]);
+    }
+  }
   return result;
 }
 
@@ -140,6 +145,59 @@ export function placeAndMerge(
           }
         }
         break;
+      }
+    }
+  }
+
+  // Apply ceiling gravity so the placed ball (and any survivors) settle upward.
+  newGrid = applyGravity(newGrid);
+
+  // Cascading global pass: any two 8-adjacent same atoms anywhere on the board
+  // auto-merge. Repeat until stable.
+  let changed = true;
+  while (changed) {
+    changed = false;
+    outer: for (let r = 0; r < newGrid.length; r++) {
+      for (let c = 0; c < newGrid[0].length; c++) {
+        const v = newGrid[r][c];
+        if (v === null || v >= maxElement) continue;
+        const nbrs = getNeighbors(newGrid, r, c);
+        for (const [nr, nc] of nbrs) {
+          if (newGrid[nr][nc] === v) {
+            const nextAtom = v + 1;
+            // Survivor: the upper-most cell (closest to ceiling), tiebreak by left column.
+            let sr = r, sc = c, ar = nr, ac = nc;
+            if (nr < sr || (nr === sr && nc < sc)) {
+              sr = nr; sc = nc; ar = r; ac = c;
+            }
+            newGrid[ar][ac] = null;
+            newGrid[sr][sc] = nextAtom;
+            merges.push({
+              absorbedRow: ar, absorbedCol: ac,
+              survivorRow: sr, survivorCol: sc,
+              resultAtomicNumber: nextAtom,
+              chainDepth,
+            });
+            scoreGained += nextAtom * 10 * Math.pow(2, chainDepth);
+            highestElement = Math.max(highestElement, nextAtom);
+            if (nextAtom >= targetElement) levelComplete = true;
+            chainDepth++;
+            newGrid = applyGravity(newGrid);
+            // Track final position for the survivor.
+            currentAtom = nextAtom;
+            // Re-locate the survivor (it may have floated up).
+            relocate: for (let rr = 0; rr < newGrid.length; rr++) {
+              for (let cc = 0; cc < newGrid[0].length; cc++) {
+                if (newGrid[rr][cc] === nextAtom) {
+                  currentRow = rr; currentCol = cc;
+                  break relocate;
+                }
+              }
+            }
+            changed = true;
+            break outer;
+          }
+        }
       }
     }
   }
