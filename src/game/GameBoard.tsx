@@ -552,7 +552,11 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     if (undiscovered.length > 0) recordDiscovery(undiscovered);
 
     // Refresh radii on any merged survivors (their atom changed).
-    setBalls(result.balls.map((b) => ({ ...b, r: radiusFor(b.atom) })));
+    setBalls(
+      result.balls.map((b) =>
+        b.stoneHp != null ? b : { ...b, r: radiusFor(b.atom) },
+      ),
+    );
     setHighlightId(result.finalBallId);
     const shimmerHit = currentIsShimmer && result.merges.length > 0;
     const grabAdd = result.merges.length * (shimmerHit ? 2 : 1);
@@ -586,6 +590,21 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     } else {
       // Missed shot — atom didn't merge with anything. Cool the combo bar.
       setGrabProgress((p) => Math.max(0, p - 1));
+    }
+
+    // === Stone spawn check ===
+    // Track shots that produce zero merges. After 3 in a row, spawn a Stone.
+    if (result.merges.length === 0) {
+      setNoMergeStreak((s) => {
+        const next = s + 1;
+        if (next >= STONE_NO_MERGE_TRIGGER) {
+          setTimeout(() => spawnStoneOnBoard(), 220);
+          return 0;
+        }
+        return next;
+      });
+    } else {
+      setNoMergeStreak(0);
     }
 
     const nextHighest = Math.max(highest, result.highestElement);
@@ -716,7 +735,11 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     const undiscovered = Array.from(newAtoms).filter((n) => !discoveredElements.includes(n));
     if (undiscovered.length > 0) recordDiscovery(undiscovered);
 
-    setBalls(result.balls.map((b) => ({ ...b, r: radiusFor(b.atom) })));
+    setBalls(
+      result.balls.map((b) =>
+        b.stoneHp != null ? b : { ...b, r: radiusFor(b.atom) },
+      ),
+    );
     setHighlightId(result.finalBallId);
     if (result.merges.length > 0) {
       const comboLabel = getComboLabel(result.merges.length);
@@ -747,6 +770,73 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
       maxChainDepth: result.merges.length,
     });
     setTimeout(() => setHighlightId(null), 200 + result.merges.length * 120);
+  }
+
+  // Spawn a Stone obstacle near the top of the board, pushing nearby balls
+  // outward to make room.
+  function spawnStoneOnBoard() {
+    const stoneR = (ballSize / 2) * (1 + (8 - 4) * 0.11);
+    const sx = boardW / 2;
+    const sy = TOP_PAD + stoneR + 6;
+    setBalls((prev) => {
+      const others = prev.map((b) => ({ ...b }));
+      for (let iter = 0; iter < 18; iter++) {
+        let moved = false;
+        for (const o of others) {
+          const dxs = o.x - sx;
+          const dys = o.y - sy;
+          const d = Math.hypot(dxs, dys) || 0.001;
+          const min = stoneR + o.r;
+          if (d < min) {
+            const push = min - d + 0.5;
+            o.x += (dxs / d) * push;
+            o.y += (dys / d) * push;
+            moved = true;
+          }
+        }
+        for (let i = 0; i < others.length; i++) {
+          for (let j = i + 1; j < others.length; j++) {
+            const a = others[i];
+            const b = others[j];
+            if (a.stoneHp != null && b.stoneHp != null) continue;
+            const dx = b.x - a.x;
+            const dy = b.y - a.y;
+            const d = Math.hypot(dx, dy) || 0.001;
+            const min = a.r + b.r;
+            if (d < min) {
+              const push = (min - d) / 2 + 0.25;
+              a.x -= (dx / d) * push;
+              a.y -= (dy / d) * push;
+              b.x += (dx / d) * push;
+              b.y += (dy / d) * push;
+              moved = true;
+            }
+          }
+        }
+        for (const o of others) {
+          o.x = Math.max(SIDE_PAD + o.r, Math.min(boardW - SIDE_PAD - o.r, o.x));
+          o.y = Math.max(TOP_PAD + o.r, o.y);
+        }
+        if (!moved) break;
+      }
+      const stone: Ball = {
+        id: nextBallId(),
+        x: sx,
+        y: sy,
+        atom: -1,
+        r: stoneR,
+        stoneHp: STONE_MAX_HP,
+        stoneMaxHp: STONE_MAX_HP,
+      };
+      return [...others, stone];
+    });
+    spawnPopup("⛰ STONE!");
+    haptic([30, 50, 30]);
+    showTip(
+      "feature-stone",
+      "⛰ A Stone appeared!",
+      "Stones don't merge with anything. Hit one with atoms to crack it — each impact shoves nearby atoms 5× harder than usual. Destroy it after 8 hits for a big score bonus.",
+    );
   }
 
   // === aim handling ===
