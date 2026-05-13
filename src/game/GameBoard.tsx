@@ -585,8 +585,8 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
                 key={b.id}
                 style={{
                   position: "absolute",
-                  left: b.x - ballSize / 2,
-                  top: b.y - ballSize / 2,
+                  left: b.x - b.r,
+                  top: b.y - b.r,
                   transition: "left 180ms ease-out, top 180ms ease-out",
                 }}
               >
@@ -638,8 +638,8 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
             <div
               style={{
                 position: "absolute",
-                left: projectile.x - ballSize / 2,
-                top: projectile.y - ballSize / 2,
+                left: projectile.x - sizeFor(current) / 2,
+                top: projectile.y - sizeFor(current) / 2,
                 pointerEvents: "none",
                 zIndex: 4,
               }}
@@ -652,8 +652,8 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
           <div
             style={{
               position: "absolute",
-              left: launcherX - ballSize / 2,
-              top: launcherY - ballSize / 2,
+              left: launcherX - sizeFor(current) / 2,
+              top: launcherY - sizeFor(current) / 2,
               zIndex: 2,
               pointerEvents: "none",
               transform: `rotate(${aimDeg}deg)`,
