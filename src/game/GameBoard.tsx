@@ -29,9 +29,11 @@ const MAX_AIM_DEG = 75;
 const SHIMMER_MIN_LEVEL = 5;
 const GRAB_MIN_LEVEL = 4;
 const EGUN_MIN_LEVEL = 6;
+const BLANK_MIN_LEVEL = 10;
+const BLANK_ATOM_CHANCE = 0.01;
 const POWER_UP_CHANCE = 0.05;
 const EGUN_MIN_SHOT_GAP = 10;
-const GRAVITY_UNLOCK_TIMES_MS = [5, 10, 15].map((minutes) => minutes * 60 * 1000);
+const EMISSION_UNLOCK_INTERVAL_MS = 5 * 60 * 1000;
 const STONE_MAX_HP = 8;
 
 function StoneVisual({ size, hp }: { size: number; hp: number }) {
@@ -85,6 +87,32 @@ function EGunVisual({ size }: { size: number }) {
     </div>
   );
 }
+function BlankAtomVisual({ size }: { size: number }) {
+  return (
+    <div
+      className="blank-atom"
+      style={{
+        width: size,
+        height: size,
+        borderRadius: "50%",
+        background:
+          "radial-gradient(circle at 35% 25%, oklch(1 0 0), oklch(0.78 0.06 250) 45%, oklch(0.22 0.03 275))",
+        boxShadow:
+          "0 0 18px oklch(1 0 0 / 0.75), inset 0 -6px 12px rgba(0,0,0,0.35), inset 0 5px 12px rgba(255,255,255,0.35)",
+        border: "2px solid oklch(1 0 0 / 0.85)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: "oklch(0.14 0.04 275)",
+        fontWeight: 1000,
+        fontSize: Math.max(14, size * 0.5),
+        textShadow: "0 1px 5px rgba(255,255,255,0.8)",
+      }}
+    >
+      ✦
+    </div>
+  );
+}
 const STONE_NO_MERGE_TRIGGER = 3;
 const STONE_NUDGE_MULT = 5;
 
@@ -94,6 +122,12 @@ function getComboLabel(mergeCount: number): string | null {
   if (mergeCount >= 3) return "Reaction Chain!";
   if (mergeCount >= 2) return "Catalyst!";
   return null;
+}
+function getStarParShots(level: (typeof LEVELS)[0]): number {
+  const par = level.parShots ?? 30;
+  if (level.id <= 4) return par;
+  const lateLevelRelief = 1 + Math.min(0.9, (level.id - 4) * 0.055);
+  return Math.round(par * lateLevelRelief);
 }
 
 function calculateStars(
@@ -107,7 +141,7 @@ function calculateStars(
   // 3★ = at or under both par shots AND par time
   // 2★ = within 1.3× of both
   // 1★ = completed
-  const par = level.parShots ?? 30;
+  const par = getStarParShots(level);
   const parTime = level.parTimeSec ?? par * 5;
   const shotsRatio = shots / par;
   const timeRatio = timeSec / parTime;
@@ -121,6 +155,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
   const shimmerEnabled = level.id >= SHIMMER_MIN_LEVEL;
   const grabEnabled = level.id >= GRAB_MIN_LEVEL;
   const eGunEnabled = level.id >= EGUN_MIN_LEVEL;
+  const blankEnabled = level.id >= BLANK_MIN_LEVEL;
   const {
     recordDiscovery,
     addScore,
@@ -149,6 +184,10 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
   const [eGunQueue, setEGunQueue] = useState<boolean[]>(() =>
     Array.from({ length: QUEUE_SIZE }, () => false),
   );
+  // Parallel array — true means this queue slot is a Blank atom wildcard.
+  const [blankQueue, setBlankQueue] = useState<boolean[]>(() =>
+    Array.from({ length: QUEUE_SIZE }, () => blankEnabled && Math.random() < BLANK_ATOM_CHANCE),
+  );
   const [score, setScore] = useState(0);
   const [highest, setHighest] = useState(1);
   const [shots, setShots] = useState(0);
@@ -163,6 +202,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
   const [highlightId, setHighlightId] = useState<number | null>(null);
   const [wiggleIds, setWiggleIds] = useState<Set<number>>(new Set());
   const [projectile, setProjectile] = useState<{ x: number; y: number } | null>(null);
+  const [gravityFxId, setGravityFxId] = useState<number | null>(null);
   const popupId = useRef(0);
   const eGunCooldownSlots = useRef(0);
 
@@ -188,11 +228,13 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
   const GRAB_THRESHOLD = 10;
   const [grabProgress, setGrabProgress] = useState(0);
 
-  // === Gravity power-up ===
-  // Awarded at 5, 10, and 15 minutes. When used, atoms fall upward and any
-  // resulting combinations count like regular merges for progress/rewards.
+  // === Gravity and Emission power-ups ===
+  // Gravity is awarded by 4× combos. Emission is awarded every 5 minutes and
+  // raises atoms without creating the level target.
   const [gravityCharges, setGravityCharges] = useState(0);
-  const [gravityUnlockIndex, setGravityUnlockIndex] = useState(0);
+  const [emissionCharges, setEmissionCharges] = useState(0);
+  const [emissionUnlockIndex, setEmissionUnlockIndex] = useState(0);
+  const [emissionBoost, setEmissionBoost] = useState(0);
 
   // === Continue past target ===
   // When the player reaches the target element, we offer a choice: claim the
@@ -215,6 +257,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
   const current = queue[0];
   const currentIsShimmer = shimmerQueue[0] ?? false;
   const currentIsEGun = eGunQueue[0] ?? false;
+  const currentIsBlank = blankQueue[0] ?? false;
 
   const sfx = (fn: () => void) => {
     if (soundEnabled) fn();
@@ -228,20 +271,30 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     id: string;
     title: string;
     body: string;
+    tone?: "default" | "danger";
   }>(null);
 
-  function showTip(id: string, title: string, body: string) {
+  function showTip(
+    id: string,
+    title: string,
+    body: string,
+    tone: "default" | "danger" = "default",
+  ) {
     if (seenTips.includes(id)) return;
     markTipSeen(id);
-    setActiveTip({ id, title, body });
+    setActiveTip({ id, title, body, tone });
   }
 
   useEffect(() => {
     setBalls(createEmptyBoard());
     const initialQueue = generateInitialQueue(level.maxQueueElement, QUEUE_SIZE, level.queueDecay);
     const initialEGun = Array.from({ length: QUEUE_SIZE }, () => false);
+    const initialBlank = initialEGun.map(
+      (isEGun) => !isEGun && blankEnabled && Math.random() < BLANK_ATOM_CHANCE,
+    );
     const initialShimmer = initialEGun.map(
-      (isEGun) => !isEGun && shimmerEnabled && Math.random() < POWER_UP_CHANCE,
+      (isEGun, i) =>
+        !isEGun && !initialBlank[i] && shimmerEnabled && Math.random() < POWER_UP_CHANCE,
     );
     setQueue(
       initialQueue.map((atom, i) =>
@@ -250,6 +303,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     );
     setShimmerQueue(initialShimmer);
     setEGunQueue(initialEGun);
+    setBlankQueue(initialBlank);
     setScore(0);
     setHighest(1);
     setShots(0);
@@ -261,6 +315,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     setHighlightId(null);
     setWiggleIds(new Set());
     setProjectile(null);
+    setGravityFxId(null);
     setBusy(false);
     setAimDeg(0);
     setGrabs(0);
@@ -274,7 +329,9 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     setPendingStone(false);
     setStoneSpawnCount(0);
     setGravityCharges(0);
-    setGravityUnlockIndex(0);
+    setEmissionCharges(0);
+    setEmissionUnlockIndex(0);
+    setEmissionBoost(0);
     eGunCooldownSlots.current = 0;
     startTimeRef.current = Date.now();
     setElapsedMs(0);
@@ -298,6 +355,13 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
         "feature-egun-unlock",
         "⚡ E-gun unlocked!",
         "Rare E-gun shots fire a straight beam to the far edge without bouncing. Every non-Hydrogen atom in the beam drops by 1 tier.",
+      );
+    }
+    if (level.id >= BLANK_MIN_LEVEL) {
+      showTip(
+        "feature-blank-unlock",
+        "✦ Blank atom unlocked!",
+        "Blank atoms are rare 1% wildcard shots. They merge as whatever atom they hit — and if they hit a Stone, the Stone vanishes completely.",
       );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -327,18 +391,18 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
 
   useEffect(() => {
     if (gameOver || won) return;
-    if (gravityUnlockIndex >= GRAVITY_UNLOCK_TIMES_MS.length) return;
-    if (elapsedMs < GRAVITY_UNLOCK_TIMES_MS[gravityUnlockIndex]) return;
-    setGravityCharges((g) => g + 1);
-    setGravityUnlockIndex((i) => i + 1);
-    spawnPopup("🌀 GRAVITY READY");
+    const nextUnlockMs = (emissionUnlockIndex + 1) * EMISSION_UNLOCK_INTERVAL_MS;
+    if (elapsedMs < nextUnlockMs) return;
+    setEmissionCharges((g) => g + 1);
+    setEmissionUnlockIndex((i) => i + 1);
+    spawnPopup("☢ EMISSION READY");
     showTip(
-      "feature-gravity-powerup",
-      "🌀 Gravity power-up ready!",
-      "Gravity unlocks after 5, 10, and 15 minutes. Tap the Gravity button to make every atom fall upward; any combinations formed still count toward Grab progress and quest progress.",
+      "feature-emission-powerup",
+      "☢ Emission power-up ready!",
+      "Emission unlocks every 5 minutes. Tap it to raise all atoms by 1 tier without creating the level target; future launcher atoms also start 1 tier higher.",
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [elapsedMs, gameOver, won, gravityUnlockIndex]);
+  }, [elapsedMs, gameOver, won, emissionUnlockIndex]);
 
   // Dynamic queue cap: as the board fills, unlock higher-tier atoms in the
   // shooting queue. Adds +1 tier at 15 atoms on board, +2 at 25, etc.
@@ -353,22 +417,51 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     return Math.max(1, Math.min(118, Math.floor(Math.random() * maxElement) + 1));
   }
 
+  function raiseAtomForEmission(atom: number): number {
+    if (atom < 1) return atom;
+    const raised = Math.min(118, atom + 1);
+    return raised === target ? atom : raised;
+  }
+
+  function applyEmissionBoost(atom: number): number {
+    let boosted = atom;
+    for (let i = 0; i < emissionBoost; i++) {
+      boosted = raiseAtomForEmission(boosted);
+    }
+    return boosted;
+  }
+
+  function grantGravityForCombo(mergeCount: number) {
+    if (mergeCount < 4) return;
+    setGravityCharges((g) => g + 1);
+    spawnPopup("🌀 GRAVITY READY");
+    showTip(
+      "feature-gravity-powerup",
+      "🌀 Gravity power-up ready!",
+      "A 4× combo unlocks Gravity. Tap the Gravity button to make every atom fall upward; any combinations formed still count toward Grab progress and quest progress.",
+    );
+  }
+
   function makeNextQueueSlot(maxElement: number): {
     atom: number;
     shimmer: boolean;
     eGun: boolean;
+    blank: boolean;
   } {
     const eGunEligible = eGunEnabled && eGunCooldownSlots.current <= 0;
     const eGun = eGunEligible && Math.random() < POWER_UP_CHANCE;
     if (eGun) eGunCooldownSlots.current = EGUN_MIN_SHOT_GAP;
     else if (eGunCooldownSlots.current > 0) eGunCooldownSlots.current -= 1;
-    const shimmer = !eGun && shimmerEnabled && Math.random() < POWER_UP_CHANCE;
+    const blank = !eGun && blankEnabled && Math.random() < BLANK_ATOM_CHANCE;
+    const shimmer = !eGun && !blank && shimmerEnabled && Math.random() < POWER_UP_CHANCE;
+    const atom = shimmer
+      ? randomAvailableElement(maxElement)
+      : generateQueueElement(maxElement, level.queueDecay);
     return {
-      atom: shimmer
-        ? randomAvailableElement(maxElement)
-        : generateQueueElement(maxElement, level.queueDecay),
+      atom: applyEmissionBoost(atom),
       shimmer,
       eGun,
+      blank,
     };
   }
 
@@ -423,12 +516,8 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
   const TOP_PAD = 6;
   const SIDE_PAD = 4;
 
-  const baseDangerY = boardH - 8 - ballSize - 8;
-  const halfBoardDangerY = boardH / 2;
-  const dangerY = Math.max(
-    halfBoardDangerY,
-    baseDangerY - ((baseDangerY - halfBoardDangerY) * Math.min(stoneSpawnCount, 5)) / 5,
-  );
+  const dangerZonePct = Math.min(0.7, 0.2 + stoneSpawnCount * 0.1);
+  const dangerY = Math.max(TOP_PAD + ballSize, boardH * (1 - dangerZonePct));
 
   const geo: Geo = useMemo(
     () => ({
@@ -438,7 +527,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
       leftPad: SIDE_PAD,
       rightPad: SIDE_PAD,
       topPad: TOP_PAD,
-      // danger line rises as Stones spawn; after 5 Stones it reaches half the board.
+      // danger line starts at a 20% red zone and rises by 10% per Stone.
       dangerY,
     }),
     [boardW, boardH, R, dangerY],
@@ -525,16 +614,23 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
         const ly = Math.max(ceilingY, y - bestT * dy);
         const hitBall = balls[hitIdx];
         path.push({ x: lx, y: ly });
-        if (hitBall.stoneHp != null && bouncedStoneIds.length < 8) {
+        if (hitBall.stoneHp != null && !currentIsBlank && bouncedStoneIds.length < 8) {
           bouncedStoneIds.push(hitBall.id);
-          const nx = (lx - hitBall.x) / (Math.hypot(lx - hitBall.x, ly - hitBall.y) || 1);
-          const ny = (ly - hitBall.y) / (Math.hypot(lx - hitBall.x, ly - hitBall.y) || 1);
+          const normalMag = Math.hypot(lx - hitBall.x, ly - hitBall.y) || 1;
+          const nx = (lx - hitBall.x) / normalMag;
+          const ny = (ly - hitBall.y) / normalMag;
           const dot = dx * nx + dy * ny;
-          dx = dx - 2 * dot * nx;
-          dy = dy - 2 * dot * ny;
+          const reflectedX = dx - 2 * dot * nx;
+          const reflectedY = dy - 2 * dot * ny;
+          const bounceInfluence = 0.45;
+          dx = dx * (1 - bounceInfluence) + reflectedX * bounceInfluence;
+          dy = dy * (1 - bounceInfluence) + reflectedY * bounceInfluence;
           const mag = Math.hypot(dx, dy) || 1;
           dx /= mag;
           dy /= mag;
+          if (import.meta.env.DEV) {
+            console.log("Stone bounce", { aimDeg, dx, dy, hitId: hitBall.id });
+          }
           y = ly + dy * step * 1.5;
           x = lx + dx * step * 1.5;
           continue;
@@ -650,6 +746,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
         if (i >= beam.path.length) {
           clearInterval(interval);
           setProjectile(null);
+          setGravityFxId(null);
           fireEGun(beam.path);
         } else {
           setProjectile(beam.path[i]);
@@ -676,6 +773,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
       if (i >= path.length) {
         clearInterval(interval);
         setProjectile(null);
+        setGravityFxId(null);
         triggerImpact(hit.x, hit.y, hit.hitId, hit.dx, hit.dy, hit.stoneHitIds);
       } else {
         setProjectile(path[i]);
@@ -711,6 +809,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     setQueue((q) => [...q.slice(1), nextSlot.atom]);
     setShimmerQueue((s) => [...s.slice(1), nextSlot.shimmer]);
     setEGunQueue((e) => [...e.slice(1), nextSlot.eGun]);
+    setBlankQueue((b) => [...b.slice(1), nextSlot.blank]);
     if (checkGameOver(updated, geo)) {
       setGameOver(true);
       haptic([50, 80, 50, 80, 200]);
@@ -862,6 +961,28 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
       }
     }
 
+    if (currentIsBlank && hitId !== null) {
+      const blankStone = impactBalls.find((b) => b.id === hitId && b.stoneHp != null);
+      if (blankStone) {
+        const updated = impactBalls.filter((b) => b.id !== blankStone.id);
+        const nextShots = shots + 1;
+        setShots(nextShots);
+        setBalls(updated);
+        setStoneHitIds(new Set([blankStone.id]));
+        setTimeout(() => setStoneHitIds(new Set()), 380);
+        setNoMergeStreak(0);
+        spawnPopup("✦ STONE ERASED");
+        haptic([30, 60, 30, 90]);
+        const nextSlot = makeNextQueueSlot(dynamicMaxQueue(updated.length));
+        setQueue((q) => [...q.slice(1), nextSlot.atom]);
+        setShimmerQueue((sq) => [...sq.slice(1), nextSlot.shimmer]);
+        setEGunQueue((eq) => [...eq.slice(1), nextSlot.eGun]);
+        setBlankQueue((bq) => [...bq.slice(1), nextSlot.blank]);
+        setBusy(false);
+        return;
+      }
+    }
+
     // === Stone hit branch ===
     // Hitting a Stone deals 1 damage, shoves neighbors with 5× force, and
     // shrinks the stone. If destroyed, awards a big score bonus.
@@ -925,12 +1046,20 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
         return;
       }
     }
+    const blankHitAtom =
+      currentIsBlank && hitId !== null
+        ? impactBalls.find((b) => b.id === hitId && b.stoneHp == null)?.atom
+        : undefined;
+    const activeAtom = blankHitAtom ?? current;
+    if (currentIsBlank && blankHitAtom != null)
+      spawnPopup(`✦ BLANK → ${ELEMENTS[blankHitAtom - 1]?.symbol ?? "?"}`);
+
     // Wiggle nearby same-type balls before placing.
-    const projR = radiusFor(current);
+    const projR = radiusFor(activeAtom);
     const ADJ_F = 1.4;
     const matches: number[] = [];
     for (const b of impactBalls) {
-      if (b.atom !== current) continue;
+      if (b.atom !== activeAtom) continue;
       if (Math.hypot(b.x - x, b.y - y) <= (projR + b.r) * ADJ_F) matches.push(b.id);
     }
     // Tactical nudge: if we hit an existing ball that won't fuse with us,
@@ -939,9 +1068,9 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     let nudged = impactBalls;
     if (hitId !== null) {
       const hb = impactBalls.find((b) => b.id === hitId);
-      if (hb && hb.atom !== current) {
+      if (hb && hb.atom !== activeAtom) {
         // Heavier elements (lower in the periodic table) hit harder.
-        const projPeriod = Math.max(1, Math.min(8, ELEMENTS[current - 1]?.period ?? 4));
+        const projPeriod = Math.max(1, Math.min(8, ELEMENTS[activeAtom - 1]?.period ?? 4));
         const NUDGE = projR * (0.15 + projPeriod * 0.12);
         const minX = SIDE_PAD + hb.r;
         const maxX = boardW - SIDE_PAD - hb.r;
@@ -1038,7 +1167,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
       }
     }
     if (matches.length === 0) {
-      finalizePlacement(x, y, nudged, impactStoneBonus);
+      finalizePlacement(x, y, nudged, impactStoneBonus, activeAtom);
       return;
     }
     // Pull placement toward the closest matching atom so adjacency is
@@ -1069,7 +1198,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     haptic(20);
     setTimeout(() => {
       setWiggleIds(new Set());
-      finalizePlacement(placeX, placeY, nudged, impactStoneBonus);
+      finalizePlacement(placeX, placeY, nudged, impactStoneBonus, activeAtom);
     }, 220);
   }
 
@@ -1078,14 +1207,21 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     y: number,
     currentBalls: Board = balls,
     impactStoneBonus = 0,
+    atomOverride = current,
   ) {
-    const newBall: Ball = { id: nextBallId(), x, y, atom: current, r: radiusFor(current) };
+    const newBall: Ball = {
+      id: nextBallId(),
+      x,
+      y,
+      atom: atomOverride,
+      r: radiusFor(atomOverride),
+    };
     if (currentBalls !== balls) setBalls(currentBalls);
     let result = placeAndMerge(currentBalls, newBall, geo, target, 118);
     const nextShots = shots + 1;
     setShots(nextShots);
 
-    const newAtoms = new Set<number>([current]);
+    const newAtoms = new Set<number>([atomOverride]);
     result.merges.forEach((m) => newAtoms.add(m.resultAtomicNumber));
     const undiscovered = Array.from(newAtoms).filter((n) => !discoveredElements.includes(n));
     if (undiscovered.length > 0) recordDiscovery(undiscovered);
@@ -1112,11 +1248,12 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     // Refresh radii on any merged survivors (their atom changed).
     setBalls(result.balls.map((b) => (b.stoneHp != null ? b : { ...b, r: radiusFor(b.atom) })));
     setHighlightId(result.finalBallId);
-    const shimmerHit = currentIsShimmer && result.merges.length > 0;
+    const shimmerHit = !currentIsBlank && currentIsShimmer && result.merges.length > 0;
     const grabAdd = result.merges.length * (shimmerHit ? 2 : 1);
     if (result.merges.length > 0) {
       const comboLabel = getComboLabel(result.merges.length);
       if (comboLabel) spawnPopup(comboLabel);
+      grantGravityForCombo(result.merges.length);
       setRunBestCombo((best) => Math.max(best, result.merges.length));
       setBestCombo(result.merges.length);
       result.merges.forEach((m, i) => {
@@ -1209,6 +1346,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
           setQueue((q) => [...q.slice(1), nextSlot.atom]);
           setShimmerQueue((s) => [...s.slice(1), nextSlot.shimmer]);
           setEGunQueue((e) => [...e.slice(1), nextSlot.eGun]);
+          setBlankQueue((b) => [...b.slice(1), nextSlot.blank]);
           setBusy(false);
           return;
         }
@@ -1220,6 +1358,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
         setQueue((q) => [...q.slice(1), nextSlot.atom]);
         setShimmerQueue((s) => [...s.slice(1), nextSlot.shimmer]);
         setEGunQueue((e) => [...e.slice(1), nextSlot.eGun]);
+        setBlankQueue((b) => [...b.slice(1), nextSlot.blank]);
         if (checkGameOver(result.balls, geo)) {
           setGameOver(true);
           haptic([50, 80, 50, 80, 200]);
@@ -1230,9 +1369,48 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     );
   }
 
+  function triggerEmissionPowerUp() {
+    if (busy || gameOver || won || emissionCharges <= 0) return;
+    setBusy(true);
+    setEmissionCharges((g) => Math.max(0, g - 1));
+    setEmissionBoost((boost) => boost + 1);
+
+    const raisedBalls = balls.map((b) => {
+      if (b.stoneHp != null) return b;
+      const atom = raiseAtomForEmission(b.atom);
+      return atom === b.atom ? b : { ...b, atom, r: radiusFor(atom) };
+    });
+    const raisedQueue = queue.map((atom, i) => (eGunQueue[i] ? atom : raiseAtomForEmission(atom)));
+    const reachedAtoms = new Set<number>();
+    raisedBalls.forEach((b) => {
+      if (b.stoneHp == null) reachedAtoms.add(b.atom);
+    });
+    raisedQueue.forEach((atom, i) => {
+      if (!eGunQueue[i]) reachedAtoms.add(atom);
+    });
+    const discoveries = Array.from(reachedAtoms).filter((n) => !discoveredElements.includes(n));
+    if (discoveries.length > 0) recordDiscovery(discoveries);
+
+    setBalls(raisedBalls);
+    setQueue(raisedQueue);
+    spawnPopup("☢ EMISSION +1");
+    reportQuestProgress({ discoveries, reachedAtomicNumbers: Array.from(reachedAtoms) });
+    haptic([25, 45, 25]);
+    setTimeout(() => {
+      if (checkGameOver(raisedBalls, geo)) {
+        setGameOver(true);
+        haptic([50, 80, 50, 80, 200]);
+      }
+      setBusy(false);
+    }, 180);
+  }
+
   function triggerGravityPowerUp() {
     if (busy || gameOver || won || gravityCharges <= 0) return;
     setBusy(true);
+    const fxId = Date.now();
+    setGravityFxId(fxId);
+    setTimeout(() => setGravityFxId((active) => (active === fxId ? null : active)), 1050);
     setGravityCharges((g) => Math.max(0, g - 1));
     const atoms = balls.filter((b) => b.stoneHp == null).map((b) => ({ ...b }));
     const stones = balls.filter((b) => b.stoneHp != null).map((b) => ({ ...b }));
@@ -1282,6 +1460,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     setScore((s) => s + gained);
     addScore(gained);
     if (result.merges.length > 0) {
+      grantGravityForCombo(result.merges.length);
       setRunBestCombo((best) => Math.max(best, result.merges.length));
       setBestCombo(result.merges.length);
       setGrabProgress((p) => {
@@ -1430,6 +1609,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
     if (result.merges.length > 0) {
       const comboLabel = getComboLabel(result.merges.length);
       if (comboLabel) spawnPopup(comboLabel);
+      grantGravityForCombo(result.merges.length);
       setRunBestCombo((best) => Math.max(best, result.merges.length));
       setBestCombo(result.merges.length);
       result.merges.forEach((m, i) => {
@@ -1488,6 +1668,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
       "feature-stone",
       "⛰ A Stone is loaded!",
       "Your next shot is a giant Stone. Aim it at clusters — it won't merge, but it shoves nearby atoms 5× harder than usual and takes 8 hits to crack for a big score bonus.",
+      "danger",
     );
   }
 
@@ -1556,6 +1737,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
       "feature-stone",
       "⛰ A Stone appeared!",
       "Stones don't merge with anything. Hit one with atoms to crack it — each impact shoves nearby atoms 5× harder than usual. Destroy it after 8 hits for a big score bonus.",
+      "danger",
     );
   }
 
@@ -1886,11 +2068,14 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
               return (
                 <div
                   key={b.id}
+                  className={gravityFxId && b.stoneHp == null ? "gravity-atom-lift" : undefined}
                   style={{
                     position: "absolute",
                     left: x - b.r,
                     top: y - b.r,
-                    transition: isDrag ? "none" : "left 180ms ease-out, top 180ms ease-out",
+                    transition: isDrag
+                      ? "none"
+                      : "left 420ms cubic-bezier(0.2, 0.9, 0.2, 1), top 420ms cubic-bezier(0.2, 0.9, 0.2, 1)",
                     zIndex: isDrag ? 5 : undefined,
                     filter: isDrag ? "drop-shadow(0 6px 12px rgba(0,0,0,0.5))" : undefined,
                   }}
@@ -1906,6 +2091,24 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
               );
             })}
           </div>
+
+          {gravityFxId && (
+            <div
+              className="gravity-fx"
+              style={{ position: "absolute", inset: 0, zIndex: 5, pointerEvents: "none" }}
+            >
+              <div className="gravity-fx-core">🌀</div>
+              <div className="gravity-fx-ring gravity-fx-ring-a" />
+              <div className="gravity-fx-ring gravity-fx-ring-b" />
+              {Array.from({ length: 9 }, (_, i) => (
+                <div
+                  key={i}
+                  className="gravity-fx-stream"
+                  style={{ left: `${10 + i * 10}%`, animationDelay: `${i * 45}ms` }}
+                />
+              ))}
+            </div>
+          )}
 
           {grabMode && (
             <div
@@ -1976,6 +2179,8 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
                 <StoneVisual size={projShotSize} hp={STONE_MAX_HP} />
               ) : currentIsEGun ? (
                 <EGunVisual size={projShotSize} />
+              ) : currentIsBlank ? (
+                <BlankAtomVisual size={projShotSize} />
               ) : (
                 <ElementBall
                   atomicNumber={current}
@@ -2004,6 +2209,8 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
                 <StoneVisual size={projShotSize} hp={STONE_MAX_HP} />
               ) : currentIsEGun ? (
                 <EGunVisual size={projShotSize} />
+              ) : currentIsBlank ? (
+                <BlankAtomVisual size={projShotSize} />
               ) : (
                 <ElementBall
                   atomicNumber={current}
@@ -2058,6 +2265,8 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
               .map((n, i) =>
                 eGunQueue[i + 1] ? (
                   <EGunVisual key={i} size={32 - i * 3} />
+                ) : blankQueue[i + 1] ? (
+                  <BlankAtomVisual key={i} size={32 - i * 3} />
                 ) : (
                   <ElementBall
                     key={i}
@@ -2074,9 +2283,30 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
               alignItems: "center",
               justifyContent: "flex-end",
               gap: 6,
-              minWidth: 74,
+              minWidth: 120,
             }}
           >
+            {emissionCharges > 0 && (
+              <button
+                type="button"
+                title="Emission: raise all atoms by 1 tier without creating the level target. Future launcher atoms also start higher."
+                aria-label={`Use Emission power-up (${emissionCharges} available)`}
+                onClick={triggerEmissionPowerUp}
+                disabled={busy}
+                style={{
+                  ...powerUpIconBtn,
+                  border: "1px solid oklch(0.82 0.19 55)",
+                  background: "linear-gradient(135deg, oklch(0.72 0.19 55), oklch(0.55 0.16 35))",
+                  color: "var(--primary-foreground)",
+                  boxShadow: "0 0 14px oklch(0.72 0.19 55 / 0.5)",
+                  opacity: busy ? 0.65 : 1,
+                  cursor: busy ? "not-allowed" : "pointer",
+                }}
+              >
+                <span aria-hidden="true">☢</span>
+                <span style={powerUpCount}>{emissionCharges}</span>
+              </button>
+            )}
             {gravityCharges > 0 && (
               <button
                 type="button"
@@ -2128,6 +2358,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
           <FeatureTip
             title={activeTip.title}
             body={activeTip.body}
+            tone={activeTip.tone}
             onClose={() => setActiveTip(null)}
           />
         )}
@@ -2233,12 +2464,20 @@ function formatTime(ms: number): string {
 function FeatureTip({
   title,
   body,
+  tone = "default",
   onClose,
 }: {
   title: string;
   body: string;
+  tone?: "default" | "danger";
   onClose: () => void;
 }) {
+  const isDanger = tone === "danger";
+  const accent = isDanger ? "var(--destructive)" : "var(--accent)";
+  const glow = isDanger ? "oklch(0.58 0.22 25 / 0.45)" : "var(--accent-glow)";
+  const buttonBg = isDanger
+    ? "linear-gradient(135deg, var(--destructive), oklch(0.52 0.2 25))"
+    : "linear-gradient(135deg, var(--primary), var(--accent))";
   return (
     <div
       style={{
@@ -2257,10 +2496,10 @@ function FeatureTip({
           maxWidth: 360,
           width: "100%",
           background: "var(--surface-elevated)",
-          border: "1px solid var(--accent)",
+          border: `1px solid ${accent}`,
           borderRadius: 14,
           padding: "12px 14px",
-          boxShadow: "0 10px 30px rgba(0,0,0,0.5), 0 0 24px var(--accent-glow)",
+          boxShadow: `0 10px 30px rgba(0,0,0,0.5), 0 0 24px ${glow}`,
           pointerEvents: "auto",
           animation: "pop-in 220ms ease-out",
         }}
@@ -2269,7 +2508,7 @@ function FeatureTip({
           style={{
             fontSize: 13,
             fontWeight: 800,
-            color: "var(--accent)",
+            color: accent,
             marginBottom: 4,
           }}
         >
@@ -2283,7 +2522,7 @@ function FeatureTip({
             padding: "6px 12px",
             borderRadius: 8,
             border: "none",
-            background: "linear-gradient(135deg, var(--primary), var(--accent))",
+            background: buttonBg,
             color: "var(--primary-foreground)",
             fontWeight: 700,
             fontSize: 12,
@@ -2463,14 +2702,10 @@ function ResultModal({
         />
         <ResultStat
           label="Shots"
-          value={`${shots}${level.parShots ? ` / ${level.parShots}` : ""}`}
+          value={`${shots}${level.parShots ? ` / ${getStarParShots(level)}` : ""}`}
           color="var(--foreground)"
         />
-        <ResultStat
-          label="Best Combo"
-          value={`${bestCombo}${level.comboGoal ? ` / ${level.comboGoal}` : ""}`}
-          color="var(--foreground)"
-        />
+        <ResultStat label="Best Combo" value={`${bestCombo}`} color="var(--foreground)" />
       </div>
       {level.scoreGoal && (
         <div
