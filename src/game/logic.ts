@@ -164,7 +164,7 @@ export const DANGER_ROWS_FROM_BOTTOM = 1;
 
 export function checkGameOver(balls: Board, geo: Geo): boolean {
   for (const b of balls) {
-    if (b.y + geo.radius >= geo.dangerY) return true;
+    if (b.y + b.r >= geo.dangerY) return true;
   }
   return false;
 }
