@@ -1,5 +1,6 @@
 // Core merge logic — adapted from provided codesnippets.txt
-// Gravity is BOTTOM-UP: balls stack from the bottom row upward.
+// Bubble-shooter style: balls stick to the CEILING (row 0) and stack downward.
+// Game over when the stack reaches the danger line near the launcher (bottom).
 
 export type Grid = (number | null)[][];
 
@@ -13,8 +14,8 @@ export function createEmptyGrid(rows: number, cols: number): Grid {
  * Returns -1 if the column is full.
  */
 export function findPlacementRow(grid: Grid, col: number): number {
-  const rows = grid.length;
-  for (let row = rows - 1; row >= 0; row--) {
+  // Top-down: first empty row from the ceiling.
+  for (let row = 0; row < grid.length; row++) {
     if (grid[row][col] === null) return row;
   }
   return -1;
@@ -53,7 +54,7 @@ function getNeighbors(grid: Grid, row: number, col: number): [number, number][] 
 }
 
 /**
- * Apply gravity: in each column, let floating cells fall to the bottom.
+ * Apply ceiling gravity: floating cells stick UP toward row 0.
  */
 function applyGravity(grid: Grid): Grid {
   const rows = grid.length;
@@ -65,8 +66,7 @@ function applyGravity(grid: Grid): Grid {
       if (next[r][c] !== null) stack.push(next[r][c] as number);
     }
     for (let r = 0; r < rows; r++) {
-      const fromBottom = rows - 1 - r;
-      next[fromBottom][c] = stack[stack.length - 1 - r] ?? null;
+      next[r][c] = stack[r] ?? null;
     }
   }
   return next;
@@ -129,8 +129,8 @@ export function placeAndMerge(
             }
           }
         }
-        // Simpler: re-locate by searching for our atom near the previous position.
-        outer: for (let r = newGrid.length - 1; r >= 0; r--) {
+        // Re-locate our atom (search from the ceiling down — survivor floats up).
+        outer: for (let r = 0; r < newGrid.length; r++) {
           for (let c = 0; c < cols; c++) {
             if (newGrid[r][c] === currentAtom) {
               currentRow = r;
@@ -157,9 +157,20 @@ export function placeAndMerge(
   };
 }
 
+/** Rows from the bottom (inclusive) treated as the danger zone near the launcher. */
+export const DANGER_ROWS_FROM_BOTTOM = 1;
+
+export function getDangerRow(grid: Grid): number {
+  return grid.length - DANGER_ROWS_FROM_BOTTOM;
+}
+
 export function checkGameOver(grid: Grid): boolean {
-  // Game over when any column's TOP cell is filled (stack reached the ceiling)
-  return grid[0].some((cell) => cell !== null);
+  // Game over when the stack has grown down to the danger line just above the launcher.
+  const dangerRow = getDangerRow(grid);
+  for (let r = dangerRow; r < grid.length; r++) {
+    if (grid[r].some((cell) => cell !== null)) return true;
+  }
+  return false;
 }
 
 export function isColumnFull(grid: Grid, col: number): boolean {
