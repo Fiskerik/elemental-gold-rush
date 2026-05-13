@@ -1403,13 +1403,17 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
             <div
               style={{
                 position: "absolute",
-                left: projectile.x - sizeFor(current) / 2,
-                top: projectile.y - sizeFor(current) / 2,
+                left: projectile.x - projShotSize / 2,
+                top: projectile.y - projShotSize / 2,
                 pointerEvents: "none",
                 zIndex: 4,
               }}
             >
-              <ElementBall atomicNumber={current} size={ballSize} glow shimmer={currentIsShimmer} />
+              {pendingStone ? (
+                <StoneVisual size={projShotSize} hp={STONE_MAX_HP} maxHp={STONE_MAX_HP} />
+              ) : (
+                <ElementBall atomicNumber={current} size={ballSize} glow shimmer={currentIsShimmer} />
+              )}
             </div>
           )}
 
@@ -1417,8 +1421,8 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
           <div
             style={{
               position: "absolute",
-              left: launcherX - sizeFor(current) / 2,
-              top: launcherY - sizeFor(current) / 2,
+              left: launcherX - projShotSize / 2,
+              top: launcherY - projShotSize / 2,
               zIndex: 2,
               pointerEvents: "none",
               transform: `rotate(${aimDeg}deg)`,
@@ -1426,12 +1430,16 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
             }}
           >
             {!projectile && (
-              <ElementBall
-                atomicNumber={current}
-                size={ballSize}
-                glow
-                shimmer={currentIsShimmer}
-              />
+              pendingStone ? (
+                <StoneVisual size={projShotSize} hp={STONE_MAX_HP} maxHp={STONE_MAX_HP} />
+              ) : (
+                <ElementBall
+                  atomicNumber={current}
+                  size={ballSize}
+                  glow
+                  shimmer={currentIsShimmer}
+                />
+              )
             )}
           </div>
 
