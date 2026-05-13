@@ -70,7 +70,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
   // Parallel array — true means that queued atom is "shimmering" and will give
   // 2× score and 2× grab-combo progress on a successful merge.
   const [shimmerQueue, setShimmerQueue] = useState<boolean[]>(() =>
-    Array.from({ length: QUEUE_SIZE }, () => Math.random() < 0.12),
+    Array.from({ length: QUEUE_SIZE }, () => Math.random() < 0.05),
   );
   const [score, setScore] = useState(0);
   const [highest, setHighest] = useState(1);
@@ -129,7 +129,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
   useEffect(() => {
     setBalls(createEmptyBoard());
     setQueue(generateInitialQueue(level.maxQueueElement, QUEUE_SIZE));
-    setShimmerQueue(Array.from({ length: QUEUE_SIZE }, () => Math.random() < 0.12));
+    setShimmerQueue(Array.from({ length: QUEUE_SIZE }, () => Math.random() < 0.05));
     setScore(0);
     setHighest(1);
     setShots(0);
@@ -475,7 +475,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
             ...q.slice(1),
             generateQueueElement(dynamicMaxQueue(result.balls.length)),
           ]);
-          setShimmerQueue((s) => [...s.slice(1), Math.random() < 0.12]);
+          setShimmerQueue((s) => [...s.slice(1), Math.random() < 0.05]);
           setBusy(false);
           return;
         }
@@ -487,7 +487,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
           ...q.slice(1),
           generateQueueElement(dynamicMaxQueue(result.balls.length)),
         ]);
-        setShimmerQueue((s) => [...s.slice(1), Math.random() < 0.12]);
+        setShimmerQueue((s) => [...s.slice(1), Math.random() < 0.05]);
         if (checkGameOver(result.balls, geo)) {
           setGameOver(true);
           haptic([50, 80, 50, 80, 200]);
