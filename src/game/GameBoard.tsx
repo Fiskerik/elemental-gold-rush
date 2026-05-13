@@ -385,7 +385,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
       if (comboLabel) spawnPopup(comboLabel);
       setRunBestCombo((best) => Math.max(best, result.merges.length));
       setBestCombo(result.merges.length);
-      if (result.merges.length >= 10) {
+      if (result.merges.length >= GRAB_THRESHOLD) {
         setGrabs((g) => g + 1);
         spawnPopup("🤚 GRAB UNLOCKED!");
       }
@@ -400,6 +400,7 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
         );
       });
     }
+    setLastChain(result.merges.length);
 
     const nextHighest = Math.max(highest, result.highestElement);
     setHighest(nextHighest);
@@ -437,7 +438,10 @@ export function GameBoard({ levelId, onExit, onWin }: Props) {
           setDiscoveryEl(firstDiscovery);
         }
         // Advance queue (functional update — guarantees fresh state)
-        setQueue((q) => [...q.slice(1), generateQueueElement(level.maxQueueElement)]);
+        setQueue((q) => [
+          ...q.slice(1),
+          generateQueueElement(dynamicMaxQueue(result.balls.length)),
+        ]);
         if (checkGameOver(result.balls, geo)) {
           setGameOver(true);
           haptic([50, 80, 50, 80, 200]);
