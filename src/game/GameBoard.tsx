@@ -1141,7 +1141,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
           stoneHp: STONE_MAX_HP,
           stoneMaxHp: STONE_MAX_HP,
         };
-        return [...others, stone];
+        return relaxBoard([...others, stone]);
       });
       setPendingStone(false);
       setStoneSpawnCount((count) => count + 1);
