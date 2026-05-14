@@ -32,6 +32,20 @@ export function getTodayQuestDate(date = new Date()): string {
   return date.toISOString().slice(0, 10);
 }
 
+function isRemovedDailyQuest(quest: DailyQuest): boolean {
+  const normalizedTitle = quest.title
+    .toLowerCase()
+    .replace(/[^a-z]+/g, " ")
+    .trim();
+  return (
+    normalizedTitle === "reqch transition metal" || normalizedTitle === "reach transition metal"
+  );
+}
+
+function removeRetiredDailyQuests(quests: DailyQuest[]): DailyQuest[] {
+  return quests.filter((quest) => !isRemovedDailyQuest(quest));
+}
+
 export function createDailyQuests(dateKey = getTodayQuestDate()): DailyQuest[] {
   const seed = dateKey.split("").reduce((sum, char) => sum + char.charCodeAt(0), 0);
   const approachableElementGoals = [
@@ -107,18 +121,22 @@ export function refreshDailyQuests(
 ) {
   const today = getTodayQuestDate();
   if (dailyQuestDate === today && dailyQuests.length > 0) {
-    return { dailyQuestDate, dailyQuests, claimedDailyReward };
+    return {
+      dailyQuestDate,
+      dailyQuests: removeRetiredDailyQuests(dailyQuests),
+      claimedDailyReward,
+    };
   }
 
   return {
     dailyQuestDate: today,
-    dailyQuests: createDailyQuests(today),
+    dailyQuests: removeRetiredDailyQuests(createDailyQuests(today)),
     claimedDailyReward: false,
   };
 }
 
 export function applyQuestProgress(quests: DailyQuest[], event: QuestProgressEvent): DailyQuest[] {
-  return quests.map((quest) => {
+  return removeRetiredDailyQuests(quests).map((quest) => {
     let progress = quest.progress;
 
     if (quest.type === "merge_atoms" && event.merges) {
