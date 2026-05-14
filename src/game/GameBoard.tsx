@@ -306,6 +306,18 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     setActiveTip({ id, title, body, tone });
   }
 
+  // Force-show a tooltip regardless of whether the user has seen it.
+  // Used by long-press on power-up icons to re-explain the feature.
+  function showTipForce(
+    id: string,
+    title: string,
+    body: string,
+    tone: "default" | "danger" = "default",
+  ) {
+    if (!seenTips.includes(id)) markTipSeen(id);
+    setActiveTip({ id, title, body, tone });
+  }
+
   useEffect(() => {
     const initialBalls = createSeededBoard();
     setBalls(initialBalls);
