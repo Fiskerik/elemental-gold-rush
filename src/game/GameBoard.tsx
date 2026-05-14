@@ -607,6 +607,54 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
   const TOP_PAD = 6;
   const SIDE_PAD = 4;
 
+  // Resolve overlaps across all balls including stones. Stones never move
+  // and ordinary atoms get pushed away from them. Used after placements and
+  // shockwaves to guarantee no two balls visually overlap.
+  const relaxBoard = useCallback(
+    (board: Board): Board => {
+      const list = board.map((b) => ({ ...b }));
+      for (let iter = 0; iter < 24; iter++) {
+        let moved = false;
+        for (let i = 0; i < list.length; i++) {
+          for (let j = i + 1; j < list.length; j++) {
+            const a = list[i];
+            const b = list[j];
+            if (a.stoneHp != null && b.stoneHp != null) continue;
+            const dx = b.x - a.x;
+            const dy = b.y - a.y;
+            const d = Math.hypot(dx, dy) || 0.001;
+            const min = a.r + b.r;
+            if (d < min) {
+              const push = min - d + 0.5;
+              const ux = dx / d;
+              const uy = dy / d;
+              if (a.stoneHp != null) {
+                b.x += ux * push;
+                b.y += uy * push;
+              } else if (b.stoneHp != null) {
+                a.x -= ux * push;
+                a.y -= uy * push;
+              } else {
+                a.x -= ux * (push / 2);
+                a.y -= uy * (push / 2);
+                b.x += ux * (push / 2);
+                b.y += uy * (push / 2);
+              }
+              moved = true;
+            }
+          }
+        }
+        for (const o of list) {
+          o.x = Math.max(SIDE_PAD + o.r, Math.min(boardW - SIDE_PAD - o.r, o.x));
+          o.y = Math.max(TOP_PAD + o.r, o.y);
+        }
+        if (!moved) break;
+      }
+      return list;
+    },
+    [boardW, SIDE_PAD, TOP_PAD],
+  );
+
   const continuePressureSteps =
     continuingPastTarget && continueStartedElapsedMs != null
       ? Math.max(0, Math.floor((elapsedMs - continueStartedElapsedMs) / 30_000))
