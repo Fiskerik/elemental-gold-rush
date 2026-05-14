@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import type { MouseEvent as ReactMouseEvent } from "react";
 import { ELEMENTS } from "./elements";
 import { LEVELS, getLevelById, getNextLevel } from "./levels";
 import {
@@ -254,6 +255,17 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
   const [fusionJumpArmed, setFusionJumpArmed] = useState(false);
   const [catalystCharges, setCatalystCharges] = useState(0);
   const [catalystShotsRemaining, setCatalystShotsRemaining] = useState(0);
+  const [pendingReversiblePowerUp, setPendingReversiblePowerUp] = useState<
+    null | "transmute" | "emission" | "fusion-jump" | "catalyst"
+  >(null);
+  const queueUndoRef = useRef<null | {
+    queue: number[];
+    shimmerQueue: boolean[];
+    eGunQueue: boolean[];
+    blankQueue: boolean[];
+    powerUp: "transmute" | "emission";
+  }>(null);
+  const longPressTimerRef = useRef<number | null>(null);
 
   // === Continue past target ===
   // When the player reaches the target element, we offer a choice: claim the
@@ -382,6 +394,8 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     setFusionJumpArmed(false);
     setCatalystCharges(0);
     setCatalystShotsRemaining(0);
+    setPendingReversiblePowerUp(null);
+    queueUndoRef.current = null;
     eGunCooldownSlots.current = 0;
     startTimeRef.current = Date.now();
     setElapsedMs(0);
@@ -487,8 +501,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
 
   function raiseAtomForEmission(atom: number): number {
     if (atom < 1) return atom;
-    const raised = Math.min(118, atom + 1);
-    return raised === target ? atom : raised;
+    return Math.min(118, atom + 1);
   }
 
   function grantGravityForCombo(mergeCount: number) {
@@ -660,9 +673,13 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
       ? Math.max(0, Math.floor((elapsedMs - continueStartedElapsedMs) / 30_000))
       : 0;
   const survivalPressurePct = mode === "survival" ? Math.floor(elapsedMs / 60_000) * 0.05 : 0;
+  const pendingStonePressure = pendingStone ? 1 : 0;
   const dangerZonePct = Math.min(
     0.85,
-    0.2 + stoneSpawnCount * 0.1 + continuePressureSteps * 0.03 + survivalPressurePct,
+    0.2 +
+      (stoneSpawnCount + pendingStonePressure) * 0.1 +
+      continuePressureSteps * 0.03 +
+      survivalPressurePct,
   );
   const dangerY = Math.max(TOP_PAD + ballSize, boardH * (1 - dangerZonePct));
 
@@ -725,6 +742,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     let x = launcherX;
     let y = launcherY;
     const bouncedStoneIds: number[] = [];
+    const recentlyBouncedStoneIds = new Set<number>();
     const projR = projShotR;
     const step = Math.max(1, projR / 4);
     const path: { x: number; y: number }[] = [{ x, y }];
@@ -753,10 +771,18 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
       // off the bottom
       if (y > boardH) return null;
 
+      for (const id of Array.from(recentlyBouncedStoneIds)) {
+        const stone = balls.find((b) => b.id === id);
+        if (!stone || Math.hypot(x - stone.x, y - stone.y) > projR + stone.r + step * 2) {
+          recentlyBouncedStoneIds.delete(id);
+        }
+      }
+
       // collision with existing balls
       let hitIdx = -1;
       let bestT = Infinity;
       for (let b = 0; b < balls.length; b++) {
+        if (balls[b].stoneHp != null && recentlyBouncedStoneIds.has(balls[b].id)) continue;
         const sumR = projR + balls[b].r;
         const ddx = x - balls[b].x;
         const ddy = y - balls[b].y;
@@ -788,6 +814,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
         path.push({ x: lx, y: ly });
         if (hitBall.stoneHp != null && !currentIsBlank && bouncedStoneIds.length < 8) {
           bouncedStoneIds.push(hitBall.id);
+          recentlyBouncedStoneIds.add(hitBall.id);
           const normalMag = Math.hypot(lx - hitBall.x, ly - hitBall.y) || 1;
           const nx = (lx - hitBall.x) / normalMag;
           const ny = (ly - hitBall.y) / normalMag;
@@ -908,6 +935,8 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
   function shoot() {
     if (busy || gameOver || won) return;
     trackShot(levelId, pendingStone ? -1 : currentIsEGun ? 0 : current, aimDeg, mode);
+    queueUndoRef.current = null;
+    setPendingReversiblePowerUp(null);
     if (currentIsEGun && !pendingStone) {
       const beam = castStraightRay(aimDeg);
       if (!beam) return;
@@ -988,6 +1017,23 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     }
     spawnPopup(hitIds.size > 0 ? `⚡ E-GUN +${hitIds.size}` : "⚡ E-GUN");
     haptic(hitIds.size > 0 ? [20, 40, 20] : 20);
+    const reachedTarget = Array.from(upgradedAtoms).some((atom) => atom >= target);
+    if (reachedTarget && !continuingPastTarget) {
+      const nextHighest = Math.max(highest, ...Array.from(upgradedAtoms));
+      const timeSec = (Date.now() - startTimeRef.current) / 1000;
+      const stars = calculateStars(level, score, nextShots, runBestCombo, timeSec);
+      setEarnedStars(stars);
+      setLevelStars(levelId, stars);
+      reportQuestProgress({ levelCleared: true, starsEarned: stars });
+      unlockLevel(levelId + 1);
+      sfx(playWinSound);
+      haptic([30, 60, 30, 60, 80]);
+      trackLevelWin(levelId, score, nextShots, nextHighest, mode);
+      if (mode !== "campaign") setChallengeBestScore(mode, score);
+      setWinChoice({ stars, score, shots: nextShots, bestCombo: runBestCombo });
+      setBusy(false);
+      return;
+    }
     const nextSlot = makeNextQueueSlot(dynamicMaxQueue(updated.length));
     setQueue((q) => [...q.slice(1), nextSlot.atom]);
     setShimmerQueue((s) => [...s.slice(1), nextSlot.shimmer]);
@@ -1452,7 +1498,10 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
       catalystShotsRemaining > 0 ? CATALYST_ADJ_FACTOR : undefined,
       fusionJumpArmed,
     );
-    if (fusionJumpArmed && result.merges.length > 0) setFusionJumpArmed(false);
+    if (fusionJumpArmed && result.merges.length > 0) {
+      setFusionJumpArmed(false);
+      if (pendingReversiblePowerUp === "fusion-jump") setPendingReversiblePowerUp(null);
+    }
     const nextShots = shots + 1;
     setShots(nextShots);
     applyShotMilestones(nextShots);
@@ -1612,12 +1661,73 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     );
   }
 
+  function cancelPendingPowerUp(powerUp: "transmute" | "emission" | "fusion-jump" | "catalyst") {
+    if (busy || gameOver || won) return false;
+    if (pendingReversiblePowerUp !== powerUp) return false;
+    if (
+      (powerUp === "transmute" || powerUp === "emission") &&
+      queueUndoRef.current?.powerUp === powerUp
+    ) {
+      const undo = queueUndoRef.current;
+      setQueue(undo.queue);
+      setShimmerQueue(undo.shimmerQueue);
+      setEGunQueue(undo.eGunQueue);
+      setBlankQueue(undo.blankQueue);
+      if (powerUp === "transmute") setTransmuteCharges((g) => g + 1);
+      if (powerUp === "emission") setEmissionCharges((g) => g + 1);
+      queueUndoRef.current = null;
+    }
+    if (powerUp === "fusion-jump") {
+      setFusionJumpArmed(false);
+      setFusionJumpCharges((g) => g + 1);
+    }
+    if (powerUp === "catalyst") {
+      setCatalystShotsRemaining(0);
+      setCatalystCharges((g) => g + 1);
+    }
+    setPendingReversiblePowerUp(null);
+    spawnPopup("↩ CANCELED");
+    haptic(15);
+    return true;
+  }
+
+  function powerUpInfoHandlers(title: string, body: string) {
+    const show = () => showTipForce(`powerup-info-${title}`, title, body);
+    const clear = () => {
+      if (longPressTimerRef.current != null) window.clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    };
+    return {
+      onPointerDown: () => {
+        clear();
+        longPressTimerRef.current = window.setTimeout(show, 520);
+      },
+      onPointerUp: clear,
+      onPointerLeave: clear,
+      onContextMenu: (event: ReactMouseEvent) => {
+        event.preventDefault();
+        show();
+      },
+    };
+  }
+
   function triggerTransmutePowerUp() {
-    if (busy || gameOver || won || pendingStone || transmuteCharges <= 0) return;
+    if (cancelPendingPowerUp("transmute")) return;
+    if (
+      busy ||
+      gameOver ||
+      won ||
+      pendingStone ||
+      transmuteCharges <= 0 ||
+      pendingReversiblePowerUp
+    )
+      return;
     if (currentIsEGun || currentIsBlank) return;
     const maxTier = Math.min(118, Math.max(current + 1, target - 1));
     if (current >= maxTier) return;
     const atom = current + 1 + Math.floor(Math.random() * (maxTier - current));
+    queueUndoRef.current = { queue, shimmerQueue, eGunQueue, blankQueue, powerUp: "transmute" };
+    setPendingReversiblePowerUp("transmute");
     setTransmuteCharges((g) => Math.max(0, g - 1));
     setQueue((q) => [atom, ...q.slice(1)]);
     setShimmerQueue((q) => [false, ...q.slice(1)]);
@@ -1628,7 +1738,9 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
   }
 
   function triggerFusionJumpPowerUp() {
-    if (busy || gameOver || won || fusionJumpCharges <= 0 || fusionJumpArmed) return;
+    if (cancelPendingPowerUp("fusion-jump")) return;
+    if (busy || gameOver || won || fusionJumpCharges <= 0 || pendingReversiblePowerUp) return;
+    setPendingReversiblePowerUp("fusion-jump");
     setFusionJumpCharges((g) => Math.max(0, g - 1));
     setFusionJumpArmed(true);
     spawnPopup("⏭ JUMP ARMED");
@@ -1636,7 +1748,17 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
   }
 
   function triggerCatalystPowerUp() {
-    if (busy || gameOver || won || catalystCharges <= 0 || catalystShotsRemaining > 0) return;
+    if (cancelPendingPowerUp("catalyst")) return;
+    if (
+      busy ||
+      gameOver ||
+      won ||
+      catalystCharges <= 0 ||
+      catalystShotsRemaining > 0 ||
+      pendingReversiblePowerUp
+    )
+      return;
+    setPendingReversiblePowerUp("catalyst");
     setCatalystCharges((g) => Math.max(0, g - 1));
     setCatalystShotsRemaining(CATALYST_AURA_SHOTS);
     spawnPopup("🧪 AURA ×5");
@@ -1644,12 +1766,16 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
   }
 
   function triggerEmissionPowerUp() {
-    if (busy || gameOver || won || emissionCharges <= 0 || pendingStone) return;
+    if (cancelPendingPowerUp("emission")) return;
+    if (busy || gameOver || won || emissionCharges <= 0 || pendingStone || pendingReversiblePowerUp)
+      return;
     if (currentIsEGun || currentIsBlank) return;
 
     const raisedAtom = raiseAtomForEmission(current);
     if (raisedAtom === current) return;
 
+    queueUndoRef.current = { queue, shimmerQueue, eGunQueue, blankQueue, powerUp: "emission" };
+    setPendingReversiblePowerUp("emission");
     setEmissionCharges((g) => Math.max(0, g - 1));
     setQueue((q) => [raisedAtom, ...q.slice(1)]);
 
@@ -2322,13 +2448,15 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
         >
           {/* danger zone shading near the launcher (bottom) */}
           <div
+            className="danger-zone-rise"
             style={{
               position: "absolute",
               left: 4,
               right: 4,
               top: geo.dangerY,
               bottom: 4,
-              background: "linear-gradient(0deg, var(--danger-glow), transparent)",
+              background:
+                "linear-gradient(0deg, var(--danger-glow) 0%, oklch(0.72 0.22 25 / 0.16) 58%, transparent 100%)",
               borderTop: "1px dashed var(--destructive)",
               borderRadius: 4,
               pointerEvents: "none",
@@ -2607,19 +2735,32 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
               flexWrap: "wrap",
             }}
           >
-            {transmuteCharges > 0 && (
+            {(transmuteCharges > 0 || pendingReversiblePowerUp === "transmute") && (
               <button
                 type="button"
                 title="Transmute: reroll your current queued atom into a higher-tier atom."
                 aria-label={`Use Transmute Shot power-up (${transmuteCharges} available)`}
                 onClick={triggerTransmutePowerUp}
+                {...powerUpInfoHandlers(
+                  "🔀 Transmute Shot",
+                  "Rerolls your current queued atom into a higher tier. Tap it again before shooting to restore the original atom and refund the charge.",
+                )}
                 disabled={
-                  busy || pendingStone || currentIsEGun || currentIsBlank || current >= target - 1
+                  busy ||
+                  (pendingReversiblePowerUp !== "transmute" &&
+                    (pendingStone ||
+                      currentIsEGun ||
+                      currentIsBlank ||
+                      current >= target - 1 ||
+                      pendingReversiblePowerUp != null))
                 }
                 style={{
                   ...powerUpIconBtn,
-                  border: "1px solid oklch(0.76 0.18 305)",
-                  background: "linear-gradient(135deg, oklch(0.62 0.2 305), oklch(0.5 0.18 255))",
+                  border: `1px solid ${pendingReversiblePowerUp === "transmute" ? "var(--accent)" : "oklch(0.76 0.18 305)"}`,
+                  background:
+                    pendingReversiblePowerUp === "transmute"
+                      ? "linear-gradient(135deg, var(--accent), oklch(0.5 0.18 255))"
+                      : "linear-gradient(135deg, oklch(0.62 0.2 305), oklch(0.5 0.18 255))",
                   color: "var(--primary-foreground)",
                   boxShadow: "0 0 14px oklch(0.66 0.2 305 / 0.5)",
                   opacity:
@@ -2633,7 +2774,9 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
                 }}
               >
                 <span aria-hidden="true">🔀</span>
-                <span style={powerUpCount}>{transmuteCharges}</span>
+                <span style={powerUpCount}>
+                  {pendingReversiblePowerUp === "transmute" ? "↩" : transmuteCharges}
+                </span>
               </button>
             )}
             {(fusionJumpCharges > 0 || fusionJumpArmed) && (
@@ -2642,7 +2785,14 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
                 title="Fusion Jump: arm your next merge to skip one element tier."
                 aria-label={`Arm Fusion Jump power-up (${fusionJumpCharges} available)`}
                 onClick={triggerFusionJumpPowerUp}
-                disabled={busy || fusionJumpArmed}
+                {...powerUpInfoHandlers(
+                  "⏭ Fusion Jump",
+                  "Arms your next merge to skip one element tier. Tap it again before shooting to cancel and refund the charge.",
+                )}
+                disabled={
+                  busy ||
+                  (pendingReversiblePowerUp !== "fusion-jump" && pendingReversiblePowerUp != null)
+                }
                 style={{
                   ...powerUpIconBtn,
                   border: `1px solid ${fusionJumpArmed ? "var(--accent)" : "oklch(0.72 0.16 150)"}`,
@@ -2653,12 +2803,12 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
                   boxShadow: fusionJumpArmed
                     ? "0 0 16px var(--accent-glow)"
                     : "0 0 14px oklch(0.62 0.16 150 / 0.45)",
-                  opacity: busy || fusionJumpArmed ? 0.65 : 1,
-                  cursor: busy || fusionJumpArmed ? "not-allowed" : "pointer",
+                  opacity: busy ? 0.65 : 1,
+                  cursor: busy ? "not-allowed" : "pointer",
                 }}
               >
                 <span aria-hidden="true">⏭</span>
-                <span style={powerUpCount}>{fusionJumpCharges}</span>
+                <span style={powerUpCount}>{fusionJumpArmed ? "↩" : fusionJumpCharges}</span>
               </button>
             )}
             {(catalystCharges > 0 || catalystShotsRemaining > 0) && (
@@ -2667,7 +2817,17 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
                 title="Catalyst Aura: double fusion radius for your next 5 shots."
                 aria-label={`Use Catalyst Aura power-up (${catalystCharges} available)`}
                 onClick={triggerCatalystPowerUp}
-                disabled={busy || catalystCharges <= 0 || catalystShotsRemaining > 0}
+                {...powerUpInfoHandlers(
+                  "🧪 Catalyst Aura",
+                  "Doubles fusion radius for your next 5 shots. Tap it again before taking a shot to cancel and refund the charge.",
+                )}
+                disabled={
+                  busy ||
+                  (pendingReversiblePowerUp !== "catalyst" &&
+                    (catalystCharges <= 0 ||
+                      catalystShotsRemaining > 0 ||
+                      pendingReversiblePowerUp != null))
+                }
                 style={{
                   ...powerUpIconBtn,
                   border: `1px solid ${catalystShotsRemaining > 0 ? "var(--accent)" : "oklch(0.78 0.18 115)"}`,
@@ -2683,27 +2843,40 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
               >
                 <span aria-hidden="true">🧪</span>
                 <span style={powerUpCount}>
-                  {catalystShotsRemaining > 0 ? catalystShotsRemaining : catalystCharges}
+                  {pendingReversiblePowerUp === "catalyst"
+                    ? "↩"
+                    : catalystShotsRemaining > 0
+                      ? catalystShotsRemaining
+                      : catalystCharges}
                 </span>
               </button>
             )}
-            {emissionCharges > 0 && (
+            {(emissionCharges > 0 || pendingReversiblePowerUp === "emission") && (
               <button
                 type="button"
-                title="Emission: raise only your current queued atom by 1 tier without creating the level target."
+                title="Emission: raise your current queued atom by 1 tier."
                 aria-label={`Use Emission power-up (${emissionCharges} available)`}
                 onClick={triggerEmissionPowerUp}
+                {...powerUpInfoHandlers(
+                  "☢ Emission",
+                  "Raises your current queued atom by 1 tier, and can now complete the target if that upgrade reaches it. Tap again before shooting to undo it.",
+                )}
                 disabled={
                   busy ||
-                  pendingStone ||
-                  currentIsEGun ||
-                  currentIsBlank ||
-                  raiseAtomForEmission(current) === current
+                  (pendingReversiblePowerUp !== "emission" &&
+                    (pendingStone ||
+                      currentIsEGun ||
+                      currentIsBlank ||
+                      raiseAtomForEmission(current) === current ||
+                      pendingReversiblePowerUp != null))
                 }
                 style={{
                   ...powerUpIconBtn,
-                  border: "1px solid oklch(0.82 0.19 55)",
-                  background: "linear-gradient(135deg, oklch(0.72 0.19 55), oklch(0.55 0.16 35))",
+                  border: `1px solid ${pendingReversiblePowerUp === "emission" ? "var(--accent)" : "oklch(0.82 0.19 55)"}`,
+                  background:
+                    pendingReversiblePowerUp === "emission"
+                      ? "linear-gradient(135deg, var(--accent), oklch(0.55 0.16 35))"
+                      : "linear-gradient(135deg, oklch(0.72 0.19 55), oklch(0.55 0.16 35))",
                   color: "var(--primary-foreground)",
                   boxShadow: "0 0 14px oklch(0.72 0.19 55 / 0.5)",
                   opacity:
@@ -2725,7 +2898,9 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
                 }}
               >
                 <span aria-hidden="true">☢</span>
-                <span style={powerUpCount}>{emissionCharges}</span>
+                <span style={powerUpCount}>
+                  {pendingReversiblePowerUp === "emission" ? "↩" : emissionCharges}
+                </span>
               </button>
             )}
             {gravityCharges > 0 && (
@@ -2734,6 +2909,10 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
                 title="Gravity: make all atoms fall upward. Combos count toward Grab progress."
                 aria-label={`Use Gravity power-up (${gravityCharges} available)`}
                 onClick={triggerGravityPowerUp}
+                {...powerUpInfoHandlers(
+                  "🌀 Gravity",
+                  "Immediately lifts all atoms upward and resolves any new fusions. Because it changes the board right away, it cannot be canceled after use.",
+                )}
                 disabled={busy}
                 style={{
                   ...powerUpIconBtn,
@@ -2755,6 +2934,10 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
                 title="Grab: drag any atom on the board to a new position."
                 aria-label={`Toggle Grab power-up (${grabs} available)`}
                 onClick={() => setGrabMode((g) => !g)}
+                {...powerUpInfoHandlers(
+                  "🤚 Grab",
+                  "Toggle Grab, then drag an atom to a new position. Toggle it off before grabbing if you change your mind.",
+                )}
                 style={{
                   ...powerUpIconBtn,
                   border: `1px solid ${grabMode ? "var(--accent)" : "var(--border)"}`,

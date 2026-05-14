@@ -1,12 +1,22 @@
 import { ELEMENTS } from "./elements";
 
+export type BadgeGroup = "milestones" | "families" | "periods" | "mastery";
+
 export interface BadgeDefinition {
   id: string;
   name: string;
   description: string;
   icon: string;
+  group: BadgeGroup;
   requiredAtomicNumbers: number[];
 }
+
+export const BADGE_GROUPS: { id: BadgeGroup; title: string; description: string }[] = [
+  { id: "milestones", title: "Element Milestones", description: "Single landmark discoveries." },
+  { id: "families", title: "Chemical Families", description: "Complete periodic-table families." },
+  { id: "periods", title: "Full Periods", description: "Discover every element in a row." },
+  { id: "mastery", title: "Collection Mastery", description: "Long-term collection goals." },
+];
 
 function byCategory(category: string): number[] {
   return ELEMENTS.filter((element) => element.category === category).map(
@@ -23,6 +33,7 @@ function byPeriod(period: number): number[] {
 export const BADGES: BadgeDefinition[] = [
   {
     id: "noble-collector",
+    group: "families",
     name: "Noble Collector",
     description: "Discover every noble gas.",
     icon: "✨",
@@ -30,6 +41,7 @@ export const BADGES: BadgeDefinition[] = [
   },
   {
     id: "alchemist",
+    group: "milestones",
     name: "Alchemist",
     description: "Reach Gold.",
     icon: "🏆",
@@ -37,6 +49,7 @@ export const BADGES: BadgeDefinition[] = [
   },
   {
     id: "radioactive-pioneer",
+    group: "milestones",
     name: "Radioactive Pioneer",
     description: "Discover Uranium.",
     icon: "☢️",
@@ -44,6 +57,7 @@ export const BADGES: BadgeDefinition[] = [
   },
   {
     id: "full-period-2",
+    group: "periods",
     name: "Full Period 2",
     description: "Discover every Period 2 element.",
     icon: "🧪",
@@ -51,6 +65,7 @@ export const BADGES: BadgeDefinition[] = [
   },
   {
     id: "transition-master",
+    group: "families",
     name: "Transition Master",
     description: "Discover every transition metal.",
     icon: "⚙️",
@@ -58,6 +73,7 @@ export const BADGES: BadgeDefinition[] = [
   },
   {
     id: "halogen-hunter",
+    group: "families",
     name: "Halogen Hunter",
     description: "Discover every halogen.",
     icon: "🧂",
@@ -65,6 +81,7 @@ export const BADGES: BadgeDefinition[] = [
   },
   {
     id: "alkali-adept",
+    group: "families",
     name: "Alkali Adept",
     description: "Discover every alkali metal.",
     icon: "🔥",
@@ -72,6 +89,7 @@ export const BADGES: BadgeDefinition[] = [
   },
   {
     id: "alkaline-earth",
+    group: "families",
     name: "Earth Mover",
     description: "Discover every alkaline earth metal.",
     icon: "🪨",
@@ -79,6 +97,7 @@ export const BADGES: BadgeDefinition[] = [
   },
   {
     id: "metalloid-mind",
+    group: "families",
     name: "Metalloid Mind",
     description: "Discover every metalloid.",
     icon: "🔷",
@@ -86,6 +105,7 @@ export const BADGES: BadgeDefinition[] = [
   },
   {
     id: "lanthanide-lord",
+    group: "families",
     name: "Lanthanide Lord",
     description: "Discover every lanthanide.",
     icon: "💎",
@@ -93,6 +113,7 @@ export const BADGES: BadgeDefinition[] = [
   },
   {
     id: "actinide-archon",
+    group: "families",
     name: "Actinide Archon",
     description: "Discover every actinide.",
     icon: "⚛️",
@@ -100,6 +121,7 @@ export const BADGES: BadgeDefinition[] = [
   },
   {
     id: "full-period-3",
+    group: "periods",
     name: "Full Period 3",
     description: "Discover every Period 3 element.",
     icon: "🧫",
@@ -107,6 +129,7 @@ export const BADGES: BadgeDefinition[] = [
   },
   {
     id: "full-period-4",
+    group: "periods",
     name: "Full Period 4",
     description: "Discover every Period 4 element.",
     icon: "🔬",
@@ -114,6 +137,7 @@ export const BADGES: BadgeDefinition[] = [
   },
   {
     id: "noble-helium",
+    group: "milestones",
     name: "First Breath",
     description: "Discover Helium.",
     icon: "🎈",
@@ -121,6 +145,7 @@ export const BADGES: BadgeDefinition[] = [
   },
   {
     id: "carbon-life",
+    group: "milestones",
     name: "Carbon-Based",
     description: "Discover Carbon.",
     icon: "🌱",
@@ -128,6 +153,7 @@ export const BADGES: BadgeDefinition[] = [
   },
   {
     id: "iron-forge",
+    group: "milestones",
     name: "Iron Forge",
     description: "Discover Iron.",
     icon: "⚒️",
@@ -135,6 +161,7 @@ export const BADGES: BadgeDefinition[] = [
   },
   {
     id: "silver-tongue",
+    group: "milestones",
     name: "Silver Tongue",
     description: "Discover Silver.",
     icon: "🥈",
@@ -142,6 +169,7 @@ export const BADGES: BadgeDefinition[] = [
   },
   {
     id: "platinum-elite",
+    group: "milestones",
     name: "Platinum Elite",
     description: "Discover Platinum.",
     icon: "💍",
@@ -149,6 +177,7 @@ export const BADGES: BadgeDefinition[] = [
   },
   {
     id: "century-club",
+    group: "mastery",
     name: "Century Club",
     description: "Discover 50 elements.",
     icon: "🏅",

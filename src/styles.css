@@ -346,3 +346,14 @@
 .decay-warn-flash {
   animation: decay-warn-flash 0.6s ease-in-out infinite;
 }
+
+/* Danger zone rises smoothly and pulses when Stone pressure increases. */
+@keyframes danger-gradient-surge {
+  0% { opacity: 0.58; filter: saturate(0.9); }
+  45% { opacity: 0.92; filter: saturate(1.35); }
+  100% { opacity: 0.78; filter: saturate(1); }
+}
+.danger-zone-rise {
+  transition: top 420ms ease, background 420ms ease;
+  animation: danger-gradient-surge 760ms ease-out;
+}
