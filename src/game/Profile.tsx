@@ -66,8 +66,8 @@ export function Profile({ onBack }: Props) {
           <ProfileStat label="Best Combo" value={`${bestCombo}×`} sub="record" />
           <ProfileStat
             label="Highest Atom"
-            value={highestEl?.symbol ?? "H"}
-            sub={`#${highestElement}`}
+            value={highestEl?.name ?? "Hydrogen"}
+            sub={`${highestEl?.symbol ?? "H"} • #${highestElement}`}
           />
           <ProfileStat
             label="Elements"
@@ -128,7 +128,16 @@ function ProfileStat({ label, value, sub }: { label: string; value: string; sub:
       >
         {label.toUpperCase()}
       </div>
-      <div style={{ fontSize: 24, color: "var(--primary)", fontWeight: 900, marginTop: 3 }}>
+      <div
+        style={{
+          fontSize: value.length > 9 ? 16 : value.length > 6 ? 20 : 24,
+          color: "var(--primary)",
+          fontWeight: 900,
+          marginTop: 3,
+          lineHeight: 1.1,
+          wordBreak: "break-word",
+        }}
+      >
         {value}
       </div>
       <div style={{ fontSize: 11, color: "var(--muted-foreground)" }}>{sub}</div>

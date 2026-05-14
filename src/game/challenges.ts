@@ -104,9 +104,13 @@ export const GAME_MODES: GameModeConfig[] = [
     name: "Isotope Decay",
     emoji: "🧪",
     kind: "challenge",
-    description: "Every 10 shots, every atom on the board lowers by 1 tier.",
+    description: "Every 20 shots, every atom on the board lowers by 1 tier.",
     unlockedAtLevel: 5,
-    rules: ["Every 10 shots, all non-Hydrogen atoms decay by 1", "Queue atoms are unchanged"],
+    rules: [
+      "Every 20 shots, all non-Hydrogen atoms decay by 1",
+      "The shot counter flashes red on the warning shot",
+      "Queue atoms are unchanged",
+    ],
   },
 ];
 

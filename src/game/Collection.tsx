@@ -38,14 +38,14 @@ export function Collection({ onBack }: { onBack: () => void }) {
         </div>
 
         {/* Real periodic-table layout: 18 columns × 7 periods + lanthanide/actinide rows */}
-        <div style={{ overflowX: "auto", paddingBottom: 8 }}>
+        <div style={{ paddingBottom: 8 }}>
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(18, minmax(22px, 1fr))",
+              gridTemplateColumns: "repeat(18, minmax(0, 1fr))",
               gridAutoRows: "1fr",
-              gap: 3,
-              minWidth: 520,
+              gap: 2,
+              width: "100%",
             }}
           >
             {ELEMENTS.map((e) => {
