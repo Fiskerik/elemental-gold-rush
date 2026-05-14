@@ -66,8 +66,8 @@ export function Profile({ onBack }: Props) {
           <ProfileStat label="Best Combo" value={`${bestCombo}×`} sub="record" />
           <ProfileStat
             label="Highest Atom"
-            value={highestEl?.symbol ?? "H"}
-            sub={`#${highestElement}`}
+            value={highestEl?.name ?? "Hydrogen"}
+            sub={`${highestEl?.symbol ?? "H"} • #${highestElement}`}
           />
           <ProfileStat
             label="Elements"

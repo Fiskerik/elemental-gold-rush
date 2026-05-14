@@ -61,7 +61,7 @@ export const BADGES: BadgeDefinition[] = [
     name: "Halogen Hunter",
     description: "Discover every halogen.",
     icon: "🧂",
-    requiredAtomicNumbers: byCategory("halogen"),
+    requiredAtomicNumbers: [9, 17, 35, 53, 85, 117],
   },
   {
     id: "alkali-adept",
@@ -75,7 +75,7 @@ export const BADGES: BadgeDefinition[] = [
     name: "Earth Mover",
     description: "Discover every alkaline earth metal.",
     icon: "🪨",
-    requiredAtomicNumbers: byCategory("alkaline-earth-metal"),
+    requiredAtomicNumbers: byCategory("alkaline-earth"),
   },
   {
     id: "metalloid-mind",
