@@ -49,6 +49,7 @@ const CATALYST_AURA_SHOTS = 5;
 const CATALYST_ADJ_FACTOR = 2.3;
 const DISCOVERY_DECAY_STEP = 5;
 const DISCOVERY_DECAY_BOOST = 0.04;
+const STAGE_CLEAR_ANIMATION_MS = 6200;
 
 function StoneVisual({ size, hp }: { size: number; hp: number }) {
   return (
@@ -302,6 +303,13 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     shots: number;
     bestCombo: number;
   } | null>(null);
+  const [stageClearFx, setStageClearFx] = useState<{
+    stars: number;
+    score: number;
+    shots: number;
+    bestCombo: number;
+  } | null>(null);
+  const stageClearTimeoutRef = useRef<number | null>(null);
 
   // === Run timer ===
   const [elapsedMs, setElapsedMs] = useState(0);
@@ -404,6 +412,11 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     setContinueStartedElapsedMs(null);
     setContinueClaimPromptOpen(false);
     setWinChoice(null);
+    setStageClearFx(null);
+    if (stageClearTimeoutRef.current !== null) {
+      window.clearTimeout(stageClearTimeoutRef.current);
+      stageClearTimeoutRef.current = null;
+    }
     setNoMergeStreak(0);
     setStoneHitIds(new Set());
     setPendingStone(false);
@@ -601,6 +614,33 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     setPopups((p) => [...p, { id, text, x: 50 + (Math.random() * 20 - 10), y: 30 }]);
     setTimeout(() => setPopups((p) => p.filter((x) => x.id !== id)), 900);
   }
+
+  function showStageClearAnimation(stats: {
+    stars: number;
+    score: number;
+    shots: number;
+    bestCombo: number;
+  }) {
+    if (stageClearTimeoutRef.current !== null) {
+      window.clearTimeout(stageClearTimeoutRef.current);
+    }
+    setStageClearFx(stats);
+    spawnPopup("⚛ TARGET FORMED");
+    stageClearTimeoutRef.current = window.setTimeout(() => {
+      setStageClearFx(null);
+      setWinChoice(stats);
+      setBusy(false);
+      stageClearTimeoutRef.current = null;
+    }, STAGE_CLEAR_ANIMATION_MS);
+  }
+
+  useEffect(() => {
+    return () => {
+      if (stageClearTimeoutRef.current !== null) {
+        window.clearTimeout(stageClearTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // === sizing ===
   const boardRef = useRef<HTMLDivElement>(null);
@@ -1060,8 +1100,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
       haptic([30, 60, 30, 60, 80]);
       trackLevelWin(levelId, score, nextShots, nextHighest, mode);
       if (mode !== "campaign") setChallengeBestScore(mode, score);
-      setWinChoice({ stars, score, shots: nextShots, bestCombo: runBestCombo });
-      setBusy(false);
+      showStageClearAnimation({ stars, score, shots: nextShots, bestCombo: runBestCombo });
       return;
     }
     const nextSlot = makeNextQueueSlot(dynamicMaxQueue(updated.length));
@@ -1656,7 +1695,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
           // Offer a choice — claim the win or keep playing for score.
           trackLevelWin(levelId, nextScore, nextShots, nextHighest, mode);
           if (mode !== "campaign") setChallengeBestScore(mode, nextScore);
-          setWinChoice({
+          showStageClearAnimation({
             stars,
             score: nextScore,
             shots: nextShots,
@@ -1668,7 +1707,6 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
           setShimmerQueue((s) => [...s.slice(1), nextSlot.shimmer]);
           setEGunQueue((e) => [...e.slice(1), nextSlot.eGun]);
           setBlankQueue((b) => [...b.slice(1), nextSlot.blank]);
-          setBusy(false);
           return;
         }
         if (firstDiscovery && firstDiscovery > 1) {
@@ -1922,12 +1960,13 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
           setLevelStars(levelId, stars);
           reportQuestProgress({ levelCleared: true, starsEarned: stars });
           unlockLevel(levelId + 1);
-          setWinChoice({
+          showStageClearAnimation({
             stars,
             score: score + gained,
             shots,
             bestCombo: Math.max(runBestCombo, result.merges.length),
           });
+          return;
         }
         if (checkGameOver(result.balls, geo)) setGameOver(true);
         setBusy(false);
@@ -2069,7 +2108,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
       sfx(playWinSound);
       haptic([30, 60, 30, 60, 80]);
       if (mode !== "campaign") setChallengeBestScore(mode, nextScore);
-      setWinChoice({
+      showStageClearAnimation({
         stars,
         score: nextScore,
         shots,
@@ -2584,6 +2623,39 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
                   style={{ left: `${10 + i * 10}%`, animationDelay: `${i * 45}ms` }}
                 />
               ))}
+            </div>
+          )}
+
+          {stageClearFx && (
+            <div className="stage-clear-fx" aria-live="polite" aria-label="Target atom formed">
+              <div className="stage-clear-wash" />
+              <div className="stage-clear-ring stage-clear-ring-a" />
+              <div className="stage-clear-ring stage-clear-ring-b" />
+              <div className="stage-clear-burst">
+                {Array.from({ length: 18 }, (_, i) => (
+                  <span
+                    key={i}
+                    className="stage-clear-spark"
+                    style={{
+                      transform: `rotate(${i * 20}deg) translateY(-1px)`,
+                      animationDelay: `${i * 70}ms`,
+                    }}
+                  />
+                ))}
+              </div>
+              <div className="stage-clear-card">
+                <div className="stage-clear-eyebrow">TARGET ATOM FORMED</div>
+                <div className="stage-clear-atom">
+                  <ElementBall atomicNumber={target} size={92} glow />
+                </div>
+                <div className="stage-clear-title">{targetEl?.name ?? "Target"} unlocked!</div>
+                <div className="stage-clear-subtitle">Clearing the stage…</div>
+                <div className="stage-clear-stars">
+                  {Array.from({ length: 3 }, (_, i) => (i < stageClearFx.stars ? "★" : "☆")).join(
+                    "",
+                  )}
+                </div>
+              </div>
             </div>
           )}
 
