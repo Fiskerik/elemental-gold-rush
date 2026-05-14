@@ -241,6 +241,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
   const [highlightId, setHighlightId] = useState<number | null>(null);
   const [wiggleIds, setWiggleIds] = useState<Set<number>>(new Set());
   const [projectile, setProjectile] = useState<{ x: number; y: number } | null>(null);
+  const [eGunBeamPath, setEGunBeamPath] = useState<{ x: number; y: number }[] | null>(null);
   const [gravityFxId, setGravityFxId] = useState<number | null>(null);
   const popupId = useRef(0);
   const eGunCooldownSlots = useRef(0);
@@ -1014,6 +1015,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
       sfx(playShootSound);
       haptic(15);
       setProjectile(beam.path[0]);
+      setEGunBeamPath(beam.path);
       const totalMs = Math.min(220, 50 + beam.path.length * 3);
       const stepMs = totalMs / beam.path.length;
       let i = 0;
@@ -1022,6 +1024,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
         if (i >= beam.path.length) {
           clearInterval(interval);
           setProjectile(null);
+          setEGunBeamPath(null);
           setGravityFxId(null);
           fireEGun(beam.path);
         } else {
@@ -1080,7 +1083,11 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     setNoMergeStreak(0);
     if (upgradedAtoms.size > 0) {
       const discoveries = Array.from(upgradedAtoms).filter((n) => !discoveredElements.includes(n));
-      if (discoveries.length > 0) recordDiscovery(discoveries);
+      if (discoveries.length > 0) {
+        recordDiscovery(discoveries);
+        const firstDiscovery = [...discoveries].sort((a, b) => b - a)[0];
+        if (firstDiscovery > 1) setDiscoveryEl(firstDiscovery);
+      }
       reportQuestProgress({ discoveries, reachedAtomicNumbers: Array.from(upgradedAtoms) });
       setHighestElement(Math.max(highest, ...Array.from(upgradedAtoms)));
       setHighest((h) => Math.max(h, ...Array.from(upgradedAtoms)));
@@ -2220,10 +2227,31 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
   // preview trajectory (recomputed every render based on aimDeg)
   const previewPath = useMemo(() => {
     if (busy || gameOver || won) return [];
+    if (currentIsEGun && !pendingStone) {
+      const r = castStraightRay(aimDeg);
+      return r?.path ?? [];
+    }
     const r = castRay(aimDeg);
     return r?.path ?? [];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [aimDeg, balls, busy, gameOver, won, boardW, boardH, cellSize]);
+  }, [aimDeg, balls, busy, gameOver, won, boardW, boardH, cellSize, currentIsEGun, pendingStone]);
+
+  const eGunPreviewHitIds = useMemo(() => {
+    if (!currentIsEGun || pendingStone || previewPath.length < 2) return new Set<number>();
+    const start = previewPath[0];
+    const end = previewPath[previewPath.length - 1];
+    return new Set(
+      balls
+        .filter(
+          (b) =>
+            b.stoneHp == null &&
+            b.atom < 118 &&
+            distanceToSegment(b.x, b.y, start.x, start.y, end.x, end.y) <= b.r + eGunR * 0.35,
+        )
+        .map((b) => b.id),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [balls, currentIsEGun, pendingStone, previewPath]);
 
   const progressPct = Math.min(100, (highest / target) * 100);
   const continueChoiceStats = continueClaimPromptOpen
@@ -2593,13 +2621,17 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
                       ? "none"
                       : "left 420ms cubic-bezier(0.2, 0.9, 0.2, 1), top 420ms cubic-bezier(0.2, 0.9, 0.2, 1)",
                     zIndex: isDrag ? 5 : undefined,
-                    filter: isDrag ? "drop-shadow(0 6px 12px rgba(0,0,0,0.5))" : undefined,
+                    filter: eGunPreviewHitIds.has(b.id)
+                      ? "drop-shadow(0 0 16px oklch(0.82 0.18 85 / 0.95)) brightness(1.18)"
+                      : isDrag
+                        ? "drop-shadow(0 6px 12px rgba(0,0,0,0.5))"
+                        : undefined,
                   }}
                 >
                   <ElementBall
                     atomicNumber={b.atom}
                     size={ballSize}
-                    highlight={highlightId === b.id}
+                    highlight={highlightId === b.id || eGunPreviewHitIds.has(b.id)}
                     wiggle={wiggleIds.has(b.id)}
                     glow={isDrag}
                   />
@@ -2680,36 +2712,100 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
             </div>
           )}
 
-          {/* AIM TRAJECTORY (dotted line) */}
+          {/* AIM TRAJECTORY */}
           {!busy && !gameOver && !won && previewPath.length > 1 && (
             <svg
               style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 3 }}
               width={boardW}
               height={boardH}
             >
-              <polyline
-                points={previewPath.map((p) => `${p.x},${p.y}`).join(" ")}
-                fill="none"
-                stroke="var(--primary)"
-                strokeWidth={2}
-                strokeDasharray="4 6"
-                opacity={0.6}
-              />
-              {/* landing target marker */}
-              {(() => {
-                const last = previewPath[previewPath.length - 1];
-                return (
-                  <circle
-                    cx={last.x}
-                    cy={last.y}
-                    r={ballSize / 2.4}
+              {currentIsEGun && !pendingStone ? (
+                <>
+                  <polyline
+                    points={previewPath.map((p) => `${p.x},${p.y}`).join(" ")}
                     fill="none"
-                    stroke="var(--accent)"
-                    strokeWidth={2}
-                    opacity={0.7}
+                    stroke="oklch(0.82 0.18 85)"
+                    strokeWidth={10}
+                    strokeLinecap="round"
+                    opacity={0.18}
                   />
-                );
-              })()}
+                  <polyline
+                    points={previewPath.map((p) => `${p.x},${p.y}`).join(" ")}
+                    fill="none"
+                    stroke="oklch(0.92 0.2 90)"
+                    strokeWidth={4}
+                    strokeLinecap="round"
+                    opacity={0.92}
+                  />
+                  <polyline
+                    points={previewPath.map((p) => `${p.x},${p.y}`).join(" ")}
+                    fill="none"
+                    stroke="white"
+                    strokeWidth={1.5}
+                    strokeLinecap="round"
+                    opacity={0.85}
+                  />
+                </>
+              ) : (
+                <>
+                  <polyline
+                    points={previewPath.map((p) => `${p.x},${p.y}`).join(" ")}
+                    fill="none"
+                    stroke="var(--primary)"
+                    strokeWidth={2}
+                    strokeDasharray="4 6"
+                    opacity={0.6}
+                  />
+                  {/* landing target marker */}
+                  {(() => {
+                    const last = previewPath[previewPath.length - 1];
+                    return (
+                      <circle
+                        cx={last.x}
+                        cy={last.y}
+                        r={ballSize / 2.4}
+                        fill="none"
+                        stroke="var(--accent)"
+                        strokeWidth={2}
+                        opacity={0.7}
+                      />
+                    );
+                  })()}
+                </>
+              )}
+            </svg>
+          )}
+
+          {eGunBeamPath && eGunBeamPath.length > 1 && (
+            <svg
+              style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 4 }}
+              width={boardW}
+              height={boardH}
+            >
+              <polyline
+                points={eGunBeamPath.map((p) => `${p.x},${p.y}`).join(" ")}
+                fill="none"
+                stroke="oklch(0.82 0.18 85)"
+                strokeWidth={14}
+                strokeLinecap="round"
+                opacity={0.24}
+              />
+              <polyline
+                points={eGunBeamPath.map((p) => `${p.x},${p.y}`).join(" ")}
+                fill="none"
+                stroke="oklch(0.95 0.2 95)"
+                strokeWidth={5}
+                strokeLinecap="round"
+                opacity={0.95}
+              />
+              <polyline
+                points={eGunBeamPath.map((p) => `${p.x},${p.y}`).join(" ")}
+                fill="none"
+                stroke="white"
+                strokeWidth={2}
+                strokeLinecap="round"
+                opacity={0.92}
+              />
             </svg>
           )}
 
