@@ -30,8 +30,27 @@ export const POWER_UPS = [
     icon: "☢",
     name: "Emission",
     unlock: "Every 5 minutes",
+    description: "Raises every atom currently waiting in your queue by 1 tier.",
+  },
+  {
+    icon: "🔀",
+    name: "Transmute Shot",
+    unlock: "Every 30 shots",
     description:
-      "Raises only the current queued atom by 1 tier without directly creating the level target.",
+      "Rerolls the current queued atom into a higher tier. It cannot be canceled after use.",
+  },
+  {
+    icon: "⏭",
+    name: "Fusion Jump",
+    unlock: "Break a Stone",
+    description: "Arms your next successful merge to skip one extra element tier.",
+  },
+  {
+    icon: "🧪",
+    name: "Catalyst Aura",
+    unlock: "4× combo",
+    description:
+      "Doubles fusion radius for the next 5 shots, shown by a green ring around the loaded atom.",
   },
   {
     icon: "⛰",

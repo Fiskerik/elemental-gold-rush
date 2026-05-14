@@ -101,6 +101,28 @@ function EGunVisual({ size }: { size: number }) {
     </div>
   );
 }
+
+function CatalystRadiusRing({ radius, size }: { radius: number; size: number }) {
+  const diameter = radius * 2;
+  return (
+    <div
+      aria-hidden="true"
+      style={{
+        position: "absolute",
+        left: size / 2 - radius,
+        top: size / 2 - radius,
+        width: diameter,
+        height: diameter,
+        borderRadius: "50%",
+        border: "2px dashed oklch(0.82 0.18 125 / 0.9)",
+        background: "oklch(0.76 0.16 125 / 0.08)",
+        boxShadow: "0 0 18px oklch(0.76 0.16 125 / 0.45)",
+        pointerEvents: "none",
+      }}
+    />
+  );
+}
+
 function BlankAtomVisual({ size }: { size: number }) {
   return (
     <div
@@ -473,7 +495,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     showTip(
       "feature-emission-powerup",
       "☢ Emission power-up ready!",
-      "Emission unlocks every 5 minutes. Tap it to raise only your current queued atom by 1 tier without creating the level target.",
+      "Emission unlocks every 5 minutes. Tap it to raise every atom currently waiting in your queue by 1 tier.",
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [elapsedMs, gameOver, won, emissionUnlockIndex]);
@@ -502,6 +524,11 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
   function raiseAtomForEmission(atom: number): number {
     if (atom < 1) return atom;
     return Math.min(118, atom + 1);
+  }
+
+  function discoveredSeedAtoms(maxSeedAtom: number): number[] {
+    const atoms = discoveredElements.filter((atom) => atom >= 1 && atom <= maxSeedAtom);
+    return atoms.length > 0 ? atoms : [1];
   }
 
   function grantGravityForCombo(mergeCount: number) {
@@ -615,6 +642,8 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
   const eGunSize = eGunR * 2;
   const projShotR = pendingStone ? stoneR : currentIsEGun ? eGunR : radiusFor(current);
   const projShotSize = pendingStone ? stoneSize : currentIsEGun ? eGunSize : sizeFor(current);
+  const showCatalystShotRadius = catalystShotsRemaining > 0 && !pendingStone && !currentIsEGun;
+  const catalystShotRadius = projShotR * CATALYST_ADJ_FACTOR;
   const launcherX = boardW / 2;
   const launcherY = boardH - 8; // near bottom of board
   const TOP_PAD = 6;
@@ -700,6 +729,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
   function createSeededBoard(): Board {
     if (target < SEEDED_BOARD_MIN_TARGET) return createEmptyBoard();
     const maxSeedAtom = Math.max(1, target - SEEDED_BOARD_TARGET_OFFSET);
+    const availableAtoms = discoveredSeedAtoms(maxSeedAtom);
     const count =
       SEEDED_BOARD_MIN_ATOMS +
       Math.floor(Math.random() * (SEEDED_BOARD_MAX_ATOMS - SEEDED_BOARD_MIN_ATOMS + 1));
@@ -707,7 +737,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     const minAtomRadius = radiusFor(1);
     const usableWidth = Math.max(minAtomRadius * 2, boardW - SIDE_PAD * 2 - minAtomRadius * 2);
     for (let i = 0; i < count; i++) {
-      const atom = randomAvailableElement(maxSeedAtom);
+      const atom = availableAtoms[Math.floor(Math.random() * availableAtoms.length)];
       const r = radiusFor(atom);
       const laneX = SIDE_PAD + minAtomRadius + (usableWidth * (i + 0.5)) / count;
       const jitter = (Math.random() - 0.5) * Math.max(0, usableWidth / count - r * 2);
@@ -1712,7 +1742,6 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
   }
 
   function triggerTransmutePowerUp() {
-    if (cancelPendingPowerUp("transmute")) return;
     if (
       busy ||
       gameOver ||
@@ -1726,8 +1755,6 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     const maxTier = Math.min(118, Math.max(current + 1, target - 1));
     if (current >= maxTier) return;
     const atom = current + 1 + Math.floor(Math.random() * (maxTier - current));
-    queueUndoRef.current = { queue, shimmerQueue, eGunQueue, blankQueue, powerUp: "transmute" };
-    setPendingReversiblePowerUp("transmute");
     setTransmuteCharges((g) => Math.max(0, g - 1));
     setQueue((q) => [atom, ...q.slice(1)]);
     setShimmerQueue((q) => [false, ...q.slice(1)]);
@@ -1769,21 +1796,23 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     if (cancelPendingPowerUp("emission")) return;
     if (busy || gameOver || won || emissionCharges <= 0 || pendingStone || pendingReversiblePowerUp)
       return;
-    if (currentIsEGun || currentIsBlank) return;
 
-    const raisedAtom = raiseAtomForEmission(current);
-    if (raisedAtom === current) return;
+    const raisedQueue = queue.map((atom, i) =>
+      eGunQueue[i] || blankQueue[i] ? atom : raiseAtomForEmission(atom),
+    );
+    if (raisedQueue.every((atom, i) => atom === queue[i])) return;
 
     queueUndoRef.current = { queue, shimmerQueue, eGunQueue, blankQueue, powerUp: "emission" };
     setPendingReversiblePowerUp("emission");
     setEmissionCharges((g) => Math.max(0, g - 1));
-    setQueue((q) => [raisedAtom, ...q.slice(1)]);
+    setQueue(raisedQueue);
 
-    const discoveries = discoveredElements.includes(raisedAtom) ? [] : [raisedAtom];
+    const reachedAtomicNumbers = raisedQueue.filter((atom, i) => atom !== queue[i]);
+    const discoveries = reachedAtomicNumbers.filter((n) => !discoveredElements.includes(n));
     if (discoveries.length > 0) recordDiscovery(discoveries);
 
-    spawnPopup(`☢ ${ELEMENTS[raisedAtom - 1]?.symbol ?? "?"} READY`);
-    reportQuestProgress({ discoveries, reachedAtomicNumbers: [raisedAtom] });
+    spawnPopup("☢ QUEUE +1");
+    reportQuestProgress({ discoveries, reachedAtomicNumbers });
     haptic([25, 45, 25]);
   }
 
@@ -2623,6 +2652,9 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
                 zIndex: 4,
               }}
             >
+              {showCatalystShotRadius && (
+                <CatalystRadiusRing radius={catalystShotRadius} size={projShotSize} />
+              )}
               {pendingStone ? (
                 <StoneVisual size={projShotSize} hp={STONE_MAX_HP} />
               ) : currentIsEGun ? (
@@ -2652,6 +2684,9 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
               transformOrigin: "center center",
             }}
           >
+            {!projectile && showCatalystShotRadius && (
+              <CatalystRadiusRing radius={catalystShotRadius} size={projShotSize} />
+            )}
             {!projectile &&
               (pendingStone ? (
                 <StoneVisual size={projShotSize} hp={STONE_MAX_HP} />
@@ -2743,7 +2778,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
                 onClick={triggerTransmutePowerUp}
                 {...powerUpInfoHandlers(
                   "🔀 Transmute Shot",
-                  "Rerolls your current queued atom into a higher tier. Tap it again before shooting to restore the original atom and refund the charge.",
+                  "Rerolls your current queued atom into a higher tier. It cannot be canceled after use, so choose carefully.",
                 )}
                 disabled={
                   busy ||
@@ -2774,9 +2809,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
                 }}
               >
                 <span aria-hidden="true">🔀</span>
-                <span style={powerUpCount}>
-                  {pendingReversiblePowerUp === "transmute" ? "↩" : transmuteCharges}
-                </span>
+                <span style={powerUpCount}>{transmuteCharges}</span>
               </button>
             )}
             {(fusionJumpCharges > 0 || fusionJumpArmed) && (
@@ -2819,7 +2852,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
                 onClick={triggerCatalystPowerUp}
                 {...powerUpInfoHandlers(
                   "🧪 Catalyst Aura",
-                  "Doubles fusion radius for your next 5 shots. Tap it again before taking a shot to cancel and refund the charge.",
+                  "Doubles fusion radius for your next 5 shots. A green ring around the loaded shot shows the larger merge radius.",
                 )}
                 disabled={
                   busy ||
@@ -2859,15 +2892,16 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
                 onClick={triggerEmissionPowerUp}
                 {...powerUpInfoHandlers(
                   "☢ Emission",
-                  "Raises your current queued atom by 1 tier, and can now complete the target if that upgrade reaches it. Tap again before shooting to undo it.",
+                  "Raises every atom currently waiting in your queue by 1 tier. Tap again before shooting to undo it.",
                 )}
                 disabled={
                   busy ||
                   (pendingReversiblePowerUp !== "emission" &&
                     (pendingStone ||
-                      currentIsEGun ||
-                      currentIsBlank ||
-                      raiseAtomForEmission(current) === current ||
+                      queue.every(
+                        (atom, i) =>
+                          eGunQueue[i] || blankQueue[i] || raiseAtomForEmission(atom) === atom,
+                      ) ||
                       pendingReversiblePowerUp != null))
                 }
                 style={{
@@ -2882,17 +2916,19 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
                   opacity:
                     busy ||
                     pendingStone ||
-                    currentIsEGun ||
-                    currentIsBlank ||
-                    raiseAtomForEmission(current) === current
+                    queue.every(
+                      (atom, i) =>
+                        eGunQueue[i] || blankQueue[i] || raiseAtomForEmission(atom) === atom,
+                    )
                       ? 0.65
                       : 1,
                   cursor:
                     busy ||
                     pendingStone ||
-                    currentIsEGun ||
-                    currentIsBlank ||
-                    raiseAtomForEmission(current) === current
+                    queue.every(
+                      (atom, i) =>
+                        eGunQueue[i] || blankQueue[i] || raiseAtomForEmission(atom) === atom,
+                    )
                       ? "not-allowed"
                       : "pointer",
                 }}
