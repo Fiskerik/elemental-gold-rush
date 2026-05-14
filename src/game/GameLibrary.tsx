@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { GAME_MODES } from "./challenges";
 import { PowerUpIcon } from "./PowerUpLibrary";
 import { POWER_UPS } from "./powerUps";
@@ -9,6 +10,7 @@ interface Props {
 
 export function GameLibrary({ onBack }: Props) {
   const unlockedLevel = useProgress((s) => s.unlockedLevel);
+  const [tab, setTab] = useState<"challenges" | "powerups">("challenges");
 
   return (
     <div className="app-shell" style={{ padding: 20, paddingTop: 32, minHeight: "100dvh" }}>
@@ -28,9 +30,24 @@ export function GameLibrary({ onBack }: Props) {
           </p>
         </header>
 
-        <section style={sectionCard}>
-          <div style={sectionHeading}>Challenges</div>
-          <div style={{ display: "grid", gap: 12 }}>
+        <div style={tabBar}>
+          <button
+            onClick={() => setTab("challenges")}
+            style={{ ...tabBtn, ...(tab === "challenges" ? tabBtnActive : {}) }}
+          >
+            Challenges
+          </button>
+          <button
+            onClick={() => setTab("powerups")}
+            style={{ ...tabBtn, ...(tab === "powerups" ? tabBtnActive : {}) }}
+          >
+            Power-Ups
+          </button>
+        </div>
+
+        {tab === "challenges" && (
+          <section style={sectionCard}>
+            <div style={{ display: "grid", gap: 12 }}>
             {GAME_MODES.filter((mode) => mode.kind !== "campaign").map((mode) => {
               const locked = unlockedLevel < mode.unlockedAtLevel;
               return (
@@ -53,12 +70,13 @@ export function GameLibrary({ onBack }: Props) {
                 </article>
               );
             })}
-          </div>
-        </section>
+            </div>
+          </section>
+        )}
 
-        <section style={sectionCard}>
-          <div style={sectionHeading}>Power-Up Library</div>
-          <div style={{ display: "grid", gap: 12 }}>
+        {tab === "powerups" && (
+          <section style={sectionCard}>
+            <div style={{ display: "grid", gap: 12 }}>
             {POWER_UPS.map((powerUp) => (
               <article key={powerUp.name} style={rowCard}>
                 <div style={iconWrap}>
@@ -75,8 +93,9 @@ export function GameLibrary({ onBack }: Props) {
                 </div>
               </article>
             ))}
-          </div>
-        </section>
+            </div>
+          </section>
+        )}
       </div>
     </div>
   );
@@ -101,12 +120,32 @@ const sectionCard: React.CSSProperties = {
   marginBottom: 16,
 };
 
-const sectionHeading: React.CSSProperties = {
-  fontSize: 12,
-  letterSpacing: 2.5,
-  color: "var(--accent)",
-  fontWeight: 900,
-  marginBottom: 12,
+const tabBar: React.CSSProperties = {
+  display: "flex",
+  gap: 6,
+  padding: 4,
+  borderRadius: 14,
+  background: "var(--surface)",
+  border: "1px solid var(--border)",
+  marginBottom: 16,
+};
+
+const tabBtn: React.CSSProperties = {
+  flex: 1,
+  padding: "10px 12px",
+  borderRadius: 10,
+  border: "none",
+  background: "transparent",
+  color: "var(--muted-foreground)",
+  fontWeight: 800,
+  fontSize: 13,
+  cursor: "pointer",
+};
+
+const tabBtnActive: React.CSSProperties = {
+  background: "linear-gradient(135deg, var(--primary), var(--accent))",
+  color: "var(--primary-foreground)",
+  boxShadow: "0 4px 14px var(--primary-glow)",
 };
 
 const rowCard: React.CSSProperties = {
