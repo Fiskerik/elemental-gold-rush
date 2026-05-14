@@ -27,11 +27,21 @@ function getCtx(): AudioContext | null {
 function runSound(play: (c: AudioContext, now: number) => void) {
   const c = getCtx();
   if (!c) return;
-  try {
-    play(c, c.currentTime);
-  } catch (error) {
-    console.log("Sound playback failed", error);
+  const playNow = () => {
+    try {
+      play(c, c.currentTime);
+    } catch (error) {
+      console.log("Sound playback failed", error);
+    }
+  };
+  if (c.state === "suspended") {
+    void c
+      .resume()
+      .then(playNow)
+      .catch((error) => console.log("Audio context resume failed", error));
+    return;
   }
+  playNow();
 }
 
 export function playMergeSound(chainDepth: number) {

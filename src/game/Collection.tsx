@@ -2,7 +2,7 @@ import { useState } from "react";
 import { ELEMENTS, CATEGORY_COLORS } from "./elements";
 import { useProgress } from "./store";
 import { ElementBall } from "./ElementBall";
-import { BADGES } from "./badges";
+import { BADGES, BADGE_GROUPS } from "./badges";
 
 export function Collection({ onBack }: { onBack: () => void }) {
   const { discoveredElements, earnedBadges } = useProgress();
@@ -139,55 +139,99 @@ export function Collection({ onBack }: { onBack: () => void }) {
           >
             BADGES
           </div>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
-              gap: 8,
-            }}
-          >
-            {BADGES.map((badge) => {
-              const unlocked = earned.has(badge.id);
-              const progress = badge.requiredAtomicNumbers.filter((atomicNumber) =>
-                found.has(atomicNumber),
-              ).length;
+          <div style={{ display: "grid", gap: 12 }}>
+            {BADGE_GROUPS.map((group) => {
+              const groupBadges = BADGES.filter((badge) => badge.group === group.id);
+              const unlockedCount = groupBadges.filter((badge) => earned.has(badge.id)).length;
               return (
-                <div
-                  key={badge.id}
+                <section
+                  key={group.id}
                   style={{
-                    display: "flex",
-                    gap: 8,
-                    alignItems: "center",
                     padding: 10,
-                    borderRadius: 12,
-                    border: `1px solid ${unlocked ? "var(--accent)" : "var(--border)"}`,
-                    background: unlocked
-                      ? "color-mix(in oklch, var(--accent) 15%, var(--surface))"
-                      : "var(--surface)",
-                    opacity: unlocked ? 1 : 0.65,
+                    borderRadius: 14,
+                    border: "1px solid var(--border)",
+                    background: "color-mix(in oklch, var(--surface) 82%, transparent)",
                   }}
                 >
-                  <div style={{ fontSize: 22, filter: unlocked ? undefined : "grayscale(1)" }}>
-                    {badge.icon}
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 12, fontWeight: 800 }}>{badge.name}</div>
-                    <div
-                      style={{ fontSize: 10, color: "var(--muted-foreground)", lineHeight: 1.35 }}
-                    >
-                      {badge.description}
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      gap: 10,
+                      marginBottom: 8,
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 900 }}>{group.title}</div>
+                      <div style={{ fontSize: 10, color: "var(--muted-foreground)" }}>
+                        {group.description}
+                      </div>
                     </div>
-                    <div
-                      style={{
-                        fontSize: 10,
-                        color: unlocked ? "var(--accent)" : "var(--muted-foreground)",
-                        marginTop: 2,
-                      }}
-                    >
-                      {unlocked ? "Unlocked" : `${progress}/${badge.requiredAtomicNumbers.length}`}
+                    <div style={{ fontSize: 11, color: "var(--accent)", fontWeight: 800 }}>
+                      {unlockedCount}/{groupBadges.length}
                     </div>
                   </div>
-                </div>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+                      gap: 8,
+                    }}
+                  >
+                    {groupBadges.map((badge) => {
+                      const unlocked = earned.has(badge.id);
+                      const progress = badge.requiredAtomicNumbers.filter((atomicNumber) =>
+                        found.has(atomicNumber),
+                      ).length;
+                      return (
+                        <div
+                          key={badge.id}
+                          style={{
+                            display: "flex",
+                            gap: 8,
+                            alignItems: "center",
+                            padding: 10,
+                            borderRadius: 12,
+                            border: `1px solid ${unlocked ? "var(--accent)" : "var(--border)"}`,
+                            background: unlocked
+                              ? "color-mix(in oklch, var(--accent) 15%, var(--surface))"
+                              : "var(--surface)",
+                            opacity: unlocked ? 1 : 0.65,
+                          }}
+                        >
+                          <div
+                            style={{ fontSize: 22, filter: unlocked ? undefined : "grayscale(1)" }}
+                          >
+                            {badge.icon}
+                          </div>
+                          <div>
+                            <div style={{ fontSize: 12, fontWeight: 800 }}>{badge.name}</div>
+                            <div
+                              style={{
+                                fontSize: 10,
+                                color: "var(--muted-foreground)",
+                                lineHeight: 1.35,
+                              }}
+                            >
+                              {badge.description}
+                            </div>
+                            <div
+                              style={{
+                                fontSize: 10,
+                                color: unlocked ? "var(--accent)" : "var(--muted-foreground)",
+                                marginTop: 2,
+                              }}
+                            >
+                              {unlocked
+                                ? "Unlocked"
+                                : `${progress}/${badge.requiredAtomicNumbers.length}`}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
               );
             })}
           </div>
