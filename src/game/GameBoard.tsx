@@ -947,7 +947,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
 
   function applyShotModeEffects(source: Board, nextShots: number): Board {
     let updated = source;
-    if (mode === "isotope-decay" && nextShots > 0 && nextShots % 10 === 0) {
+    if (mode === "isotope-decay" && nextShots > 0 && nextShots % 20 === 0) {
       updated = updated.map((b) => {
         if (b.stoneHp != null || b.atom <= 1) return b;
         const atom = b.atom - 1;
