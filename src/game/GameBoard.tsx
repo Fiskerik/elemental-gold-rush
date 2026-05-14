@@ -161,10 +161,12 @@ function getComboLabel(mergeCount: number): string | null {
   return null;
 }
 function getStarParShots(level: (typeof LEVELS)[0]): number {
-  const par = level.parShots ?? 30;
-  if (level.id <= 4) return par;
-  const lateLevelRelief = 1 + Math.min(0.9, (level.id - 4) * 0.055);
-  return Math.round(par * lateLevelRelief);
+  const configuredPar = level.parShots ?? 30;
+  const targetGap = Math.max(0, level.targetElement - level.maxQueueElement);
+  const targetComplexity = Math.ceil(targetGap * (level.id >= 10 ? 2.4 : 1.15));
+  const levelComplexity = Math.max(0, level.id - 1) * (level.id >= 7 ? 3 : 2);
+  const realisticPar = 12 + targetComplexity + levelComplexity;
+  return Math.max(configuredPar, realisticPar);
 }
 
 function calculateStars(
@@ -238,6 +240,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
   const [gameOver, setGameOver] = useState(false);
   const [won, setWon] = useState(false);
   const [discoveryEl, setDiscoveryEl] = useState<number | null>(null);
+  const [newlyDiscoveredThisRun, setNewlyDiscoveredThisRun] = useState<number[]>([]);
   const [highlightId, setHighlightId] = useState<number | null>(null);
   const [wiggleIds, setWiggleIds] = useState<Set<number>>(new Set());
   const [projectile, setProjectile] = useState<{ x: number; y: number } | null>(null);
@@ -361,7 +364,21 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     setActiveTip({ id, title, body, tone });
   }
 
+  function registerDiscoveries(atoms: number[]) {
+    const uniqueAtoms = atoms.filter((atom, index) => atom > 1 && atoms.indexOf(atom) === index);
+    if (uniqueAtoms.length === 0) return;
+    recordDiscovery(uniqueAtoms);
+    setNewlyDiscoveredThisRun((current) => {
+      const merged = [...current];
+      uniqueAtoms.forEach((atom) => {
+        if (!merged.includes(atom)) merged.push(atom);
+      });
+      return merged.sort((a, b) => a - b);
+    });
+  }
+
   useEffect(() => {
+    setNewlyDiscoveredThisRun([]);
     const initialBalls = createSeededBoard();
     setBalls(initialBalls);
     const initialHighest = Math.max(1, getHighestOnBoard(initialBalls));
@@ -369,7 +386,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     const initialDiscoveries = initialBalls
       .map((b) => b.atom)
       .filter((n, i, atoms) => n > 1 && atoms.indexOf(n) === i && !discoveredElements.includes(n));
-    if (initialDiscoveries.length > 0) recordDiscovery(initialDiscoveries);
+    if (initialDiscoveries.length > 0) registerDiscoveries(initialDiscoveries);
     const initialQueue = generateInitialQueue(
       level.maxQueueElement,
       QUEUE_SIZE,
@@ -385,7 +402,9 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     );
     setQueue(
       initialQueue.map((atom, i) =>
-        initialShimmer[i] ? randomAvailableElement(level.maxQueueElement) : atom,
+        initialShimmer[i]
+          ? generateQueueAtom(level.maxQueueElement, initialBalls, true)
+          : Math.max(atom, queueFloorFromBoard(initialBalls)),
       ),
     );
     setShimmerQueue(initialShimmer);
@@ -523,8 +542,10 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     return Math.min(level.maxQueueElement + tierBonus, cap);
   }
 
-  function randomAvailableElement(maxElement: number): number {
-    return Math.max(1, Math.min(118, Math.floor(Math.random() * maxElement) + 1));
+  function randomAvailableElement(maxElement: number, minElement = 1): number {
+    const min = Math.max(1, Math.min(118, Math.floor(minElement)));
+    const max = Math.max(min, Math.min(118, Math.floor(maxElement)));
+    return min + Math.floor(Math.random() * (max - min + 1));
   }
 
   function currentQueueDecay(): number {
@@ -538,6 +559,28 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
   function raiseAtomForEmission(atom: number): number {
     if (atom < 1) return atom;
     return Math.min(118, atom + 1);
+  }
+
+  function queueFloorFromBoard(board: Board): number {
+    let floor = 1;
+    const depletionTier = Math.max(0, emissionUnlockIndex);
+    for (let atom = 1; atom <= depletionTier; atom++) {
+      const stillOnBoard = board.some((ball) => ball.stoneHp == null && ball.atom === atom);
+      if (stillOnBoard) {
+        floor = atom;
+        break;
+      }
+      floor = atom + 1;
+    }
+    return Math.min(118, floor);
+  }
+
+  function generateQueueAtom(maxElement: number, board: Board, forceUniform = false): number {
+    const minElement = queueFloorFromBoard(board);
+    const effectiveMax = Math.max(minElement, maxElement);
+    if (forceUniform) return randomAvailableElement(effectiveMax, minElement);
+    const shiftedMax = effectiveMax - minElement + 1;
+    return generateQueueElement(shiftedMax, currentQueueDecay()) + minElement - 1;
   }
 
   function discoveredSeedAtoms(maxSeedAtom: number): number[] {
@@ -587,7 +630,10 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     setCatalystShotsRemaining((remaining) => Math.max(0, remaining - 1));
   }
 
-  function makeNextQueueSlot(maxElement: number): {
+  function makeNextQueueSlot(
+    maxElement: number,
+    board: Board = balls,
+  ): {
     atom: number;
     shimmer: boolean;
     eGun: boolean;
@@ -599,9 +645,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     else if (eGunCooldownSlots.current > 0) eGunCooldownSlots.current -= 1;
     const blank = !eGun && blankEnabled && Math.random() < BLANK_ATOM_CHANCE;
     const shimmer = !eGun && !blank && shimmerEnabled && Math.random() < POWER_UP_CHANCE;
-    const atom = shimmer
-      ? randomAvailableElement(maxElement)
-      : generateQueueElement(maxElement, currentQueueDecay());
+    const atom = generateQueueAtom(maxElement, board, shimmer);
     return {
       atom,
       shimmer,
@@ -1084,7 +1128,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     if (upgradedAtoms.size > 0) {
       const discoveries = Array.from(upgradedAtoms).filter((n) => !discoveredElements.includes(n));
       if (discoveries.length > 0) {
-        recordDiscovery(discoveries);
+        registerDiscoveries(discoveries);
         const firstDiscovery = [...discoveries].sort((a, b) => b - a)[0];
         if (firstDiscovery > 1) setDiscoveryEl(firstDiscovery);
       }
@@ -1110,7 +1154,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
       showStageClearAnimation({ stars, score, shots: nextShots, bestCombo: runBestCombo });
       return;
     }
-    const nextSlot = makeNextQueueSlot(dynamicMaxQueue(updated.length));
+    const nextSlot = makeNextQueueSlot(dynamicMaxQueue(updated.length), updated);
     setQueue((q) => [...q.slice(1), nextSlot.atom]);
     setShimmerQueue((s) => [...s.slice(1), nextSlot.shimmer]);
     setEGunQueue((e) => [...e.slice(1), nextSlot.eGun]);
@@ -1317,7 +1361,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
         setNoMergeStreak(0);
         spawnPopup("✦ STONE ERASED");
         haptic([30, 60, 30, 90]);
-        const nextSlot = makeNextQueueSlot(dynamicMaxQueue(updated.length));
+        const nextSlot = makeNextQueueSlot(dynamicMaxQueue(updated.length), updated);
         setQueue((q) => [...q.slice(1), nextSlot.atom]);
         setShimmerQueue((sq) => [...sq.slice(1), nextSlot.shimmer]);
         setEGunQueue((eq) => [...eq.slice(1), nextSlot.eGun]);
@@ -1585,7 +1629,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     const newAtoms = new Set<number>([atomOverride]);
     result.merges.forEach((m) => newAtoms.add(m.resultAtomicNumber));
     const undiscovered = Array.from(newAtoms).filter((n) => !discoveredElements.includes(n));
-    if (undiscovered.length > 0) recordDiscovery(undiscovered);
+    if (undiscovered.length > 0) registerDiscoveries(undiscovered);
 
     let mergeStoneBonus = 0;
     const mergeStoneDamage = damageStones(
@@ -1709,7 +1753,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
             bestCombo: nextBestCombo,
           });
           // Advance the queue so play can resume if the user keeps going.
-          const nextSlot = makeNextQueueSlot(dynamicMaxQueue(result.balls.length));
+          const nextSlot = makeNextQueueSlot(dynamicMaxQueue(result.balls.length), result.balls);
           setQueue((q) => [...q.slice(1), nextSlot.atom]);
           setShimmerQueue((s) => [...s.slice(1), nextSlot.shimmer]);
           setEGunQueue((e) => [...e.slice(1), nextSlot.eGun]);
@@ -1720,7 +1764,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
           setDiscoveryEl(firstDiscovery);
         }
         // Advance queue (functional update — guarantees fresh state)
-        const nextSlot = makeNextQueueSlot(dynamicMaxQueue(result.balls.length));
+        const nextSlot = makeNextQueueSlot(dynamicMaxQueue(result.balls.length), result.balls);
         setQueue((q) => [...q.slice(1), nextSlot.atom]);
         setShimmerQueue((s) => [...s.slice(1), nextSlot.shimmer]);
         setEGunQueue((e) => [...e.slice(1), nextSlot.eGun]);
@@ -1854,7 +1898,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
 
     const reachedAtomicNumbers = raisedQueue.filter((atom, i) => atom !== queue[i]);
     const discoveries = reachedAtomicNumbers.filter((n) => !discoveredElements.includes(n));
-    if (discoveries.length > 0) recordDiscovery(discoveries);
+    if (discoveries.length > 0) registerDiscoveries(discoveries);
 
     spawnPopup("☢ QUEUE +1");
     reportQuestProgress({ discoveries, reachedAtomicNumbers });
@@ -1909,7 +1953,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     });
     result.merges.forEach((m) => newAtoms.add(m.resultAtomicNumber));
     const undiscovered = Array.from(newAtoms).filter((n) => !discoveredElements.includes(n));
-    if (undiscovered.length > 0) recordDiscovery(undiscovered);
+    if (undiscovered.length > 0) registerDiscoveries(undiscovered);
 
     setBalls(result.balls.map((b) => (b.stoneHp != null ? b : { ...b, r: radiusFor(b.atom) })));
     setHighlightId(result.finalBallId);
@@ -2047,7 +2091,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     const newAtoms = new Set<number>([grabbed.atom]);
     result.merges.forEach((m) => newAtoms.add(m.resultAtomicNumber));
     const undiscovered = Array.from(newAtoms).filter((n) => !discoveredElements.includes(n));
-    if (undiscovered.length > 0) recordDiscovery(undiscovered);
+    if (undiscovered.length > 0) registerDiscoveries(undiscovered);
 
     let mergeStoneBonus = 0;
     const mergeStoneDamage = damageStones(
@@ -3201,6 +3245,8 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
             shots={shots}
             bestCombo={runBestCombo}
             stars={earnedStars}
+            newDiscoveries={newlyDiscoveredThisRun}
+            onDiscoveryClick={setDiscoveryEl}
             onMain={onExit}
             onNext={() => onWin(getNextLevel(levelId)?.id ?? null)}
           />
@@ -3214,6 +3260,8 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
             shots={shots}
             bestCombo={runBestCombo}
             stars={0}
+            newDiscoveries={newlyDiscoveredThisRun}
+            onDiscoveryClick={setDiscoveryEl}
             onMain={onExit}
             onNext={() => onWin(levelId)}
             nextLabel="Retry"
@@ -3462,6 +3510,8 @@ function ResultModal({
   shots,
   bestCombo,
   stars,
+  newDiscoveries = [],
+  onDiscoveryClick,
   onMain,
   onNext,
   nextLabel,
@@ -3473,6 +3523,8 @@ function ResultModal({
   shots: number;
   bestCombo: number;
   stars: number;
+  newDiscoveries?: number[];
+  onDiscoveryClick?: (atomicNumber: number) => void;
   onMain: () => void;
   onNext: () => void;
   nextLabel?: string;
@@ -3524,6 +3576,41 @@ function ResultModal({
         />
         <ResultStat label="Best Combo" value={`${bestCombo}`} color="var(--foreground)" />
       </div>
+      {newDiscoveries.length > 0 && (
+        <div
+          style={{
+            background: "var(--surface)",
+            border: "1px solid var(--border)",
+            borderRadius: 14,
+            padding: 10,
+            marginBottom: 12,
+          }}
+        >
+          <div
+            style={{
+              fontSize: 10,
+              letterSpacing: 1.6,
+              color: "var(--muted-foreground)",
+              fontWeight: 800,
+              marginBottom: 8,
+              textAlign: "center",
+            }}
+          >
+            NEW DISCOVERIES — TAP TO RE-READ
+          </div>
+          <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
+            {newDiscoveries.map((atomicNumber) => (
+              <ElementBall
+                key={atomicNumber}
+                atomicNumber={atomicNumber}
+                size={42}
+                glow
+                onClick={() => onDiscoveryClick?.(atomicNumber)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
       {level.scoreGoal && (
         <div
           style={{
