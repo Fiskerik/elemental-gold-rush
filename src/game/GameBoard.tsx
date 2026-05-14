@@ -2096,7 +2096,28 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
             <div style={{ fontSize: 14, fontWeight: 800, color: "var(--accent)" }}>
               {formatScore(score)}
             </div>
-            <div style={{ fontSize: 10, color: "var(--muted-foreground)" }}>{shots} shots</div>
+            <div
+              className={
+                mode === "isotope-decay" && shots > 0 && shots % 20 === 19
+                  ? "decay-warn-flash"
+                  : undefined
+              }
+              style={{
+                fontSize: 10,
+                color:
+                  mode === "isotope-decay" && shots > 0 && shots % 20 === 19
+                    ? "var(--destructive)"
+                    : "var(--muted-foreground)",
+                fontWeight: mode === "isotope-decay" && shots > 0 && shots % 20 === 19 ? 900 : 400,
+              }}
+              title={
+                mode === "isotope-decay" && shots > 0 && shots % 20 === 19
+                  ? "Next shot triggers isotope decay!"
+                  : undefined
+              }
+            >
+              {shots} shots
+            </div>
           </div>
         </div>
 
