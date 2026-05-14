@@ -1483,6 +1483,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     }
 
     result = { ...result, balls: applyShotModeEffects(result.balls, nextShots) };
+    result = { ...result, balls: relaxBoard(result.balls) };
     // Refresh radii on any merged survivors (their atom changed).
     setBalls(result.balls.map((b) => (b.stoneHp != null ? b : { ...b, r: radiusFor(b.atom) })));
     setHighlightId(result.finalBallId);
