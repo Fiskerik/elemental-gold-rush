@@ -13,6 +13,7 @@ interface Props {
   onShop: () => void;
   onLab: () => void;
   onLibrary: () => void;
+  onProfile: () => void;
 }
 
 export function MainMenu({
@@ -23,6 +24,7 @@ export function MainMenu({
   onShop,
   onLab,
   onLibrary,
+  onProfile,
 }: Props) {
   const {
     unlockedLevel,
@@ -51,16 +53,27 @@ export function MainMenu({
         style={{
           position: "relative",
           zIndex: 1,
-          maxWidth: 480,
+          maxWidth: 560,
           margin: "0 auto",
           display: "flex",
           flexDirection: "column",
-          gap: 24,
+          gap: 18,
           minHeight: "100dvh",
           paddingBottom: 24,
         }}
       >
-        <header style={{ textAlign: "center", marginTop: 24 }}>
+        <header
+          style={{
+            textAlign: "center",
+            marginTop: 18,
+            padding: "20px 16px",
+            borderRadius: 26,
+            background:
+              "radial-gradient(circle at top, oklch(0.72 0.14 85 / 0.18), transparent 58%), linear-gradient(135deg, var(--surface-elevated), var(--surface))",
+            border: "1px solid var(--border)",
+            boxShadow: "0 16px 40px rgba(0,0,0,0.28)",
+          }}
+        >
           <div
             style={{
               fontSize: 12,
@@ -88,6 +101,27 @@ export function MainMenu({
           <p style={{ color: "var(--muted-foreground)", marginTop: 10, fontSize: 13 }}>
             Fuse atoms. Forge the periodic table. Reach gold.
           </p>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 10, marginTop: 16 }}>
+            <button
+              onClick={() => {
+                trackMenuAction("continue");
+                onPlay();
+              }}
+              style={heroPlayBtn}
+            >
+              ▶ Continue Level {unlockedLevel}
+            </button>
+            <button
+              onClick={() => {
+                trackMenuAction("profile");
+                onProfile();
+              }}
+              style={profileBtn}
+              aria-label="Open profile"
+            >
+              👤
+            </button>
+          </div>
         </header>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
@@ -114,7 +148,7 @@ export function MainMenu({
               marginBottom: 8,
             }}
           >
-            QUICK TUTORIAL
+            MISSION BRIEFING
           </div>
           <div
             style={{
@@ -207,21 +241,28 @@ export function MainMenu({
         </section>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <BigButton
-            primary
-            onClick={() => {
-              trackMenuAction("continue");
-              onPlay();
-            }}
-          >
-            <div style={{ fontSize: 11, opacity: 0.7, letterSpacing: 2 }}>CONTINUE</div>
-            <div style={{ fontSize: 18, fontWeight: 800 }}>
-              Level {unlockedLevel} — {nextLevel?.name}
+          <section style={nextRunCard}>
+            <div>
+              <div style={{ fontSize: 11, opacity: 0.7, letterSpacing: 2, fontWeight: 900 }}>
+                NEXT RUN
+              </div>
+              <div style={{ fontSize: 18, fontWeight: 900 }}>
+                Level {unlockedLevel} — {nextLevel?.name}
+              </div>
+              <div style={{ fontSize: 12, opacity: 0.85, marginTop: 2 }}>
+                {nextLevel?.description}
+              </div>
             </div>
-            <div style={{ fontSize: 12, opacity: 0.85, marginTop: 2 }}>
-              {nextLevel?.description}
-            </div>
-          </BigButton>
+            <button
+              onClick={() => {
+                trackMenuAction("continue");
+                onPlay();
+              }}
+              style={smallPlayBtn}
+            >
+              Play
+            </button>
+          </section>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <BigButton
               onClick={() => {
@@ -255,17 +296,25 @@ export function MainMenu({
                 onLibrary();
               }}
             >
-              Power-Up Library
+              Game Library
             </BigButton>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+            <BigButton
+              onClick={() => {
+                trackMenuAction("profile");
+                onProfile();
+              }}
+            >
+              Profile
+            </BigButton>
             <BigButton
               onClick={() => {
                 trackMenuAction("shop");
                 onShop();
               }}
             >
-              {hasProPack ? "Pro Lab Active" : "Shop"}
+              {hasProPack ? "Pro" : "Shop"}
             </BigButton>
             <BigButton
               onClick={() => {
@@ -293,6 +342,49 @@ export function MainMenu({
     </div>
   );
 }
+
+const heroPlayBtn: React.CSSProperties = {
+  border: "none",
+  borderRadius: 16,
+  padding: "13px 16px",
+  background: "linear-gradient(135deg, var(--primary), oklch(0.55 0.15 230))",
+  color: "var(--primary-foreground)",
+  boxShadow: "0 10px 26px var(--primary-glow)",
+  fontWeight: 900,
+  cursor: "pointer",
+};
+
+const profileBtn: React.CSSProperties = {
+  border: "1px solid var(--border)",
+  borderRadius: 16,
+  padding: "0 14px",
+  background: "var(--surface)",
+  color: "var(--foreground)",
+  fontSize: 20,
+  cursor: "pointer",
+};
+
+const nextRunCard: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "1fr auto",
+  alignItems: "center",
+  gap: 14,
+  padding: 16,
+  borderRadius: 18,
+  background: "linear-gradient(135deg, var(--primary), oklch(0.55 0.15 230))",
+  color: "var(--primary-foreground)",
+  boxShadow: "0 10px 30px var(--primary-glow)",
+};
+
+const smallPlayBtn: React.CSSProperties = {
+  border: "none",
+  borderRadius: 12,
+  padding: "10px 14px",
+  background: "rgba(255,255,255,0.22)",
+  color: "var(--primary-foreground)",
+  fontWeight: 900,
+  cursor: "pointer",
+};
 
 function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (

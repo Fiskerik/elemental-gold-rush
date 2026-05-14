@@ -7,7 +7,8 @@ import { Collection } from "@/game/Collection";
 import { Settings } from "@/game/Settings";
 import { Shop } from "@/game/Shop";
 import { LabModes } from "@/game/LabModes";
-import { PowerUpLibrary } from "@/game/PowerUpLibrary";
+import { GameLibrary } from "@/game/GameLibrary";
+import { Profile } from "@/game/Profile";
 import { GameModeId } from "@/game/challenges";
 import { useProgress } from "@/game/store";
 
@@ -39,6 +40,7 @@ type Screen =
   | { name: "shop" }
   | { name: "lab" }
   | { name: "library" }
+  | { name: "profile" }
   | { name: "settings" };
 
 function Index() {
@@ -56,6 +58,7 @@ function Index() {
           onShop={() => setScreen({ name: "shop" })}
           onLab={() => setScreen({ name: "lab" })}
           onLibrary={() => setScreen({ name: "library" })}
+          onProfile={() => setScreen({ name: "profile" })}
         />
       );
     case "levels":
@@ -89,7 +92,9 @@ function Index() {
         />
       );
     case "library":
-      return <PowerUpLibrary onBack={() => setScreen({ name: "menu" })} />;
+      return <GameLibrary onBack={() => setScreen({ name: "menu" })} />;
+    case "profile":
+      return <Profile onBack={() => setScreen({ name: "menu" })} />;
     case "settings":
       return <Settings onBack={() => setScreen({ name: "menu" })} />;
   }

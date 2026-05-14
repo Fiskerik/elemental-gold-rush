@@ -245,11 +245,10 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
 
   // === Gravity and Emission power-ups ===
   // Gravity is awarded by 4× combos. Emission is awarded every 5 minutes and
-  // raises atoms without creating the level target.
+  // upgrades only the currently queued atom without creating the level target.
   const [gravityCharges, setGravityCharges] = useState(0);
   const [emissionCharges, setEmissionCharges] = useState(0);
   const [emissionUnlockIndex, setEmissionUnlockIndex] = useState(0);
-  const [emissionBoost, setEmissionBoost] = useState(0);
   const [transmuteCharges, setTransmuteCharges] = useState(0);
   const [fusionJumpCharges, setFusionJumpCharges] = useState(0);
   const [fusionJumpArmed, setFusionJumpArmed] = useState(false);
@@ -366,7 +365,6 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     setGravityCharges(0);
     setEmissionCharges(0);
     setEmissionUnlockIndex(0);
-    setEmissionBoost(0);
     setTransmuteCharges(0);
     setFusionJumpCharges(0);
     setFusionJumpArmed(false);
@@ -449,7 +447,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     showTip(
       "feature-emission-powerup",
       "☢ Emission power-up ready!",
-      "Emission unlocks every 5 minutes. Tap it to raise all atoms by 1 tier without creating the level target; future launcher atoms also start 1 tier higher.",
+      "Emission unlocks every 5 minutes. Tap it to raise only your current queued atom by 1 tier without creating the level target.",
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [elapsedMs, gameOver, won, emissionUnlockIndex]);
@@ -479,14 +477,6 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     if (atom < 1) return atom;
     const raised = Math.min(118, atom + 1);
     return raised === target ? atom : raised;
-  }
-
-  function applyEmissionBoost(atom: number): number {
-    let boosted = atom;
-    for (let i = 0; i < emissionBoost; i++) {
-      boosted = raiseAtomForEmission(boosted);
-    }
-    return boosted;
   }
 
   function grantGravityForCombo(mergeCount: number) {
@@ -547,7 +537,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
       ? randomAvailableElement(maxElement)
       : generateQueueElement(maxElement, currentQueueDecay());
     return {
-      atom: applyEmissionBoost(atom),
+      atom,
       shimmer,
       eGun,
       blank,
@@ -1568,7 +1558,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     if (current >= maxTier) return;
     const atom = current + 1 + Math.floor(Math.random() * (maxTier - current));
     setTransmuteCharges((g) => Math.max(0, g - 1));
-    setQueue((q) => [applyEmissionBoost(atom), ...q.slice(1)]);
+    setQueue((q) => [atom, ...q.slice(1)]);
     setShimmerQueue((q) => [false, ...q.slice(1)]);
     setEGunQueue((q) => [false, ...q.slice(1)]);
     setBlankQueue((q) => [false, ...q.slice(1)]);
@@ -1593,39 +1583,21 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
   }
 
   function triggerEmissionPowerUp() {
-    if (busy || gameOver || won || emissionCharges <= 0) return;
-    setBusy(true);
-    setEmissionCharges((g) => Math.max(0, g - 1));
-    setEmissionBoost((boost) => boost + 1);
+    if (busy || gameOver || won || emissionCharges <= 0 || pendingStone) return;
+    if (currentIsEGun || currentIsBlank) return;
 
-    const raisedBalls = balls.map((b) => {
-      if (b.stoneHp != null) return b;
-      const atom = raiseAtomForEmission(b.atom);
-      return atom === b.atom ? b : { ...b, atom, r: radiusFor(atom) };
-    });
-    const raisedQueue = queue.map((atom, i) => (eGunQueue[i] ? atom : raiseAtomForEmission(atom)));
-    const reachedAtoms = new Set<number>();
-    raisedBalls.forEach((b) => {
-      if (b.stoneHp == null) reachedAtoms.add(b.atom);
-    });
-    raisedQueue.forEach((atom, i) => {
-      if (!eGunQueue[i]) reachedAtoms.add(atom);
-    });
-    const discoveries = Array.from(reachedAtoms).filter((n) => !discoveredElements.includes(n));
+    const raisedAtom = raiseAtomForEmission(current);
+    if (raisedAtom === current) return;
+
+    setEmissionCharges((g) => Math.max(0, g - 1));
+    setQueue((q) => [raisedAtom, ...q.slice(1)]);
+
+    const discoveries = discoveredElements.includes(raisedAtom) ? [] : [raisedAtom];
     if (discoveries.length > 0) recordDiscovery(discoveries);
 
-    setBalls(raisedBalls);
-    setQueue(raisedQueue);
-    spawnPopup("☢ EMISSION +1");
-    reportQuestProgress({ discoveries, reachedAtomicNumbers: Array.from(reachedAtoms) });
+    spawnPopup(`☢ ${ELEMENTS[raisedAtom - 1]?.symbol ?? "?"} READY`);
+    reportQuestProgress({ discoveries, reachedAtomicNumbers: [raisedAtom] });
     haptic([25, 45, 25]);
-    setTimeout(() => {
-      if (checkGameOver(raisedBalls, geo)) {
-        setGameOver(true);
-        haptic([50, 80, 50, 80, 200]);
-      }
-      setBusy(false);
-    }, 180);
   }
 
   function triggerGravityPowerUp() {
@@ -2636,18 +2608,38 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
             {emissionCharges > 0 && (
               <button
                 type="button"
-                title="Emission: raise all atoms by 1 tier without creating the level target. Future launcher atoms also start higher."
+                title="Emission: raise only your current queued atom by 1 tier without creating the level target."
                 aria-label={`Use Emission power-up (${emissionCharges} available)`}
                 onClick={triggerEmissionPowerUp}
-                disabled={busy}
+                disabled={
+                  busy ||
+                  pendingStone ||
+                  currentIsEGun ||
+                  currentIsBlank ||
+                  raiseAtomForEmission(current) === current
+                }
                 style={{
                   ...powerUpIconBtn,
                   border: "1px solid oklch(0.82 0.19 55)",
                   background: "linear-gradient(135deg, oklch(0.72 0.19 55), oklch(0.55 0.16 35))",
                   color: "var(--primary-foreground)",
                   boxShadow: "0 0 14px oklch(0.72 0.19 55 / 0.5)",
-                  opacity: busy ? 0.65 : 1,
-                  cursor: busy ? "not-allowed" : "pointer",
+                  opacity:
+                    busy ||
+                    pendingStone ||
+                    currentIsEGun ||
+                    currentIsBlank ||
+                    raiseAtomForEmission(current) === current
+                      ? 0.65
+                      : 1,
+                  cursor:
+                    busy ||
+                    pendingStone ||
+                    currentIsEGun ||
+                    currentIsBlank ||
+                    raiseAtomForEmission(current) === current
+                      ? "not-allowed"
+                      : "pointer",
                 }}
               >
                 <span aria-hidden="true">☢</span>

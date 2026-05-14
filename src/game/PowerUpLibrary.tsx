@@ -1,58 +1,33 @@
 import { ElementBall } from "./ElementBall";
+import { POWER_UPS } from "./powerUps";
 
 interface Props {
   onBack: () => void;
 }
 
-const POWER_UPS = [
-  {
-    icon: "✦",
-    name: "Shimmer Atom",
-    unlock: "Level 5",
-    description:
-      "A glowing atom that gives 2× score and fills the Grab bar twice as fast when it merges.",
-  },
-  {
-    icon: "🤚",
-    name: "Grab",
-    unlock: "Level 4",
-    description:
-      "Earned after 8 consecutive merge progress. Drag one atom to reposition it and set up reactions.",
-  },
-  {
-    icon: "⚡",
-    name: "E-Gun",
-    unlock: "Level 6",
-    description:
-      "A straight beam that upgrades each atom it touches by 1 tier instead of degrading it.",
-  },
-  {
-    icon: "🌀",
-    name: "Gravity",
-    unlock: "4× combo",
-    description: "Pulls atoms upward and lets any newly touching matches merge immediately.",
-  },
-  {
-    icon: "☢",
-    name: "Emission",
-    unlock: "Every 5 minutes",
-    description:
-      "Raises atoms and future queued atoms by 1 tier without directly creating the level target.",
-  },
-  {
-    icon: "⛰",
-    name: "Stone",
-    unlock: "3 missed shots",
-    description:
-      "A heavy obstacle projectile that shoves clusters and can be cracked for bonus points.",
-  },
-  {
-    icon: "✦",
-    name: "Blank Atom",
-    unlock: "Level 10",
-    description: "A rare wildcard that copies the atom it hits, or erases a Stone completely.",
-  },
-];
+export function ShimmerAtomIcon({ size = 42 }: { size?: number }) {
+  return (
+    <div
+      style={{
+        width: size + 8,
+        height: size + 8,
+        borderRadius: "50%",
+        padding: 4,
+        background:
+          "conic-gradient(from 20deg, #ff4d6d, #ffd166, #06d6a0, #4cc9f0, #9b5de5, #ff4d6d)",
+        boxShadow: "0 0 18px rgba(155, 93, 229, 0.55)",
+      }}
+    >
+      <ElementBall atomicNumber={1} size={size} />
+    </div>
+  );
+}
+
+export function PowerUpIcon({ icon }: { icon: string }) {
+  if (icon === "shimmer") return <ShimmerAtomIcon />;
+  if (icon === "H") return <ElementBall atomicNumber={1} size={42} />;
+  return <>{icon}</>;
+}
 
 export function PowerUpLibrary({ onBack }: Props) {
   return (
@@ -76,7 +51,7 @@ export function PowerUpLibrary({ onBack }: Props) {
           {POWER_UPS.map((powerUp) => (
             <article key={powerUp.name} style={card}>
               <div style={iconWrap}>
-                {powerUp.icon === "H" ? <ElementBall atomicNumber={1} size={42} /> : powerUp.icon}
+                <PowerUpIcon icon={powerUp.icon} />
               </div>
               <div style={{ flex: 1 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
