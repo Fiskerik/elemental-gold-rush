@@ -2392,6 +2392,18 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     [launcherX, launcherY],
   );
 
+  const isPointerOnLauncherAtom = useCallback(
+    (clientX: number, clientY: number) => {
+      if (!boardRef.current) return false;
+      const rect = boardRef.current.getBoundingClientRect();
+      const px = clientX - rect.left;
+      const py = clientY - rect.top;
+      const tapRadius = projShotSize / 2 + Math.max(8, projShotSize * 0.18);
+      return Math.hypot(px - launcherX, py - launcherY) <= tapRadius;
+    },
+    [launcherX, launcherY, projShotSize],
+  );
+
   // preview trajectory (recomputed every render based on aimDeg)
   const previewPath = useMemo(() => {
     if (busy || gameOver || won) return [];
@@ -2691,8 +2703,9 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
               return;
             }
             if (grabMode) return;
-            updateAimFromPointer(e.clientX, e.clientY);
-            shoot();
+            if (isPointerOnLauncherAtom(e.clientX, e.clientY)) {
+              shoot();
+            }
           }}
           style={{
             position: "relative",
