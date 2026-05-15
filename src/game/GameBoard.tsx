@@ -17,7 +17,12 @@ import {
   getHighestOnBoard,
 } from "./logic";
 import { ElementBall } from "./ElementBall";
-import { useProgress } from "./store";
+import {
+  emptyPowerUpInventory,
+  type InventoryPowerUpId,
+  type PowerUpInventory,
+  useProgress,
+} from "./store";
 import { playMergeSound, playShootSound, playWinSound, vibrate } from "./audio";
 import { GameModeId, getGameMode, getModeLevelLabel } from "./challenges";
 import { trackGameOver, trackGameStart, trackLevelWin, trackMerge, trackShot } from "./analytics";
@@ -50,6 +55,52 @@ const CATALYST_ADJ_FACTOR = 2.3;
 const DISCOVERY_DECAY_STEP = 5;
 const DISCOVERY_DECAY_BOOST = 0.04;
 const STAGE_CLEAR_ANIMATION_MS = 6200;
+
+const INVENTORY_PICK_LIMIT = 3;
+
+const POWER_UP_INVENTORY_META: Record<
+  InventoryPowerUpId,
+  { icon: string; name: string; description: string }
+> = {
+  transmute: {
+    icon: "🔀",
+    name: "Transmute Shot",
+    description: "Reroll your current queued atom into a higher tier.",
+  },
+  "fusion-jump": {
+    icon: "⏭",
+    name: "Fusion Jump",
+    description: "Arm your next merge to skip one extra element tier.",
+  },
+  catalyst: {
+    icon: "🧪",
+    name: "Catalyst Aura",
+    description: "Double fusion radius for your next 5 shots.",
+  },
+  emission: {
+    icon: "☢",
+    name: "Emission",
+    description: "Raise the atoms currently waiting in your queue by 1 tier.",
+  },
+  gravity: {
+    icon: "🌀",
+    name: "Gravity",
+    description: "Lift all atoms upward and resolve any new fusions.",
+  },
+  grab: {
+    icon: "🤚",
+    name: "Grab",
+    description: "Drag one atom to a better spot and set up a chain.",
+  },
+};
+
+function countPowerUps(inventory: Partial<Record<InventoryPowerUpId, number>>): number {
+  return Object.values(inventory).reduce((total, count) => total + (count ?? 0), 0);
+}
+
+function hasPowerUps(inventory: Partial<Record<InventoryPowerUpId, number>>): boolean {
+  return countPowerUps(inventory) > 0;
+}
 
 function StoneVisual({ size, hp }: { size: number; hp: number }) {
   return (
@@ -208,6 +259,9 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     setBestCombo,
     setLevelStars,
     setChallengeBestScore,
+    powerUpInventory,
+    addInventoryPowerUps,
+    consumeInventoryPowerUps,
     seenTips,
     markTipSeen,
   } = useProgress();
@@ -314,6 +368,11 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     bestCombo: number;
   } | null>(null);
   const stageClearTimeoutRef = useRef<number | null>(null);
+  const hasClaimedUnusedInventoryRef = useRef(false);
+  const [inventoryPickerOpen, setInventoryPickerOpen] = useState(false);
+  const [selectedInventoryPowerUps, setSelectedInventoryPowerUps] = useState<PowerUpInventory>(() =>
+    emptyPowerUpInventory(),
+  );
 
   // === Run timer ===
   const [elapsedMs, setElapsedMs] = useState(0);
@@ -450,6 +509,9 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     setCatalystCharges(0);
     setCatalystShotsRemaining(0);
     setPendingReversiblePowerUp(null);
+    hasClaimedUnusedInventoryRef.current = false;
+    setSelectedInventoryPowerUps(emptyPowerUpInventory());
+    setInventoryPickerOpen(hasPowerUps(powerUpInventory));
     queueUndoRef.current = null;
     eGunCooldownSlots.current = 0;
     startTimeRef.current = Date.now();
@@ -686,6 +748,11 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (won || gameOver) claimUnusedPowerUps();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [won, gameOver]);
 
   // === sizing ===
   const boardRef = useRef<HTMLDivElement>(null);
@@ -1048,7 +1115,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
   }
 
   function shoot() {
-    if (busy || gameOver || won) return;
+    if (busy || gameOver || won || inventoryPickerOpen) return;
     trackShot(levelId, pendingStone ? -1 : currentIsEGun ? 0 : current, aimDeg, mode);
     queueUndoRef.current = null;
     setPendingReversiblePowerUp(null);
@@ -1778,6 +1845,63 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
       },
       200 + result.merges.length * 120,
     );
+  }
+
+  function collectUnusedPowerUps(): Partial<Record<InventoryPowerUpId, number>> {
+    return {
+      transmute: transmuteCharges,
+      "fusion-jump": fusionJumpCharges + (fusionJumpArmed ? 1 : 0),
+      catalyst: catalystCharges,
+      emission: emissionCharges,
+      gravity: gravityCharges,
+      grab: grabs,
+    };
+  }
+
+  function claimUnusedPowerUps() {
+    if (hasClaimedUnusedInventoryRef.current) return;
+    const unused = collectUnusedPowerUps();
+    const totalUnused = countPowerUps(unused);
+    if (totalUnused <= 0) {
+      hasClaimedUnusedInventoryRef.current = true;
+      return;
+    }
+    addInventoryPowerUps(unused);
+    hasClaimedUnusedInventoryRef.current = true;
+    spawnPopup(`🎒 SAVED ×${totalUnused}`);
+  }
+
+  function changeInventorySelection(powerUp: InventoryPowerUpId, delta: 1 | -1) {
+    setSelectedInventoryPowerUps((selected) => {
+      const currentlySelected = selected[powerUp];
+      if (delta < 0) {
+        return { ...selected, [powerUp]: Math.max(0, currentlySelected - 1) };
+      }
+      if (countPowerUps(selected) >= INVENTORY_PICK_LIMIT) return selected;
+      if (currentlySelected >= powerUpInventory[powerUp]) return selected;
+      return { ...selected, [powerUp]: currentlySelected + 1 };
+    });
+  }
+
+  function startWithSelectedInventory() {
+    const selectedCount = countPowerUps(selectedInventoryPowerUps);
+    if (selectedCount > 0 && !consumeInventoryPowerUps(selectedInventoryPowerUps)) return;
+    setTransmuteCharges((count) => count + selectedInventoryPowerUps.transmute);
+    setFusionJumpCharges((count) => count + selectedInventoryPowerUps["fusion-jump"]);
+    setCatalystCharges((count) => count + selectedInventoryPowerUps.catalyst);
+    setEmissionCharges((count) => count + selectedInventoryPowerUps.emission);
+    setGravityCharges((count) => count + selectedInventoryPowerUps.gravity);
+    setGrabs((count) => count + selectedInventoryPowerUps.grab);
+    if (selectedCount > 0) {
+      spawnPopup(`🎒 LOADED ×${selectedCount}`);
+      showTip(
+        "feature-inventory-start",
+        "🎒 Inventory loaded",
+        "Unused power-ups are saved after a run. At the start of a level, choose up to 3 from your inventory to begin with an early strategy boost.",
+      );
+    }
+    setSelectedInventoryPowerUps(emptyPowerUpInventory());
+    setInventoryPickerOpen(false);
   }
 
   function cancelPendingPowerUp(powerUp: "transmute" | "emission" | "fusion-jump" | "catalyst") {
@@ -3203,6 +3327,14 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
           </div>
         </div>
 
+        {inventoryPickerOpen && !won && !gameOver && (
+          <InventoryStartModal
+            inventory={powerUpInventory}
+            selected={selectedInventoryPowerUps}
+            onChange={changeInventorySelection}
+            onStart={startWithSelectedInventory}
+          />
+        )}
         {discoveryEl !== null && (
           <DiscoveryModal atomicNumber={discoveryEl} onClose={() => setDiscoveryEl(null)} />
         )}
@@ -3393,6 +3525,142 @@ function FeatureTip({
         </button>
       </div>
     </div>
+  );
+}
+
+function InventoryStartModal({
+  inventory,
+  selected,
+  onChange,
+  onStart,
+}: {
+  inventory: PowerUpInventory;
+  selected: PowerUpInventory;
+  onChange: (powerUp: InventoryPowerUpId, delta: 1 | -1) => void;
+  onStart: () => void;
+}) {
+  const selectedCount = countPowerUps(selected);
+  const availablePowerUps = (Object.keys(POWER_UP_INVENTORY_META) as InventoryPowerUpId[]).filter(
+    (id) => inventory[id] > 0,
+  );
+
+  return (
+    <Modal>
+      <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--accent)", marginBottom: 8 }}>
+        POWER-UP INVENTORY
+      </div>
+      <h2 style={{ margin: "0 0 8px", fontSize: 24, fontWeight: 900 }}>Pick up to 3 boosts</h2>
+      <p style={{ margin: "0 0 14px", color: "var(--muted-foreground)", fontSize: 13 }}>
+        Saved unused power-ups can be loaded before a level starts. Tap a selected card again to add
+        copies, or use minus to remove them.
+      </p>
+      <div style={{ display: "grid", gap: 8 }}>
+        {availablePowerUps.map((id) => {
+          const meta = POWER_UP_INVENTORY_META[id];
+          const selectedAmount = selected[id];
+          const isSelected = selectedAmount > 0;
+          const disabled = !isSelected && selectedCount >= INVENTORY_PICK_LIMIT;
+          return (
+            <button
+              key={id}
+              type="button"
+              onClick={() => onChange(id, 1)}
+              disabled={disabled}
+              style={{
+                display: "grid",
+                gridTemplateColumns: "36px 1fr auto",
+                alignItems: "center",
+                gap: 10,
+                padding: 10,
+                borderRadius: 12,
+                border: `1px solid ${isSelected ? "var(--accent)" : "var(--border)"}`,
+                background: isSelected
+                  ? "color-mix(in oklch, var(--accent) 18%, var(--surface-elevated))"
+                  : "var(--surface)",
+                color: "var(--foreground)",
+                opacity: disabled ? 0.55 : 1,
+                cursor: disabled ? "not-allowed" : "pointer",
+                textAlign: "left",
+              }}
+            >
+              <span style={{ fontSize: 24, textAlign: "center" }} aria-hidden="true">
+                {meta.icon}
+              </span>
+              <span>
+                <span style={{ display: "block", fontWeight: 900, fontSize: 13 }}>{meta.name}</span>
+                <span style={{ display: "block", color: "var(--muted-foreground)", fontSize: 11 }}>
+                  {meta.description}
+                </span>
+              </span>
+              <span
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "flex-end",
+                  gap: 6,
+                  minWidth: 76,
+                  color: isSelected ? "var(--accent)" : "var(--muted-foreground)",
+                  fontWeight: 900,
+                  fontVariantNumeric: "tabular-nums",
+                }}
+              >
+                {isSelected && (
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Remove ${meta.name} from selected inventory`}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onChange(id, -1);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key !== "Enter" && event.key !== " ") return;
+                      event.preventDefault();
+                      event.stopPropagation();
+                      onChange(id, -1);
+                    }}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      width: 24,
+                      height: 24,
+                      borderRadius: 8,
+                      background: "var(--surface-elevated)",
+                      border: "1px solid var(--border)",
+                      color: "var(--foreground)",
+                    }}
+                  >
+                    −
+                  </span>
+                )}
+                <span>
+                  {isSelected ? `${selectedAmount}/${inventory[id]}` : `×${inventory[id]}`}
+                </span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      <div
+        style={{
+          marginTop: 14,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          color: "var(--muted-foreground)",
+          fontSize: 12,
+        }}
+      >
+        <span>
+          Selected {selectedCount}/{INVENTORY_PICK_LIMIT}
+        </span>
+        <button onClick={onStart} style={{ ...modalBtn, marginTop: 0, flex: "0 0 auto" }}>
+          {selectedCount > 0 ? "Start with boosts" : "Start without boosts"}
+        </button>
+      </div>
+    </Modal>
   );
 }
 

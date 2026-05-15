@@ -1,10 +1,62 @@
 import { useState } from "react";
 import { PRODUCT_IDS, getProductById } from "./products";
 import { purchaseProduct, restorePurchases } from "./purchases";
-import { useProgress } from "./store";
+import { type InventoryPowerUpId, useProgress } from "./store";
+
+const SHOP_POWER_UPS: Array<{
+  id: InventoryPowerUpId;
+  icon: string;
+  name: string;
+  cost: number;
+  description: string;
+}> = [
+  {
+    id: "transmute",
+    icon: "🔀",
+    name: "Transmute Shot",
+    cost: 900,
+    description: "Reroll the loaded atom into a higher tier at the start of a run.",
+  },
+  {
+    id: "fusion-jump",
+    icon: "⏭",
+    name: "Fusion Jump",
+    cost: 1200,
+    description: "Save a tier-skipping merge for a future level opening.",
+  },
+  {
+    id: "catalyst",
+    icon: "🧪",
+    name: "Catalyst Aura",
+    cost: 1100,
+    description: "Start a level with 5 shots of wider fusion radius available.",
+  },
+  {
+    id: "emission",
+    icon: "☢",
+    name: "Emission",
+    cost: 850,
+    description: "Raise your starting queue when a level needs a quick push.",
+  },
+  {
+    id: "gravity",
+    icon: "🌀",
+    name: "Gravity",
+    cost: 1000,
+    description: "Bank a board-lifting move for a difficult future board.",
+  },
+  {
+    id: "grab",
+    icon: "🤚",
+    name: "Grab",
+    cost: 750,
+    description: "Bring a saved reposition move into your next level.",
+  },
+];
 
 export function Shop({ onBack }: { onBack: () => void }) {
-  const { hasProPack, grantProPack } = useProgress();
+  const { hasProPack, grantProPack, totalScore, powerUpInventory, purchaseInventoryPowerUp } =
+    useProgress();
   const [message, setMessage] = useState("");
   const proPack = getProductById(PRODUCT_IDS.proLabPack);
 
@@ -16,6 +68,15 @@ export function Shop({ onBack }: { onBack: () => void }) {
       return;
     }
     setMessage("Native App Store purchase support is not available in this web build yet.");
+  }
+
+  function handlePowerUpPurchase(powerUp: InventoryPowerUpId, cost: number, name: string) {
+    const purchased = purchaseInventoryPowerUp(powerUp, cost);
+    setMessage(
+      purchased
+        ? `${name} added to your inventory.`
+        : `You need ${cost.toLocaleString()} total score to buy ${name}.`,
+    );
   }
 
   async function handleRestore() {
@@ -139,6 +200,108 @@ export function Shop({ onBack }: { onBack: () => void }) {
               {message}
             </p>
           )}
+        </section>
+
+        <section
+          style={{
+            background: "var(--surface-elevated)",
+            border: "1px solid var(--border)",
+            borderRadius: 18,
+            padding: 18,
+            boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "baseline",
+              gap: 12,
+              marginBottom: 10,
+            }}
+          >
+            <div>
+              <div
+                style={{
+                  fontSize: 11,
+                  letterSpacing: 2,
+                  color: "var(--accent)",
+                  fontWeight: 800,
+                  marginBottom: 6,
+                }}
+              >
+                INVENTORY POWER-UPS
+              </div>
+              <h2 style={{ margin: 0, fontSize: 22, fontWeight: 900 }}>Stock your next run</h2>
+            </div>
+            <div
+              style={{
+                padding: "6px 10px",
+                borderRadius: 999,
+                background: "var(--surface)",
+                border: "1px solid var(--border)",
+                color: "var(--accent)",
+                fontSize: 12,
+                fontWeight: 900,
+                fontVariantNumeric: "tabular-nums",
+              }}
+            >
+              {totalScore.toLocaleString()} score
+            </div>
+          </div>
+          <p style={{ margin: "0 0 14px", color: "var(--muted-foreground)", fontSize: 13 }}>
+            Buy extra inventory copies with your saved score. Before each level, you can choose up
+            to 3 inventory power-ups to start with.
+          </p>
+          <div style={{ display: "grid", gap: 10 }}>
+            {SHOP_POWER_UPS.map((powerUp) => {
+              const canAfford = totalScore >= powerUp.cost;
+              return (
+                <div
+                  key={powerUp.id}
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "36px 1fr auto",
+                    gap: 10,
+                    alignItems: "center",
+                    padding: 10,
+                    borderRadius: 12,
+                    border: "1px solid var(--border)",
+                    background: "var(--surface)",
+                  }}
+                >
+                  <span style={{ fontSize: 24, textAlign: "center" }} aria-hidden="true">
+                    {powerUp.icon}
+                  </span>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 900 }}>{powerUp.name}</div>
+                    <div
+                      style={{ fontSize: 11, color: "var(--muted-foreground)", lineHeight: 1.35 }}
+                    >
+                      {powerUp.description}
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--accent)", marginTop: 3 }}>
+                      Owned: {powerUpInventory[powerUp.id]}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handlePowerUpPurchase(powerUp.id, powerUp.cost, powerUp.name)}
+                    disabled={!canAfford}
+                    style={{
+                      ...shopButton,
+                      padding: "9px 10px",
+                      minWidth: 78,
+                      opacity: canAfford ? 1 : 0.55,
+                      cursor: canAfford ? "pointer" : "not-allowed",
+                    }}
+                  >
+                    {powerUp.cost.toLocaleString()}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
         </section>
       </div>
     </div>
