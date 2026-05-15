@@ -12,6 +12,49 @@ import {
   refreshDailyQuests,
 } from "./quests";
 
+export const INVENTORY_POWER_UPS = [
+  "transmute",
+  "fusion-jump",
+  "catalyst",
+  "emission",
+  "gravity",
+  "grab",
+] as const;
+
+export type InventoryPowerUpId = (typeof INVENTORY_POWER_UPS)[number];
+
+export type PowerUpInventory = Record<InventoryPowerUpId, number>;
+
+export const emptyPowerUpInventory = (): PowerUpInventory => ({
+  transmute: 0,
+  "fusion-jump": 0,
+  catalyst: 0,
+  emission: 0,
+  gravity: 0,
+  grab: 0,
+});
+
+function normalizePowerUpInventory(
+  inventory: Partial<Record<InventoryPowerUpId, number>> | undefined,
+): PowerUpInventory {
+  const empty = emptyPowerUpInventory();
+  for (const id of INVENTORY_POWER_UPS) {
+    empty[id] = Math.max(0, Math.floor(inventory?.[id] ?? 0));
+  }
+  return empty;
+}
+
+function mergePowerUpInventory(
+  current: PowerUpInventory,
+  delta: Partial<Record<InventoryPowerUpId, number>>,
+): PowerUpInventory {
+  const next = { ...current };
+  for (const id of INVENTORY_POWER_UPS) {
+    next[id] = Math.max(0, Math.floor(next[id] + (delta[id] ?? 0)));
+  }
+  return next;
+}
+
 interface ProgressState {
   unlockedLevel: number; // highest level unlocked (1-based)
   highestElement: number; // highest atomic number ever reached
@@ -28,6 +71,7 @@ interface ProgressState {
   levelStars: Record<number, number>;
   challengeBestScores: Partial<Record<GameModeId, number>>;
   hasProPack: boolean;
+  powerUpInventory: PowerUpInventory;
   seenTips: string[];
   markTipSeen: (id: string) => void;
   unlockLevel: (id: number) => void;
@@ -41,6 +85,9 @@ interface ProgressState {
   setLevelStars: (levelId: number, stars: number) => void;
   setChallengeBestScore: (mode: GameModeId, score: number) => void;
   grantProPack: () => void;
+  addInventoryPowerUps: (powerUps: Partial<Record<InventoryPowerUpId, number>>) => void;
+  consumeInventoryPowerUps: (powerUps: Partial<Record<InventoryPowerUpId, number>>) => boolean;
+  purchaseInventoryPowerUp: (powerUp: InventoryPowerUpId, cost: number) => boolean;
   toggleSound: () => void;
   toggleHaptics: () => void;
   reset: () => void;
@@ -67,6 +114,7 @@ export const useProgress = create<ProgressState>()(
       levelStars: {},
       challengeBestScores: {},
       hasProPack: false,
+      powerUpInventory: emptyPowerUpInventory(),
       seenTips: [],
       markTipSeen: (id) =>
         set((s) => (s.seenTips.includes(id) ? s : { seenTips: [...s.seenTips, id] })),
@@ -130,6 +178,40 @@ export const useProgress = create<ProgressState>()(
           },
         })),
       grantProPack: () => set({ hasProPack: true }),
+      addInventoryPowerUps: (powerUps) =>
+        set((s) => ({
+          powerUpInventory: mergePowerUpInventory(s.powerUpInventory, powerUps),
+        })),
+      consumeInventoryPowerUps: (powerUps) => {
+        let consumed = false;
+        set((s) => {
+          for (const id of INVENTORY_POWER_UPS) {
+            if ((powerUps[id] ?? 0) > s.powerUpInventory[id]) return s;
+          }
+          consumed = true;
+          return {
+            powerUpInventory: mergePowerUpInventory(
+              s.powerUpInventory,
+              Object.fromEntries(
+                INVENTORY_POWER_UPS.map((id) => [id, -(powerUps[id] ?? 0)]),
+              ) as Partial<Record<InventoryPowerUpId, number>>,
+            ),
+          };
+        });
+        return consumed;
+      },
+      purchaseInventoryPowerUp: (powerUp, cost) => {
+        let purchased = false;
+        set((s) => {
+          if (s.totalScore < cost) return s;
+          purchased = true;
+          return {
+            totalScore: s.totalScore - cost,
+            powerUpInventory: mergePowerUpInventory(s.powerUpInventory, { [powerUp]: 1 }),
+          };
+        });
+        return purchased;
+      },
       toggleSound: () => set((s) => ({ soundEnabled: !s.soundEnabled })),
       toggleHaptics: () => set((s) => ({ hapticsEnabled: !s.hapticsEnabled })),
       reset: () =>
@@ -147,6 +229,7 @@ export const useProgress = create<ProgressState>()(
           levelStars: {},
           challengeBestScores: {},
           hasProPack: false,
+          powerUpInventory: emptyPowerUpInventory(),
           seenTips: [],
         }),
     }),
@@ -167,6 +250,7 @@ export const useProgress = create<ProgressState>()(
           levelStars: persistedState?.levelStars ?? current.levelStars,
           challengeBestScores: persistedState?.challengeBestScores ?? current.challengeBestScores,
           hasProPack: persistedState?.hasProPack ?? current.hasProPack,
+          powerUpInventory: normalizePowerUpInventory(persistedState?.powerUpInventory),
           seenTips: persistedState?.seenTips ?? current.seenTips,
         } as ProgressState;
       },

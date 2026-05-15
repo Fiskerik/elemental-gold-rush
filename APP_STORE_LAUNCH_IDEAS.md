@@ -169,9 +169,9 @@ Keep challenge results separate from campaign progression in `src/game/store.ts`
 
 ## Monetization Ideas
 
-### 6. Use Rewarded Ads Carefully
+### 6. Prepare Rewarded Ads and Free/Pro Tiers Carefully
 
-A fair model for this game is optional rewarded ads, not aggressive interruption. Rewarded ads should help players recover or boost rewards without making the game feel pay-to-win.
+A fair model for this game is a free tier with optional rewarded ads, plus a one-time Pro tier purchase that removes forced/interstitial ads and unlocks premium quality-of-life/cosmetic benefits. Rewarded ads should help players recover or boost rewards without making the game feel pay-to-win.
 
 #### Implementation direction
 
@@ -183,7 +183,7 @@ export async function showRewardedAd(rewardType: RewardType): Promise<boolean>;
 export function grantReward(rewardType: RewardType): void;
 ```
 
-Do not hard-code a specific ad SDK in `GameBoard.tsx`. Keep the UI calling the abstraction.
+Do not hard-code a specific ad SDK in `GameBoard.tsx`. Keep the UI calling the abstraction. Gate forced/interstitial ad calls behind a `hasProPack` or equivalent entitlement check so the Pro tier can remove them cleanly without scattering purchase logic through gameplay code.
 
 Suggested rewarded ad placements:
 
@@ -194,7 +194,7 @@ Suggested rewarded ad placements:
 
 Update the game-over UI in `src/game/GameBoard.tsx` to show **Watch Ad to Continue** only when available.
 
-Update `src/game/store.ts` to track whether a rewarded continue was already used during the current run.
+Update `src/game/store.ts` to track whether a rewarded continue was already used during the current run, and keep free/pro ad behavior in a small monetization layer so future ad SDK and one-time purchase integrations stay isolated.
 
 ---
 
@@ -323,7 +323,33 @@ Add a **Replay Tutorial** button to `src/game/Settings.tsx`.
 
 ---
 
-### 12. Add a Detailed Level-Complete Summary Screen
+### 12. Add Off-Game Power-Up Inventory
+
+Power-ups should become a lightweight meta-progression loop instead of disappearing between levels. Players can save unused run power-ups into an off-game inventory, then choose up to 3 inventory power-ups when a new level starts.
+
+#### Implementation direction
+
+Add a persisted inventory map in `src/game/store.ts`, such as:
+
+```ts
+powerUpInventory: Record<PowerUpId, number>;
+```
+
+When a level ends, collect unused eligible power-ups from the current run and add them to the inventory.
+
+At the beginning of a level, show a small inventory picker if the player has saved power-ups:
+
+1. Display owned counts for each saved power-up.
+2. Let the player select up to 3 total power-ups.
+3. Consume selected inventory counts only when the level starts.
+4. Add the selected power-ups to the run's starting charges.
+5. Let the player skip selection and start normally.
+
+Add a shop section where saved-score purchases can add inventory power-ups. Keep this balanced as optional preparation, not mandatory progression.
+
+---
+
+### 13. Add a Detailed Level-Complete Summary Screen
 
 A richer win screen would support mastery, rewards, discoveries, and monetization.
 
@@ -344,7 +370,7 @@ Trigger `unlockLevel`, `addScore`, `recordDiscovery`, and `setHighestElement` be
 
 ---
 
-### 13. Add Privacy-Conscious Gameplay Analytics
+### 14. Add Privacy-Conscious Gameplay Analytics
 
 Before tuning monetization, the game needs visibility into where players fail, quit, win, and replay.
 
@@ -384,7 +410,7 @@ Before App Store submission, ensure any analytics SDK use is reflected accuratel
 
 ---
 
-### 14. Add Progress Export/Import and Prepare for Cloud Save
+### 15. Add Progress Export/Import and Prepare for Cloud Save
 
 Progress is currently persisted locally. If the app is deleted or installed on another device, progress may be lost.
 
