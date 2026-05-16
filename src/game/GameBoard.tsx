@@ -3790,6 +3790,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
             selected={selectedInventoryPowerUps}
             onChange={changeInventorySelection}
             onStart={startWithSelectedInventory}
+            onBack={onExit}
           />
         )}
         {shuffleStartOpen && !won && !gameOver && (
