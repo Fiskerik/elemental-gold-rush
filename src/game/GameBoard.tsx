@@ -54,6 +54,8 @@ const SHUFFLE_LIMIT = 3;
 const SHUFFLE_OFFSET_MIN = 4;
 const SHUFFLE_OFFSET_MAX = 10;
 const GAMMA_MIN_LEVEL = 12;
+const GAMMA_SHOT_INTERVAL = 40;
+const GAMMA_RADIUS_MULT = 3.5;
 const SEEDED_BOARD_MIN_TARGET = 10;
 const SEEDED_BOARD_MIN_ATOMS = 3;
 const SEEDED_BOARD_MAX_ATOMS = 8;
@@ -232,6 +234,32 @@ function BlankAtomVisual({ size }: { size: number }) {
     </div>
   );
 }
+function GammaVisual({ size }: { size: number }) {
+  return (
+    <div
+      style={{
+        width: size,
+        height: size,
+        borderRadius: "50%",
+        background:
+          "radial-gradient(circle at 35% 30%, oklch(0.96 0.16 145), oklch(0.62 0.22 145) 55%, oklch(0.22 0.12 150))",
+        boxShadow:
+          "0 0 24px oklch(0.7 0.22 145 / 0.85), 0 0 48px oklch(0.7 0.22 145 / 0.45), inset 0 -6px 12px rgba(0,0,0,0.35)",
+        border: "2px solid oklch(0.85 0.18 145)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: "oklch(0.1 0.05 150)",
+        fontWeight: 1000,
+        fontSize: Math.max(14, size * 0.5),
+        textShadow: "0 1px 4px rgba(255,255,255,0.6)",
+        animation: "decay-warn-flash 1.2s ease-in-out infinite",
+      }}
+    >
+      ☢
+    </div>
+  );
+}
 const STONE_NO_MERGE_TRIGGER = 3;
 const STONE_NUDGE_MULT = 5;
 
@@ -243,6 +271,7 @@ function getComboLabel(mergeCount: number): string | null {
   return null;
 }
 function getStarParShots(level: (typeof LEVELS)[0]): number {
+  if (level.starShotsThree != null) return level.starShotsThree - 1;
   const configuredPar = level.parShots ?? 30;
   const targetGap = Math.max(0, level.targetElement - level.maxQueueElement);
   const targetComplexity = Math.ceil(targetGap * (level.id >= 10 ? 2.4 : 1.15));
@@ -258,6 +287,12 @@ function calculateStars(
   bestCombo: number,
   timeSec: number,
 ): number {
+  // Hard per-level overrides win when present.
+  if (level.starShotsThree != null && level.starShotsTwo != null) {
+    if (shots < level.starShotsThree) return 3;
+    if (shots < level.starShotsTwo) return 2;
+    return 1;
+  }
   // New star formula: pure performance based on shots + time vs par.
   // 3★ = at or under both par shots AND par time
   // 2★ = within 1.3× of both
@@ -621,17 +656,15 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
       );
     }
     if (level.id >= GRAB_MIN_LEVEL) {
+      // First-ever Grab unlock: give one free charge so the player can try it immediately.
+      if (!seenTips.includes("feature-grab-unlock")) {
+        setGrabs((g) => g + 1);
+        spawnPopup("🤚 +1 GRAB");
+      }
       showTip(
         "feature-grab-unlock",
         "🤚 Grab power-up unlocked!",
         "Build the Grab combo bar by making 8 merge progress in a row. When it fills, tap the Grab button (bottom-right), then drag any atom on the board to a new position — surrounding atoms slide out of the way to make room. Use it to set up huge merge chains.",
-      );
-    }
-    if (level.id >= EGUN_MIN_LEVEL) {
-      showTip(
-        "feature-egun-unlock",
-        "⚡ E-gun unlocked!",
-        "Rare E-gun shots fire a straight beam to the far edge without bouncing. Every atom in the beam upgrades by 1 tier.",
       );
     }
     if (level.id >= BLANK_MIN_LEVEL) {
@@ -656,6 +689,20 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shimmerQueue, shimmerEnabled]);
+
+  // Show the E-gun explanation the first time an E-gun shot actually appears
+  // in the queue (not on every level 6+ start).
+  useEffect(() => {
+    if (!eGunEnabled) return;
+    if (eGunQueue.some(Boolean)) {
+      showTip(
+        "feature-egun-unlock",
+        "⚡ E-gun unlocked!",
+        "Rare E-gun shots fire a straight beam to the far edge without bouncing. Every atom in the beam upgrades by 1 tier.",
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eGunQueue, eGunEnabled]);
 
   // Tick the run timer every second while the level is active.
   useEffect(() => {
@@ -798,6 +845,15 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
         "Every 30 shots earns Transmute. Activate it to reroll your queued atom into a higher-tier atom.",
       );
     }
+    if (gammaEnabled && nextShots > 0 && nextShots % GAMMA_SHOT_INTERVAL === 0) {
+      setGammaCharges((g) => g + 1);
+      spawnPopup("☢ GAMMA READY");
+      showTip(
+        "feature-gamma-powerup",
+        "☢ Gamma Bomb ready!",
+        "Every 40 shots after level 12 earns a Gamma Bomb. Activate it, aim, and fire: a slow heavy projectile irradiates every atom in a wide radius, upgrading each one by 1 tier and triggering any cascading fusions.",
+      );
+    }
     setCatalystShotsRemaining((remaining) => Math.max(0, remaining - 1));
   }
 
@@ -901,8 +957,22 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
   // Effective projectile radius/size — uses stone dims when a stone is loaded.
   const eGunR = Math.max(12, ballSize * 0.34);
   const eGunSize = eGunR * 2;
-  const projShotR = pendingStone ? stoneR : currentIsEGun ? eGunR : radiusFor(current);
-  const projShotSize = pendingStone ? stoneSize : currentIsEGun ? eGunSize : sizeFor(current);
+  const gammaR = Math.max(stoneR * 0.85, ballSize * 0.55);
+  const gammaSize = gammaR * 2;
+  const projShotR = pendingStone
+    ? stoneR
+    : pendingGamma
+      ? gammaR
+      : currentIsEGun
+        ? eGunR
+        : radiusFor(current);
+  const projShotSize = pendingStone
+    ? stoneSize
+    : pendingGamma
+      ? gammaSize
+      : currentIsEGun
+        ? eGunSize
+        : sizeFor(current);
   const showCatalystShotRadius = catalystShotsRemaining > 0 && !pendingStone && !currentIsEGun;
   // Visual ring now matches the ACTUAL catalyst merge reach: any atom whose
   // center is within (projR + otherR) * CATALYST_ADJ_FACTOR will merge.
@@ -1269,6 +1339,31 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     trackShot(levelId, pendingStone ? -1 : currentIsEGun ? 0 : current, aimDeg, mode);
     queueUndoRef.current = null;
     setPendingReversiblePowerUp(null);
+    if (pendingGamma && !pendingStone) {
+      const hit = castRay(aimDeg);
+      if (!hit) return;
+      setBusy(true);
+      sfx(playShootSound);
+      haptic([10, 15, 10]);
+      const path = hit.path;
+      // Slow, heavy projectile — about 1.6× normal travel time.
+      const totalMs = Math.min(560, 100 + path.length * 6);
+      const stepMs = totalMs / path.length;
+      let i = 0;
+      setProjectile(path[0]);
+      const interval = setInterval(() => {
+        i++;
+        if (i >= path.length) {
+          clearInterval(interval);
+          setProjectile(null);
+          setGravityFxId(null);
+          fireGamma(hit.x, hit.y);
+        } else {
+          setProjectile(path[i]);
+        }
+      }, stepMs);
+      return;
+    }
     if (currentIsEGun && !pendingStone) {
       const beam = castStraightRay(aimDeg);
       if (!beam) return;
@@ -1386,6 +1481,105 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
 
   function isNobleGasLocked(atom: number): boolean {
     return mode === "noble-gas-lock" && ELEMENTS[atom - 1]?.category === "noble-gas";
+  }
+
+  function fireGamma(ix: number, iy: number) {
+    // Irradiate every non-stone atom within the gamma radius by +1 tier,
+    // then settle any cascading merges.
+    const radius = gammaR * GAMMA_RADIUS_MULT;
+    const upgradedAtoms = new Set<number>();
+    const hitIds = new Set<number>();
+    const irradiated: Board = balls.map((b) => {
+      if (b.stoneHp != null) return b;
+      if (Math.hypot(b.x - ix, b.y - iy) > radius + b.r) return b;
+      hitIds.add(b.id);
+      if (b.atom >= 118) return b;
+      const atom = Math.min(118, b.atom + 1);
+      upgradedAtoms.add(atom);
+      return { ...b, atom, r: radiusFor(atom) };
+    });
+    const nextShots = shots + 1;
+    setShots(nextShots);
+    applyShotMilestones(nextShots);
+    setPendingGamma(false);
+    // Settle merges produced by the upgrade.
+    let result = mergeSettledBoard(
+      irradiated,
+      geo,
+      target,
+      118,
+      catalystShotsRemaining > 0 ? CATALYST_ADJ_FACTOR : undefined,
+      false,
+    );
+    result = { ...result, balls: relaxBoard(result.balls) };
+    setBalls(result.balls.map((b) => (b.stoneHp != null ? b : { ...b, r: radiusFor(b.atom) })));
+    setWiggleIds(hitIds);
+    setTimeout(() => setWiggleIds(new Set()), 380);
+    setNoMergeStreak(0);
+
+    const newAtoms = new Set<number>();
+    upgradedAtoms.forEach((n) => newAtoms.add(n));
+    result.merges.forEach((m) => newAtoms.add(m.resultAtomicNumber));
+    const discoveries = Array.from(newAtoms).filter((n) => !discoveredElements.includes(n));
+    if (discoveries.length > 0) registerDiscoveries(discoveries);
+
+    if (result.merges.length > 0) {
+      pushMergeHistory(result.merges);
+      setRunBestCombo((best) => Math.max(best, result.merges.length));
+      setBestCombo(result.merges.length);
+      result.merges.forEach((m, i) => {
+        setTimeout(
+          () => {
+            sfx(() => playMergeSound(m.chainDepth));
+            haptic([10, 20, 10]);
+          },
+          80 + i * 120,
+        );
+      });
+    }
+
+    const reachedHighest = Math.max(highest, ...Array.from(newAtoms), result.highestElement);
+    setHighest(reachedHighest);
+    setHighestElement(reachedHighest);
+    const gained = Math.floor(
+      (result.scoreGained + hitIds.size * 25) * level.scoreMultiplier,
+    );
+    const nextScore = score + gained;
+    setScore(nextScore);
+    addScore(gained);
+
+    spawnPopup(hitIds.size > 0 ? `☢ GAMMA +${hitIds.size}` : "☢ GAMMA");
+    haptic([30, 50, 30, 50, 60]);
+
+    reportQuestProgress({
+      merges: result.merges.length,
+      discoveries,
+      reachedAtomicNumbers: Array.from(newAtoms),
+      maxChainDepth: result.merges.length,
+    });
+
+    const reachedTarget = result.levelComplete || Array.from(newAtoms).some((a) => a >= target);
+    if (reachedTarget && !continuingPastTarget) {
+      const timeSec = (Date.now() - startTimeRef.current) / 1000;
+      const stars = calculateStars(level, nextScore, nextShots, runBestCombo, timeSec);
+      setEarnedStars(stars);
+      setLevelStars(levelId, stars);
+      reportQuestProgress({ levelCleared: true, starsEarned: stars });
+      unlockLevel(levelId + 1);
+      sfx(playWinSound);
+      haptic([30, 60, 30, 60, 80]);
+      trackLevelWin(levelId, nextScore, nextShots, reachedHighest, mode);
+      if (mode !== "campaign") setChallengeBestScore(mode, nextScore);
+      showStageClearAnimation({ stars, score: nextScore, shots: nextShots, bestCombo: runBestCombo });
+      return;
+    }
+
+    if (checkGameOver(result.balls, geo)) {
+      trackGameOver(levelId, score, nextShots, highest, mode);
+      setGameOver(true);
+      haptic([50, 80, 50, 80, 200]);
+    }
+    setBusy(false);
   }
 
   function applyShotModeEffects(source: Board, nextShots: number): Board {
@@ -2140,6 +2334,22 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     setFusionJumpArmed(true);
     spawnPopup("⏭ JUMP ARMED");
     haptic(20);
+  }
+
+  function triggerGammaPowerUp() {
+    if (busy || gameOver || won) return;
+    if (pendingGamma) {
+      // Cancel & refund.
+      setPendingGamma(false);
+      setGammaCharges((g) => g + 1);
+      spawnPopup("☢ CANCELED");
+      return;
+    }
+    if (gammaCharges <= 0 || pendingStone || currentIsEGun || pendingReversiblePowerUp) return;
+    setGammaCharges((g) => Math.max(0, g - 1));
+    setPendingGamma(true);
+    spawnPopup("☢ GAMMA ARMED");
+    haptic([15, 25, 15]);
   }
 
   function triggerCatalystPowerUp() {
@@ -3025,7 +3235,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
                 <div className="stage-clear-atom">
                   <ElementBall atomicNumber={target} size={92} glow />
                 </div>
-                <div className="stage-clear-title">{targetEl?.name ?? "Target"} unlocked!</div>
+                <div className="stage-clear-title">{targetEl?.name ?? "Target"} discovered!</div>
                 <div className="stage-clear-subtitle">Clearing the stage…</div>
                 <div className="stage-clear-stars">
                   {Array.from({ length: 3 }, (_, i) => (i < stageClearFx.stars ? "★" : "☆")).join(
@@ -3170,6 +3380,8 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
               )}
               {pendingStone ? (
                 <StoneVisual size={projShotSize} hp={STONE_MAX_HP} />
+              ) : pendingGamma ? (
+                <GammaVisual size={projShotSize} />
               ) : currentIsEGun ? (
                 <EGunVisual size={projShotSize} />
               ) : currentIsBlank ? (
@@ -3203,6 +3415,8 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
             {!projectile &&
               (pendingStone ? (
                 <StoneVisual size={projShotSize} hp={STONE_MAX_HP} />
+              ) : pendingGamma ? (
+                <GammaVisual size={projShotSize} />
               ) : currentIsEGun ? (
                 <EGunVisual size={projShotSize} />
               ) : currentIsBlank ? (
@@ -3499,6 +3713,35 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
               >
                 <span aria-hidden="true">🤚</span>
                 <span style={powerUpCount}>{grabs}</span>
+              </button>
+            )}
+            {(gammaCharges > 0 || pendingGamma) && (
+              <button
+                type="button"
+                title="Gamma Bomb: irradiate every atom in a wide radius, upgrading each by 1 tier."
+                aria-label={`Use Gamma Bomb power-up (${gammaCharges} available)`}
+                onClick={triggerGammaPowerUp}
+                {...powerUpInfoHandlers(
+                  "☢ Gamma Bomb",
+                  "Arms a slow, heavy projectile. On impact it upgrades every atom inside a wide radius by 1 tier and runs any cascading merges. Tap again before shooting to cancel and refund the charge.",
+                )}
+                disabled={busy || (!pendingGamma && (pendingStone || currentIsEGun))}
+                style={{
+                  ...powerUpIconBtn,
+                  border: `1px solid ${pendingGamma ? "var(--accent)" : "oklch(0.7 0.2 145)"}`,
+                  background: pendingGamma
+                    ? "linear-gradient(135deg, var(--accent), oklch(0.55 0.2 145))"
+                    : "linear-gradient(135deg, oklch(0.6 0.2 145), oklch(0.42 0.16 150))",
+                  color: "var(--primary-foreground)",
+                  boxShadow: pendingGamma
+                    ? "0 0 16px var(--accent-glow)"
+                    : "0 0 14px oklch(0.6 0.2 145 / 0.5)",
+                  opacity: busy ? 0.65 : 1,
+                  cursor: busy ? "not-allowed" : "pointer",
+                }}
+              >
+                <span aria-hidden="true">☢</span>
+                <span style={powerUpCount}>{pendingGamma ? "↩" : gammaCharges}</span>
               </button>
             )}
           </div>
@@ -4051,7 +4294,7 @@ function ContinueChoiceModal({
       <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 6 }}>
         {isContinuing
           ? "Ready to claim?"
-          : `${ELEMENTS[level.targetElement - 1]?.name ?? "?"} unlocked!`}
+          : `${ELEMENTS[level.targetElement - 1]?.name ?? "?"} discovered!`}
       </div>
       <p
         style={{

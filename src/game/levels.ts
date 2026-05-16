@@ -26,6 +26,10 @@ export interface Level {
   scoreMultiplier: number;
   /** Suggested number of shots for mastery */
   parShots?: number;
+  /** Hard 3-star threshold: clearing the level in fewer than this many shots earns 3 stars. */
+  starShotsThree?: number;
+  /** Hard 2-star threshold: clearing in fewer than this many shots earns at least 2 stars. */
+  starShotsTwo?: number;
   /** Suggested completion time in seconds (used for star rating) */
   parTimeSec?: number;
   /** Score target for mastery */
@@ -99,6 +103,8 @@ export const LEVELS: Level[] = [
     gridRows: 10,
     scoreMultiplier: 1.2,
     parShots: 23,
+    starShotsThree: 30,
+    starShotsTwo: 40,
     parTimeSec: 120,
     scoreGoal: 2040,
     comboGoal: 2,
@@ -117,6 +123,8 @@ export const LEVELS: Level[] = [
     gridRows: 11,
     scoreMultiplier: 1.3,
     parShots: 26,
+    starShotsThree: 45,
+    starShotsTwo: 55,
     parTimeSec: 140,
     scoreGoal: 2620,
     comboGoal: 2,
