@@ -45,16 +45,18 @@ function isRemovedDailyQuest(quest: DailyQuest): boolean {
   ) {
     return true;
   }
-  // Retire any quests not in the current 6-quest daily set.
-  const allowedIds = new Set([
+  // Retire any quests not in the current 6-quest daily set. Quest ids are
+  // `${YYYY-MM-DD}-${slug}`; match by suffix since the date itself contains
+  // dashes.
+  const allowedSlugs = [
     "clear-level",
     "discover-element",
     "earn-stars",
     "chain-merge",
     "merge-atoms",
     "purchase-item",
-  ]);
-  return !allowedIds.has(quest.id.split("-").slice(1).join("-"));
+  ];
+  return !allowedSlugs.some((slug) => quest.id.endsWith(`-${slug}`));
 }
 
 function removeRetiredDailyQuests(quests: DailyQuest[]): DailyQuest[] {
