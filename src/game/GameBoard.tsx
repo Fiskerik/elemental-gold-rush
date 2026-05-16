@@ -718,7 +718,10 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
 
   function queueFloorFromBoard(board: Board): number {
     let floor = 1;
-    const depletionTier = Math.max(0, emissionUnlockIndex);
+    // Combine two depletion drivers:
+    //  - emissionUnlockIndex (every 5 min, all levels)
+    //  - spawnFloorIndex     (every 2 min, lvl 10+)
+    const depletionTier = Math.max(0, emissionUnlockIndex, spawnFloorIndex);
     for (let atom = 1; atom <= depletionTier; atom++) {
       const stillOnBoard = board.some((ball) => ball.stoneHp == null && ball.atom === atom);
       if (stillOnBoard) {
