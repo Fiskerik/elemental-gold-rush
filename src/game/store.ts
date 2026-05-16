@@ -57,6 +57,24 @@ function mergePowerUpInventory(
   return next;
 }
 
+export interface LevelStats {
+  attempts: number;
+  maxScore: number;
+  bestShots: number | null;
+  powerUpsUsed: number;
+  totalScore: number;
+  stars: number;
+}
+
+export const emptyLevelStats = (): LevelStats => ({
+  attempts: 0,
+  maxScore: 0,
+  bestShots: null,
+  powerUpsUsed: 0,
+  totalScore: 0,
+  stars: 0,
+});
+
 interface ProgressState {
   unlockedLevel: number; // highest level unlocked (1-based)
   highestElement: number; // highest atomic number ever reached
@@ -72,6 +90,7 @@ interface ProgressState {
   bestComboDate: string | null;
   earnedBadges: string[];
   levelStars: Record<number, number>;
+  levelStats: Record<number, LevelStats>;
   challengeBestScores: Partial<Record<GameModeId, number>>;
   hasProPack: boolean;
   powerUpInventory: PowerUpInventory;
@@ -86,6 +105,11 @@ interface ProgressState {
   claimDailyReward: () => void;
   setBestCombo: (combo: number) => void;
   setLevelStars: (levelId: number, stars: number) => void;
+  incrementLevelAttempt: (levelId: number) => void;
+  recordLevelRun: (
+    levelId: number,
+    run: { score: number; shots: number; powerUpsUsed: number; won: boolean },
+  ) => void;
   setChallengeBestScore: (mode: GameModeId, score: number) => void;
   grantProPack: () => void;
   addInventoryPowerUps: (powerUps: Partial<Record<InventoryPowerUpId, number>>) => void;
@@ -116,6 +140,7 @@ export const useProgress = create<ProgressState>()(
       bestComboDate: null,
       earnedBadges: [],
       levelStars: {},
+      levelStats: {},
       challengeBestScores: {},
       hasProPack: false,
       powerUpInventory: emptyPowerUpInventory(),
@@ -178,7 +203,44 @@ export const useProgress = create<ProgressState>()(
             ...s.levelStars,
             [levelId]: Math.max(s.levelStars[levelId] ?? 0, stars),
           },
+          levelStats: {
+            ...s.levelStats,
+            [levelId]: {
+              ...(s.levelStats[levelId] ?? emptyLevelStats()),
+              stars: Math.max(s.levelStats[levelId]?.stars ?? 0, stars),
+            },
+          },
         })),
+      incrementLevelAttempt: (levelId) =>
+        set((s) => {
+          const current = s.levelStats[levelId] ?? emptyLevelStats();
+          return {
+            levelStats: {
+              ...s.levelStats,
+              [levelId]: { ...current, attempts: current.attempts + 1 },
+            },
+          };
+        }),
+      recordLevelRun: (levelId, run) =>
+        set((s) => {
+          const current = s.levelStats[levelId] ?? emptyLevelStats();
+          return {
+            levelStats: {
+              ...s.levelStats,
+              [levelId]: {
+                ...current,
+                maxScore: Math.max(current.maxScore, run.score),
+                totalScore: current.totalScore + Math.max(0, run.score),
+                powerUpsUsed: current.powerUpsUsed + Math.max(0, run.powerUpsUsed),
+                bestShots: run.won
+                  ? current.bestShots == null
+                    ? run.shots
+                    : Math.min(current.bestShots, run.shots)
+                  : current.bestShots,
+              },
+            },
+          };
+        }),
       setChallengeBestScore: (mode, score) =>
         set((s) => ({
           challengeBestScores: {
@@ -244,6 +306,7 @@ export const useProgress = create<ProgressState>()(
           bestComboDate: null,
           earnedBadges: [],
           levelStars: {},
+          levelStats: {},
           challengeBestScores: {},
           hasProPack: false,
           powerUpInventory: emptyPowerUpInventory(),
@@ -266,6 +329,7 @@ export const useProgress = create<ProgressState>()(
           bestComboDate: persistedState?.bestComboDate ?? current.bestComboDate,
           earnedBadges: getEarnedBadgeIds(discoveredElements),
           levelStars: persistedState?.levelStars ?? current.levelStars,
+          levelStats: persistedState?.levelStats ?? current.levelStats,
           challengeBestScores: persistedState?.challengeBestScores ?? current.challengeBestScores,
           hasProPack: persistedState?.hasProPack ?? current.hasProPack,
           powerUpInventory: normalizePowerUpInventory(persistedState?.powerUpInventory),

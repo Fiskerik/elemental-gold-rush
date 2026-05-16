@@ -2,6 +2,7 @@ import { LEVELS } from "./levels";
 import { ELEMENTS } from "./elements";
 import { useProgress } from "./store";
 import { ElementBall } from "./ElementBall";
+import { formatScore } from "./logic";
 
 export function LevelSelect({
   onPick,
@@ -10,7 +11,7 @@ export function LevelSelect({
   onPick: (id: number) => void;
   onBack: () => void;
 }) {
-  const { unlockedLevel, levelStars } = useProgress();
+  const { unlockedLevel, levelStars, levelStats } = useProgress();
   return (
     <div className="app-shell" style={{ padding: 16 }}>
       <div style={{ position: "relative", zIndex: 1, maxWidth: 480, margin: "0 auto" }}>
@@ -20,6 +21,7 @@ export function LevelSelect({
             const locked = lvl.id > unlockedLevel;
             const target = ELEMENTS[lvl.targetElement - 1];
             const stars = levelStars[lvl.id] ?? 0;
+            const stats = levelStats[lvl.id];
             return (
               <button
                 key={lvl.id}
@@ -27,6 +29,7 @@ export function LevelSelect({
                 onClick={() => onPick(lvl.id)}
                 style={{
                   display: "flex",
+                  flexDirection: "column",
                   alignItems: "center",
                   gap: 12,
                   padding: 12,
@@ -39,46 +42,101 @@ export function LevelSelect({
                   color: "var(--foreground)",
                 }}
               >
-                <div style={{ filter: locked ? "grayscale(0.8)" : undefined }}>
-                  <ElementBall atomicNumber={lvl.targetElement} size={48} glow={!locked} />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 11, color: "var(--muted-foreground)" }}>
-                    LEVEL {lvl.id}
+                <div style={{ display: "flex", alignItems: "center", gap: 12, width: "100%" }}>
+                  <div style={{ filter: locked ? "grayscale(0.8)" : undefined }}>
+                    <ElementBall atomicNumber={lvl.targetElement} size={48} glow={!locked} />
                   </div>
-                  <div style={{ fontSize: 16, fontWeight: 700 }}>{lvl.name}</div>
-                  <div style={{ fontSize: 12, color: "var(--muted-foreground)" }}>
-                    {lvl.description}
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 11, color: "var(--muted-foreground)" }}>
+                      LEVEL {lvl.id}
+                    </div>
+                    <div style={{ fontSize: 16, fontWeight: 700 }}>{lvl.name}</div>
+                    <div style={{ fontSize: 12, color: "var(--muted-foreground)" }}>
+                      {lvl.description}
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      textAlign: "right",
+                      fontSize: 11,
+                      color: "var(--muted-foreground)",
+                      minWidth: 52,
+                    }}
+                  >
+                    {locked ? (
+                      "🔒"
+                    ) : (
+                      <>
+                        <div>{`→ ${target?.symbol}`}</div>
+                        <div
+                          style={{
+                            color: stars > 0 ? "var(--accent)" : "var(--muted-foreground)",
+                            letterSpacing: 1,
+                          }}
+                        >
+                          {Array.from({ length: 3 }, (_, i) =>
+                            i < stars ? "★" : "☆",
+                          ).join("")}
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
-                <div
-                  style={{
-                    textAlign: "right",
-                    fontSize: 11,
-                    color: "var(--muted-foreground)",
-                    minWidth: 52,
-                  }}
-                >
-                  {locked ? (
-                    "🔒"
-                  ) : (
-                    <>
-                      <div>{`→ ${target?.symbol}`}</div>
-                      <div
-                        style={{
-                          color: stars > 0 ? "var(--accent)" : "var(--muted-foreground)",
-                          letterSpacing: 1,
-                        }}
-                      >
-                        {Array.from({ length: 3 }, (_, i) => (i < stars ? "★" : "☆")).join("")}
-                      </div>
-                    </>
-                  )}
-                </div>
+                {!locked && stats && stats.attempts > 0 && (
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+                      gap: 6,
+                      width: "100%",
+                      marginTop: 4,
+                      paddingTop: 8,
+                      borderTop: "1px solid var(--border)",
+                    }}
+                  >
+                    <StatCell label="Attempts" value={`${stats.attempts}`} />
+                    <StatCell label="Max Score" value={formatScore(stats.maxScore)} />
+                    <StatCell
+                      label="Best Run"
+                      value={stats.bestShots != null ? `${stats.bestShots} shots` : "—"}
+                    />
+                    <StatCell label="Power-ups" value={`${stats.powerUpsUsed}`} />
+                    <StatCell label="Total Score" value={formatScore(stats.totalScore)} />
+                    <StatCell label="Stars" value={`${stats.stars}/3`} />
+                  </div>
+                )}
               </button>
             );
           })}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function StatCell({ label, value }: { label: string; value: string }) {
+  return (
+    <div
+      style={{
+        background: "var(--surface)",
+        border: "1px solid var(--border)",
+        borderRadius: 8,
+        padding: "6px 8px",
+        textAlign: "center",
+      }}
+    >
+      <div
+        style={{
+          fontSize: 9,
+          letterSpacing: 1,
+          color: "var(--muted-foreground)",
+          fontWeight: 700,
+        }}
+      >
+        {label.toUpperCase()}
+      </div>
+      <div style={{ fontSize: 12, fontWeight: 800, color: "var(--foreground)", marginTop: 2 }}>
+        {value}
       </div>
     </div>
   );

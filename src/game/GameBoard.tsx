@@ -329,6 +329,8 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     reportQuestProgress,
     setBestCombo,
     setLevelStars,
+    incrementLevelAttempt,
+    recordLevelRun,
     setChallengeBestScore,
     powerUpInventory,
     addInventoryPowerUps,
@@ -440,6 +442,8 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
   } | null>(null);
   const stageClearTimeoutRef = useRef<number | null>(null);
   const hasClaimedUnusedInventoryRef = useRef(false);
+  const runPowerUpsUsedRef = useRef(0);
+  const runRecordedRef = useRef(false);
   const [inventoryPickerOpen, setInventoryPickerOpen] = useState(false);
   const [selectedInventoryPowerUps, setSelectedInventoryPowerUps] = useState<PowerUpInventory>(() =>
     emptyPowerUpInventory(),
@@ -633,6 +637,9 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     setCatalystShotsRemaining(0);
     setPendingReversiblePowerUp(null);
     hasClaimedUnusedInventoryRef.current = false;
+    runPowerUpsUsedRef.current = 0;
+    runRecordedRef.current = false;
+    incrementLevelAttempt(levelId);
     setSelectedInventoryPowerUps(emptyPowerUpInventory());
     setInventoryPickerOpen(hasPowerUps(powerUpInventory));
     setMergeHistory([]);
@@ -921,6 +928,15 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
 
   useEffect(() => {
     if (won || gameOver) claimUnusedPowerUps();
+    if ((won || gameOver) && !runRecordedRef.current) {
+      runRecordedRef.current = true;
+      recordLevelRun(levelId, {
+        score,
+        shots,
+        powerUpsUsed: runPowerUpsUsedRef.current,
+        won,
+      });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [won, gameOver]);
 
@@ -2332,6 +2348,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     }
     const atom = candidates[Math.floor(Math.random() * candidates.length)];
     setTransmuteCharges((g) => Math.max(0, g - 1));
+    runPowerUpsUsedRef.current += 1;
     setQueue((q) => [atom, ...q.slice(1)]);
     setShimmerQueue((q) => [false, ...q.slice(1)]);
     setEGunQueue((q) => [false, ...q.slice(1)]);
@@ -2345,6 +2362,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     if (busy || gameOver || won || fusionJumpCharges <= 0 || pendingReversiblePowerUp) return;
     setPendingReversiblePowerUp("fusion-jump");
     setFusionJumpCharges((g) => Math.max(0, g - 1));
+    runPowerUpsUsedRef.current += 1;
     setFusionJumpArmed(true);
     spawnPopup("⏭ JUMP ARMED");
     haptic(20);
@@ -2361,6 +2379,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     }
     if (gammaCharges <= 0 || pendingStone || currentIsEGun || pendingReversiblePowerUp) return;
     setGammaCharges((g) => Math.max(0, g - 1));
+    runPowerUpsUsedRef.current += 1;
     setPendingGamma(true);
     spawnPopup("☢ GAMMA ARMED");
     haptic([15, 25, 15]);
@@ -2379,6 +2398,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
       return;
     setPendingReversiblePowerUp("catalyst");
     setCatalystCharges((g) => Math.max(0, g - 1));
+    runPowerUpsUsedRef.current += 1;
     setCatalystShotsRemaining(CATALYST_AURA_SHOTS);
     spawnPopup("🧪 AURA ×5");
     haptic([20, 30, 20]);
@@ -2397,6 +2417,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     queueUndoRef.current = { queue, shimmerQueue, eGunQueue, blankQueue, powerUp: "emission" };
     setPendingReversiblePowerUp("emission");
     setEmissionCharges((g) => Math.max(0, g - 1));
+    runPowerUpsUsedRef.current += 1;
     setQueue(raisedQueue);
 
     const reachedAtomicNumbers = raisedQueue.filter((atom, i) => atom !== queue[i]);
@@ -2415,6 +2436,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     setGravityFxId(fxId);
     setTimeout(() => setGravityFxId((active) => (active === fxId ? null : active)), 1050);
     setGravityCharges((g) => Math.max(0, g - 1));
+    runPowerUpsUsedRef.current += 1;
     const atoms = balls.filter((b) => b.stoneHp == null).map((b) => ({ ...b }));
     const stones = balls.filter((b) => b.stoneHp != null).map((b) => ({ ...b }));
     atoms.sort((a, b) => a.y - b.y);
@@ -3055,6 +3077,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
               if (hit) {
                 setGrabbing({ id: hit.id, x: px, y: py });
                 setGrabs((g) => g - 1);
+                runPowerUpsUsedRef.current += 1;
               }
               return;
             }
@@ -3767,6 +3790,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
             selected={selectedInventoryPowerUps}
             onChange={changeInventorySelection}
             onStart={startWithSelectedInventory}
+            onBack={onExit}
           />
         )}
         {shuffleStartOpen && !won && !gameOver && (
@@ -3978,11 +4002,13 @@ function InventoryStartModal({
   selected,
   onChange,
   onStart,
+  onBack,
 }: {
   inventory: PowerUpInventory;
   selected: PowerUpInventory;
   onChange: (powerUp: InventoryPowerUpId, delta: 1 | -1) => void;
   onStart: () => void;
+  onBack: () => void;
 }) {
   const selectedCount = countPowerUps(selected);
   const availablePowerUps = (Object.keys(POWER_UP_INVENTORY_META) as InventoryPowerUpId[]).filter(
@@ -4098,6 +4124,21 @@ function InventoryStartModal({
           fontSize: 12,
         }}
       >
+        <button
+          onClick={onBack}
+          style={{
+            background: "var(--surface)",
+            border: "1px solid var(--border)",
+            color: "var(--foreground)",
+            borderRadius: 10,
+            padding: "8px 12px",
+            fontWeight: 700,
+            cursor: "pointer",
+            flex: "0 0 auto",
+          }}
+        >
+          ← Back
+        </button>
         <span>
           Selected {selectedCount}/{INVENTORY_PICK_LIMIT}
         </span>
