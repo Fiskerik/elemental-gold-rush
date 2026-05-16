@@ -1304,6 +1304,31 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     trackShot(levelId, pendingStone ? -1 : currentIsEGun ? 0 : current, aimDeg, mode);
     queueUndoRef.current = null;
     setPendingReversiblePowerUp(null);
+    if (pendingGamma && !pendingStone) {
+      const hit = castRay(aimDeg);
+      if (!hit) return;
+      setBusy(true);
+      sfx(playShootSound);
+      haptic([10, 15, 10]);
+      const path = hit.path;
+      // Slow, heavy projectile — about 1.6× normal travel time.
+      const totalMs = Math.min(560, 100 + path.length * 6);
+      const stepMs = totalMs / path.length;
+      let i = 0;
+      setProjectile(path[0]);
+      const interval = setInterval(() => {
+        i++;
+        if (i >= path.length) {
+          clearInterval(interval);
+          setProjectile(null);
+          setGravityFxId(null);
+          fireGamma(hit.x, hit.y);
+        } else {
+          setProjectile(path[i]);
+        }
+      }, stepMs);
+      return;
+    }
     if (currentIsEGun && !pendingStone) {
       const beam = castStraightRay(aimDeg);
       if (!beam) return;
