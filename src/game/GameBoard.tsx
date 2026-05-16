@@ -628,17 +628,15 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
       );
     }
     if (level.id >= GRAB_MIN_LEVEL) {
+      // First-ever Grab unlock: give one free charge so the player can try it immediately.
+      if (!seenTips.includes("feature-grab-unlock")) {
+        setGrabs((g) => g + 1);
+        spawnPopup("🤚 +1 GRAB");
+      }
       showTip(
         "feature-grab-unlock",
         "🤚 Grab power-up unlocked!",
         "Build the Grab combo bar by making 8 merge progress in a row. When it fills, tap the Grab button (bottom-right), then drag any atom on the board to a new position — surrounding atoms slide out of the way to make room. Use it to set up huge merge chains.",
-      );
-    }
-    if (level.id >= EGUN_MIN_LEVEL) {
-      showTip(
-        "feature-egun-unlock",
-        "⚡ E-gun unlocked!",
-        "Rare E-gun shots fire a straight beam to the far edge without bouncing. Every atom in the beam upgrades by 1 tier.",
       );
     }
     if (level.id >= BLANK_MIN_LEVEL) {
