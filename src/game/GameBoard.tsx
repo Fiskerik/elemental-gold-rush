@@ -928,6 +928,15 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
 
   useEffect(() => {
     if (won || gameOver) claimUnusedPowerUps();
+    if ((won || gameOver) && !runRecordedRef.current) {
+      runRecordedRef.current = true;
+      recordLevelRun(levelId, {
+        score,
+        shots,
+        powerUpsUsed: runPowerUpsUsedRef.current,
+        won,
+      });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [won, gameOver]);
 
