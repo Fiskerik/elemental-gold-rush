@@ -804,7 +804,10 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
   const projShotR = pendingStone ? stoneR : currentIsEGun ? eGunR : radiusFor(current);
   const projShotSize = pendingStone ? stoneSize : currentIsEGun ? eGunSize : sizeFor(current);
   const showCatalystShotRadius = catalystShotsRemaining > 0 && !pendingStone && !currentIsEGun;
-  const catalystShotRadius = projShotR * CATALYST_ADJ_FACTOR;
+  // Visual ring now matches the ACTUAL catalyst merge reach: any atom whose
+  // center is within (projR + otherR) * CATALYST_ADJ_FACTOR will merge.
+  // Approximate otherR ≈ projShotR for the preview ring.
+  const catalystShotRadius = projShotR * 2 * CATALYST_ADJ_FACTOR;
   const launcherX = boardW / 2;
   const launcherY = boardH - 8; // near bottom of board
   const TOP_PAD = 6;
