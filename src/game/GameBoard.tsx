@@ -2209,6 +2209,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
       emission: emissionCharges,
       gravity: gravityCharges,
       grab: grabs,
+      gamma: gammaCharges + (pendingGamma ? 1 : 0),
     };
   }
 
@@ -2246,6 +2247,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     setEmissionCharges((count) => count + selectedInventoryPowerUps.emission);
     setGravityCharges((count) => count + selectedInventoryPowerUps.gravity);
     setGrabs((count) => count + selectedInventoryPowerUps.grab);
+    setGammaCharges((count) => count + selectedInventoryPowerUps.gamma);
     if (selectedCount > 0) {
       spawnPopup(`🎒 LOADED ×${selectedCount}`);
       showTip(
