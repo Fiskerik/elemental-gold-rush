@@ -922,8 +922,22 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
   // Effective projectile radius/size — uses stone dims when a stone is loaded.
   const eGunR = Math.max(12, ballSize * 0.34);
   const eGunSize = eGunR * 2;
-  const projShotR = pendingStone ? stoneR : currentIsEGun ? eGunR : radiusFor(current);
-  const projShotSize = pendingStone ? stoneSize : currentIsEGun ? eGunSize : sizeFor(current);
+  const gammaR = Math.max(stoneR * 0.85, ballSize * 0.55);
+  const gammaSize = gammaR * 2;
+  const projShotR = pendingStone
+    ? stoneR
+    : pendingGamma
+      ? gammaR
+      : currentIsEGun
+        ? eGunR
+        : radiusFor(current);
+  const projShotSize = pendingStone
+    ? stoneSize
+    : pendingGamma
+      ? gammaSize
+      : currentIsEGun
+        ? eGunSize
+        : sizeFor(current);
   const showCatalystShotRadius = catalystShotsRemaining > 0 && !pendingStone && !currentIsEGun;
   // Visual ring now matches the ACTUAL catalyst merge reach: any atom whose
   // center is within (projR + otherR) * CATALYST_ADJ_FACTOR will merge.
