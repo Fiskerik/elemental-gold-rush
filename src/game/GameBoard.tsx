@@ -2782,14 +2782,12 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
                       top: y - b.r,
                       width: size,
                       height: size,
-                      borderRadius: "50%",
-                      background:
-                        "radial-gradient(circle at 30% 28%, oklch(0.55 0.02 60), oklch(0.32 0.02 60) 60%, oklch(0.18 0.02 60))",
+                      borderRadius: stoneBorderRadius,
+                      background: stoneBackground,
                       boxShadow:
-                        "0 6px 14px rgba(0,0,0,0.55), inset 0 -8px 14px rgba(0,0,0,0.45), inset 0 6px 12px rgba(255,255,255,0.12)",
-                      border: "2px solid oklch(0.25 0.02 60)",
+                        "0 6px 14px rgba(0,0,0,0.55), inset 0 -10px 18px rgba(0,0,0,0.55), inset 0 6px 14px rgba(255,255,255,0.10)",
+                      border: "2px solid oklch(0.2 0.015 55)",
                       display: "flex",
-                      flexDirection: "column",
                       alignItems: "center",
                       justifyContent: "center",
                       color: "oklch(0.95 0.02 60)",
@@ -2797,15 +2795,22 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
                       transition: isHit
                         ? "left 180ms ease-out, top 180ms ease-out, width 220ms ease-out, height 220ms ease-out"
                         : "left 180ms ease-out, top 180ms ease-out, width 220ms ease-out, height 220ms ease-out",
-                      textShadow: "0 1px 2px rgba(0,0,0,0.7)",
+                      textShadow: "0 1px 3px rgba(0,0,0,0.85)",
+                      overflow: "hidden",
                     }}
                   >
                     <div
-                      style={{ fontSize: Math.max(10, size * 0.16), opacity: 0.85, lineHeight: 1 }}
-                    >
-                      ⛰
-                    </div>
-                    <div style={{ fontSize: Math.max(14, size * 0.32), lineHeight: 1.05 }}>
+                      aria-hidden="true"
+                      style={{
+                        position: "absolute",
+                        inset: 0,
+                        background:
+                          "linear-gradient(125deg, transparent 38%, oklch(0.08 0.01 50 / 0.45) 39%, transparent 41%)," +
+                          "linear-gradient(70deg, transparent 60%, oklch(0.1 0.01 50 / 0.35) 61%, transparent 63%)",
+                        pointerEvents: "none",
+                      }}
+                    />
+                    <div style={{ fontSize: Math.max(14, size * 0.36), lineHeight: 1.05, zIndex: 1 }}>
                       {hp}
                     </div>
                   </div>
