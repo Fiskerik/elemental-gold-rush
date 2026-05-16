@@ -2316,7 +2316,14 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     if (currentIsEGun || currentIsBlank) return;
     const maxTier = Math.min(118, Math.max(current + 1, target - 1));
     if (current >= maxTier) return;
-    const atom = current + 1 + Math.floor(Math.random() * (maxTier - current));
+    // Only reroll into atoms the player has already discovered, so Transmute
+    // never hands out a fresh element for free.
+    const candidates = discoveredElements.filter((n) => n > current && n <= maxTier);
+    if (candidates.length === 0) {
+      spawnPopup("🔀 NO HIGHER DISCOVERED");
+      return;
+    }
+    const atom = candidates[Math.floor(Math.random() * candidates.length)];
     setTransmuteCharges((g) => Math.max(0, g - 1));
     setQueue((q) => [atom, ...q.slice(1)]);
     setShimmerQueue((q) => [false, ...q.slice(1)]);
@@ -4099,7 +4106,7 @@ function DiscoveryModal({ atomicNumber, onClose }: { atomicNumber: number; onClo
   const el = ELEMENTS[atomicNumber - 1];
   if (!el) return null;
   return (
-    <Modal>
+    <Modal zIndex={200}>
       <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--accent)", marginBottom: 8 }}>
         NEW DISCOVERY
       </div>
@@ -4495,7 +4502,7 @@ function ResultStat({ label, value, color }: { label: string; value: string; col
   );
 }
 
-function Modal({ children }: { children: React.ReactNode }) {
+function Modal({ children, zIndex = 100 }: { children: React.ReactNode; zIndex?: number }) {
   return (
     <div
       style={{
@@ -4505,7 +4512,7 @@ function Modal({ children }: { children: React.ReactNode }) {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        zIndex: 100,
+        zIndex,
         padding: 24,
         backdropFilter: "blur(4px)",
       }}
