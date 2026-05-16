@@ -17,6 +17,7 @@ export function Profile({ onBack }: Props) {
     dailyStreak,
     claimedDailyReward,
     bestCombo,
+    bestComboDate,
     earnedBadges,
     levelStars,
     challengeBestScores,
@@ -63,7 +64,19 @@ export function Profile({ onBack }: Props) {
             value={`${dailyStreak}`}
             sub={claimedDailyReward ? "claimed" : "active"}
           />
-          <ProfileStat label="Best Combo" value={`${bestCombo}×`} sub="record" />
+          <ProfileStat
+            label="Best Combo"
+            value={`${bestCombo}×`}
+            sub={
+              bestComboDate
+                ? new Date(bestComboDate).toLocaleDateString(undefined, {
+                    year: "numeric",
+                    month: "short",
+                    day: "numeric",
+                  })
+                : "no record yet"
+            }
+          />
           <ProfileStat
             label="Highest Atom"
             value={highestEl?.name ?? "Hydrogen"}
