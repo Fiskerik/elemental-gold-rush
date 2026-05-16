@@ -3685,6 +3685,35 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
                 <span style={powerUpCount}>{grabs}</span>
               </button>
             )}
+            {(gammaCharges > 0 || pendingGamma) && (
+              <button
+                type="button"
+                title="Gamma Bomb: irradiate every atom in a wide radius, upgrading each by 1 tier."
+                aria-label={`Use Gamma Bomb power-up (${gammaCharges} available)`}
+                onClick={triggerGammaPowerUp}
+                {...powerUpInfoHandlers(
+                  "☢ Gamma Bomb",
+                  "Arms a slow, heavy projectile. On impact it upgrades every atom inside a wide radius by 1 tier and runs any cascading merges. Tap again before shooting to cancel and refund the charge.",
+                )}
+                disabled={busy || (!pendingGamma && (pendingStone || currentIsEGun))}
+                style={{
+                  ...powerUpIconBtn,
+                  border: `1px solid ${pendingGamma ? "var(--accent)" : "oklch(0.7 0.2 145)"}`,
+                  background: pendingGamma
+                    ? "linear-gradient(135deg, var(--accent), oklch(0.55 0.2 145))"
+                    : "linear-gradient(135deg, oklch(0.6 0.2 145), oklch(0.42 0.16 150))",
+                  color: "var(--primary-foreground)",
+                  boxShadow: pendingGamma
+                    ? "0 0 16px var(--accent-glow)"
+                    : "0 0 14px oklch(0.6 0.2 145 / 0.5)",
+                  opacity: busy ? 0.65 : 1,
+                  cursor: busy ? "not-allowed" : "pointer",
+                }}
+              >
+                <span aria-hidden="true">☢</span>
+                <span style={powerUpCount}>{pendingGamma ? "↩" : gammaCharges}</span>
+              </button>
+            )}
           </div>
         </div>
 
