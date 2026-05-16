@@ -80,6 +80,7 @@ interface ProgressState {
   highestElement: number; // highest atomic number ever reached
   totalScore: number;
   discoveredElements: number[]; // atomic numbers seen
+  discoveredCompounds: string[];
   soundEnabled: boolean;
   hapticsEnabled: boolean;
   dailyQuestDate: string;
@@ -98,6 +99,7 @@ interface ProgressState {
   markTipSeen: (id: string) => void;
   unlockLevel: (id: number) => void;
   recordDiscovery: (atomicNumbers: number[]) => void;
+  recordCompoundDiscovery: (compoundId: string) => void;
   addScore: (n: number) => void;
   setHighestElement: (n: number) => void;
   refreshDailyLab: () => void;
@@ -130,6 +132,7 @@ export const useProgress = create<ProgressState>()(
       highestElement: 1,
       totalScore: 0,
       discoveredElements: [1],
+      discoveredCompounds: [],
       soundEnabled: true,
       hapticsEnabled: true,
       dailyQuestDate: initialQuestDate,
@@ -158,6 +161,12 @@ export const useProgress = create<ProgressState>()(
             earnedBadges: getEarnedBadgeIds(discoveredElements),
           };
         }),
+      recordCompoundDiscovery: (compoundId) =>
+        set((s) =>
+          s.discoveredCompounds.includes(compoundId)
+            ? s
+            : { discoveredCompounds: [...s.discoveredCompounds, compoundId] },
+        ),
       addScore: (n) =>
         set((s) => ({ totalScore: s.totalScore + Math.max(0, Math.floor(n / 10)) })),
       setHighestElement: (n) => set((s) => ({ highestElement: Math.max(s.highestElement, n) })),
@@ -298,6 +307,7 @@ export const useProgress = create<ProgressState>()(
           highestElement: 1,
           totalScore: 0,
           discoveredElements: [1],
+          discoveredCompounds: [],
           dailyQuestDate: getTodayQuestDate(),
           dailyQuests: createDailyQuests(),
           dailyStreak: 0,
@@ -328,6 +338,7 @@ export const useProgress = create<ProgressState>()(
           bestCombo: persistedState?.bestCombo ?? current.bestCombo,
           bestComboDate: persistedState?.bestComboDate ?? current.bestComboDate,
           earnedBadges: getEarnedBadgeIds(discoveredElements),
+          discoveredCompounds: persistedState?.discoveredCompounds ?? current.discoveredCompounds,
           levelStars: persistedState?.levelStars ?? current.levelStars,
           levelStats: persistedState?.levelStats ?? current.levelStats,
           challengeBestScores: persistedState?.challengeBestScores ?? current.challengeBestScores,

@@ -26,6 +26,11 @@ import {
 import { playMergeSound, playShootSound, playWinSound, vibrate } from "./audio";
 import { GameModeId, getGameMode, getModeLevelLabel } from "./challenges";
 import { trackGameOver, trackGameStart, trackLevelWin, trackMerge, trackShot } from "./analytics";
+import {
+  type CompoundDefinition,
+  compoundKey,
+  findCompoundByElements,
+} from "./compounds";
 
 interface Props {
   levelId: number;
@@ -56,6 +61,10 @@ const SHUFFLE_OFFSET_MAX = 10;
 const GAMMA_MIN_LEVEL = 12;
 const GAMMA_SHOT_INTERVAL = 40;
 const GAMMA_RADIUS_MULT = 3.5;
+const COMPOUND_REGEN_MS = 5 * 60 * 1000;
+const COMPOUND_MAX_SELECTION = 8;
+const COMPOUND_MAX_ELEMENT_TYPES = 3;
+const COMPOUND_STORAGE_KEY = "elemental-gold-rush-compound-charge";
 const SEEDED_BOARD_MIN_TARGET = 10;
 const SEEDED_BOARD_MIN_ATOMS = 3;
 const SEEDED_BOARD_MAX_ATOMS = 8;
@@ -116,6 +125,41 @@ function countPowerUps(inventory: Partial<Record<InventoryPowerUpId, number>>): 
 
 function hasPowerUps(inventory: Partial<Record<InventoryPowerUpId, number>>): boolean {
   return countPowerUps(inventory) > 0;
+}
+
+function loadCompoundChargeState(): { charges: number; spentAt: number | null } {
+  if (typeof window === "undefined") return { charges: 1, spentAt: null };
+  try {
+    const raw = window.localStorage.getItem(COMPOUND_STORAGE_KEY);
+    if (!raw) return { charges: 1, spentAt: null };
+    const parsed = JSON.parse(raw) as { charges?: number; spentAt?: number | null };
+    const spentAt = typeof parsed.spentAt === "number" ? parsed.spentAt : null;
+    const charges = Math.min(1, Math.max(0, Math.floor(parsed.charges ?? 1)));
+    if (charges <= 0 && spentAt != null && Date.now() - spentAt >= COMPOUND_REGEN_MS) {
+      return { charges: 1, spentAt: null };
+    }
+    return { charges, spentAt };
+  } catch {
+    return { charges: 1, spentAt: null };
+  }
+}
+
+function saveCompoundChargeState(charges: number, spentAt: number | null): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(
+    COMPOUND_STORAGE_KEY,
+    JSON.stringify({ charges: Math.min(1, Math.max(0, charges)), spentAt }),
+  );
+}
+
+function countsForBalls(balls: Ball[]): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const ball of balls) {
+    const symbol = ELEMENTS[ball.atom - 1]?.symbol;
+    if (!symbol) continue;
+    counts[symbol] = (counts[symbol] ?? 0) + 1;
+  }
+  return counts;
 }
 
 // Shared rocky styling — used for both the launcher visual and live stones
@@ -376,6 +420,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     soundEnabled,
     hapticsEnabled,
     discoveredElements,
+    recordCompoundDiscovery,
     reportQuestProgress,
     setBestCombo,
     setLevelStars,
@@ -417,6 +462,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
   const [gameOver, setGameOver] = useState(false);
   const [won, setWon] = useState(false);
   const [discoveryEl, setDiscoveryEl] = useState<number | null>(null);
+  const [discoveryCompound, setDiscoveryCompound] = useState<CompoundDefinition | null>(null);
   const [newlyDiscoveredThisRun, setNewlyDiscoveredThisRun] = useState<number[]>([]);
   const [highlightId, setHighlightId] = useState<number | null>(null);
   const [wiggleIds, setWiggleIds] = useState<Set<number>>(new Set());
@@ -434,6 +480,15 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
   const [grabs, setGrabs] = useState(0);
   const [grabMode, setGrabMode] = useState(false);
   const [grabbing, setGrabbing] = useState<{ id: number; x: number; y: number } | null>(null);
+
+  const [compoundCharges, setCompoundCharges] = useState(() => loadCompoundChargeState().charges);
+  const [compoundMode, setCompoundMode] = useState(false);
+  const [selectedCompoundIds, setSelectedCompoundIds] = useState<Set<number>>(new Set());
+  const [compoundFx, setCompoundFx] = useState<{
+    compound: CompoundDefinition;
+    atoms: { id: number; x: number; y: number; atom: number; r: number }[];
+  } | null>(null);
+  const [formingCompoundIds, setFormingCompoundIds] = useState<Set<number>>(new Set());
 
   // === Stone obstacle ===
   // After STONE_NO_MERGE_TRIGGER shots in a row that produce no merges, a
@@ -572,6 +627,18 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
   const currentIsShimmer = shimmerQueue[0] ?? false;
   const currentIsEGun = eGunQueue[0] ?? false;
   const currentIsBlank = blankQueue[0] ?? false;
+  const selectedCompoundAtoms = useMemo(
+    () => balls.filter((b) => selectedCompoundIds.has(b.id) && b.stoneHp == null),
+    [balls, selectedCompoundIds],
+  );
+  const compoundSelectionCounts = useMemo(
+    () => countsForBalls(selectedCompoundAtoms),
+    [selectedCompoundAtoms],
+  );
+  const matchingCompound = useMemo(
+    () => findCompoundByElements(compoundSelectionCounts),
+    [compoundSelectionCounts],
+  );
 
   const sfx = (fn: () => void) => {
     if (soundEnabled) fn();
@@ -625,6 +692,17 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
   }
 
   useEffect(() => {
+    const refresh = () => {
+      const state = loadCompoundChargeState();
+      setCompoundCharges(state.charges);
+      if (state.charges > 0 && state.spentAt == null) saveCompoundChargeState(1, null);
+    };
+    refresh();
+    const timer = window.setInterval(refresh, 15_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
     setNewlyDiscoveredThisRun([]);
     // For level 10+ we defer seeding until the player confirms their shuffle;
     // the shuffle modal opens immediately and seeds via confirmShuffleStart().
@@ -676,6 +754,11 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     setGrabs(0);
     setGrabMode(false);
     setGrabbing(null);
+    setCompoundMode(false);
+    setSelectedCompoundIds(new Set());
+    setCompoundFx(null);
+    setFormingCompoundIds(new Set());
+    setDiscoveryCompound(null);
     setGrabProgress(0);
     setContinuingPastTarget(false);
     setContinueStartedElapsedMs(null);
@@ -2441,6 +2524,106 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     haptic([15, 25, 15]);
   }
 
+  function triggerCompoundPowerUp() {
+    if (busy || gameOver || won) return;
+    if (compoundMode) {
+      setCompoundMode(false);
+      setSelectedCompoundIds(new Set());
+      spawnPopup("Compound canceled");
+      return;
+    }
+    if (compoundCharges <= 0 || pendingStone || pendingGamma || currentIsEGun || pendingReversiblePowerUp)
+      return;
+    setGrabMode(false);
+    setCompoundMode(true);
+    setSelectedCompoundIds(new Set());
+    showTip(
+      "feature-compound-powerup",
+      "Compound ready",
+      "Select up to 8 atoms on the board using no more than 3 element types. If the recipe matches a known compound, form it for a big bonus.",
+    );
+    spawnPopup("Compound select");
+    haptic(20);
+  }
+
+  function handleCompoundBoardTap(clientX: number, clientY: number) {
+    const rect = boardRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const px = clientX - rect.left;
+    const py = clientY - rect.top;
+    let hit: Ball | null = null;
+    for (let i = balls.length - 1; i >= 0; i--) {
+      const b = balls[i];
+      if (b.stoneHp != null || formingCompoundIds.has(b.id)) continue;
+      if (Math.hypot(px - b.x, py - b.y) <= b.r) {
+        hit = b;
+        break;
+      }
+    }
+    if (!hit) return;
+    const targetBall = hit;
+    setSelectedCompoundIds((selected) => {
+      const next = new Set(selected);
+      if (next.has(targetBall.id)) {
+        next.delete(targetBall.id);
+        return next;
+      }
+      if (next.size >= COMPOUND_MAX_SELECTION) {
+        spawnPopup("Max 8 atoms");
+        haptic(12);
+        return selected;
+      }
+      const currentBalls = balls.filter((b) => next.has(b.id));
+      const counts = countsForBalls(currentBalls);
+      const symbol = ELEMENTS[targetBall.atom - 1]?.symbol;
+      if (!symbol) return selected;
+      if (!counts[symbol] && Object.keys(counts).length >= COMPOUND_MAX_ELEMENT_TYPES) {
+        spawnPopup("Max 3 elements");
+        haptic(12);
+        return selected;
+      }
+      next.add(targetBall.id);
+      haptic(8);
+      return next;
+    });
+  }
+
+  function formSelectedCompound() {
+    if (!matchingCompound || busy) return;
+    const selectedAtoms = balls
+      .filter((b) => selectedCompoundIds.has(b.id) && b.stoneHp == null)
+      .map((b) => ({ id: b.id, x: b.x, y: b.y, atom: b.atom, r: b.r }));
+    if (selectedAtoms.length === 0) return;
+    const selectedKey = compoundKey(countsForBalls(selectedAtoms));
+    if (selectedKey !== compoundKey(matchingCompound.elements)) return;
+
+    const spentAt = Date.now();
+    saveCompoundChargeState(0, spentAt);
+    setCompoundCharges(0);
+    setCompoundMode(false);
+    setSelectedCompoundIds(new Set());
+    setFormingCompoundIds(new Set(selectedAtoms.map((atom) => atom.id)));
+    setCompoundFx({ compound: matchingCompound, atoms: selectedAtoms });
+    setBusy(true);
+    runPowerUpsUsedRef.current += 1;
+    sfx(playWinSound);
+    haptic([25, 50, 25, 75]);
+
+    window.setTimeout(() => {
+      setBalls((currentBalls) =>
+        relaxBoard(currentBalls.filter((ball) => !selectedAtoms.some((atom) => atom.id === ball.id))),
+      );
+      setFormingCompoundIds(new Set());
+      setCompoundFx(null);
+      recordCompoundDiscovery(matchingCompound.id);
+      setScore((currentScore) => currentScore + matchingCompound.bonusScore);
+      addScore(matchingCompound.bonusScore);
+      spawnPopup(`+${formatScore(matchingCompound.bonusScore)}`);
+      setDiscoveryCompound(matchingCompound);
+      setBusy(false);
+    }, 900);
+  }
+
   function triggerCatalystPowerUp() {
     if (cancelPendingPowerUp("catalyst")) return;
     if (
@@ -3130,6 +3313,10 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
           ref={boardRef}
           onPointerDown={(e) => {
             (e.target as Element).setPointerCapture?.(e.pointerId);
+            if (compoundMode) {
+              handleCompoundBoardTap(e.clientX, e.clientY);
+              return;
+            }
             if (grabMode && grabs > 0 && !grabbing) {
               const rect = boardRef.current!.getBoundingClientRect();
               const px = e.clientX - rect.left;
@@ -3162,6 +3349,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
               });
               return;
             }
+            if (compoundMode) return;
             if (grabMode) return;
             if (e.buttons === 0 && e.pointerType === "mouse") {
               // hover-aim with mouse
@@ -3178,6 +3366,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
               setGrabMode(false);
               return;
             }
+            if (compoundMode) return;
             if (grabMode) return;
             updateAimFromPointer(e.clientX, e.clientY);
             shoot();
@@ -3194,7 +3383,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
             display: "flex",
             flexDirection: "column",
             touchAction: "none",
-            cursor: "crosshair",
+            cursor: compoundMode ? "pointer" : "crosshair",
             userSelect: "none",
           }}
         >
@@ -3217,9 +3406,24 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
           />
 
           {/* BALLS — absolutely positioned in pixel space */}
+          {compoundMode && (
+            <CompoundSelectionPanel
+              counts={compoundSelectionCounts}
+              selectedCount={selectedCompoundAtoms.length}
+              match={matchingCompound}
+              onForm={formSelectedCompound}
+              onCancel={() => {
+                setCompoundMode(false);
+                setSelectedCompoundIds(new Set());
+              }}
+            />
+          )}
+
           <div style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 1 }}>
             {balls.map((b) => {
               const isDrag = grabbing?.id === b.id;
+              const isCompoundSelected = selectedCompoundIds.has(b.id);
+              const isFormingCompound = formingCompoundIds.has(b.id);
               const x = isDrag ? grabbing!.x : b.x;
               const y = isDrag ? grabbing!.y : b.y;
               if (b.stoneHp != null) {
@@ -3274,7 +3478,12 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
               return (
                 <div
                   key={b.id}
-                  className={gravityFxId && b.stoneHp == null ? "gravity-atom-lift" : undefined}
+                  className={[
+                    gravityFxId && b.stoneHp == null ? "gravity-atom-lift" : "",
+                    isCompoundSelected ? "compound-selected-atom" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
                   style={{
                     position: "absolute",
                     left: x - b.r,
@@ -3283,8 +3492,11 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
                       ? "none"
                       : "left 420ms cubic-bezier(0.2, 0.9, 0.2, 1), top 420ms cubic-bezier(0.2, 0.9, 0.2, 1)",
                     zIndex: isDrag ? 5 : undefined,
+                    opacity: isFormingCompound ? 0 : 1,
                     filter: eGunPreviewHitIds.has(b.id)
                       ? "drop-shadow(0 0 16px oklch(0.82 0.18 85 / 0.95)) brightness(1.18)"
+                      : isCompoundSelected
+                        ? "drop-shadow(0 0 18px oklch(0.82 0.16 145 / 0.95)) brightness(1.16)"
                       : isDrag
                         ? "drop-shadow(0 6px 12px rgba(0,0,0,0.5))"
                         : undefined,
@@ -3294,13 +3506,21 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
                     atomicNumber={b.atom}
                     size={ballSize}
                     highlight={highlightId === b.id || eGunPreviewHitIds.has(b.id)}
-                    wiggle={wiggleIds.has(b.id)}
-                    glow={isDrag}
+                    wiggle={wiggleIds.has(b.id) || isCompoundSelected}
+                    glow={isDrag || isCompoundSelected}
                   />
                 </div>
               );
             })}
           </div>
+
+          {compoundFx && (
+            <CompoundFormationFx
+              compound={compoundFx.compound}
+              atoms={compoundFx.atoms}
+              center={{ x: boardW / 2, y: Math.max(TOP_PAD + 120, boardH * 0.36) }}
+            />
+          )}
 
           {gravityFxId && (
             <div
@@ -3839,6 +4059,43 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
                 <span style={powerUpCount}>{grabs}</span>
               </button>
             )}
+            {(compoundCharges > 0 || compoundMode) && (
+              <button
+                type="button"
+                title="Compound: select atoms to form a known compound."
+                aria-label={`Use Compound power-up (${compoundCharges} available)`}
+                onClick={triggerCompoundPowerUp}
+                {...powerUpInfoHandlers(
+                  "Compound",
+                  "Select up to 8 atoms using no more than 3 element types. Match a known recipe to form a compound, remove those atoms, and earn a big bonus.",
+                )}
+                disabled={
+                  busy ||
+                  (!compoundMode &&
+                    (compoundCharges <= 0 ||
+                      pendingStone ||
+                      pendingGamma ||
+                      currentIsEGun ||
+                      pendingReversiblePowerUp != null))
+                }
+                style={{
+                  ...powerUpIconBtn,
+                  border: `1px solid ${compoundMode ? "var(--accent)" : "oklch(0.75 0.16 145)"}`,
+                  background: compoundMode
+                    ? "linear-gradient(135deg, var(--accent), oklch(0.55 0.16 145))"
+                    : "linear-gradient(135deg, oklch(0.62 0.16 145), oklch(0.42 0.13 185))",
+                  color: "var(--primary-foreground)",
+                  boxShadow: compoundMode
+                    ? "0 0 16px var(--accent-glow)"
+                    : "0 0 14px oklch(0.62 0.16 145 / 0.45)",
+                  opacity: busy ? 0.65 : 1,
+                  cursor: busy ? "not-allowed" : "pointer",
+                }}
+              >
+                <span aria-hidden="true">Co</span>
+                <span style={powerUpCount}>{compoundMode ? "×" : compoundCharges}</span>
+              </button>
+            )}
             {(gammaCharges > 0 || pendingGamma) && (
               <button
                 type="button"
@@ -3893,6 +4150,12 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
         )}
         {discoveryEl !== null && (
           <DiscoveryModal atomicNumber={discoveryEl} onClose={() => setDiscoveryEl(null)} />
+        )}
+        {discoveryCompound && (
+          <CompoundDiscoveryModal
+            compound={discoveryCompound}
+            onClose={() => setDiscoveryCompound(null)}
+          />
         )}
         {activeTip && (
           <FeatureTip
@@ -4254,6 +4517,210 @@ function DiscoveryModal({ atomicNumber, onClose }: { atomicNumber: number; onClo
       </div>
       <p style={{ fontSize: 13, lineHeight: 1.55, color: "var(--foreground)", margin: 0 }}>
         {el.fact}
+      </p>
+      <button onClick={onClose} style={modalBtn}>
+        Continue
+      </button>
+    </Modal>
+  );
+}
+
+function CompoundSelectionPanel({
+  counts,
+  selectedCount,
+  match,
+  onForm,
+  onCancel,
+}: {
+  counts: Record<string, number>;
+  selectedCount: number;
+  match: CompoundDefinition | null;
+  onForm: () => void;
+  onCancel: () => void;
+}) {
+  const entries = Object.entries(counts).sort(([a], [b]) => a.localeCompare(b));
+  return (
+    <div
+      style={{
+        position: "absolute",
+        left: 10,
+        right: 10,
+        top: 10,
+        zIndex: 8,
+        padding: 10,
+        borderRadius: 12,
+        border: "1px solid var(--border)",
+        background: "color-mix(in oklch, var(--surface-elevated) 92%, transparent)",
+        boxShadow: "0 10px 24px rgba(0,0,0,0.35)",
+        pointerEvents: "auto",
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
+        <div>
+          <div style={{ fontSize: 10, letterSpacing: 1.5, color: "var(--accent)", fontWeight: 900 }}>
+            COMPOUND MODE
+          </div>
+          <div style={{ fontSize: 12, color: "var(--muted-foreground)" }}>
+            {selectedCount}/{COMPOUND_MAX_SELECTION} atoms · max {COMPOUND_MAX_ELEMENT_TYPES} elements
+          </div>
+        </div>
+        <button type="button" onClick={onCancel} style={miniPanelBtn}>
+          Cancel
+        </button>
+      </div>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
+        {entries.length === 0 ? (
+          <span style={{ fontSize: 12, color: "var(--muted-foreground)" }}>Tap atoms to select</span>
+        ) : (
+          entries.map(([symbol, count]) => (
+            <span key={symbol} style={compoundCountPill}>
+              {symbol}: {count}
+            </span>
+          ))
+        )}
+      </div>
+      <button
+        type="button"
+        onClick={onForm}
+        disabled={!match}
+        style={{
+          ...modalBtn,
+          width: "100%",
+          marginTop: 10,
+          background: match
+            ? "linear-gradient(135deg, var(--accent), oklch(0.58 0.16 145))"
+            : "var(--surface-high)",
+          color: match ? "var(--primary-foreground)" : "var(--muted-foreground)",
+          cursor: match ? "pointer" : "not-allowed",
+          boxShadow: match ? "0 0 18px var(--accent-glow)" : undefined,
+        }}
+      >
+        {match ? `Form ${match.name}` : "Form Compound"}
+      </button>
+    </div>
+  );
+}
+
+function CompoundFormationFx({
+  compound,
+  atoms,
+  center,
+}: {
+  compound: CompoundDefinition;
+  atoms: { id: number; x: number; y: number; atom: number; r: number }[];
+  center: { x: number; y: number };
+}) {
+  return (
+    <div style={{ position: "absolute", inset: 0, zIndex: 9, pointerEvents: "none" }}>
+      <div
+        className="compound-flash"
+        style={{ position: "absolute", left: center.x, top: center.y }}
+      />
+      {atoms.map((atom, index) => (
+        <div
+          key={atom.id}
+          className="compound-fly-atom"
+          style={
+            {
+              position: "absolute",
+              left: atom.x - atom.r,
+              top: atom.y - atom.r,
+              "--compound-dx": `${center.x - atom.x}px`,
+              "--compound-dy": `${center.y - atom.y}px`,
+              animationDelay: `${index * 35}ms`,
+            } as React.CSSProperties & Record<"--compound-dx" | "--compound-dy", string>
+          }
+        >
+          <ElementBall atomicNumber={atom.atom} size={atom.r * 2} glow />
+        </div>
+      ))}
+      <div
+        className="compound-molecule-pop"
+        style={{ position: "absolute", left: center.x, top: center.y }}
+      >
+        <MoleculeVisual compound={compound} size={112} />
+      </div>
+    </div>
+  );
+}
+
+function MoleculeVisual({ compound, size = 86 }: { compound: CompoundDefinition; size?: number }) {
+  const atoms = Object.entries(compound.elements).flatMap(([symbol, count]) =>
+    Array.from({ length: count }, () => symbol),
+  );
+  const radius = size * 0.28;
+  return (
+    <div
+      style={{
+        width: size,
+        height: size,
+        position: "relative",
+        filter: "drop-shadow(0 0 18px var(--accent-glow))",
+      }}
+    >
+      {atoms.map((symbol, index) => {
+        const angle = (index / Math.max(1, atoms.length)) * Math.PI * 2 - Math.PI / 2;
+        const atomSize = symbol.length > 1 ? size * 0.25 : size * 0.22;
+        return (
+          <div
+            key={`${symbol}-${index}`}
+            style={{
+              position: "absolute",
+              left: size / 2 + Math.cos(angle) * radius - atomSize / 2,
+              top: size / 2 + Math.sin(angle) * radius - atomSize / 2,
+              width: atomSize,
+              height: atomSize,
+              borderRadius: "50%",
+              display: "grid",
+              placeItems: "center",
+              background: "linear-gradient(135deg, var(--accent), var(--primary))",
+              color: "var(--primary-foreground)",
+              fontSize: Math.max(10, atomSize * 0.36),
+              fontWeight: 900,
+              border: "1px solid rgba(255,255,255,0.35)",
+            }}
+          >
+            {symbol}
+          </div>
+        );
+      })}
+      <div
+        style={{
+          position: "absolute",
+          inset: size * 0.34,
+          borderRadius: "50%",
+          border: "1px solid var(--accent)",
+          opacity: 0.7,
+        }}
+      />
+    </div>
+  );
+}
+
+function CompoundDiscoveryModal({
+  compound,
+  onClose,
+}: {
+  compound: CompoundDefinition;
+  onClose: () => void;
+}) {
+  return (
+    <Modal zIndex={210}>
+      <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--accent)", marginBottom: 8 }}>
+        NEW COMPOUND
+      </div>
+      <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
+        <MoleculeVisual compound={compound} size={118} />
+      </div>
+      <div style={{ fontSize: 24, fontWeight: 900, marginBottom: 4 }}>{compound.name}</div>
+      <div style={{ fontSize: 18, color: "var(--accent)", fontWeight: 900, marginBottom: 8 }}>
+        {compound.formula}
+      </div>
+      <div style={{ fontSize: 20, fontWeight: 900, color: "var(--primary)", marginBottom: 10 }}>
+        +{formatScore(compound.bonusScore)}
+      </div>
+      <p style={{ fontSize: 13, lineHeight: 1.55, color: "var(--foreground)", margin: 0 }}>
+        {compound.fact}
       </p>
       <button onClick={onClose} style={modalBtn}>
         Continue
@@ -4682,4 +5149,25 @@ const modalBtn: React.CSSProperties = {
   fontSize: 14,
   cursor: "pointer",
   boxShadow: "0 4px 16px var(--primary-glow)",
+};
+
+const miniPanelBtn: React.CSSProperties = {
+  border: "1px solid var(--border)",
+  borderRadius: 8,
+  background: "var(--surface)",
+  color: "var(--foreground)",
+  padding: "6px 9px",
+  fontSize: 11,
+  fontWeight: 800,
+  cursor: "pointer",
+};
+
+const compoundCountPill: React.CSSProperties = {
+  border: "1px solid var(--border)",
+  borderRadius: 999,
+  background: "var(--surface)",
+  color: "var(--foreground)",
+  padding: "4px 8px",
+  fontSize: 12,
+  fontWeight: 900,
 };

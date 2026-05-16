@@ -67,6 +67,13 @@ export const POWER_UPS = [
       "Arms a slow heavy projectile that clears every non-stone atom in a wide blast radius.",
   },
   {
+    icon: "Co",
+    name: "Compound",
+    unlock: "1 charge / 5 minutes",
+    description:
+      "Select up to 8 board atoms with no more than 3 element types to form a known compound for a big bonus.",
+  },
+  {
     icon: "✦",
     name: "Blank Atom",
     unlock: "Level 10",

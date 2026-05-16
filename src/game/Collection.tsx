@@ -3,11 +3,14 @@ import { ELEMENTS, CATEGORY_COLORS } from "./elements";
 import { useProgress } from "./store";
 import { ElementBall } from "./ElementBall";
 import { BADGES, BADGE_GROUPS } from "./badges";
+import { COMPOUNDS, type CompoundDefinition } from "./compounds";
 
 export function Collection({ onBack }: { onBack: () => void }) {
-  const { discoveredElements, earnedBadges } = useProgress();
+  const { discoveredElements, discoveredCompounds, earnedBadges } = useProgress();
   const [selected, setSelected] = useState<number | null>(null);
+  const [selectedCompound, setSelectedCompound] = useState<CompoundDefinition | null>(null);
   const found = new Set(discoveredElements);
+  const foundCompounds = new Set(discoveredCompounds);
   const earned = new Set(earnedBadges);
   const el = selected ? ELEMENTS[selected - 1] : null;
 
@@ -128,6 +131,56 @@ export function Collection({ onBack }: { onBack: () => void }) {
         </div>
 
         <CategoryLegend />
+
+        <section style={{ marginTop: 18 }}>
+          <div
+            style={{
+              fontSize: 11,
+              letterSpacing: 1.5,
+              color: "var(--muted-foreground)",
+              marginBottom: 8,
+            }}
+          >
+            COMPOUNDS
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 8 }}>
+            {COMPOUNDS.map((compound) => {
+              const unlocked = foundCompounds.has(compound.id);
+              return (
+                <button
+                  key={compound.id}
+                  type="button"
+                  onClick={() => setSelectedCompound(compound)}
+                  style={{
+                    display: "flex",
+                    gap: 9,
+                    alignItems: "center",
+                    padding: 10,
+                    borderRadius: 12,
+                    border: `1px solid ${unlocked ? "var(--accent)" : "var(--border)"}`,
+                    background: unlocked
+                      ? "color-mix(in oklch, var(--accent) 14%, var(--surface))"
+                      : "var(--surface)",
+                    color: "var(--foreground)",
+                    opacity: unlocked ? 1 : 0.56,
+                    cursor: "pointer",
+                    textAlign: "left",
+                  }}
+                >
+                  <CompoundMiniVisual compound={compound} locked={!unlocked} />
+                  <span style={{ minWidth: 0 }}>
+                    <span style={{ display: "block", fontSize: 12, fontWeight: 900 }}>
+                      {unlocked ? compound.name : "Unknown"}
+                    </span>
+                    <span style={{ display: "block", fontSize: 11, color: "var(--muted-foreground)" }}>
+                      {unlocked ? compound.formula : `${compound.totalAtoms} atoms`}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
 
         {/* Badges */}
         <div style={{ marginTop: 20 }}>
@@ -316,7 +369,106 @@ export function Collection({ onBack }: { onBack: () => void }) {
           </div>
         </div>
       )}
+
+      {selectedCompound && (
+        <div
+          onClick={() => setSelectedCompound(null)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.8)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 24,
+            zIndex: 100,
+            backdropFilter: "blur(4px)",
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "var(--surface-elevated)",
+              border: "1px solid var(--border)",
+              borderRadius: 18,
+              padding: 24,
+              maxWidth: 380,
+              width: "100%",
+              animation: "pop-in 240ms ease-out",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
+              <CompoundMiniVisual compound={selectedCompound} size={92} locked={!foundCompounds.has(selectedCompound.id)} />
+            </div>
+            <div style={{ fontSize: 24, fontWeight: 900, textAlign: "center" }}>
+              {foundCompounds.has(selectedCompound.id) ? selectedCompound.name : "Unknown Compound"}
+            </div>
+            <div style={{ fontSize: 16, fontWeight: 900, color: "var(--accent)", textAlign: "center", marginBottom: 12 }}>
+              {foundCompounds.has(selectedCompound.id) ? selectedCompound.formula : "???"}
+            </div>
+            <p style={{ fontSize: 13, lineHeight: 1.55, margin: 0, color: "var(--foreground)" }}>
+              {foundCompounds.has(selectedCompound.id)
+                ? selectedCompound.fact
+                : "Form this recipe with the Compound power-up to unlock its fact."}
+            </p>
+          </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+function CompoundMiniVisual({
+  compound,
+  locked,
+  size = 44,
+}: {
+  compound: CompoundDefinition;
+  locked?: boolean;
+  size?: number;
+}) {
+  const atoms = Object.entries(compound.elements).flatMap(([symbol, count]) =>
+    Array.from({ length: count }, () => symbol),
+  );
+  const radius = size * 0.28;
+  return (
+    <span
+      style={{
+        width: size,
+        height: size,
+        position: "relative",
+        flex: "0 0 auto",
+        display: "inline-block",
+        filter: locked ? "grayscale(1)" : "drop-shadow(0 0 10px var(--accent-glow))",
+      }}
+      aria-hidden="true"
+    >
+      {atoms.slice(0, 8).map((symbol, index) => {
+        const atomSize = size * 0.28;
+        const angle = (index / Math.max(1, atoms.length)) * Math.PI * 2 - Math.PI / 2;
+        return (
+          <span
+            key={`${symbol}-${index}`}
+            style={{
+              position: "absolute",
+              left: size / 2 + Math.cos(angle) * radius - atomSize / 2,
+              top: size / 2 + Math.sin(angle) * radius - atomSize / 2,
+              width: atomSize,
+              height: atomSize,
+              borderRadius: "50%",
+              display: "grid",
+              placeItems: "center",
+              background: locked ? "var(--surface-high)" : "linear-gradient(135deg, var(--accent), var(--primary))",
+              color: locked ? "var(--muted-foreground)" : "var(--primary-foreground)",
+              fontSize: Math.max(7, atomSize * 0.38),
+              fontWeight: 900,
+            }}
+          >
+            {locked ? "?" : symbol}
+          </span>
+        );
+      })}
+    </span>
   );
 }
 
