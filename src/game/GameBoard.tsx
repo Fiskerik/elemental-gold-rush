@@ -711,7 +711,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     blank: boolean;
   } {
     const eGunEligible = eGunEnabled && eGunCooldownSlots.current <= 0;
-    const eGun = eGunEligible && Math.random() < POWER_UP_CHANCE;
+    const eGun = eGunEligible && Math.random() < EGUN_CHANCE;
     if (eGun) eGunCooldownSlots.current = EGUN_MIN_SHOT_GAP;
     else if (eGunCooldownSlots.current > 0) eGunCooldownSlots.current -= 1;
     const blank = !eGun && blankEnabled && Math.random() < BLANK_ATOM_CHANCE;
