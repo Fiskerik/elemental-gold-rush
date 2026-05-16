@@ -3307,6 +3307,23 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
             </div>
           )}
 
+          {fusionJumpFx && (
+            <div
+              className="fusion-jump-fx"
+              style={{
+                position: "absolute",
+                left: fusionJumpFx.x,
+                top: fusionJumpFx.y,
+                zIndex: 6,
+                pointerEvents: "none",
+              }}
+            >
+              <div className="fusion-jump-fx-ring fusion-jump-fx-ring-a" />
+              <div className="fusion-jump-fx-ring fusion-jump-fx-ring-b" />
+              <div className="fusion-jump-fx-core">⏭</div>
+            </div>
+          )}
+
           {stageClearFx && (
             <div className="stage-clear-fx" aria-live="polite" aria-label="Target atom formed">
               <div className="stage-clear-wash" />
