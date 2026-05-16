@@ -593,6 +593,18 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     hasClaimedUnusedInventoryRef.current = false;
     setSelectedInventoryPowerUps(emptyPowerUpInventory());
     setInventoryPickerOpen(hasPowerUps(powerUpInventory));
+    setMergeHistory([]);
+    setHistoryOpen(false);
+    setGammaCharges(0);
+    setPendingGamma(false);
+    setSpawnFloorIndex(0);
+    if (level.id >= SHUFFLE_MIN_LEVEL) {
+      setShufflesLeft(SHUFFLE_LIMIT);
+      setShuffleAtoms(generateShuffleAtoms());
+      setShuffleStartOpen(true);
+    } else {
+      setShuffleStartOpen(false);
+    }
     queueUndoRef.current = null;
     eGunCooldownSlots.current = 0;
     startTimeRef.current = Date.now();
