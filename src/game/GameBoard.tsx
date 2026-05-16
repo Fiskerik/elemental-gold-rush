@@ -243,6 +243,7 @@ function getComboLabel(mergeCount: number): string | null {
   return null;
 }
 function getStarParShots(level: (typeof LEVELS)[0]): number {
+  if (level.starShotsThree != null) return level.starShotsThree - 1;
   const configuredPar = level.parShots ?? 30;
   const targetGap = Math.max(0, level.targetElement - level.maxQueueElement);
   const targetComplexity = Math.ceil(targetGap * (level.id >= 10 ? 2.4 : 1.15));
@@ -258,6 +259,12 @@ function calculateStars(
   bestCombo: number,
   timeSec: number,
 ): number {
+  // Hard per-level overrides win when present.
+  if (level.starShotsThree != null && level.starShotsTwo != null) {
+    if (shots < level.starShotsThree) return 3;
+    if (shots < level.starShotsTwo) return 2;
+    return 1;
+  }
   // New star formula: pure performance based on shots + time vs par.
   // 3★ = at or under both par shots AND par time
   // 2★ = within 1.3× of both
