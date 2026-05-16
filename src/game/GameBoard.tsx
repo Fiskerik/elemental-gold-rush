@@ -234,6 +234,32 @@ function BlankAtomVisual({ size }: { size: number }) {
     </div>
   );
 }
+function GammaVisual({ size }: { size: number }) {
+  return (
+    <div
+      style={{
+        width: size,
+        height: size,
+        borderRadius: "50%",
+        background:
+          "radial-gradient(circle at 35% 30%, oklch(0.96 0.16 145), oklch(0.62 0.22 145) 55%, oklch(0.22 0.12 150))",
+        boxShadow:
+          "0 0 24px oklch(0.7 0.22 145 / 0.85), 0 0 48px oklch(0.7 0.22 145 / 0.45), inset 0 -6px 12px rgba(0,0,0,0.35)",
+        border: "2px solid oklch(0.85 0.18 145)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: "oklch(0.1 0.05 150)",
+        fontWeight: 1000,
+        fontSize: Math.max(14, size * 0.5),
+        textShadow: "0 1px 4px rgba(255,255,255,0.6)",
+        animation: "decay-warn-flash 1.2s ease-in-out infinite",
+      }}
+    >
+      ☢
+    </div>
+  );
+}
 const STONE_NO_MERGE_TRIGGER = 3;
 const STONE_NUDGE_MULT = 5;
 
