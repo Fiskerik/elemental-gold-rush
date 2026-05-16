@@ -2621,7 +2621,31 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
           <button onClick={onExit} style={iconBtn}>
             ← Menu
           </button>
-          <div style={{ textAlign: "center" }}>
+          <div style={{ textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+            <button
+              type="button"
+              onClick={() => setHistoryOpen(true)}
+              title="Open merge history"
+              aria-label="Open merge history log"
+              style={{
+                position: "absolute",
+                top: 6,
+                left: "50%",
+                transform: "translateX(-50%)",
+                background: "var(--surface)",
+                border: "1px solid var(--border)",
+                borderRadius: 999,
+                padding: "2px 8px",
+                fontSize: 10,
+                fontWeight: 800,
+                color: "var(--muted-foreground)",
+                cursor: "pointer",
+                pointerEvents: "auto",
+                opacity: 0,
+              }}
+            >
+              📜
+            </button>
             <div style={{ fontSize: 10, letterSpacing: 2, color: "var(--muted-foreground)" }}>
               {getModeLevelLabel(gameMode, level)}
             </div>
