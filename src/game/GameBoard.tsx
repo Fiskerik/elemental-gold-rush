@@ -1766,16 +1766,21 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
       setRunBestCombo((best) => Math.max(best, result.merges.length));
       setBestCombo(result.merges.length);
       result.merges.forEach((m) => trackMerge(levelId, m.resultAtomicNumber, m.chainDepth, mode));
+      const showSymbolPopups = result.merges.length >= 2;
       result.merges.forEach((m, i) => {
         setTimeout(
           () => {
             sfx(() => playMergeSound(m.chainDepth));
             haptic([10, 20, 10]);
-            spawnPopup(`+${ELEMENTS[m.resultAtomicNumber - 1]?.symbol ?? "?"}`);
+            if (showSymbolPopups) {
+              spawnPopup(`+${ELEMENTS[m.resultAtomicNumber - 1]?.symbol ?? "?"}`);
+            }
           },
           80 + i * 120,
         );
       });
+      // Append to history log (single chronological record per merge).
+      pushMergeHistory(result.merges);
     }
     if (shimmerHit) spawnPopup("✦ SHIMMER ×2 ✦");
     if (grabAdd > 0) {
