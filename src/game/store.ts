@@ -184,7 +184,7 @@ export const useProgress = create<ProgressState>()(
           );
           if (refreshed.claimedDailyReward || !areDailyQuestsComplete(refreshed.dailyQuests))
             return refreshed;
-          const reward = 5000;
+          const reward = 500;
           return {
             ...refreshed,
             claimedDailyReward: true,
