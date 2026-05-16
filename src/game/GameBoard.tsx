@@ -2703,6 +2703,19 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     const nextScore = score + gained + mergeStoneBonus;
     setScore(nextScore);
     addScore(gained);
+    // Grab-and-drop that produces a merge counts as 1 step toward the next
+    // Grab charge, matching how a normal merge feeds the grab progress bar.
+    if (result.merges.length > 0) {
+      setGrabProgress((p) => {
+        const total = p + 1;
+        const earned = Math.floor(total / GRAB_THRESHOLD);
+        if (earned > 0) {
+          setGrabs((g) => g + earned);
+          spawnPopup(`🤚 GRAB UNLOCKED${earned > 1 ? ` ×${earned}` : ""}!`);
+        }
+        return total % GRAB_THRESHOLD;
+      });
+    }
     reportQuestProgress({
       merges: result.merges.length,
       discoveries: undiscovered,
