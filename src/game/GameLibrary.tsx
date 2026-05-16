@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Atom, Clock, FlaskConical, LockKeyhole, Map, RotateCcw, Shield, type LucideIcon } from "lucide-react";
 import { GAME_MODES } from "./challenges";
 import { PowerUpIcon } from "./PowerUpLibrary";
 import { POWER_UPS } from "./powerUps";
@@ -52,7 +53,9 @@ export function GameLibrary({ onBack }: Props) {
               const locked = unlockedLevel < mode.unlockedAtLevel;
               return (
                 <article key={mode.id} style={{ ...rowCard, opacity: locked ? 0.58 : 1 }}>
-                  <div style={iconWrap}>{mode.emoji}</div>
+                  <div style={iconWrap}>
+                    <ChallengeIcon id={mode.id} />
+                  </div>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
                       <h2 style={{ margin: 0, fontSize: 16 }}>{mode.name}</h2>
@@ -99,6 +102,22 @@ export function GameLibrary({ onBack }: Props) {
       </div>
     </div>
   );
+}
+
+const CHALLENGE_ICONS: Record<string, LucideIcon> = {
+  campaign: Map,
+  survival: Shield,
+  "unstable-isotopes": Atom,
+  "gravity-surge": RotateCcw,
+  "pure-hydrogen": FlaskConical,
+  "noble-gas-lock": LockKeyhole,
+  "gold-rush-timer": Clock,
+  "isotope-decay": Atom,
+};
+
+function ChallengeIcon({ id }: { id: string }) {
+  const Icon = CHALLENGE_ICONS[id] ?? FlaskConical;
+  return <Icon size={26} strokeWidth={2.4} aria-hidden="true" />;
 }
 
 const backBtn: React.CSSProperties = {

@@ -2,12 +2,16 @@ import { useEffect, type CSSProperties, type ReactNode } from "react";
 import {
   Atom,
   BookOpen,
+  CheckCircle2,
   FlaskConical,
   Layers,
   Library,
   Play,
   ShoppingBag,
+  Sparkles,
+  Star,
   Settings as SettingsIcon,
+  Trophy,
   User,
   type LucideIcon,
 } from "lucide-react";
@@ -225,15 +229,28 @@ export function MainMenu({
               <div key={quest.id} style={questRow}>
                 <span
                   style={{
-                    ...questDot,
-                    background: quest.completed ? "var(--accent)" : "var(--surface-high)",
+                    ...questIconWrap,
+                    color: quest.completed ? "var(--accent)" : "var(--muted-foreground)",
                   }}
-                />
+                >
+                  <QuestIcon type={quest.type} completed={quest.completed} />
+                </span>
                 <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {quest.title}
                 </span>
-                <span style={{ color: "var(--muted-foreground)", fontSize: 11 }}>
-                  {quest.progress}/{quest.target}
+                <span style={questProgressWrap} aria-label={`${quest.progress} of ${quest.target}`}>
+                  {quest.completed ? (
+                    <CheckCircle2 size={15} aria-hidden="true" />
+                  ) : (
+                    <span style={questProgressTrack}>
+                      <span
+                        style={{
+                          ...questProgressFill,
+                          width: `${Math.max(8, Math.min(100, (quest.progress / quest.target) * 100))}%`,
+                        }}
+                      />
+                    </span>
+                  )}
                 </span>
               </div>
             ))}
@@ -265,6 +282,19 @@ export function MainMenu({
       </div>
     </div>
   );
+}
+
+function QuestIcon({ type, completed }: { type: string; completed: boolean }) {
+  const iconMap: Record<string, LucideIcon> = {
+    clear_level: Trophy,
+    discover_elements: Sparkles,
+    earn_stars: Star,
+    chain_merge: Layers,
+    merge_atoms: Atom,
+    purchase_item: ShoppingBag,
+  };
+  const Icon = completed ? CheckCircle2 : iconMap[type] ?? FlaskConical;
+  return <Icon size={15} strokeWidth={2.4} aria-hidden="true" />;
 }
 
 const heroPanel: CSSProperties = {
@@ -429,16 +459,44 @@ const questGrid: CSSProperties = {
 
 const questRow: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "10px minmax(0, 1fr) auto",
+  gridTemplateColumns: "22px minmax(0, 1fr) 42px",
   alignItems: "center",
   gap: 8,
   fontSize: 12,
 };
 
-const questDot: CSSProperties = {
-  width: 8,
-  height: 8,
+const questIconWrap: CSSProperties = {
+  width: 20,
+  height: 20,
   borderRadius: 999,
+  flex: "0 0 auto",
+  display: "grid",
+  placeItems: "center",
+  background: "var(--surface-high)",
+  border: "1px solid var(--border)",
+};
+
+const questProgressWrap: CSSProperties = {
+  width: 42,
+  display: "flex",
+  justifyContent: "flex-end",
+  color: "var(--accent)",
+};
+
+const questProgressTrack: CSSProperties = {
+  width: 34,
+  height: 6,
+  borderRadius: 999,
+  overflow: "hidden",
+  background: "var(--surface-high)",
+  border: "1px solid var(--border)",
+};
+
+const questProgressFill: CSSProperties = {
+  display: "block",
+  height: "100%",
+  borderRadius: 999,
+  background: "linear-gradient(90deg, var(--primary), var(--accent))",
 };
 
 function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {

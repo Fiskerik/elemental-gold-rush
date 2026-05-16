@@ -11,6 +11,23 @@ export interface CompoundDefinition {
   fact: string;
 }
 
+export interface CompoundAtomNode {
+  symbol: string;
+  x: number;
+  y: number;
+}
+
+export interface CompoundBond {
+  from: number;
+  to: number;
+  order?: 1 | 2 | 3;
+}
+
+export interface CompoundStructure {
+  atoms: CompoundAtomNode[];
+  bonds: CompoundBond[];
+}
+
 function compound(
   id: string,
   name: string,
@@ -76,4 +93,158 @@ export const COMPOUND_BY_KEY = new Map(
 
 export function findCompoundByElements(elements: Record<string, number>): CompoundDefinition | null {
   return COMPOUND_BY_KEY.get(compoundKey(elements)) ?? null;
+}
+
+export const COMPOUND_HINTS: Record<string, string> = {
+  "water": "A clear liquid that covers oceans, clouds, and cells.",
+  "carbon-dioxide": "An invisible gas made by breathing, fire, and fizzy drinks.",
+  "ammonia": "A sharp-smelling gas used to make fertilizers.",
+  "methane": "A simple fuel gas found in natural gas.",
+  "sodium-chloride": "A familiar white crystal sprinkled on food.",
+  "hydrogen-peroxide": "A bubbling household disinfectant that releases oxygen.",
+  "ozone": "A reactive form of oxygen that helps shield Earth high above.",
+  "hydrogen-chloride": "A sharp gas that becomes a powerful acid in water.",
+  "nitrous-oxide": "A gas famous for whipped cream chargers and laughing gas.",
+  "calcium-oxide": "A hot-reacting powder known as quicklime.",
+  "silicon-dioxide": "The hard mineral chemistry behind quartz and sand.",
+  "acetic-acid": "The tangy molecule that gives vinegar its bite.",
+  "carbon-monoxide": "A dangerous invisible gas from incomplete burning.",
+  "sulfur-dioxide": "A choking volcanic gas linked to smoky pollution.",
+  "nitric-oxide": "A tiny signaling gas used by the body.",
+  "nitrogen-dioxide": "A reddish-brown gas seen in polluted air.",
+  "magnesium-oxide": "A white mineral made when magnesium burns brightly.",
+  "iron-oxide": "The red-brown chemistry of rust and earthy pigments.",
+  "calcium-carbonate": "A chalky solid found in shells, limestone, and pearls.",
+  "sodium-hydroxide": "A slippery, caustic base used in soap making.",
+  "hydrogen-sulfide": "A foul-smelling gas associated with rotten eggs.",
+  "sulfuric-acid": "A heavy industrial acid used around the world.",
+  "methanol": "A small alcohol used as fuel and solvent.",
+  "carbonic-acid": "The weak acid that appears when bubbles meet water.",
+  "chlorine-gas": "A greenish disinfecting gas with a harsh smell.",
+  "oxygen-gas": "The breathable gas cells use to release energy.",
+  "hydrogen-gas": "The lightest gas, often used in rockets and fuel cells.",
+};
+
+export const COMPOUND_STRUCTURES: Record<string, CompoundStructure> = {
+  "water": {
+    atoms: [{ symbol: "O", x: 0, y: -0.12 }, { symbol: "H", x: -0.46, y: 0.38 }, { symbol: "H", x: 0.46, y: 0.38 }],
+    bonds: [{ from: 0, to: 1 }, { from: 0, to: 2 }],
+  },
+  "carbon-dioxide": {
+    atoms: [{ symbol: "O", x: -0.58, y: 0 }, { symbol: "C", x: 0, y: 0 }, { symbol: "O", x: 0.58, y: 0 }],
+    bonds: [{ from: 0, to: 1, order: 2 }, { from: 1, to: 2, order: 2 }],
+  },
+  "ammonia": {
+    atoms: [{ symbol: "N", x: 0, y: 0 }, { symbol: "H", x: -0.5, y: 0.28 }, { symbol: "H", x: 0.5, y: 0.28 }, { symbol: "H", x: 0, y: -0.54 }],
+    bonds: [{ from: 0, to: 1 }, { from: 0, to: 2 }, { from: 0, to: 3 }],
+  },
+  "methane": {
+    atoms: [{ symbol: "C", x: 0, y: 0 }, { symbol: "H", x: -0.5, y: -0.42 }, { symbol: "H", x: 0.5, y: -0.42 }, { symbol: "H", x: -0.5, y: 0.42 }, { symbol: "H", x: 0.5, y: 0.42 }],
+    bonds: [{ from: 0, to: 1 }, { from: 0, to: 2 }, { from: 0, to: 3 }, { from: 0, to: 4 }],
+  },
+  "sodium-chloride": {
+    atoms: [{ symbol: "Na", x: -0.32, y: 0 }, { symbol: "Cl", x: 0.32, y: 0 }],
+    bonds: [{ from: 0, to: 1 }],
+  },
+  "hydrogen-peroxide": {
+    atoms: [{ symbol: "H", x: -0.64, y: 0.28 }, { symbol: "O", x: -0.24, y: 0 }, { symbol: "O", x: 0.24, y: 0 }, { symbol: "H", x: 0.64, y: -0.28 }],
+    bonds: [{ from: 0, to: 1 }, { from: 1, to: 2 }, { from: 2, to: 3 }],
+  },
+  "ozone": {
+    atoms: [{ symbol: "O", x: -0.48, y: 0.22 }, { symbol: "O", x: 0, y: -0.18 }, { symbol: "O", x: 0.48, y: 0.22 }],
+    bonds: [{ from: 0, to: 1 }, { from: 1, to: 2, order: 2 }],
+  },
+  "hydrogen-chloride": {
+    atoms: [{ symbol: "H", x: -0.36, y: 0 }, { symbol: "Cl", x: 0.36, y: 0 }],
+    bonds: [{ from: 0, to: 1 }],
+  },
+  "nitrous-oxide": {
+    atoms: [{ symbol: "N", x: -0.56, y: 0 }, { symbol: "N", x: 0, y: 0 }, { symbol: "O", x: 0.56, y: 0 }],
+    bonds: [{ from: 0, to: 1, order: 2 }, { from: 1, to: 2, order: 2 }],
+  },
+  "calcium-oxide": {
+    atoms: [{ symbol: "Ca", x: -0.34, y: 0 }, { symbol: "O", x: 0.34, y: 0 }],
+    bonds: [{ from: 0, to: 1 }],
+  },
+  "silicon-dioxide": {
+    atoms: [{ symbol: "O", x: -0.58, y: 0 }, { symbol: "Si", x: 0, y: 0 }, { symbol: "O", x: 0.58, y: 0 }],
+    bonds: [{ from: 0, to: 1, order: 2 }, { from: 1, to: 2, order: 2 }],
+  },
+  "acetic-acid": {
+    atoms: [{ symbol: "C", x: -0.28, y: 0 }, { symbol: "C", x: 0.22, y: 0 }, { symbol: "H", x: -0.62, y: -0.38 }, { symbol: "H", x: -0.68, y: 0.26 }, { symbol: "H", x: -0.24, y: 0.55 }, { symbol: "O", x: 0.56, y: -0.36 }, { symbol: "O", x: 0.62, y: 0.3 }, { symbol: "H", x: 0.3, y: 0.64 }],
+    bonds: [{ from: 0, to: 1 }, { from: 0, to: 2 }, { from: 0, to: 3 }, { from: 0, to: 4 }, { from: 1, to: 5, order: 2 }, { from: 1, to: 6 }, { from: 6, to: 7 }],
+  },
+  "carbon-monoxide": {
+    atoms: [{ symbol: "C", x: -0.32, y: 0 }, { symbol: "O", x: 0.32, y: 0 }],
+    bonds: [{ from: 0, to: 1, order: 3 }],
+  },
+  "sulfur-dioxide": {
+    atoms: [{ symbol: "O", x: -0.48, y: 0.24 }, { symbol: "S", x: 0, y: -0.08 }, { symbol: "O", x: 0.48, y: 0.24 }],
+    bonds: [{ from: 0, to: 1, order: 2 }, { from: 1, to: 2, order: 2 }],
+  },
+  "nitric-oxide": {
+    atoms: [{ symbol: "N", x: -0.32, y: 0 }, { symbol: "O", x: 0.32, y: 0 }],
+    bonds: [{ from: 0, to: 1, order: 2 }],
+  },
+  "nitrogen-dioxide": {
+    atoms: [{ symbol: "O", x: -0.48, y: 0.24 }, { symbol: "N", x: 0, y: -0.08 }, { symbol: "O", x: 0.48, y: 0.24 }],
+    bonds: [{ from: 0, to: 1 }, { from: 1, to: 2, order: 2 }],
+  },
+  "magnesium-oxide": {
+    atoms: [{ symbol: "Mg", x: -0.34, y: 0 }, { symbol: "O", x: 0.34, y: 0 }],
+    bonds: [{ from: 0, to: 1 }],
+  },
+  "iron-oxide": {
+    atoms: [{ symbol: "O", x: -0.52, y: -0.36 }, { symbol: "Fe", x: -0.18, y: 0 }, { symbol: "O", x: 0, y: 0.46 }, { symbol: "Fe", x: 0.18, y: 0 }, { symbol: "O", x: 0.52, y: -0.36 }],
+    bonds: [{ from: 0, to: 1 }, { from: 1, to: 2 }, { from: 2, to: 3 }, { from: 3, to: 4 }],
+  },
+  "calcium-carbonate": {
+    atoms: [{ symbol: "Ca", x: -0.62, y: 0 }, { symbol: "C", x: 0, y: 0 }, { symbol: "O", x: 0, y: -0.55 }, { symbol: "O", x: 0.48, y: 0.3 }, { symbol: "O", x: -0.48, y: 0.3 }],
+    bonds: [{ from: 0, to: 4 }, { from: 1, to: 2, order: 2 }, { from: 1, to: 3 }, { from: 1, to: 4 }],
+  },
+  "sodium-hydroxide": {
+    atoms: [{ symbol: "Na", x: -0.55, y: 0 }, { symbol: "O", x: 0.05, y: 0 }, { symbol: "H", x: 0.55, y: 0 }],
+    bonds: [{ from: 0, to: 1 }, { from: 1, to: 2 }],
+  },
+  "hydrogen-sulfide": {
+    atoms: [{ symbol: "S", x: 0, y: -0.1 }, { symbol: "H", x: -0.48, y: 0.36 }, { symbol: "H", x: 0.48, y: 0.36 }],
+    bonds: [{ from: 0, to: 1 }, { from: 0, to: 2 }],
+  },
+  "sulfuric-acid": {
+    atoms: [{ symbol: "S", x: 0, y: 0 }, { symbol: "O", x: -0.42, y: -0.42 }, { symbol: "O", x: 0.42, y: -0.42 }, { symbol: "O", x: -0.42, y: 0.42 }, { symbol: "O", x: 0.42, y: 0.42 }, { symbol: "H", x: -0.72, y: 0.58 }, { symbol: "H", x: 0.72, y: 0.58 }],
+    bonds: [{ from: 0, to: 1, order: 2 }, { from: 0, to: 2, order: 2 }, { from: 0, to: 3 }, { from: 0, to: 4 }, { from: 3, to: 5 }, { from: 4, to: 6 }],
+  },
+  "methanol": {
+    atoms: [{ symbol: "C", x: -0.24, y: 0 }, { symbol: "O", x: 0.32, y: 0 }, { symbol: "H", x: -0.62, y: -0.36 }, { symbol: "H", x: -0.66, y: 0.28 }, { symbol: "H", x: -0.22, y: 0.54 }, { symbol: "H", x: 0.7, y: 0 }],
+    bonds: [{ from: 0, to: 1 }, { from: 0, to: 2 }, { from: 0, to: 3 }, { from: 0, to: 4 }, { from: 1, to: 5 }],
+  },
+  "carbonic-acid": {
+    atoms: [{ symbol: "C", x: 0, y: 0 }, { symbol: "O", x: 0, y: -0.55 }, { symbol: "O", x: -0.5, y: 0.28 }, { symbol: "O", x: 0.5, y: 0.28 }, { symbol: "H", x: -0.78, y: 0.52 }, { symbol: "H", x: 0.78, y: 0.52 }],
+    bonds: [{ from: 0, to: 1, order: 2 }, { from: 0, to: 2 }, { from: 0, to: 3 }, { from: 2, to: 4 }, { from: 3, to: 5 }],
+  },
+  "chlorine-gas": {
+    atoms: [{ symbol: "Cl", x: -0.32, y: 0 }, { symbol: "Cl", x: 0.32, y: 0 }],
+    bonds: [{ from: 0, to: 1 }],
+  },
+  "oxygen-gas": {
+    atoms: [{ symbol: "O", x: -0.32, y: 0 }, { symbol: "O", x: 0.32, y: 0 }],
+    bonds: [{ from: 0, to: 1, order: 2 }],
+  },
+  "hydrogen-gas": {
+    atoms: [{ symbol: "H", x: -0.28, y: 0 }, { symbol: "H", x: 0.28, y: 0 }],
+    bonds: [{ from: 0, to: 1 }],
+  },
+};
+
+export function getCompoundHint(compound: CompoundDefinition): string {
+  return COMPOUND_HINTS[compound.id] ?? "A familiar substance waiting to be discovered.";
+}
+
+export function getCompoundStructure(compound: CompoundDefinition): CompoundStructure {
+  return COMPOUND_STRUCTURES[compound.id] ?? {
+    atoms: Object.entries(compound.elements).flatMap(([symbol, count]) =>
+      Array.from({ length: count }, (_, index) => ({ symbol, x: index * 0.2, y: 0 })),
+    ),
+    bonds: [],
+  };
 }

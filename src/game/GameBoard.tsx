@@ -31,6 +31,7 @@ import {
   compoundKey,
   findCompoundByElements,
 } from "./compounds";
+import { MoleculeVisual } from "./MoleculeVisual";
 
 interface Props {
   levelId: number;
@@ -1403,7 +1404,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
         | { ball: Ball; t: number; x: number; y: number; nx: number; ny: number }
         | null = null;
       for (let b = 0; b < balls.length; b++) {
-        // Stones register damage, but fired atoms keep travelling through them.
+        // Stones ricochet shots unless the reflected path would head back downward.
         if (balls[b].stoneHp != null && recentlyBouncedStoneIds.has(balls[b].id)) continue;
         if (!projectileOverlapsBall(balls[b], x, y, projR)) continue;
         const contact = firstProjectileContact(balls[b], prevX, prevY, x, y, projR);
@@ -1415,10 +1416,23 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
         const hitBall = hit.ball;
         path.push({ x: lx, y: ly });
         if (hitBall.stoneHp != null && !currentIsBlank && !pendingStone) {
+          const nx = hit.nx;
+          const ny = hit.ny;
+          const dot = dx * nx + dy * ny;
+          const reflectedX = dx - 2 * dot * nx;
+          const reflectedY = dy - 2 * dot * ny;
+          const reflectedMag = Math.hypot(reflectedX, reflectedY) || 1;
+          const nextDx = reflectedX / reflectedMag;
+          const nextDy = reflectedY / reflectedMag;
+          if (nextDy > 0.12) {
+            return { x: lx, y: ly, path, hitId: hitBall.id, dx, dy, stoneHitIds: bouncedStoneIds };
+          }
           if (!bouncedStoneIds.includes(hitBall.id)) bouncedStoneIds.push(hitBall.id);
           recentlyBouncedStoneIds.add(hitBall.id);
-          x = lx + dx * (step * 3);
-          y = ly + dy * (step * 3);
+          dx = nextDx;
+          dy = nextDy;
+          x = lx + nx * (step * 2);
+          y = ly + ny * (step * 2);
           continue;
         }
         return { x: lx, y: ly, path, hitId: hitBall.id, dx, dy, stoneHitIds: bouncedStoneIds };
@@ -4615,59 +4629,6 @@ function CompoundFormationFx({
       >
         <MoleculeVisual compound={compound} size={112} />
       </div>
-    </div>
-  );
-}
-
-function MoleculeVisual({ compound, size = 86 }: { compound: CompoundDefinition; size?: number }) {
-  const atoms = Object.entries(compound.elements).flatMap(([symbol, count]) =>
-    Array.from({ length: count }, () => symbol),
-  );
-  const radius = size * 0.28;
-  return (
-    <div
-      style={{
-        width: size,
-        height: size,
-        position: "relative",
-        filter: "drop-shadow(0 0 18px var(--accent-glow))",
-      }}
-    >
-      {atoms.map((symbol, index) => {
-        const angle = (index / Math.max(1, atoms.length)) * Math.PI * 2 - Math.PI / 2;
-        const atomSize = symbol.length > 1 ? size * 0.25 : size * 0.22;
-        return (
-          <div
-            key={`${symbol}-${index}`}
-            style={{
-              position: "absolute",
-              left: size / 2 + Math.cos(angle) * radius - atomSize / 2,
-              top: size / 2 + Math.sin(angle) * radius - atomSize / 2,
-              width: atomSize,
-              height: atomSize,
-              borderRadius: "50%",
-              display: "grid",
-              placeItems: "center",
-              background: "linear-gradient(135deg, var(--accent), var(--primary))",
-              color: "var(--primary-foreground)",
-              fontSize: Math.max(10, atomSize * 0.36),
-              fontWeight: 900,
-              border: "1px solid rgba(255,255,255,0.35)",
-            }}
-          >
-            {symbol}
-          </div>
-        );
-      })}
-      <div
-        style={{
-          position: "absolute",
-          inset: size * 0.34,
-          borderRadius: "50%",
-          border: "1px solid var(--accent)",
-          opacity: 0.7,
-        }}
-      />
     </div>
   );
 }

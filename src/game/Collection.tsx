@@ -3,7 +3,8 @@ import { ELEMENTS, CATEGORY_COLORS } from "./elements";
 import { useProgress } from "./store";
 import { ElementBall } from "./ElementBall";
 import { BADGES, BADGE_GROUPS } from "./badges";
-import { COMPOUNDS, type CompoundDefinition } from "./compounds";
+import { COMPOUNDS, getCompoundHint, type CompoundDefinition } from "./compounds";
+import { MoleculeVisual } from "./MoleculeVisual";
 
 export function Collection({ onBack }: { onBack: () => void }) {
   const { discoveredElements, discoveredCompounds, earnedBadges } = useProgress();
@@ -167,13 +168,13 @@ export function Collection({ onBack }: { onBack: () => void }) {
                     textAlign: "left",
                   }}
                 >
-                  <CompoundMiniVisual compound={compound} locked={!unlocked} />
+                  <MoleculeVisual compound={compound} locked={!unlocked} size={44} />
                   <span style={{ minWidth: 0 }}>
                     <span style={{ display: "block", fontSize: 12, fontWeight: 900 }}>
                       {unlocked ? compound.name : "Unknown"}
                     </span>
                     <span style={{ display: "block", fontSize: 11, color: "var(--muted-foreground)" }}>
-                      {unlocked ? compound.formula : `${compound.totalAtoms} atoms`}
+                      {unlocked ? compound.formula : getCompoundHint(compound)}
                     </span>
                   </span>
                 </button>
@@ -398,7 +399,7 @@ export function Collection({ onBack }: { onBack: () => void }) {
             }}
           >
             <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
-              <CompoundMiniVisual compound={selectedCompound} size={92} locked={!foundCompounds.has(selectedCompound.id)} />
+              <MoleculeVisual compound={selectedCompound} size={104} locked={!foundCompounds.has(selectedCompound.id)} />
             </div>
             <div style={{ fontSize: 24, fontWeight: 900, textAlign: "center" }}>
               {foundCompounds.has(selectedCompound.id) ? selectedCompound.name : "Unknown Compound"}
@@ -409,66 +410,12 @@ export function Collection({ onBack }: { onBack: () => void }) {
             <p style={{ fontSize: 13, lineHeight: 1.55, margin: 0, color: "var(--foreground)" }}>
               {foundCompounds.has(selectedCompound.id)
                 ? selectedCompound.fact
-                : "Form this recipe with the Compound power-up to unlock its fact."}
+                : getCompoundHint(selectedCompound)}
             </p>
           </div>
         </div>
       )}
     </div>
-  );
-}
-
-function CompoundMiniVisual({
-  compound,
-  locked,
-  size = 44,
-}: {
-  compound: CompoundDefinition;
-  locked?: boolean;
-  size?: number;
-}) {
-  const atoms = Object.entries(compound.elements).flatMap(([symbol, count]) =>
-    Array.from({ length: count }, () => symbol),
-  );
-  const radius = size * 0.28;
-  return (
-    <span
-      style={{
-        width: size,
-        height: size,
-        position: "relative",
-        flex: "0 0 auto",
-        display: "inline-block",
-        filter: locked ? "grayscale(1)" : "drop-shadow(0 0 10px var(--accent-glow))",
-      }}
-      aria-hidden="true"
-    >
-      {atoms.slice(0, 8).map((symbol, index) => {
-        const atomSize = size * 0.28;
-        const angle = (index / Math.max(1, atoms.length)) * Math.PI * 2 - Math.PI / 2;
-        return (
-          <span
-            key={`${symbol}-${index}`}
-            style={{
-              position: "absolute",
-              left: size / 2 + Math.cos(angle) * radius - atomSize / 2,
-              top: size / 2 + Math.sin(angle) * radius - atomSize / 2,
-              width: atomSize,
-              height: atomSize,
-              borderRadius: "50%",
-              display: "grid",
-              placeItems: "center",
-              background: locked ? "var(--surface-high)" : "linear-gradient(135deg, var(--accent), var(--primary))",
-              color: locked ? "var(--muted-foreground)" : "var(--primary-foreground)",
-              fontSize: Math.max(7, atomSize * 0.38),
-              fontWeight: 900,
-            }}
-          >
-            {locked ? "?" : symbol}
-          </span>
-        );
-      })}
-    </span>
   );
 }
 
