@@ -409,6 +409,56 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
   const [elapsedMs, setElapsedMs] = useState(0);
   const startTimeRef = useRef<number>(Date.now());
 
+  // === Merge history log ===
+  // Chronological list of every merge in this run. Opened from a button at
+  // the top header so the player can review what happened.
+  const [mergeHistory, setMergeHistory] = useState<
+    { id: number; ts: number; atom: number; depth: number; chainSize: number }[]
+  >([]);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const historyIdRef = useRef(0);
+  function pushMergeHistory(merges: { resultAtomicNumber: number; chainDepth: number }[]) {
+    if (merges.length === 0) return;
+    const now = Date.now();
+    setMergeHistory((prev) => {
+      const next = [...prev];
+      merges.forEach((m) => {
+        next.push({
+          id: ++historyIdRef.current,
+          ts: now,
+          atom: m.resultAtomicNumber,
+          depth: m.chainDepth,
+          chainSize: merges.length,
+        });
+      });
+      // Cap to last 200 entries to avoid runaway memory.
+      if (next.length > 200) next.splice(0, next.length - 200);
+      return next;
+    });
+  }
+
+  // === Pre-level shuffle (lvl 10+) ===
+  // Player gets 3 reshuffles of 4 starting atoms before the level begins.
+  const shuffleEnabled = level.id >= SHUFFLE_MIN_LEVEL;
+  const gammaEnabled = level.id >= GAMMA_MIN_LEVEL;
+  const [shuffleStartOpen, setShuffleStartOpen] = useState(false);
+  const [shufflesLeft, setShufflesLeft] = useState(SHUFFLE_LIMIT);
+  const [shuffleAtoms, setShuffleAtoms] = useState<number[]>([]);
+
+  // === Gamma bomb (lvl 12+) ===
+  const [gammaCharges, setGammaCharges] = useState(0);
+  const [pendingGamma, setPendingGamma] = useState(false);
+
+  // === Spawn-floor tier (lvl 10+) — every 2 min raise lowest spawnable tier
+  // if those atoms are absent from the board.
+  const [spawnFloorIndex, setSpawnFloorIndex] = useState(0);
+
+  function generateShuffleAtoms(): number[] {
+    const hi = Math.max(2, target - SHUFFLE_OFFSET_MIN);
+    const lo = Math.max(1, target - SHUFFLE_OFFSET_MAX);
+    return Array.from({ length: SHUFFLE_COUNT }, () => lo + Math.floor(Math.random() * (hi - lo + 1)));
+  }
+
   const target = level.targetElement;
   const targetEl = ELEMENTS[target - 1];
   const current = queue[0];
