@@ -103,6 +103,11 @@ const POWER_UP_INVENTORY_META: Record<
     name: "Grab",
     description: "Drag one atom to a better spot and set up a chain.",
   },
+  gamma: {
+    icon: "☢",
+    name: "Gamma Bomb",
+    description: "Detonate a wide radius that upgrades every atom inside by 1 tier.",
+  },
 };
 
 function countPowerUps(inventory: Partial<Record<InventoryPowerUpId, number>>): number {
