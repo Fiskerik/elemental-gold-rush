@@ -819,6 +819,15 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
         "Every 30 shots earns Transmute. Activate it to reroll your queued atom into a higher-tier atom.",
       );
     }
+    if (gammaEnabled && nextShots > 0 && nextShots % GAMMA_SHOT_INTERVAL === 0) {
+      setGammaCharges((g) => g + 1);
+      spawnPopup("☢ GAMMA READY");
+      showTip(
+        "feature-gamma-powerup",
+        "☢ Gamma Bomb ready!",
+        "Every 40 shots after level 12 earns a Gamma Bomb. Activate it, aim, and fire: a slow heavy projectile irradiates every atom in a wide radius, upgrading each one by 1 tier and triggering any cascading fusions.",
+      );
+    }
     setCatalystShotsRemaining((remaining) => Math.max(0, remaining - 1));
   }
 
