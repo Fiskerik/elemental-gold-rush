@@ -2346,16 +2346,19 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
       grantGravityForCombo(result.merges.length);
       setRunBestCombo((best) => Math.max(best, result.merges.length));
       setBestCombo(result.merges.length);
+      const showSymbolPopups = result.merges.length >= 2;
       result.merges.forEach((m, i) => {
         setTimeout(
           () => {
             sfx(() => playMergeSound(m.chainDepth));
             haptic([10, 20, 10]);
-            spawnPopup(`+${ELEMENTS[m.resultAtomicNumber - 1]?.symbol ?? "?"}`);
+            if (showSymbolPopups)
+              spawnPopup(`+${ELEMENTS[m.resultAtomicNumber - 1]?.symbol ?? "?"}`);
           },
           80 + i * 120,
         );
       });
+      pushMergeHistory(result.merges);
     }
     const nextHighest = Math.max(highest, result.highestElement);
     setHighest(nextHighest);
