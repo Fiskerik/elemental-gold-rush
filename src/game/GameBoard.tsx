@@ -373,6 +373,9 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
   const [projectile, setProjectile] = useState<{ x: number; y: number } | null>(null);
   const [eGunBeamPath, setEGunBeamPath] = useState<{ x: number; y: number }[] | null>(null);
   const [gravityFxId, setGravityFxId] = useState<number | null>(null);
+  const [fusionJumpFx, setFusionJumpFx] = useState<{ id: number; x: number; y: number } | null>(
+    null,
+  );
   const popupId = useRef(0);
   const eGunCooldownSlots = useRef(0);
 
@@ -1205,7 +1208,9 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
       let hitIdx = -1;
       let bestT = Infinity;
       for (let b = 0; b < balls.length; b++) {
-        if (balls[b].stoneHp != null && recentlyBouncedStoneIds.has(balls[b].id)) continue;
+        // Stones are impermeable — never skip them in collision detection,
+        // even if we just bounced off them. The "recently bounced" set is now
+        // only used to decide whether to deflect again or settle adjacent.
         const sumR = projR + balls[b].r;
         const ddx = x - balls[b].x;
         const ddy = y - balls[b].y;
@@ -1235,16 +1240,46 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
         const ly = Math.max(ceilingY, y - bestT * dy);
         const hitBall = balls[hitIdx];
         path.push({ x: lx, y: ly });
-        if (hitBall.stoneHp != null && !currentIsBlank && bouncedStoneIds.length < 8) {
-          bouncedStoneIds.push(hitBall.id);
-          recentlyBouncedStoneIds.add(hitBall.id);
+        if (hitBall.stoneHp != null && !currentIsBlank) {
+          // Compute the surface normal pointing from stone center → impact.
           const normalMag = Math.hypot(lx - hitBall.x, ly - hitBall.y) || 1;
           const nx = (lx - hitBall.x) / normalMag;
           const ny = (ly - hitBall.y) / normalMag;
+
+          // A perfectly straight (vertical) shot from the launcher hits the
+          // stone's underside head-on. In that case the atom sticks to the
+          // bottom edge of the stone instead of bouncing.
+          const isStraightShot = Math.abs(dx) < 0.02 && ny > 0.92;
+          const alreadyBouncedThisStone = recentlyBouncedStoneIds.has(hitBall.id);
+
+          if (isStraightShot || alreadyBouncedThisStone) {
+            // Settle adjacent to the stone — no further travel.
+            const stickX = Math.max(
+              minX,
+              Math.min(maxX, hitBall.x + nx * (hitBall.r + projR + 0.5)),
+            );
+            const stickY = Math.max(ceilingY, hitBall.y + ny * (hitBall.r + projR + 0.5));
+            path.push({ x: stickX, y: stickY });
+            return {
+              x: stickX,
+              y: stickY,
+              path,
+              hitId: null,
+              dx,
+              dy,
+              stoneHitIds: bouncedStoneIds,
+            };
+          }
+
+          bouncedStoneIds.push(hitBall.id);
+          recentlyBouncedStoneIds.add(hitBall.id);
           const dot = dx * nx + dy * ny;
           const reflectedX = dx - 2 * dot * nx;
           const reflectedY = dy - 2 * dot * ny;
-          const bounceInfluence = 0.45;
+          // Mostly reflective bounce so the angle-out is governed by the
+          // angle-in, with a small softening to avoid jittering inside the
+          // collision well.
+          const bounceInfluence = 0.85;
           dx = dx * (1 - bounceInfluence) + reflectedX * bounceInfluence;
           dy = dy * (1 - bounceInfluence) + reflectedY * bounceInfluence;
           const mag = Math.hypot(dx, dy) || 1;
@@ -1253,8 +1288,9 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
           if (import.meta.env.DEV) {
             console.log("Stone bounce", { aimDeg, dx, dy, hitId: hitBall.id });
           }
-          y = ly + dy * step * 1.5;
-          x = lx + dx * step * 1.5;
+          // Step away from the stone surface so we don't immediately re-collide.
+          x = lx + nx * (step * 1.5);
+          y = ly + ny * (step * 1.5);
           continue;
         }
         return { x: lx, y: ly, path, hitId: hitBall.id, dx, dy, stoneHitIds: bouncedStoneIds };
@@ -2053,6 +2089,14 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     if (fusionJumpArmed && result.merges.length > 0) {
       setFusionJumpArmed(false);
       if (pendingReversiblePowerUp === "fusion-jump") setPendingReversiblePowerUp(null);
+      // Visual cue — burst ring at the impact point.
+      const fxId = Date.now();
+      setFusionJumpFx({ id: fxId, x: newBall.x, y: newBall.y });
+      window.setTimeout(
+        () => setFusionJumpFx((fx) => (fx && fx.id === fxId ? null : fx)),
+        750,
+      );
+      spawnPopup("⏭ FUSION JUMP!");
     }
     const nextShots = shots + 1;
     setShots(nextShots);
@@ -2670,6 +2714,19 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     const nextScore = score + gained + mergeStoneBonus;
     setScore(nextScore);
     addScore(gained);
+    // Grab-and-drop that produces a merge counts as 1 step toward the next
+    // Grab charge, matching how a normal merge feeds the grab progress bar.
+    if (result.merges.length > 0) {
+      setGrabProgress((p) => {
+        const total = p + 1;
+        const earned = Math.floor(total / GRAB_THRESHOLD);
+        if (earned > 0) {
+          setGrabs((g) => g + earned);
+          spawnPopup(`🤚 GRAB UNLOCKED${earned > 1 ? ` ×${earned}` : ""}!`);
+        }
+        return total % GRAB_THRESHOLD;
+      });
+    }
     reportQuestProgress({
       merges: result.merges.length,
       discoveries: undiscovered,
@@ -3247,6 +3304,23 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
                   style={{ left: `${10 + i * 10}%`, animationDelay: `${i * 45}ms` }}
                 />
               ))}
+            </div>
+          )}
+
+          {fusionJumpFx && (
+            <div
+              className="fusion-jump-fx"
+              style={{
+                position: "absolute",
+                left: fusionJumpFx.x,
+                top: fusionJumpFx.y,
+                zIndex: 6,
+                pointerEvents: "none",
+              }}
+            >
+              <div className="fusion-jump-fx-ring fusion-jump-fx-ring-a" />
+              <div className="fusion-jump-fx-ring fusion-jump-fx-ring-b" />
+              <div className="fusion-jump-fx-core">⏭</div>
             </div>
           )}
 

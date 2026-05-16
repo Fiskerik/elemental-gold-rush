@@ -1,6 +1,7 @@
+import { useState } from "react";
 import { LEVELS } from "./levels";
 import { ELEMENTS } from "./elements";
-import { useProgress } from "./store";
+import { useProgress, type LevelStats } from "./store";
 import { ElementBall } from "./ElementBall";
 import { formatScore } from "./logic";
 
@@ -12,6 +13,7 @@ export function LevelSelect({
   onBack: () => void;
 }) {
   const { unlockedLevel, levelStars, levelStats } = useProgress();
+  const [statsOpenId, setStatsOpenId] = useState<number | null>(null);
   return (
     <div className="app-shell" style={{ padding: 16 }}>
       <div style={{ position: "relative", zIndex: 1, maxWidth: 480, margin: "0 auto" }}>
@@ -22,27 +24,40 @@ export function LevelSelect({
             const target = ELEMENTS[lvl.targetElement - 1];
             const stars = levelStars[lvl.id] ?? 0;
             const stats = levelStats[lvl.id];
+            const hasStats = !!stats && stats.attempts > 0;
+            const statsOpen = statsOpenId === lvl.id && hasStats;
             return (
-              <button
+              <div
                 key={lvl.id}
-                disabled={locked}
-                onClick={() => onPick(lvl.id)}
                 style={{
                   display: "flex",
                   flexDirection: "column",
-                  alignItems: "center",
-                  gap: 12,
+                  gap: 10,
                   padding: 12,
                   background: locked ? "var(--surface)" : "var(--surface-elevated)",
                   border: "1px solid var(--border)",
                   borderRadius: 12,
-                  textAlign: "left",
                   opacity: locked ? 0.45 : 1,
-                  cursor: locked ? "not-allowed" : "pointer",
                   color: "var(--foreground)",
                 }}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: 12, width: "100%" }}>
+                <button
+                  type="button"
+                  disabled={locked}
+                  onClick={() => !locked && onPick(lvl.id)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    width: "100%",
+                    background: "transparent",
+                    border: "none",
+                    padding: 0,
+                    textAlign: "left",
+                    cursor: locked ? "not-allowed" : "pointer",
+                    color: "inherit",
+                  }}
+                >
                   <div style={{ filter: locked ? "grayscale(0.8)" : undefined }}>
                     <ElementBall atomicNumber={lvl.targetElement} size={48} glow={!locked} />
                   </div>
@@ -81,35 +96,57 @@ export function LevelSelect({
                       </>
                     )}
                   </div>
-                </div>
-                {!locked && stats && stats.attempts > 0 && (
-                  <div
+                </button>
+                {!locked && hasStats && (
+                  <button
+                    type="button"
+                    onClick={() => setStatsOpenId(statsOpen ? null : lvl.id)}
                     style={{
-                      display: "grid",
-                      gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-                      gap: 6,
-                      width: "100%",
-                      marginTop: 4,
-                      paddingTop: 8,
-                      borderTop: "1px solid var(--border)",
+                      alignSelf: "flex-start",
+                      background: "var(--surface)",
+                      border: "1px solid var(--border)",
+                      color: "var(--muted-foreground)",
+                      borderRadius: 8,
+                      padding: "4px 10px",
+                      fontSize: 11,
+                      fontWeight: 700,
+                      cursor: "pointer",
                     }}
                   >
-                    <StatCell label="Attempts" value={`${stats.attempts}`} />
-                    <StatCell label="Max Score" value={formatScore(stats.maxScore)} />
-                    <StatCell
-                      label="Best Run"
-                      value={stats.bestShots != null ? `${stats.bestShots} shots` : "—"}
-                    />
-                    <StatCell label="Power-ups" value={`${stats.powerUpsUsed}`} />
-                    <StatCell label="Total Score" value={formatScore(stats.totalScore)} />
-                    <StatCell label="Stars" value={`${stats.stars}/3`} />
-                  </div>
+                    {statsOpen ? "Hide stats ▴" : "Show stats ▾"}
+                  </button>
                 )}
-              </button>
+                {statsOpen && stats && <StatsGrid stats={stats} />}
+              </div>
             );
           })}
         </div>
       </div>
+    </div>
+  );
+}
+
+function StatsGrid({ stats }: { stats: LevelStats }) {
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+        gap: 6,
+        width: "100%",
+        paddingTop: 8,
+        borderTop: "1px solid var(--border)",
+      }}
+    >
+      <StatCell label="Attempts" value={`${stats.attempts}`} />
+      <StatCell label="Max Score" value={formatScore(stats.maxScore)} />
+      <StatCell
+        label="Best Run"
+        value={stats.bestShots != null ? `${stats.bestShots} shots` : "—"}
+      />
+      <StatCell label="Power-ups" value={`${stats.powerUpsUsed}`} />
+      <StatCell label="Total Score" value={formatScore(stats.totalScore)} />
+      <StatCell label="Stars" value={`${stats.stars}/3`} />
     </div>
   );
 }
