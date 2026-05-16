@@ -60,6 +60,13 @@ export const POWER_UPS = [
       "A heavy obstacle projectile that shoves clusters and can be cracked for bonus points.",
   },
   {
+    icon: "☢",
+    name: "Gamma Bomb",
+    unlock: "Level 12 / every 40 shots",
+    description:
+      "Arms a slow heavy projectile that clears every non-stone atom in a wide blast radius.",
+  },
+  {
     icon: "✦",
     name: "Blank Atom",
     unlock: "Level 10",

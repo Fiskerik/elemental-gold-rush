@@ -1,10 +1,11 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, type CSSProperties, type ReactNode } from "react";
 import {
   Atom,
   BookOpen,
   FlaskConical,
   Layers,
   Library,
+  Play,
   ShoppingBag,
   Settings as SettingsIcon,
   User,
@@ -14,6 +15,7 @@ import { LEVELS } from "./levels";
 import { useProgress } from "./store";
 import { formatScore } from "./logic";
 import { ELEMENTS } from "./elements";
+import { ElementBall } from "./ElementBall";
 import { trackMenuAction } from "./analytics";
 
 interface Props {
@@ -51,15 +53,17 @@ export function MainMenu({
   } = useProgress();
   const highestEl = ELEMENTS[highestElement - 1];
   const nextLevel = LEVELS[Math.min(unlockedLevel - 1, LEVELS.length - 1)];
+  const targetEl = ELEMENTS[(nextLevel?.targetElement ?? 1) - 1];
   const completedDailyQuests = dailyQuests.filter((quest) => quest.completed).length;
   const dailyComplete = dailyQuests.length > 0 && completedDailyQuests >= 4;
+  const campaignProgress = Math.round((Math.min(unlockedLevel, LEVELS.length) / LEVELS.length) * 100);
 
   useEffect(() => {
     refreshDailyLab();
   }, [refreshDailyLab]);
 
   return (
-    <div className="app-shell" style={{ padding: 20, paddingTop: 32 }}>
+    <div className="app-shell" style={{ padding: 18, paddingTop: 26 }}>
       <div
         style={{
           position: "relative",
@@ -68,60 +72,63 @@ export function MainMenu({
           margin: "0 auto",
           display: "flex",
           flexDirection: "column",
-          gap: 18,
+          gap: 14,
           minHeight: "100dvh",
           paddingBottom: 24,
         }}
       >
-        <header
-          style={{
-            textAlign: "center",
-            marginTop: 18,
-            padding: "20px 16px",
-            borderRadius: 26,
-            background:
-              "radial-gradient(circle at top, oklch(0.72 0.14 85 / 0.18), transparent 58%), linear-gradient(135deg, var(--surface-elevated), var(--surface))",
-            border: "1px solid var(--border)",
-            boxShadow: "0 16px 40px rgba(0,0,0,0.28)",
-          }}
-        >
-          <div
-            style={{
-              fontSize: 12,
-              letterSpacing: 4,
-              color: "var(--muted-foreground)",
-              marginBottom: 6,
-            }}
-          >
-            ATOMIC FUSION • LV {unlockedLevel}
+        <header style={heroPanel}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={eyebrow}>LEVEL {unlockedLevel} OF {LEVELS.length}</div>
+            <h1 className="gold-text" style={titleStyle}>
+              Elemental Gold Rush
+            </h1>
+            <p style={subtitleStyle}>
+              Fuse atoms, discover the periodic table, and push toward {targetEl?.name ?? "Gold"}.
+            </p>
+            <div style={heroActions}>
+              <button
+                onClick={() => {
+                  trackMenuAction("continue");
+                  onPlay();
+                }}
+                style={heroPlayBtn}
+              >
+                <Play size={18} fill="currentColor" aria-hidden="true" />
+                Continue
+              </button>
+              <button
+                onClick={() => {
+                  trackMenuAction("levels");
+                  onLevels();
+                }}
+                style={secondaryBtn}
+              >
+                <Layers size={17} aria-hidden="true" />
+                Map
+              </button>
+            </div>
           </div>
-          <h1
-            className="gold-text"
-            style={{
-              fontSize: 38,
-              fontWeight: 900,
-              letterSpacing: -1,
-              lineHeight: 1.05,
-              margin: 0,
-            }}
-          >
-            Elemental
-            <br />
-            Gold Rush
-          </h1>
-          <p style={{ color: "var(--muted-foreground)", marginTop: 10, fontSize: 13 }}>
-            Fuse atoms. Forge the periodic table. Reach gold.
-          </p>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 10, marginTop: 16 }}>
-            <button
-              onClick={() => {
-                trackMenuAction("continue");
-                onPlay();
-              }}
-              style={heroPlayBtn}
-            >
-              ▶ Continue Level {unlockedLevel}
-            </button>
+          <div style={targetOrb}>
+            <ElementBall atomicNumber={nextLevel?.targetElement ?? 1} size={94} glow />
+            <div style={targetLabel}>
+              <span>{targetEl?.symbol ?? "H"}</span>
+              <small>Target</small>
+            </div>
+          </div>
+        </header>
+
+        <section style={progressPanel}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+            <div>
+              <div style={sectionLabel}>NEXT RUN</div>
+              <div style={{ fontSize: 17, fontWeight: 900 }}>
+                Level {unlockedLevel}: {nextLevel?.name}
+              </div>
+              <div style={{ fontSize: 12, color: "var(--muted-foreground)", marginTop: 2 }}>
+                {nextLevel?.description}
+              </div>
+            </div>
             <button
               onClick={() => {
                 trackMenuAction("profile");
@@ -130,89 +137,75 @@ export function MainMenu({
               style={profileBtn}
               aria-label="Open profile"
             >
-              👤
+              <User size={19} aria-hidden="true" />
             </button>
           </div>
-        </header>
-
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
-          <Stat label="Highest" value={highestEl?.symbol ?? "H"} sub={`#${highestElement}`} />
-          <Stat label="Score" value={formatScore(totalScore)} sub="total" />
-          <Stat label="Combo" value={`${bestCombo}`} sub="best" />
-        </div>
-
-        <section
-          style={{
-            background: "linear-gradient(135deg, var(--surface-elevated), var(--surface))",
-            border: "1px solid var(--border)",
-            borderRadius: 16,
-            padding: 14,
-            boxShadow: "0 8px 24px rgba(0,0,0,0.25)",
-          }}
-        >
-          <div
-            style={{
-              fontSize: 11,
-              letterSpacing: 2,
-              color: "var(--accent)",
-              fontWeight: 800,
-              marginBottom: 8,
-            }}
-          >
-            MISSION BRIEFING
+          <div style={progressTrack}>
+            <div style={{ ...progressFill, width: `${campaignProgress}%` }} />
           </div>
-          <div
-            style={{
-              display: "grid",
-              gap: 8,
-              fontSize: 12,
-              color: "var(--muted-foreground)",
-              lineHeight: 1.45,
-            }}
-          >
-            <div>🎯 Aim from the launcher, release to shoot, and bounce shots off walls.</div>
-            <div>⚛️ Match touching atoms with the same element to fuse into the next element.</div>
-            <div>
-              🚧 Keep atoms above the red danger zone and use power-ups to rescue crowded boards.
-            </div>
+          <div style={statGrid}>
+            <Stat label="Highest" value={highestEl?.symbol ?? "H"} sub={`#${highestElement}`} />
+            <Stat label="Score" value={formatScore(totalScore)} sub="total" />
+            <Stat label="Combo" value={`${bestCombo}`} sub="best" />
           </div>
         </section>
 
-        <section
-          style={{
-            background: "var(--surface-elevated)",
-            border: "1px solid var(--border)",
-            borderRadius: 16,
-            padding: 14,
-            boxShadow: "0 8px 24px rgba(0,0,0,0.25)",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 12,
-              marginBottom: 10,
+        <nav style={actionGrid} aria-label="Main game sections">
+          <BigButton
+            icon={Atom}
+            iconColor="oklch(0.78 0.18 145)"
+            onClick={() => {
+              trackMenuAction("collection");
+              onCollection();
             }}
           >
+            Collection
+          </BigButton>
+          <BigButton
+            icon={FlaskConical}
+            iconColor="oklch(0.78 0.2 320)"
+            onClick={() => {
+              trackMenuAction("lab");
+              onLab();
+            }}
+          >
+            Lab Modes
+          </BigButton>
+          <BigButton
+            icon={Library}
+            iconColor="oklch(0.78 0.16 50)"
+            onClick={() => {
+              trackMenuAction("library");
+              onLibrary();
+            }}
+          >
+            Library
+          </BigButton>
+          <BigButton
+            icon={hasProPack ? BookOpen : ShoppingBag}
+            iconColor="oklch(0.78 0.18 25)"
+            onClick={() => {
+              trackMenuAction("shop");
+              onShop();
+            }}
+          >
+            {hasProPack ? "Pro Pack" : "Shop"}
+          </BigButton>
+        </nav>
+
+        <section style={dailyPanel}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
             <div>
-              <div
-                style={{ fontSize: 11, letterSpacing: 2, color: "var(--accent)", fontWeight: 800 }}
-              >
-                DAILY LAB
-              </div>
+              <div style={sectionLabel}>DAILY LAB</div>
               <div style={{ fontSize: 12, color: "var(--muted-foreground)" }}>
-                Streak: {dailyStreak} • {completedDailyQuests}/{dailyQuests.length} quests
+                Streak {dailyStreak} - {completedDailyQuests}/{dailyQuests.length} quests
               </div>
             </div>
             <button
               onClick={claimDailyReward}
               disabled={!dailyComplete || claimedDailyReward}
               style={{
-                border: "none",
-                borderRadius: 10,
-                padding: "8px 10px",
+                ...claimBtn,
                 background:
                   dailyComplete && !claimedDailyReward
                     ? "linear-gradient(135deg, var(--accent), var(--primary))"
@@ -221,28 +214,24 @@ export function MainMenu({
                   dailyComplete && !claimedDailyReward
                     ? "var(--primary-foreground)"
                     : "var(--muted-foreground)",
-                fontSize: 11,
-                fontWeight: 800,
                 cursor: dailyComplete && !claimedDailyReward ? "pointer" : "not-allowed",
               }}
             >
               {claimedDailyReward ? "Claimed" : "Claim"}
             </button>
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {dailyQuests.map((quest) => (
-              <div
-                key={quest.id}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "20px 1fr auto",
-                  alignItems: "center",
-                  gap: 8,
-                  fontSize: 12,
-                }}
-              >
-                <span>{quest.completed ? "✅" : "⚗️"}</span>
-                <span>{quest.title}</span>
+          <div style={questGrid}>
+            {dailyQuests.slice(0, 4).map((quest) => (
+              <div key={quest.id} style={questRow}>
+                <span
+                  style={{
+                    ...questDot,
+                    background: quest.completed ? "var(--accent)" : "var(--surface-high)",
+                  }}
+                />
+                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {quest.title}
+                </span>
                 <span style={{ color: "var(--muted-foreground)", fontSize: 11 }}>
                   {quest.progress}/{quest.target}
                 </span>
@@ -251,127 +240,82 @@ export function MainMenu({
           </div>
         </section>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <section style={nextRunCard}>
-            <div>
-              <div style={{ fontSize: 11, opacity: 0.7, letterSpacing: 2, fontWeight: 900 }}>
-                NEXT RUN
-              </div>
-              <div style={{ fontSize: 18, fontWeight: 900 }}>
-                Level {unlockedLevel} — {nextLevel?.name}
-              </div>
-              <div style={{ fontSize: 12, opacity: 0.85, marginTop: 2 }}>
-                {nextLevel?.description}
-              </div>
-            </div>
-            <button
-              onClick={() => {
-                trackMenuAction("continue");
-                onPlay();
-              }}
-              style={smallPlayBtn}
-            >
-              Play
-            </button>
-          </section>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <BigButton
-              icon={Layers}
-              iconColor="oklch(0.75 0.18 230)"
-              onClick={() => {
-                trackMenuAction("levels");
-                onLevels();
-              }}
-            >
-              Levels
-            </BigButton>
-            <BigButton
-              icon={Atom}
-              iconColor="oklch(0.78 0.18 145)"
-              onClick={() => {
-                trackMenuAction("collection");
-                onCollection();
-              }}
-            >
-              Collection
-            </BigButton>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <BigButton
-              icon={FlaskConical}
-              iconColor="oklch(0.78 0.2 320)"
-              onClick={() => {
-                trackMenuAction("lab");
-                onLab();
-              }}
-            >
-              Lab Modes
-            </BigButton>
-            <BigButton
-              icon={Library}
-              iconColor="oklch(0.78 0.16 50)"
-              onClick={() => {
-                trackMenuAction("library");
-                onLibrary();
-              }}
-            >
-              Game Library
-            </BigButton>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
-            <BigButton
-              icon={User}
-              iconColor="oklch(0.8 0.16 85)"
-              onClick={() => {
-                trackMenuAction("profile");
-                onProfile();
-              }}
-            >
-              Profile
-            </BigButton>
-            <BigButton
-              icon={hasProPack ? BookOpen : ShoppingBag}
-              iconColor="oklch(0.78 0.18 25)"
-              onClick={() => {
-                trackMenuAction("shop");
-                onShop();
-              }}
-            >
-              {hasProPack ? "Pro" : "Shop"}
-            </BigButton>
-            <BigButton
-              icon={SettingsIcon}
-              iconColor="oklch(0.78 0.04 250)"
-              onClick={() => {
-                trackMenuAction("settings");
-                onSettings();
-              }}
-            >
-              Settings
-            </BigButton>
-          </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <BigButton
+            icon={User}
+            iconColor="oklch(0.8 0.16 85)"
+            onClick={() => {
+              trackMenuAction("profile");
+              onProfile();
+            }}
+          >
+            Profile
+          </BigButton>
+          <BigButton
+            icon={SettingsIcon}
+            iconColor="oklch(0.78 0.04 250)"
+            onClick={() => {
+              trackMenuAction("settings");
+              onSettings();
+            }}
+          >
+            Settings
+          </BigButton>
         </div>
-
-        <footer
-          style={{
-            marginTop: "auto",
-            textAlign: "center",
-            color: "var(--muted-foreground)",
-            fontSize: 11,
-            opacity: 0.7,
-          }}
-        >
-          Tap a column to drop your element. Match neighbors to fuse.
-        </footer>
       </div>
     </div>
   );
 }
 
-const heroPlayBtn: React.CSSProperties = {
+const heroPanel: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "minmax(0, 1fr) auto",
+  alignItems: "center",
+  gap: 18,
+  padding: "24px 18px",
+  borderRadius: 20,
+  background:
+    "radial-gradient(circle at 82% 18%, oklch(0.75 0.16 85 / 0.24), transparent 32%), linear-gradient(145deg, var(--surface-elevated), var(--surface))",
+  border: "1px solid var(--border)",
+  boxShadow: "0 16px 42px rgba(0,0,0,0.32)",
+};
+
+const eyebrow: CSSProperties = {
+  fontSize: 11,
+  letterSpacing: 2,
+  color: "var(--accent)",
+  fontWeight: 900,
+};
+
+const titleStyle: CSSProperties = {
+  fontSize: 34,
+  fontWeight: 900,
+  lineHeight: 1,
+  margin: "7px 0 0",
+};
+
+const subtitleStyle: CSSProperties = {
+  color: "var(--muted-foreground)",
+  margin: "10px 0 0",
+  fontSize: 13,
+  lineHeight: 1.45,
+};
+
+const heroActions: CSSProperties = {
+  display: "flex",
+  gap: 10,
+  marginTop: 18,
+  flexWrap: "wrap",
+};
+
+const heroPlayBtn: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 8,
   border: "none",
-  borderRadius: 16,
-  padding: "13px 16px",
+  borderRadius: 14,
+  padding: "13px 18px",
   background: "linear-gradient(135deg, var(--primary), oklch(0.55 0.15 230))",
   color: "var(--primary-foreground)",
   boxShadow: "0 10px 26px var(--primary-glow)",
@@ -379,36 +323,122 @@ const heroPlayBtn: React.CSSProperties = {
   cursor: "pointer",
 };
 
-const profileBtn: React.CSSProperties = {
+const secondaryBtn: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 7,
   border: "1px solid var(--border)",
-  borderRadius: 16,
-  padding: "0 14px",
+  borderRadius: 14,
+  padding: "12px 14px",
   background: "var(--surface)",
   color: "var(--foreground)",
-  fontSize: 20,
+  fontWeight: 800,
   cursor: "pointer",
 };
 
-const nextRunCard: React.CSSProperties = {
+const targetOrb: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "1fr auto",
-  alignItems: "center",
-  gap: 14,
-  padding: 16,
-  borderRadius: 18,
-  background: "linear-gradient(135deg, var(--primary), oklch(0.55 0.15 230))",
-  color: "var(--primary-foreground)",
-  boxShadow: "0 10px 30px var(--primary-glow)",
+  justifyItems: "center",
+  gap: 6,
+  minWidth: 110,
 };
 
-const smallPlayBtn: React.CSSProperties = {
-  border: "none",
-  borderRadius: 12,
-  padding: "10px 14px",
-  background: "rgba(255,255,255,0.22)",
-  color: "var(--primary-foreground)",
+const targetLabel: CSSProperties = {
+  display: "grid",
+  justifyItems: "center",
+  gap: 1,
   fontWeight: 900,
+  color: "var(--foreground)",
+};
+
+const progressPanel: CSSProperties = {
+  padding: 14,
+  borderRadius: 16,
+  background: "color-mix(in oklch, var(--surface-elevated) 88%, transparent)",
+  border: "1px solid var(--border)",
+};
+
+const sectionLabel: CSSProperties = {
+  fontSize: 10,
+  letterSpacing: 1.8,
+  color: "var(--accent)",
+  fontWeight: 900,
+  marginBottom: 4,
+};
+
+const profileBtn: CSSProperties = {
+  width: 42,
+  height: 42,
+  display: "grid",
+  placeItems: "center",
+  border: "1px solid var(--border)",
+  borderRadius: 12,
+  background: "var(--surface)",
+  color: "var(--foreground)",
   cursor: "pointer",
+};
+
+const progressTrack: CSSProperties = {
+  height: 8,
+  borderRadius: 999,
+  background: "var(--surface-high)",
+  overflow: "hidden",
+  marginTop: 14,
+};
+
+const progressFill: CSSProperties = {
+  height: "100%",
+  borderRadius: 999,
+  background: "linear-gradient(90deg, var(--primary), var(--accent))",
+};
+
+const statGrid: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+  gap: 8,
+  marginTop: 12,
+};
+
+const actionGrid: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+  gap: 10,
+};
+
+const dailyPanel: CSSProperties = {
+  background: "var(--surface-elevated)",
+  border: "1px solid var(--border)",
+  borderRadius: 16,
+  padding: 14,
+};
+
+const claimBtn: CSSProperties = {
+  border: "none",
+  borderRadius: 10,
+  padding: "8px 10px",
+  fontSize: 11,
+  fontWeight: 900,
+};
+
+const questGrid: CSSProperties = {
+  display: "grid",
+  gap: 7,
+  marginTop: 12,
+};
+
+const questRow: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "10px minmax(0, 1fr) auto",
+  alignItems: "center",
+  gap: 8,
+  fontSize: 12,
+};
+
+const questDot: CSSProperties = {
+  width: 8,
+  height: 8,
+  borderRadius: 999,
 };
 
 function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
@@ -417,15 +447,16 @@ function Stat({ label, value, sub }: { label: string; value: string; sub?: strin
       style={{
         background: "var(--surface)",
         border: "1px solid var(--border)",
-        borderRadius: 12,
-        padding: "12px 8px",
+        borderRadius: 10,
+        padding: "10px 8px",
         textAlign: "center",
+        minWidth: 0,
       }}
     >
-      <div style={{ fontSize: 10, letterSpacing: 1.5, color: "var(--muted-foreground)" }}>
+      <div style={{ fontSize: 9, letterSpacing: 1.3, color: "var(--muted-foreground)" }}>
         {label.toUpperCase()}
       </div>
-      <div style={{ fontSize: 22, fontWeight: 800, color: "var(--primary)", marginTop: 2 }}>
+      <div style={{ fontSize: 20, fontWeight: 900, color: "var(--primary)", marginTop: 2 }}>
         {value}
       </div>
       {sub && <div style={{ fontSize: 10, color: "var(--muted-foreground)" }}>{sub}</div>}
@@ -436,13 +467,11 @@ function Stat({ label, value, sub }: { label: string; value: string; sub?: strin
 function BigButton({
   children,
   onClick,
-  primary,
   icon: Icon,
   iconColor,
 }: {
   children: ReactNode;
   onClick: () => void;
-  primary?: boolean;
   icon?: LucideIcon;
   iconColor?: string;
 }) {
@@ -454,25 +483,26 @@ function BigButton({
         display: "flex",
         alignItems: "center",
         gap: 10,
-        padding: "16px 18px",
-        borderRadius: 14,
-        border: "1px solid " + (primary ? "transparent" : "var(--border)"),
-        background: primary
-          ? "linear-gradient(135deg, var(--primary), oklch(0.55 0.15 230))"
-          : "var(--surface)",
-        color: primary ? "var(--primary-foreground)" : "var(--foreground)",
-        boxShadow: primary ? "0 8px 24px var(--primary-glow)" : "0 2px 8px rgba(0,0,0,0.3)",
+        padding: "14px 15px",
+        borderRadius: 13,
+        border: "1px solid var(--border)",
+        background: "var(--surface)",
+        color: "var(--foreground)",
+        boxShadow: "0 2px 8px rgba(0,0,0,0.22)",
         cursor: "pointer",
-        fontSize: 16,
-        fontWeight: 700,
+        fontSize: 15,
+        fontWeight: 800,
         transition: "transform 0.1s ease",
+        minWidth: 0,
       }}
       onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.98)")}
       onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
       onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
     >
-      {Icon && <Icon size={20} color={iconColor} aria-hidden="true" />}
-      <span>{children}</span>
+      {Icon && <Icon size={19} color={iconColor} aria-hidden="true" />}
+      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        {children}
+      </span>
     </button>
   );
 }

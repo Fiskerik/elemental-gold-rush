@@ -57,7 +57,7 @@ const SHOP_POWER_UPS: Array<{
     icon: "☢",
     name: "Gamma Bomb",
     cost: 1500,
-    description: "Stock a wide-radius blast that upgrades every atom inside by 1 tier.",
+    description: "Stock a wide-radius blast that clears surrounding non-stone atoms.",
   },
 ];
 

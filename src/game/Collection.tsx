@@ -127,6 +127,8 @@ export function Collection({ onBack }: { onBack: () => void }) {
           </div>
         </div>
 
+        <CategoryLegend />
+
         {/* Badges */}
         <div style={{ marginTop: 20 }}>
           <div
@@ -237,36 +239,6 @@ export function Collection({ onBack }: { onBack: () => void }) {
           </div>
         </div>
 
-        {/* Category legend */}
-        <div style={{ marginTop: 20 }}>
-          <div
-            style={{
-              fontSize: 11,
-              letterSpacing: 1.5,
-              color: "var(--muted-foreground)",
-              marginBottom: 8,
-            }}
-          >
-            CATEGORIES
-          </div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {Object.entries(CATEGORY_COLORS).map(([k, v]) => (
-              <div
-                key={k}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 4,
-                  fontSize: 10,
-                  color: "var(--muted-foreground)",
-                }}
-              >
-                <div style={{ width: 10, height: 10, borderRadius: 3, background: v.color }} />
-                {k}
-              </div>
-            ))}
-          </div>
-        </div>
       </div>
 
       {el && (
@@ -344,6 +316,50 @@ export function Collection({ onBack }: { onBack: () => void }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function CategoryLegend() {
+  return (
+    <div
+      style={{
+        marginTop: 10,
+        padding: "10px 12px",
+        borderRadius: 10,
+        border: "1px solid var(--border)",
+        background: "color-mix(in oklch, var(--surface) 78%, transparent)",
+      }}
+    >
+      <div
+        style={{
+          fontSize: 10,
+          letterSpacing: 1.5,
+          color: "var(--muted-foreground)",
+          marginBottom: 8,
+          fontWeight: 800,
+        }}
+      >
+        LEGEND
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "7px 10px" }}>
+        {Object.entries(CATEGORY_COLORS).map(([k, v]) => (
+          <div
+            key={k}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 5,
+              fontSize: 10,
+              color: "var(--muted-foreground)",
+              lineHeight: 1,
+            }}
+          >
+            <div style={{ width: 10, height: 10, borderRadius: 3, background: v.color }} />
+            {k.replace("-", " ")}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

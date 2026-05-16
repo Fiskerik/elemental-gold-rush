@@ -30,7 +30,25 @@ function byPeriod(period: number): number[] {
   );
 }
 
+function byGroup(group: number): number[] {
+  return ELEMENTS.filter((element) => element.group === group).map(
+    (element) => element.atomicNumber,
+  );
+}
+
+function allElements(): number[] {
+  return ELEMENTS.map((element) => element.atomicNumber);
+}
+
 export const BADGES: BadgeDefinition[] = [
+  {
+    id: "first-row-complete",
+    group: "periods",
+    name: "First Row",
+    description: "Discover Hydrogen and Helium.",
+    icon: "H",
+    requiredAtomicNumbers: byPeriod(1),
+  },
   {
     id: "noble-collector",
     group: "families",
@@ -54,6 +72,54 @@ export const BADGES: BadgeDefinition[] = [
     description: "Discover Uranium.",
     icon: "☢️",
     requiredAtomicNumbers: [92],
+  },
+  {
+    id: "reactive-nonmetal-set",
+    group: "families",
+    name: "Reactive Core",
+    description: "Discover every reactive nonmetal.",
+    icon: "Rx",
+    requiredAtomicNumbers: byCategory("reactive-nonmetal"),
+  },
+  {
+    id: "post-transition-set",
+    group: "families",
+    name: "Soft Metals",
+    description: "Discover every post-transition metal.",
+    icon: "Sn",
+    requiredAtomicNumbers: byCategory("post-transition"),
+  },
+  {
+    id: "coinage-metals",
+    group: "families",
+    name: "Coinage Metals",
+    description: "Discover Copper, Silver, and Gold.",
+    icon: "Au",
+    requiredAtomicNumbers: [29, 47, 79],
+  },
+  {
+    id: "carbon-family",
+    group: "families",
+    name: "Carbon Family",
+    description: "Discover every Group 14 element.",
+    icon: "C",
+    requiredAtomicNumbers: byGroup(14),
+  },
+  {
+    id: "pnictogen-family",
+    group: "families",
+    name: "Nitrogen Family",
+    description: "Discover every Group 15 element.",
+    icon: "N",
+    requiredAtomicNumbers: byGroup(15),
+  },
+  {
+    id: "chalcogen-family",
+    group: "families",
+    name: "Oxygen Family",
+    description: "Discover every Group 16 element.",
+    icon: "O",
+    requiredAtomicNumbers: byGroup(16),
   },
   {
     id: "full-period-2",
@@ -144,6 +210,30 @@ export const BADGES: BadgeDefinition[] = [
     requiredAtomicNumbers: [2],
   },
   {
+    id: "full-period-5",
+    group: "periods",
+    name: "Full Period 5",
+    description: "Discover every Period 5 element.",
+    icon: "5",
+    requiredAtomicNumbers: byPeriod(5),
+  },
+  {
+    id: "full-period-6",
+    group: "periods",
+    name: "Full Period 6",
+    description: "Discover every Period 6 element, including lanthanides.",
+    icon: "6",
+    requiredAtomicNumbers: byPeriod(6),
+  },
+  {
+    id: "full-period-7",
+    group: "periods",
+    name: "Full Period 7",
+    description: "Discover every Period 7 element, including actinides.",
+    icon: "7",
+    requiredAtomicNumbers: byPeriod(7),
+  },
+  {
     id: "carbon-life",
     group: "milestones",
     name: "Carbon-Based",
@@ -176,12 +266,36 @@ export const BADGES: BadgeDefinition[] = [
     requiredAtomicNumbers: [78],
   },
   {
+    id: "superheavy-scout",
+    group: "milestones",
+    name: "Superheavy Scout",
+    description: "Discover Hassium.",
+    icon: "Hs",
+    requiredAtomicNumbers: [108],
+  },
+  {
+    id: "table-finisher",
+    group: "milestones",
+    name: "Table Finisher",
+    description: "Discover Oganesson.",
+    icon: "Og",
+    requiredAtomicNumbers: [118],
+  },
+  {
     id: "century-club",
     group: "mastery",
     name: "Century Club",
     description: "Discover 50 elements.",
     icon: "🏅",
     requiredAtomicNumbers: Array.from({ length: 50 }, (_, i) => i + 1),
+  },
+  {
+    id: "periodic-master",
+    group: "mastery",
+    name: "Periodic Master",
+    description: "Discover all 118 elements.",
+    icon: "118",
+    requiredAtomicNumbers: allElements(),
   },
 ];
 

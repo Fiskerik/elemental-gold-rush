@@ -106,7 +106,7 @@ const POWER_UP_INVENTORY_META: Record<
   gamma: {
     icon: "☢",
     name: "Gamma Bomb",
-    description: "Detonate a wide radius that upgrades every atom inside by 1 tier.",
+    description: "Detonate a wide radius that clears surrounding atoms.",
   },
 };
 
@@ -926,7 +926,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
       showTip(
         "feature-gamma-powerup",
         "☢ Gamma Bomb ready!",
-        "Every 40 shots after level 12 earns a Gamma Bomb. Activate it, aim, and fire: a slow heavy projectile irradiates every atom in a wide radius, upgrading each one by 1 tier and triggering any cascading fusions.",
+        "Every 40 shots after level 12 earns a Gamma Bomb. Activate it, aim, and fire: a slow heavy projectile clears every non-stone atom in a wide radius.",
       );
     }
     setCatalystShotsRemaining((remaining) => Math.max(0, remaining - 1));
@@ -1336,6 +1336,11 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
           // Compute the surface normal pointing from stone center → impact.
           const nx = hit.nx;
           const ny = hit.ny;
+          const isLowerFace = ny > 0.22 || ly > hitBall.y + hitBall.r * 0.18;
+          const isRisingIntoStone = dy < 0.15;
+          if (!pendingStone && isLowerFace && isRisingIntoStone) {
+            return { x: lx, y: ly, path, hitId: hitBall.id, dx, dy, stoneHitIds: bouncedStoneIds };
+          }
           bouncedStoneIds.push(hitBall.id);
           recentlyBouncedStoneIds.add(hitBall.id);
           const dot = dx * nx + dy * ny;
@@ -1448,7 +1453,8 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     for (const merge of merges) {
       for (const stone of source) {
         if (stone.stoneHp == null) continue;
-        if (Math.hypot(stone.x - merge.x, stone.y - merge.y) <= stone.r + geo.radius * 1.25) {
+        const outerR = stoneSurfaceRadius(stone, merge.x, merge.y);
+        if (Math.hypot(stone.x - merge.x, stone.y - merge.y) <= outerR + radiusFor(1)) {
           damage.set(stone.id, (damage.get(stone.id) ?? 0) + 1);
         }
       }
@@ -1606,97 +1612,38 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
   }
 
   function fireGamma(ix: number, iy: number) {
-    // Irradiate every non-stone atom within the gamma radius by +1 tier,
-    // then settle any cascading merges.
+    // Clear every non-stone atom within the gamma radius.
     const radius = gammaR * GAMMA_RADIUS_MULT;
-    const upgradedAtoms = new Set<number>();
     const hitIds = new Set<number>();
-    const irradiated: Board = balls.map((b) => {
-      if (b.stoneHp != null) return b;
-      if (Math.hypot(b.x - ix, b.y - iy) > radius + b.r) return b;
+    const clearedAtoms: number[] = [];
+    const remaining: Board = balls.filter((b) => {
+      if (b.stoneHp != null) return true;
+      if (Math.hypot(b.x - ix, b.y - iy) > radius + b.r) return true;
       hitIds.add(b.id);
-      if (b.atom >= 118) return b;
-      const atom = Math.min(118, b.atom + 1);
-      upgradedAtoms.add(atom);
-      return { ...b, atom, r: radiusFor(atom) };
+      clearedAtoms.push(b.atom);
+      return false;
     });
     const nextShots = shots + 1;
     setShots(nextShots);
     applyShotMilestones(nextShots);
     setPendingGamma(false);
-    // Settle merges produced by the upgrade.
-    let result = mergeSettledBoard(
-      irradiated,
-      geo,
-      target,
-      118,
-      catalystShotsRemaining > 0 ? CATALYST_ADJ_FACTOR : undefined,
-      false,
-    );
-    result = { ...result, balls: relaxBoard(result.balls) };
-    setBalls(result.balls.map((b) => (b.stoneHp != null ? b : { ...b, r: radiusFor(b.atom) })));
+    const updated = relaxBoard(remaining);
+    setBalls(updated);
     setWiggleIds(hitIds);
     setTimeout(() => setWiggleIds(new Set()), 380);
     setNoMergeStreak(0);
 
-    const newAtoms = new Set<number>();
-    upgradedAtoms.forEach((n) => newAtoms.add(n));
-    result.merges.forEach((m) => newAtoms.add(m.resultAtomicNumber));
-    const discoveries = Array.from(newAtoms).filter((n) => !discoveredElements.includes(n));
-    if (discoveries.length > 0) registerDiscoveries(discoveries);
-
-    if (result.merges.length > 0) {
-      pushMergeHistory(result.merges);
-      setRunBestCombo((best) => Math.max(best, result.merges.length));
-      setBestCombo(result.merges.length);
-      result.merges.forEach((m, i) => {
-        setTimeout(
-          () => {
-            sfx(() => playMergeSound(m.chainDepth));
-            haptic([10, 20, 10]);
-          },
-          80 + i * 120,
-        );
-      });
-    }
-
-    const reachedHighest = Math.max(highest, ...Array.from(newAtoms), result.highestElement);
-    setHighest(reachedHighest);
-    setHighestElement(reachedHighest);
     const gained = Math.floor(
-      (result.scoreGained + hitIds.size * 25) * level.scoreMultiplier,
+      clearedAtoms.reduce((sum, atom) => sum + atom * 12, 0) * level.scoreMultiplier,
     );
     const nextScore = score + gained;
     setScore(nextScore);
     addScore(gained);
 
-    spawnPopup(hitIds.size > 0 ? `☢ GAMMA +${hitIds.size}` : "☢ GAMMA");
+    spawnPopup(hitIds.size > 0 ? `☢ GAMMA -${hitIds.size}` : "☢ GAMMA");
     haptic([30, 50, 30, 50, 60]);
 
-    reportQuestProgress({
-      merges: result.merges.length,
-      discoveries,
-      reachedAtomicNumbers: Array.from(newAtoms),
-      maxChainDepth: result.merges.length,
-    });
-
-    const reachedTarget = result.levelComplete || Array.from(newAtoms).some((a) => a >= target);
-    if (reachedTarget && !continuingPastTarget) {
-      const timeSec = (Date.now() - startTimeRef.current) / 1000;
-      const stars = calculateStars(level, nextScore, nextShots, runBestCombo, timeSec);
-      setEarnedStars(stars);
-      setLevelStars(levelId, stars);
-      reportQuestProgress({ levelCleared: true, starsEarned: stars });
-      unlockLevel(levelId + 1);
-      sfx(playWinSound);
-      haptic([30, 60, 30, 60, 80]);
-      trackLevelWin(levelId, nextScore, nextShots, reachedHighest, mode);
-      if (mode !== "campaign") setChallengeBestScore(mode, nextScore);
-      showStageClearAnimation({ stars, score: nextScore, shots: nextShots, bestCombo: runBestCombo });
-      return;
-    }
-
-    if (checkGameOver(result.balls, geo)) {
+    if (checkGameOver(updated, geo)) {
       trackGameOver(levelId, score, nextShots, highest, mode);
       setGameOver(true);
       haptic([50, 80, 50, 80, 200]);
@@ -3895,12 +3842,12 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
             {(gammaCharges > 0 || pendingGamma) && (
               <button
                 type="button"
-                title="Gamma Bomb: irradiate every atom in a wide radius, upgrading each by 1 tier."
+                title="Gamma Bomb: clear every non-stone atom in a wide radius."
                 aria-label={`Use Gamma Bomb power-up (${gammaCharges} available)`}
                 onClick={triggerGammaPowerUp}
                 {...powerUpInfoHandlers(
                   "☢ Gamma Bomb",
-                  "Arms a slow, heavy projectile. On impact it upgrades every atom inside a wide radius by 1 tier and runs any cascading merges. Tap again before shooting to cancel and refund the charge.",
+                  "Arms a slow, heavy projectile. On impact it clears every non-stone atom inside a wide radius. Tap again before shooting to cancel and refund the charge.",
                 )}
                 disabled={busy || (!pendingGamma && (pendingStone || currentIsEGun))}
                 style={{

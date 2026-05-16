@@ -16,25 +16,27 @@ export function LevelSelect({
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [statsOpen, setStatsOpen] = useState(false);
 
-  // Winding zigzag path: alternate left/right columns per row to feel like a
-  // hand-drawn campaign map.
-  const MAP_W = 320;
-  const ROW_H = 120;
-  const COLS = [0.22, 0.5, 0.78];
+  // Compact winding route: four stops per row keeps 40 levels readable without
+  // stretching the campaign map into a long corridor.
+  const MAP_W = 360;
+  const ROW_H = 86;
+  const COLS = [0.16, 0.39, 0.61, 0.84];
   const nodes = useMemo(
     () =>
       LEVELS.map((lvl, i) => {
-        const row = i;
-        const colIdx = row % 4 === 0 ? 0 : row % 4 === 1 ? 1 : row % 4 === 2 ? 2 : 1;
+        const row = Math.floor(i / COLS.length);
+        const colInRow = i % COLS.length;
+        const colIdx = row % 2 === 0 ? colInRow : COLS.length - 1 - colInRow;
         return {
           lvl,
           x: COLS[colIdx] * MAP_W,
-          y: 60 + row * ROW_H,
+          y: 58 + row * ROW_H,
         };
       }),
     [],
   );
-  const mapH = 60 + LEVELS.length * ROW_H;
+  const mapRows = Math.ceil(LEVELS.length / COLS.length);
+  const mapH = 112 + (mapRows - 1) * ROW_H;
 
   // Smooth path between nodes
   const pathD = useMemo(() => {
@@ -70,15 +72,47 @@ export function LevelSelect({
               width: "100%",
               aspectRatio: `${MAP_W} / ${mapH}`,
               background:
-                "radial-gradient(ellipse at 20% 10%, oklch(0.32 0.06 250 / 0.5), transparent 55%)," +
-                "radial-gradient(ellipse at 80% 80%, oklch(0.3 0.08 30 / 0.4), transparent 55%)," +
-                "linear-gradient(180deg, var(--surface-elevated), var(--surface))",
+                "radial-gradient(circle at 20% 18%, oklch(0.78 0.16 85 / 0.22), transparent 16%)," +
+                "radial-gradient(circle at 84% 24%, oklch(0.68 0.18 210 / 0.18), transparent 15%)," +
+                "radial-gradient(circle at 72% 84%, oklch(0.72 0.18 145 / 0.16), transparent 18%)," +
+                "linear-gradient(155deg, oklch(0.18 0.04 245), oklch(0.12 0.03 260) 48%, oklch(0.18 0.05 70))",
               border: "1px solid var(--border)",
               borderRadius: 18,
               overflow: "hidden",
               boxShadow: "0 12px 32px rgba(0,0,0,0.35)",
             }}
           >
+            <div
+              aria-hidden="true"
+              style={{
+                position: "absolute",
+                inset: 0,
+                backgroundImage:
+                  "linear-gradient(rgba(255,255,255,0.045) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.045) 1px, transparent 1px)",
+                backgroundSize: "24px 24px",
+                maskImage: "linear-gradient(180deg, transparent, black 12%, black 88%, transparent)",
+              }}
+            />
+            <div
+              aria-hidden="true"
+              style={{
+                position: "absolute",
+                inset: "5% 8%",
+                border: "1px solid rgba(255,255,255,0.08)",
+                borderRadius: 999,
+                transform: "rotate(-12deg)",
+              }}
+            />
+            <div
+              aria-hidden="true"
+              style={{
+                position: "absolute",
+                inset: "16% 14%",
+                border: "1px solid rgba(255,255,255,0.07)",
+                borderRadius: 999,
+                transform: "rotate(18deg)",
+              }}
+            />
             <svg
               viewBox={`0 0 ${MAP_W} ${mapH}`}
               preserveAspectRatio="none"
@@ -98,15 +132,15 @@ export function LevelSelect({
               <path
                 d={pathD}
                 fill="none"
-                stroke="oklch(0.3 0.02 250)"
-                strokeWidth={10}
+                stroke="oklch(0.09 0.02 250 / 0.75)"
+                strokeWidth={9}
                 strokeLinecap="round"
               />
               <path
                 d={pathD}
                 fill="none"
                 stroke="url(#mapPathBg)"
-                strokeWidth={4}
+                strokeWidth={3}
                 strokeLinecap="round"
                 strokeDasharray="6 6"
               />
@@ -137,11 +171,11 @@ export function LevelSelect({
                   <div
                     style={{
                       position: "relative",
-                      width: 64,
-                      height: 64,
+                      width: 50,
+                      height: 50,
                       borderRadius: "50%",
                       background: "var(--surface)",
-                      border: `3px solid ${
+                      border: `2px solid ${
                         isCurrent
                           ? "var(--accent)"
                           : locked
@@ -162,7 +196,7 @@ export function LevelSelect({
                     {locked ? (
                       <div style={{ fontSize: 22 }}>🔒</div>
                     ) : (
-                      <ElementBall atomicNumber={lvl.targetElement} size={48} glow />
+                        <ElementBall atomicNumber={lvl.targetElement} size={38} glow />
                     )}
                     <div
                       style={{
