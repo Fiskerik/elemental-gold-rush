@@ -2198,15 +2198,18 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
         }
         return total % GRAB_THRESHOLD;
       });
+      const showSymbolPopups = result.merges.length >= 2;
       result.merges.forEach((m, i) => {
         setTimeout(
           () => {
             sfx(() => playMergeSound(m.chainDepth));
-            spawnPopup(`+${ELEMENTS[m.resultAtomicNumber - 1]?.symbol ?? "?"}`);
+            if (showSymbolPopups)
+              spawnPopup(`+${ELEMENTS[m.resultAtomicNumber - 1]?.symbol ?? "?"}`);
           },
           80 + i * 120,
         );
       });
+      pushMergeHistory(result.merges);
     } else {
       spawnPopup("🌀 Gravity shift");
     }
