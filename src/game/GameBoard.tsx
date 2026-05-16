@@ -3044,7 +3044,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
                 <div className="stage-clear-atom">
                   <ElementBall atomicNumber={target} size={92} glow />
                 </div>
-                <div className="stage-clear-title">{targetEl?.name ?? "Target"} unlocked!</div>
+                <div className="stage-clear-title">{targetEl?.name ?? "Target"} discovered!</div>
                 <div className="stage-clear-subtitle">Clearing the stage…</div>
                 <div className="stage-clear-stars">
                   {Array.from({ length: 3 }, (_, i) => (i < stageClearFx.stars ? "★" : "☆")).join(
@@ -4070,7 +4070,7 @@ function ContinueChoiceModal({
       <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 6 }}>
         {isContinuing
           ? "Ready to claim?"
-          : `${ELEMENTS[level.targetElement - 1]?.name ?? "?"} unlocked!`}
+          : `${ELEMENTS[level.targetElement - 1]?.name ?? "?"} discovered!`}
       </div>
       <p
         style={{
