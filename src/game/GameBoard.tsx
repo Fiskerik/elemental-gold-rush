@@ -1014,6 +1014,44 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     return seeded;
   }
 
+  // Place the 4 shuffle atoms across the top border of the board.
+  function buildShuffleStartBoard(atoms: number[]): Board {
+    if (atoms.length === 0) return createEmptyBoard();
+    const count = atoms.length;
+    const minR = Math.max(...atoms.map((a) => radiusFor(a)));
+    const usableWidth = Math.max(minR * 2, boardW - SIDE_PAD * 2 - minR * 2);
+    return atoms.map((atom, i) => {
+      const r = radiusFor(atom);
+      const laneX = SIDE_PAD + minR + (usableWidth * (i + 0.5)) / count;
+      return {
+        id: nextBallId(),
+        x: Math.max(SIDE_PAD + r, Math.min(boardW - SIDE_PAD - r, laneX)),
+        y: TOP_PAD + r + 2,
+        atom,
+        r,
+      };
+    });
+  }
+
+  function reshuffle() {
+    if (shufflesLeft <= 0) return;
+    setShuffleAtoms(generateShuffleAtoms());
+    setShufflesLeft((n) => Math.max(0, n - 1));
+  }
+
+  function confirmShuffleStart() {
+    const seeded = buildShuffleStartBoard(shuffleAtoms);
+    setBalls(seeded);
+    const initialHighest = Math.max(1, getHighestOnBoard(seeded));
+    if (initialHighest > 1) setHighestElement(initialHighest);
+    setHighest(initialHighest);
+    const discoveries = seeded
+      .map((b) => b.atom)
+      .filter((n, i, atoms) => n > 1 && atoms.indexOf(n) === i && !discoveredElements.includes(n));
+    if (discoveries.length > 0) registerDiscoveries(discoveries);
+    setShuffleStartOpen(false);
+  }
+
   /**
    * Ray-cast a projectile from the launcher at `angleDeg`. Walks pixel steps
    * and stops when it hits the ceiling or any existing ball. Resolves the
