@@ -688,6 +688,17 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [elapsedMs, gameOver, won, emissionUnlockIndex]);
 
+  // Spawn-floor scaling — level 10+: every 2 minutes raise the lowest
+  // spawnable tier so runs don't drag on with low-value atoms.
+  useEffect(() => {
+    if (!shuffleEnabled) return;
+    if (gameOver || won) return;
+    const nextTickMs = (spawnFloorIndex + 1) * SPAWN_FLOOR_INTERVAL_MS;
+    if (elapsedMs < nextTickMs) return;
+    setSpawnFloorIndex((i) => i + 1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [elapsedMs, gameOver, won, spawnFloorIndex, shuffleEnabled]);
+
   // Dynamic queue cap: as the board fills, unlock higher-tier atoms in the
   // shooting queue. Adds +1 tier at 15 atoms on board, +2 at 25, etc.
   // Capped at target-1 so we never spawn the literal target element.
