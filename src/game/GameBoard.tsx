@@ -2310,6 +2310,22 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     haptic(20);
   }
 
+  function triggerGammaPowerUp() {
+    if (busy || gameOver || won) return;
+    if (pendingGamma) {
+      // Cancel & refund.
+      setPendingGamma(false);
+      setGammaCharges((g) => g + 1);
+      spawnPopup("☢ CANCELED");
+      return;
+    }
+    if (gammaCharges <= 0 || pendingStone || currentIsEGun || pendingReversiblePowerUp) return;
+    setGammaCharges((g) => Math.max(0, g - 1));
+    setPendingGamma(true);
+    spawnPopup("☢ GAMMA ARMED");
+    haptic([15, 25, 15]);
+  }
+
   function triggerCatalystPowerUp() {
     if (cancelPendingPowerUp("catalyst")) return;
     if (
