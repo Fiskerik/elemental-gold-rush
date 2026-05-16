@@ -277,6 +277,7 @@ export function MainMenu({
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <BigButton
               icon={Layers}
+              iconColor="oklch(0.75 0.18 230)"
               onClick={() => {
                 trackMenuAction("levels");
                 onLevels();
@@ -286,6 +287,7 @@ export function MainMenu({
             </BigButton>
             <BigButton
               icon={Atom}
+              iconColor="oklch(0.78 0.18 145)"
               onClick={() => {
                 trackMenuAction("collection");
                 onCollection();
@@ -297,6 +299,7 @@ export function MainMenu({
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <BigButton
               icon={FlaskConical}
+              iconColor="oklch(0.78 0.2 320)"
               onClick={() => {
                 trackMenuAction("lab");
                 onLab();
@@ -306,6 +309,7 @@ export function MainMenu({
             </BigButton>
             <BigButton
               icon={Library}
+              iconColor="oklch(0.78 0.16 50)"
               onClick={() => {
                 trackMenuAction("library");
                 onLibrary();
@@ -317,6 +321,7 @@ export function MainMenu({
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
             <BigButton
               icon={User}
+              iconColor="oklch(0.8 0.16 85)"
               onClick={() => {
                 trackMenuAction("profile");
                 onProfile();
@@ -326,6 +331,7 @@ export function MainMenu({
             </BigButton>
             <BigButton
               icon={hasProPack ? BookOpen : ShoppingBag}
+              iconColor="oklch(0.78 0.18 25)"
               onClick={() => {
                 trackMenuAction("shop");
                 onShop();
@@ -335,6 +341,7 @@ export function MainMenu({
             </BigButton>
             <BigButton
               icon={SettingsIcon}
+              iconColor="oklch(0.78 0.04 250)"
               onClick={() => {
                 trackMenuAction("settings");
                 onSettings();
@@ -431,11 +438,13 @@ function BigButton({
   onClick,
   primary,
   icon: Icon,
+  iconColor,
 }: {
   children: ReactNode;
   onClick: () => void;
   primary?: boolean;
   icon?: LucideIcon;
+  iconColor?: string;
 }) {
   return (
     <button
@@ -462,7 +471,7 @@ function BigButton({
       onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
       onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
     >
-      {Icon && <Icon size={18} aria-hidden="true" />}
+      {Icon && <Icon size={20} color={iconColor} aria-hidden="true" />}
       <span>{children}</span>
     </button>
   );
