@@ -1392,7 +1392,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
         if (
           !stone ||
           Math.hypot(x - stone.x, y - stone.y) >
-            projR + stoneSurfaceRadius(stone, x, y) + step * 2
+            projR + stoneSurfaceRadius(stone, x, y) + step * 4
         ) {
           recentlyBouncedStoneIds.delete(id);
         }
@@ -1403,8 +1403,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
         | { ball: Ball; t: number; x: number; y: number; nx: number; ny: number }
         | null = null;
       for (let b = 0; b < balls.length; b++) {
-        // If we just bounced off this stone, let the atom pass through it so
-        // subsequent shots don't get stuck pinballing between nearby stones.
+        // Stones register damage, but fired atoms keep travelling through them.
         if (balls[b].stoneHp != null && recentlyBouncedStoneIds.has(balls[b].id)) continue;
         if (!projectileOverlapsBall(balls[b], x, y, projR)) continue;
         const contact = firstProjectileContact(balls[b], prevX, prevY, x, y, projR);
@@ -1415,35 +1414,11 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
         const ly = Math.max(ceilingY, hit.y);
         const hitBall = hit.ball;
         path.push({ x: lx, y: ly });
-        if (hitBall.stoneHp != null && !currentIsBlank) {
-          // Compute the surface normal pointing from stone center → impact.
-          const nx = hit.nx;
-          const ny = hit.ny;
-          const isLowerFace = ny > 0.22 || ly > hitBall.y + hitBall.r * 0.18;
-          const isRisingIntoStone = dy < 0.15;
-          if (!pendingStone && isLowerFace && isRisingIntoStone) {
-            return { x: lx, y: ly, path, hitId: hitBall.id, dx, dy, stoneHitIds: bouncedStoneIds };
-          }
-          bouncedStoneIds.push(hitBall.id);
+        if (hitBall.stoneHp != null && !currentIsBlank && !pendingStone) {
+          if (!bouncedStoneIds.includes(hitBall.id)) bouncedStoneIds.push(hitBall.id);
           recentlyBouncedStoneIds.add(hitBall.id);
-          const dot = dx * nx + dy * ny;
-          const reflectedX = dx - 2 * dot * nx;
-          const reflectedY = dy - 2 * dot * ny;
-          // Mostly reflective bounce so the angle-out is governed by the
-          // angle-in, with a small softening to avoid jittering inside the
-          // collision well.
-          const bounceInfluence = 0.85;
-          dx = dx * (1 - bounceInfluence) + reflectedX * bounceInfluence;
-          dy = dy * (1 - bounceInfluence) + reflectedY * bounceInfluence;
-          const mag = Math.hypot(dx, dy) || 1;
-          dx /= mag;
-          dy /= mag;
-          if (import.meta.env.DEV) {
-            console.log("Stone bounce", { aimDeg, dx, dy, hitId: hitBall.id });
-          }
-          // Step away from the stone surface so we don't immediately re-collide.
-          x = lx + nx * (step * 1.5);
-          y = ly + ny * (step * 1.5);
+          x = lx + dx * (step * 3);
+          y = ly + dy * (step * 3);
           continue;
         }
         return { x: lx, y: ly, path, hitId: hitBall.id, dx, dy, stoneHitIds: bouncedStoneIds };
@@ -1537,7 +1512,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
       for (const stone of source) {
         if (stone.stoneHp == null) continue;
         const outerR = stoneSurfaceRadius(stone, merge.x, merge.y);
-        if (Math.hypot(stone.x - merge.x, stone.y - merge.y) <= outerR + radiusFor(1)) {
+        if (Math.hypot(stone.x - merge.x, stone.y - merge.y) <= outerR + radiusFor(1) * 1.6) {
           damage.set(stone.id, (damage.get(stone.id) ?? 0) + 1);
         }
       }
@@ -4545,7 +4520,7 @@ function CompoundSelectionPanel({
         position: "absolute",
         left: 10,
         right: 10,
-        top: 10,
+        bottom: 10,
         zIndex: 8,
         padding: 10,
         borderRadius: 12,
