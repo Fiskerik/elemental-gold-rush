@@ -3501,6 +3501,17 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
             onStart={startWithSelectedInventory}
           />
         )}
+        {shuffleStartOpen && !won && !gameOver && (
+          <ShuffleStartModal
+            atoms={shuffleAtoms}
+            shufflesLeft={shufflesLeft}
+            onReshuffle={reshuffle}
+            onStart={confirmShuffleStart}
+          />
+        )}
+        {historyOpen && (
+          <MergeHistoryModal entries={mergeHistory} onClose={() => setHistoryOpen(false)} />
+        )}
         {discoveryEl !== null && (
           <DiscoveryModal atomicNumber={discoveryEl} onClose={() => setDiscoveryEl(null)} />
         )}
