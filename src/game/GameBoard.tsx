@@ -130,13 +130,14 @@ const stoneBackground =
   "radial-gradient(circle at 70% 70%, oklch(0.18 0.015 50) 0%, transparent 36%)," +
   "radial-gradient(circle at 50% 50%, oklch(0.42 0.02 60), oklch(0.28 0.02 55) 70%, oklch(0.16 0.015 50))";
 const stoneBorderRadius = "48% 52% 47% 53% / 50% 46% 54% 50%";
-function StoneVisual({ size, hp }: { size: number; hp: number }) {
+function StoneVisual({ size, hp, seed = 17 }: { size: number; hp: number; seed?: number }) {
   return (
     <div
       style={{
         width: size,
         height: size,
         borderRadius: stoneBorderRadius,
+        clipPath: stoneClipPath(seed),
         background: stoneBackground,
         boxShadow:
           "0 6px 14px rgba(0,0,0,0.55), inset 0 -10px 18px rgba(0,0,0,0.55), inset 0 6px 14px rgba(255,255,255,0.10)",
@@ -267,6 +268,55 @@ function GammaVisual({ size }: { size: number }) {
 }
 const STONE_NO_MERGE_TRIGGER = 3;
 const STONE_NUDGE_MULT = 5;
+const STONE_SHAPE_POINTS = 14;
+
+function seededNoise(seed: number): number {
+  const x = Math.sin(seed * 12.9898) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+function stoneRadiusFactor(seed: number, angle: number): number {
+  const normalized = ((angle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+  const segment = (normalized / (Math.PI * 2)) * STONE_SHAPE_POINTS;
+  const i0 = Math.floor(segment) % STONE_SHAPE_POINTS;
+  const i1 = (i0 + 1) % STONE_SHAPE_POINTS;
+  const t = segment - Math.floor(segment);
+  const smoothT = t * t * (3 - 2 * t);
+  const r0 = 0.86 + seededNoise(seed * 31 + i0 * 17) * 0.26;
+  const r1 = 0.86 + seededNoise(seed * 31 + i1 * 17) * 0.26;
+  return r0 + (r1 - r0) * smoothT;
+}
+
+function stoneClipPath(seed: number): string {
+  const points = Array.from({ length: STONE_SHAPE_POINTS }, (_, i) => {
+    const angle = -Math.PI / 2 + (i / STONE_SHAPE_POINTS) * Math.PI * 2;
+    const radius = 44 * stoneRadiusFactor(seed, angle);
+    const x = 50 + Math.cos(angle) * radius;
+    const y = 50 + Math.sin(angle) * radius;
+    return `${x.toFixed(1)}% ${y.toFixed(1)}%`;
+  });
+  return `polygon(${points.join(", ")})`;
+}
+
+function stoneSurfaceNormal(seed: number, angle: number): { x: number; y: number } {
+  const delta = 0.04;
+  const r0 = 0.88 * stoneRadiusFactor(seed, angle - delta);
+  const r1 = 0.88 * stoneRadiusFactor(seed, angle + delta);
+  const ax = Math.cos(angle - delta) * r0;
+  const ay = Math.sin(angle - delta) * r0;
+  const bx = Math.cos(angle + delta) * r1;
+  const by = Math.sin(angle + delta) * r1;
+  const tx = bx - ax;
+  const ty = by - ay;
+  let nx = ty;
+  let ny = -tx;
+  if (nx * Math.cos(angle) + ny * Math.sin(angle) < 0) {
+    nx = -nx;
+    ny = -ny;
+  }
+  const mag = Math.hypot(nx, ny) || 1;
+  return { x: nx / mag, y: ny / mag };
+}
 
 function getComboLabel(mergeCount: number): string | null {
   if (mergeCount >= 6) return "Nuclear Rush!";
@@ -503,7 +553,17 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
   function generateShuffleAtoms(): number[] {
     const hi = Math.max(2, level.targetElement - SHUFFLE_OFFSET_MIN);
     const lo = Math.max(1, level.targetElement - SHUFFLE_OFFSET_MAX);
-    return Array.from({ length: SHUFFLE_COUNT }, () => lo + Math.floor(Math.random() * (hi - lo + 1)));
+    const discovered = discoveredElements
+      .filter((atom, index, atoms) => atom >= lo && atom <= hi && atoms.indexOf(atom) === index)
+      .sort((a, b) => a - b);
+    const candidates =
+      discovered.length > 0
+        ? discovered
+        : discoveredElements
+            .filter((atom, index, atoms) => atom > 0 && atoms.indexOf(atom) === index)
+            .sort((a, b) => a - b);
+    const pool = candidates.length > 0 ? candidates : [1];
+    return Array.from({ length: SHUFFLE_COUNT }, () => pool[Math.floor(Math.random() * pool.length)]);
   }
 
   const target = level.targetElement;
@@ -1153,10 +1213,50 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     setShuffleStartOpen(false);
   }
 
+  function stoneSurfaceRadius(stone: Ball, px: number, py: number): number {
+    const angle = Math.atan2(py - stone.y, px - stone.x);
+    return stone.r * 0.88 * stoneRadiusFactor(stone.id, angle);
+  }
+
+  function projectileOverlapsBall(ball: Ball, px: number, py: number, projectileR: number): boolean {
+    const dx = px - ball.x;
+    const dy = py - ball.y;
+    const obstacleR = ball.stoneHp != null ? stoneSurfaceRadius(ball, px, py) : ball.r;
+    const min = projectileR + obstacleR;
+    return dx * dx + dy * dy < min * min;
+  }
+
+  function firstProjectileContact(
+    ball: Ball,
+    fromX: number,
+    fromY: number,
+    toX: number,
+    toY: number,
+    projectileR: number,
+  ): { t: number; x: number; y: number; nx: number; ny: number } {
+    let lo = 0;
+    let hi = 1;
+    for (let i = 0; i < 14; i++) {
+      const mid = (lo + hi) / 2;
+      const mx = fromX + (toX - fromX) * mid;
+      const my = fromY + (toY - fromY) * mid;
+      if (projectileOverlapsBall(ball, mx, my, projectileR)) hi = mid;
+      else lo = mid;
+    }
+    const x = fromX + (toX - fromX) * hi;
+    const y = fromY + (toY - fromY) * hi;
+    if (ball.stoneHp != null) {
+      const angle = Math.atan2(y - ball.y, x - ball.x);
+      const normal = stoneSurfaceNormal(ball.id, angle);
+      return { t: hi, x, y, nx: normal.x, ny: normal.y };
+    }
+    const mag = Math.hypot(x - ball.x, y - ball.y) || 1;
+    return { t: hi, x, y, nx: (x - ball.x) / mag, ny: (y - ball.y) / mag };
+  }
+
   /**
-   * Ray-cast a projectile from the launcher at `angleDeg`. Walks pixel steps
-   * and stops when it hits the ceiling or any existing ball. Resolves the
-   * landing position so the new ball just touches whatever it hit.
+   * Ray-cast a projectile from the launcher at `angleDeg`. Walks pixel steps,
+   * reflects off stone faces, and stops at the ceiling or first non-stone hit.
    */
   function castRay(angleDeg: number): {
     x: number;
@@ -1182,6 +1282,8 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     const ceilingY = TOP_PAD + projR;
     const maxIter = 6000;
     for (let i = 0; i < maxIter; i++) {
+      const prevX = x;
+      const prevY = y;
       x += dx * step;
       y += dy * step;
       // bounce off side walls
@@ -1204,52 +1306,36 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
 
       for (const id of Array.from(recentlyBouncedStoneIds)) {
         const stone = balls.find((b) => b.id === id);
-        if (!stone || Math.hypot(x - stone.x, y - stone.y) > projR + stone.r + step * 2) {
+        if (
+          !stone ||
+          Math.hypot(x - stone.x, y - stone.y) >
+            projR + stoneSurfaceRadius(stone, x, y) + step * 2
+        ) {
           recentlyBouncedStoneIds.delete(id);
         }
       }
 
       // collision with existing balls
-      let hitIdx = -1;
-      let bestT = Infinity;
+      let hit:
+        | { ball: Ball; t: number; x: number; y: number; nx: number; ny: number }
+        | null = null;
       for (let b = 0; b < balls.length; b++) {
         // If we just bounced off this stone, let the atom pass through it so
         // subsequent shots don't get stuck pinballing between nearby stones.
         if (balls[b].stoneHp != null && recentlyBouncedStoneIds.has(balls[b].id)) continue;
-        const sumR = projR + balls[b].r;
-        const ddx = x - balls[b].x;
-        const ddy = y - balls[b].y;
-        if (ddx * ddx + ddy * ddy < sumR * sumR) {
-          // back-track along (dx, dy) so |pos - ball| = sumR
-          // pos = (x,y) - t*(dx,dy)
-          const ox = x - balls[b].x;
-          const oy = y - balls[b].y;
-          const bcoef = -2 * (ox * dx + oy * dy);
-          const ccoef = ox * ox + oy * oy - sumR * sumR;
-          const disc = bcoef * bcoef - 4 * ccoef;
-          let t = 0;
-          if (disc >= 0) {
-            const sq = Math.sqrt(disc);
-            const t1 = (-bcoef - sq) / 2;
-            const t2 = (-bcoef + sq) / 2;
-            t = t1 >= 0 ? t1 : t2 >= 0 ? t2 : 0;
-          }
-          if (t < bestT) {
-            bestT = t;
-            hitIdx = b;
-          }
-        }
+        if (!projectileOverlapsBall(balls[b], x, y, projR)) continue;
+        const contact = firstProjectileContact(balls[b], prevX, prevY, x, y, projR);
+        if (!hit || contact.t < hit.t) hit = { ball: balls[b], ...contact };
       }
-      if (hitIdx >= 0) {
-        const lx = Math.max(minX, Math.min(maxX, x - bestT * dx));
-        const ly = Math.max(ceilingY, y - bestT * dy);
-        const hitBall = balls[hitIdx];
+      if (hit) {
+        const lx = Math.max(minX, Math.min(maxX, hit.x));
+        const ly = Math.max(ceilingY, hit.y);
+        const hitBall = hit.ball;
         path.push({ x: lx, y: ly });
         if (hitBall.stoneHp != null && !currentIsBlank) {
           // Compute the surface normal pointing from stone center → impact.
-          const normalMag = Math.hypot(lx - hitBall.x, ly - hitBall.y) || 1;
-          const nx = (lx - hitBall.x) / normalMag;
-          const ny = (ly - hitBall.y) / normalMag;
+          const nx = hit.nx;
+          const ny = hit.ny;
           bouncedStoneIds.push(hitBall.id);
           recentlyBouncedStoneIds.add(hitBall.id);
           const dot = dx * nx + dy * ny;
@@ -3204,6 +3290,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
                       width: size,
                       height: size,
                       borderRadius: stoneBorderRadius,
+                      clipPath: stoneClipPath(b.id),
                       background: stoneBackground,
                       boxShadow:
                         "0 6px 14px rgba(0,0,0,0.55), inset 0 -10px 18px rgba(0,0,0,0.55), inset 0 6px 14px rgba(255,255,255,0.10)",
