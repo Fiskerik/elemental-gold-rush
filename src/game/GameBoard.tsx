@@ -454,8 +454,8 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
   const [spawnFloorIndex, setSpawnFloorIndex] = useState(0);
 
   function generateShuffleAtoms(): number[] {
-    const hi = Math.max(2, target - SHUFFLE_OFFSET_MIN);
-    const lo = Math.max(1, target - SHUFFLE_OFFSET_MAX);
+    const hi = Math.max(2, level.targetElement - SHUFFLE_OFFSET_MIN);
+    const lo = Math.max(1, level.targetElement - SHUFFLE_OFFSET_MAX);
     return Array.from({ length: SHUFFLE_COUNT }, () => lo + Math.floor(Math.random() * (hi - lo + 1)));
   }
 
