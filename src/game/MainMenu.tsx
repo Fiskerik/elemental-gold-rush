@@ -1,4 +1,15 @@
-import { useEffect } from "react";
+import { useEffect, type ReactNode } from "react";
+import {
+  Atom,
+  BookOpen,
+  FlaskConical,
+  Layers,
+  Library,
+  ShoppingBag,
+  Settings as SettingsIcon,
+  User,
+  type LucideIcon,
+} from "lucide-react";
 import { LEVELS } from "./levels";
 import { useProgress } from "./store";
 import { formatScore } from "./logic";
@@ -265,6 +276,7 @@ export function MainMenu({
           </section>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <BigButton
+              icon={Layers}
               onClick={() => {
                 trackMenuAction("levels");
                 onLevels();
@@ -273,6 +285,7 @@ export function MainMenu({
               Levels
             </BigButton>
             <BigButton
+              icon={Atom}
               onClick={() => {
                 trackMenuAction("collection");
                 onCollection();
@@ -283,6 +296,7 @@ export function MainMenu({
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <BigButton
+              icon={FlaskConical}
               onClick={() => {
                 trackMenuAction("lab");
                 onLab();
@@ -291,6 +305,7 @@ export function MainMenu({
               Lab Modes
             </BigButton>
             <BigButton
+              icon={Library}
               onClick={() => {
                 trackMenuAction("library");
                 onLibrary();
@@ -301,6 +316,7 @@ export function MainMenu({
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
             <BigButton
+              icon={User}
               onClick={() => {
                 trackMenuAction("profile");
                 onProfile();
@@ -309,6 +325,7 @@ export function MainMenu({
               Profile
             </BigButton>
             <BigButton
+              icon={hasProPack ? BookOpen : ShoppingBag}
               onClick={() => {
                 trackMenuAction("shop");
                 onShop();
@@ -317,6 +334,7 @@ export function MainMenu({
               {hasProPack ? "Pro" : "Shop"}
             </BigButton>
             <BigButton
+              icon={SettingsIcon}
               onClick={() => {
                 trackMenuAction("settings");
                 onSettings();
@@ -412,16 +430,21 @@ function BigButton({
   children,
   onClick,
   primary,
+  icon: Icon,
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
   onClick: () => void;
   primary?: boolean;
+  icon?: LucideIcon;
 }) {
   return (
     <button
       onClick={onClick}
       style={{
         textAlign: "left",
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
         padding: "16px 18px",
         borderRadius: 14,
         border: "1px solid " + (primary ? "transparent" : "var(--border)"),
@@ -439,7 +462,8 @@ function BigButton({
       onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
       onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
     >
-      {children}
+      {Icon && <Icon size={18} aria-hidden="true" />}
+      <span>{children}</span>
     </button>
   );
 }
