@@ -103,6 +103,11 @@ const POWER_UP_INVENTORY_META: Record<
     name: "Grab",
     description: "Drag one atom to a better spot and set up a chain.",
   },
+  gamma: {
+    icon: "☢",
+    name: "Gamma Bomb",
+    description: "Detonate a wide radius that upgrades every atom inside by 1 tier.",
+  },
 };
 
 function countPowerUps(inventory: Partial<Record<InventoryPowerUpId, number>>): number {
@@ -2204,6 +2209,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
       emission: emissionCharges,
       gravity: gravityCharges,
       grab: grabs,
+      gamma: gammaCharges + (pendingGamma ? 1 : 0),
     };
   }
 
@@ -2241,6 +2247,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     setEmissionCharges((count) => count + selectedInventoryPowerUps.emission);
     setGravityCharges((count) => count + selectedInventoryPowerUps.gravity);
     setGrabs((count) => count + selectedInventoryPowerUps.grab);
+    setGammaCharges((count) => count + selectedInventoryPowerUps.gamma);
     if (selectedCount > 0) {
       spawnPopup(`🎒 LOADED ×${selectedCount}`);
       showTip(

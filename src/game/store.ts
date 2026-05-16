@@ -19,6 +19,7 @@ export const INVENTORY_POWER_UPS = [
   "emission",
   "gravity",
   "grab",
+  "gamma",
 ] as const;
 
 export type InventoryPowerUpId = (typeof INVENTORY_POWER_UPS)[number];
@@ -32,6 +33,7 @@ export const emptyPowerUpInventory = (): PowerUpInventory => ({
   emission: 0,
   gravity: 0,
   grab: 0,
+  gamma: 0,
 });
 
 function normalizePowerUpInventory(
@@ -67,6 +69,7 @@ interface ProgressState {
   dailyStreak: number;
   claimedDailyReward: boolean;
   bestCombo: number;
+  bestComboDate: string | null;
   earnedBadges: string[];
   levelStars: Record<number, number>;
   challengeBestScores: Partial<Record<GameModeId, number>>;
@@ -110,6 +113,7 @@ export const useProgress = create<ProgressState>()(
       dailyStreak: 0,
       claimedDailyReward: false,
       bestCombo: 0,
+      bestComboDate: null,
       earnedBadges: [],
       levelStars: {},
       challengeBestScores: {},
@@ -129,7 +133,8 @@ export const useProgress = create<ProgressState>()(
             earnedBadges: getEarnedBadgeIds(discoveredElements),
           };
         }),
-      addScore: (n) => set((s) => ({ totalScore: s.totalScore + n })),
+      addScore: (n) =>
+        set((s) => ({ totalScore: s.totalScore + Math.max(0, Math.floor(n / 5)) })),
       setHighestElement: (n) => set((s) => ({ highestElement: Math.max(s.highestElement, n) })),
       refreshDailyLab: () =>
         set((s) => refreshDailyQuests(s.dailyQuestDate, s.dailyQuests, s.claimedDailyReward)),
@@ -154,7 +159,7 @@ export const useProgress = create<ProgressState>()(
           );
           if (refreshed.claimedDailyReward || !areDailyQuestsComplete(refreshed.dailyQuests))
             return refreshed;
-          const reward = 250 + s.dailyStreak * 50;
+          const reward = 5000;
           return {
             ...refreshed,
             claimedDailyReward: true,
@@ -162,7 +167,11 @@ export const useProgress = create<ProgressState>()(
             totalScore: s.totalScore + reward,
           };
         }),
-      setBestCombo: (combo) => set((s) => ({ bestCombo: Math.max(s.bestCombo, combo) })),
+      setBestCombo: (combo) =>
+        set((s) => {
+          if (combo <= s.bestCombo) return s;
+          return { bestCombo: combo, bestComboDate: new Date().toISOString() };
+        }),
       setLevelStars: (levelId, stars) =>
         set((s) => ({
           levelStars: {
@@ -205,9 +214,16 @@ export const useProgress = create<ProgressState>()(
         set((s) => {
           if (s.totalScore < cost) return s;
           purchased = true;
+          const refreshed = refreshDailyQuests(
+            s.dailyQuestDate,
+            s.dailyQuests,
+            s.claimedDailyReward,
+          );
           return {
+            ...refreshed,
             totalScore: s.totalScore - cost,
             powerUpInventory: mergePowerUpInventory(s.powerUpInventory, { [powerUp]: 1 }),
+            dailyQuests: applyQuestProgress(refreshed.dailyQuests, { itemsPurchased: 1 }),
           };
         });
         return purchased;
@@ -225,6 +241,7 @@ export const useProgress = create<ProgressState>()(
           dailyStreak: 0,
           claimedDailyReward: false,
           bestCombo: 0,
+          bestComboDate: null,
           earnedBadges: [],
           levelStars: {},
           challengeBestScores: {},
@@ -246,6 +263,7 @@ export const useProgress = create<ProgressState>()(
           dailyStreak: persistedState?.dailyStreak ?? current.dailyStreak,
           claimedDailyReward: persistedState?.claimedDailyReward ?? current.claimedDailyReward,
           bestCombo: persistedState?.bestCombo ?? current.bestCombo,
+          bestComboDate: persistedState?.bestComboDate ?? current.bestComboDate,
           earnedBadges: getEarnedBadgeIds(discoveredElements),
           levelStars: persistedState?.levelStars ?? current.levelStars,
           challengeBestScores: persistedState?.challengeBestScores ?? current.challengeBestScores,
