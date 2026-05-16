@@ -2089,6 +2089,14 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     if (fusionJumpArmed && result.merges.length > 0) {
       setFusionJumpArmed(false);
       if (pendingReversiblePowerUp === "fusion-jump") setPendingReversiblePowerUp(null);
+      // Visual cue — burst ring at the impact point.
+      const fxId = Date.now();
+      setFusionJumpFx({ id: fxId, x: newBall.x, y: newBall.y });
+      window.setTimeout(
+        () => setFusionJumpFx((fx) => (fx && fx.id === fxId ? null : fx)),
+        750,
+      );
+      spawnPopup("⏭ FUSION JUMP!");
     }
     const nextShots = shots + 1;
     setShots(nextShots);
