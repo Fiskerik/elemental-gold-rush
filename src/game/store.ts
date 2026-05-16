@@ -158,7 +158,8 @@ export const useProgress = create<ProgressState>()(
             earnedBadges: getEarnedBadgeIds(discoveredElements),
           };
         }),
-      addScore: (n) => set((s) => ({ totalScore: s.totalScore + Math.max(0, Math.floor(n)) })),
+      addScore: (n) =>
+        set((s) => ({ totalScore: s.totalScore + Math.max(0, Math.floor(n / 10)) })),
       setHighestElement: (n) => set((s) => ({ highestElement: Math.max(s.highestElement, n) })),
       refreshDailyLab: () =>
         set((s) => refreshDailyQuests(s.dailyQuestDate, s.dailyQuests, s.claimedDailyReward)),
