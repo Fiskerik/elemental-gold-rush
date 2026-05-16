@@ -4106,7 +4106,7 @@ function DiscoveryModal({ atomicNumber, onClose }: { atomicNumber: number; onClo
   const el = ELEMENTS[atomicNumber - 1];
   if (!el) return null;
   return (
-    <Modal>
+    <Modal zIndex={200}>
       <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--accent)", marginBottom: 8 }}>
         NEW DISCOVERY
       </div>
