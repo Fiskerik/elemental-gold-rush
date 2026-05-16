@@ -2348,6 +2348,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     }
     const atom = candidates[Math.floor(Math.random() * candidates.length)];
     setTransmuteCharges((g) => Math.max(0, g - 1));
+    runPowerUpsUsedRef.current += 1;
     setQueue((q) => [atom, ...q.slice(1)]);
     setShimmerQueue((q) => [false, ...q.slice(1)]);
     setEGunQueue((q) => [false, ...q.slice(1)]);
@@ -2361,6 +2362,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     if (busy || gameOver || won || fusionJumpCharges <= 0 || pendingReversiblePowerUp) return;
     setPendingReversiblePowerUp("fusion-jump");
     setFusionJumpCharges((g) => Math.max(0, g - 1));
+    runPowerUpsUsedRef.current += 1;
     setFusionJumpArmed(true);
     spawnPopup("⏭ JUMP ARMED");
     haptic(20);
@@ -2377,6 +2379,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     }
     if (gammaCharges <= 0 || pendingStone || currentIsEGun || pendingReversiblePowerUp) return;
     setGammaCharges((g) => Math.max(0, g - 1));
+    runPowerUpsUsedRef.current += 1;
     setPendingGamma(true);
     spawnPopup("☢ GAMMA ARMED");
     haptic([15, 25, 15]);
@@ -2395,6 +2398,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
       return;
     setPendingReversiblePowerUp("catalyst");
     setCatalystCharges((g) => Math.max(0, g - 1));
+    runPowerUpsUsedRef.current += 1;
     setCatalystShotsRemaining(CATALYST_AURA_SHOTS);
     spawnPopup("🧪 AURA ×5");
     haptic([20, 30, 20]);
@@ -2413,6 +2417,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     queueUndoRef.current = { queue, shimmerQueue, eGunQueue, blankQueue, powerUp: "emission" };
     setPendingReversiblePowerUp("emission");
     setEmissionCharges((g) => Math.max(0, g - 1));
+    runPowerUpsUsedRef.current += 1;
     setQueue(raisedQueue);
 
     const reachedAtomicNumbers = raisedQueue.filter((atom, i) => atom !== queue[i]);
@@ -2431,6 +2436,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     setGravityFxId(fxId);
     setTimeout(() => setGravityFxId((active) => (active === fxId ? null : active)), 1050);
     setGravityCharges((g) => Math.max(0, g - 1));
+    runPowerUpsUsedRef.current += 1;
     const atoms = balls.filter((b) => b.stoneHp == null).map((b) => ({ ...b }));
     const stones = balls.filter((b) => b.stoneHp != null).map((b) => ({ ...b }));
     atoms.sort((a, b) => a.y - b.y);
