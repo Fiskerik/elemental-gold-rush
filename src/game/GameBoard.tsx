@@ -4002,11 +4002,13 @@ function InventoryStartModal({
   selected,
   onChange,
   onStart,
+  onBack,
 }: {
   inventory: PowerUpInventory;
   selected: PowerUpInventory;
   onChange: (powerUp: InventoryPowerUpId, delta: 1 | -1) => void;
   onStart: () => void;
+  onBack: () => void;
 }) {
   const selectedCount = countPowerUps(selected);
   const availablePowerUps = (Object.keys(POWER_UP_INVENTORY_META) as InventoryPowerUpId[]).filter(
@@ -4122,6 +4124,21 @@ function InventoryStartModal({
           fontSize: 12,
         }}
       >
+        <button
+          onClick={onBack}
+          style={{
+            background: "var(--surface)",
+            border: "1px solid var(--border)",
+            color: "var(--foreground)",
+            borderRadius: 10,
+            padding: "8px 12px",
+            fontWeight: 700,
+            cursor: "pointer",
+            flex: "0 0 auto",
+          }}
+        >
+          ← Back
+        </button>
         <span>
           Selected {selectedCount}/{INVENTORY_PICK_LIMIT}
         </span>
