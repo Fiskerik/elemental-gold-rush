@@ -662,6 +662,20 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shimmerQueue, shimmerEnabled]);
 
+  // Show the E-gun explanation the first time an E-gun shot actually appears
+  // in the queue (not on every level 6+ start).
+  useEffect(() => {
+    if (!eGunEnabled) return;
+    if (eGunQueue.some(Boolean)) {
+      showTip(
+        "feature-egun-unlock",
+        "⚡ E-gun unlocked!",
+        "Rare E-gun shots fire a straight beam to the far edge without bouncing. Every atom in the beam upgrades by 1 tier.",
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eGunQueue, eGunEnabled]);
+
   // Tick the run timer every second while the level is active.
   useEffect(() => {
     if (gameOver || won) return;
