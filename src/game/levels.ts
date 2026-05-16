@@ -26,6 +26,10 @@ export interface Level {
   scoreMultiplier: number;
   /** Suggested number of shots for mastery */
   parShots?: number;
+  /** Hard 3-star threshold: clearing the level in fewer than this many shots earns 3 stars. */
+  starShotsThree?: number;
+  /** Hard 2-star threshold: clearing in fewer than this many shots earns at least 2 stars. */
+  starShotsTwo?: number;
   /** Suggested completion time in seconds (used for star rating) */
   parTimeSec?: number;
   /** Score target for mastery */
