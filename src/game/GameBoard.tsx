@@ -42,9 +42,18 @@ const EGUN_MIN_LEVEL = 6;
 const BLANK_MIN_LEVEL = 10;
 const BLANK_ATOM_CHANCE = 0.01;
 const POWER_UP_CHANCE = 0.05;
+const EGUN_CHANCE = 0.01;
 const EGUN_MIN_SHOT_GAP = 10;
 const EMISSION_UNLOCK_INTERVAL_MS = 5 * 60 * 1000;
 const STONE_MAX_HP = 8;
+const SPAWN_FLOOR_LEVEL = 10;
+const SPAWN_FLOOR_INTERVAL_MS = 2 * 60 * 1000;
+const SHUFFLE_MIN_LEVEL = 10;
+const SHUFFLE_COUNT = 4;
+const SHUFFLE_LIMIT = 3;
+const SHUFFLE_OFFSET_MIN = 4;
+const SHUFFLE_OFFSET_MAX = 10;
+const GAMMA_MIN_LEVEL = 12;
 const SEEDED_BOARD_MIN_TARGET = 10;
 const SEEDED_BOARD_MIN_ATOMS = 3;
 const SEEDED_BOARD_MAX_ATOMS = 8;
@@ -102,29 +111,51 @@ function hasPowerUps(inventory: Partial<Record<InventoryPowerUpId, number>>): bo
   return countPowerUps(inventory) > 0;
 }
 
+// Shared rocky styling — used for both the launcher visual and live stones
+// on the board. Looks like a chunky rock with cracks and uneven shading
+// instead of a smooth grey ball.
+const stoneBackground =
+  // Multiple radial gradients layered to mimic uneven rocky surface,
+  // plus craggy highlights and shadow pockets.
+  "radial-gradient(circle at 22% 20%, oklch(0.68 0.025 70) 0%, transparent 32%)," +
+  "radial-gradient(circle at 78% 30%, oklch(0.52 0.02 60) 0%, transparent 28%)," +
+  "radial-gradient(circle at 30% 75%, oklch(0.22 0.015 55) 0%, transparent 38%)," +
+  "radial-gradient(circle at 70% 70%, oklch(0.18 0.015 50) 0%, transparent 36%)," +
+  "radial-gradient(circle at 50% 50%, oklch(0.42 0.02 60), oklch(0.28 0.02 55) 70%, oklch(0.16 0.015 50))";
+const stoneBorderRadius = "48% 52% 47% 53% / 50% 46% 54% 50%";
 function StoneVisual({ size, hp }: { size: number; hp: number }) {
   return (
     <div
       style={{
         width: size,
         height: size,
-        borderRadius: "50%",
-        background:
-          "radial-gradient(circle at 30% 28%, oklch(0.55 0.02 60), oklch(0.32 0.02 60) 60%, oklch(0.18 0.02 60))",
+        borderRadius: stoneBorderRadius,
+        background: stoneBackground,
         boxShadow:
-          "0 6px 14px rgba(0,0,0,0.55), inset 0 -8px 14px rgba(0,0,0,0.45), inset 0 6px 12px rgba(255,255,255,0.12)",
-        border: "2px solid oklch(0.25 0.02 60)",
+          "0 6px 14px rgba(0,0,0,0.55), inset 0 -10px 18px rgba(0,0,0,0.55), inset 0 6px 14px rgba(255,255,255,0.10)",
+        border: "2px solid oklch(0.2 0.015 55)",
         display: "flex",
-        flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        color: "oklch(0.95 0.02 60)",
+        color: "oklch(0.96 0.02 70)",
         fontWeight: 900,
-        textShadow: "0 1px 2px rgba(0,0,0,0.7)",
+        textShadow: "0 1px 3px rgba(0,0,0,0.85)",
+        position: "relative",
+        overflow: "hidden",
       }}
     >
-      <div style={{ fontSize: Math.max(10, size * 0.16), opacity: 0.85, lineHeight: 1 }}>⛰</div>
-      <div style={{ fontSize: Math.max(14, size * 0.32), lineHeight: 1.05 }}>{hp}</div>
+      <div
+        aria-hidden="true"
+        style={{
+          position: "absolute",
+          inset: 0,
+          background:
+            "linear-gradient(125deg, transparent 38%, oklch(0.08 0.01 50 / 0.45) 39%, transparent 41%)," +
+            "linear-gradient(70deg, transparent 60%, oklch(0.1 0.01 50 / 0.35) 61%, transparent 63%)",
+          pointerEvents: "none",
+        }}
+      />
+      <div style={{ fontSize: Math.max(14, size * 0.36), lineHeight: 1.05, zIndex: 1 }}>{hp}</div>
     </div>
   );
 }
@@ -378,6 +409,56 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
   const [elapsedMs, setElapsedMs] = useState(0);
   const startTimeRef = useRef<number>(Date.now());
 
+  // === Merge history log ===
+  // Chronological list of every merge in this run. Opened from a button at
+  // the top header so the player can review what happened.
+  const [mergeHistory, setMergeHistory] = useState<
+    { id: number; ts: number; atom: number; depth: number; chainSize: number }[]
+  >([]);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const historyIdRef = useRef(0);
+  function pushMergeHistory(merges: { resultAtomicNumber: number; chainDepth: number }[]) {
+    if (merges.length === 0) return;
+    const now = Date.now();
+    setMergeHistory((prev) => {
+      const next = [...prev];
+      merges.forEach((m) => {
+        next.push({
+          id: ++historyIdRef.current,
+          ts: now,
+          atom: m.resultAtomicNumber,
+          depth: m.chainDepth,
+          chainSize: merges.length,
+        });
+      });
+      // Cap to last 200 entries to avoid runaway memory.
+      if (next.length > 200) next.splice(0, next.length - 200);
+      return next;
+    });
+  }
+
+  // === Pre-level shuffle (lvl 10+) ===
+  // Player gets 3 reshuffles of 4 starting atoms before the level begins.
+  const shuffleEnabled = level.id >= SHUFFLE_MIN_LEVEL;
+  const gammaEnabled = level.id >= GAMMA_MIN_LEVEL;
+  const [shuffleStartOpen, setShuffleStartOpen] = useState(false);
+  const [shufflesLeft, setShufflesLeft] = useState(SHUFFLE_LIMIT);
+  const [shuffleAtoms, setShuffleAtoms] = useState<number[]>([]);
+
+  // === Gamma bomb (lvl 12+) ===
+  const [gammaCharges, setGammaCharges] = useState(0);
+  const [pendingGamma, setPendingGamma] = useState(false);
+
+  // === Spawn-floor tier (lvl 10+) — every 2 min raise lowest spawnable tier
+  // if those atoms are absent from the board.
+  const [spawnFloorIndex, setSpawnFloorIndex] = useState(0);
+
+  function generateShuffleAtoms(): number[] {
+    const hi = Math.max(2, level.targetElement - SHUFFLE_OFFSET_MIN);
+    const lo = Math.max(1, level.targetElement - SHUFFLE_OFFSET_MAX);
+    return Array.from({ length: SHUFFLE_COUNT }, () => lo + Math.floor(Math.random() * (hi - lo + 1)));
+  }
+
   const target = level.targetElement;
   const targetEl = ELEMENTS[target - 1];
   const current = queue[0];
@@ -438,7 +519,9 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
 
   useEffect(() => {
     setNewlyDiscoveredThisRun([]);
-    const initialBalls = createSeededBoard();
+    // For level 10+ we defer seeding until the player confirms their shuffle;
+    // the shuffle modal opens immediately and seeds via confirmShuffleStart().
+    const initialBalls = level.id >= SHUFFLE_MIN_LEVEL ? createEmptyBoard() : createSeededBoard();
     setBalls(initialBalls);
     const initialHighest = Math.max(1, getHighestOnBoard(initialBalls));
     if (initialHighest > 1) setHighestElement(initialHighest);
@@ -512,6 +595,18 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     hasClaimedUnusedInventoryRef.current = false;
     setSelectedInventoryPowerUps(emptyPowerUpInventory());
     setInventoryPickerOpen(hasPowerUps(powerUpInventory));
+    setMergeHistory([]);
+    setHistoryOpen(false);
+    setGammaCharges(0);
+    setPendingGamma(false);
+    setSpawnFloorIndex(0);
+    if (level.id >= SHUFFLE_MIN_LEVEL) {
+      setShufflesLeft(SHUFFLE_LIMIT);
+      setShuffleAtoms(generateShuffleAtoms());
+      setShuffleStartOpen(true);
+    } else {
+      setShuffleStartOpen(false);
+    }
     queueUndoRef.current = null;
     eGunCooldownSlots.current = 0;
     startTimeRef.current = Date.now();
@@ -595,6 +690,17 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [elapsedMs, gameOver, won, emissionUnlockIndex]);
 
+  // Spawn-floor scaling — level 10+: every 2 minutes raise the lowest
+  // spawnable tier so runs don't drag on with low-value atoms.
+  useEffect(() => {
+    if (!shuffleEnabled) return;
+    if (gameOver || won) return;
+    const nextTickMs = (spawnFloorIndex + 1) * SPAWN_FLOOR_INTERVAL_MS;
+    if (elapsedMs < nextTickMs) return;
+    setSpawnFloorIndex((i) => i + 1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [elapsedMs, gameOver, won, spawnFloorIndex, shuffleEnabled]);
+
   // Dynamic queue cap: as the board fills, unlock higher-tier atoms in the
   // shooting queue. Adds +1 tier at 15 atoms on board, +2 at 25, etc.
   // Capped at target-1 so we never spawn the literal target element.
@@ -625,7 +731,10 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
 
   function queueFloorFromBoard(board: Board): number {
     let floor = 1;
-    const depletionTier = Math.max(0, emissionUnlockIndex);
+    // Combine two depletion drivers:
+    //  - emissionUnlockIndex (every 5 min, all levels)
+    //  - spawnFloorIndex     (every 2 min, lvl 10+)
+    const depletionTier = Math.max(0, emissionUnlockIndex, spawnFloorIndex);
     for (let atom = 1; atom <= depletionTier; atom++) {
       const stillOnBoard = board.some((ball) => ball.stoneHp == null && ball.atom === atom);
       if (stillOnBoard) {
@@ -702,7 +811,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     blank: boolean;
   } {
     const eGunEligible = eGunEnabled && eGunCooldownSlots.current <= 0;
-    const eGun = eGunEligible && Math.random() < POWER_UP_CHANCE;
+    const eGun = eGunEligible && Math.random() < EGUN_CHANCE;
     if (eGun) eGunCooldownSlots.current = EGUN_MIN_SHOT_GAP;
     else if (eGunCooldownSlots.current > 0) eGunCooldownSlots.current -= 1;
     const blank = !eGun && blankEnabled && Math.random() < BLANK_ATOM_CHANCE;
@@ -795,7 +904,10 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
   const projShotR = pendingStone ? stoneR : currentIsEGun ? eGunR : radiusFor(current);
   const projShotSize = pendingStone ? stoneSize : currentIsEGun ? eGunSize : sizeFor(current);
   const showCatalystShotRadius = catalystShotsRemaining > 0 && !pendingStone && !currentIsEGun;
-  const catalystShotRadius = projShotR * CATALYST_ADJ_FACTOR;
+  // Visual ring now matches the ACTUAL catalyst merge reach: any atom whose
+  // center is within (projR + otherR) * CATALYST_ADJ_FACTOR will merge.
+  // Approximate otherR ≈ projShotR for the preview ring.
+  const catalystShotRadius = projShotR * 2 * CATALYST_ADJ_FACTOR;
   const launcherX = boardW / 2;
   const launcherY = boardH - 8; // near bottom of board
   const TOP_PAD = 6;
@@ -902,6 +1014,44 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
       });
     }
     return seeded;
+  }
+
+  // Place the 4 shuffle atoms across the top border of the board.
+  function buildShuffleStartBoard(atoms: number[]): Board {
+    if (atoms.length === 0) return createEmptyBoard();
+    const count = atoms.length;
+    const minR = Math.max(...atoms.map((a) => radiusFor(a)));
+    const usableWidth = Math.max(minR * 2, boardW - SIDE_PAD * 2 - minR * 2);
+    return atoms.map((atom, i) => {
+      const r = radiusFor(atom);
+      const laneX = SIDE_PAD + minR + (usableWidth * (i + 0.5)) / count;
+      return {
+        id: nextBallId(),
+        x: Math.max(SIDE_PAD + r, Math.min(boardW - SIDE_PAD - r, laneX)),
+        y: TOP_PAD + r + 2,
+        atom,
+        r,
+      };
+    });
+  }
+
+  function reshuffle() {
+    if (shufflesLeft <= 0) return;
+    setShuffleAtoms(generateShuffleAtoms());
+    setShufflesLeft((n) => Math.max(0, n - 1));
+  }
+
+  function confirmShuffleStart() {
+    const seeded = buildShuffleStartBoard(shuffleAtoms);
+    setBalls(seeded);
+    const initialHighest = Math.max(1, getHighestOnBoard(seeded));
+    if (initialHighest > 1) setHighestElement(initialHighest);
+    setHighest(initialHighest);
+    const discoveries = seeded
+      .map((b) => b.atom)
+      .filter((n, i, atoms) => n > 1 && atoms.indexOf(n) === i && !discoveredElements.includes(n));
+    if (discoveries.length > 0) registerDiscoveries(discoveries);
+    setShuffleStartOpen(false);
   }
 
   /**
@@ -1115,7 +1265,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
   }
 
   function shoot() {
-    if (busy || gameOver || won || inventoryPickerOpen) return;
+    if (busy || gameOver || won || inventoryPickerOpen || shuffleStartOpen) return;
     trackShot(levelId, pendingStone ? -1 : currentIsEGun ? 0 : current, aimDeg, mode);
     queueUndoRef.current = null;
     setPendingReversiblePowerUp(null);
@@ -1732,16 +1882,21 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
       setRunBestCombo((best) => Math.max(best, result.merges.length));
       setBestCombo(result.merges.length);
       result.merges.forEach((m) => trackMerge(levelId, m.resultAtomicNumber, m.chainDepth, mode));
+      const showSymbolPopups = result.merges.length >= 2;
       result.merges.forEach((m, i) => {
         setTimeout(
           () => {
             sfx(() => playMergeSound(m.chainDepth));
             haptic([10, 20, 10]);
-            spawnPopup(`+${ELEMENTS[m.resultAtomicNumber - 1]?.symbol ?? "?"}`);
+            if (showSymbolPopups) {
+              spawnPopup(`+${ELEMENTS[m.resultAtomicNumber - 1]?.symbol ?? "?"}`);
+            }
           },
           80 + i * 120,
         );
       });
+      // Append to history log (single chronological record per merge).
+      pushMergeHistory(result.merges);
     }
     if (shimmerHit) spawnPopup("✦ SHIMMER ×2 ✦");
     if (grabAdd > 0) {
@@ -2097,15 +2252,18 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
         }
         return total % GRAB_THRESHOLD;
       });
+      const showSymbolPopups = result.merges.length >= 2;
       result.merges.forEach((m, i) => {
         setTimeout(
           () => {
             sfx(() => playMergeSound(m.chainDepth));
-            spawnPopup(`+${ELEMENTS[m.resultAtomicNumber - 1]?.symbol ?? "?"}`);
+            if (showSymbolPopups)
+              spawnPopup(`+${ELEMENTS[m.resultAtomicNumber - 1]?.symbol ?? "?"}`);
           },
           80 + i * 120,
         );
       });
+      pushMergeHistory(result.merges);
     } else {
       spawnPopup("🌀 Gravity shift");
     }
@@ -2245,16 +2403,19 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
       grantGravityForCombo(result.merges.length);
       setRunBestCombo((best) => Math.max(best, result.merges.length));
       setBestCombo(result.merges.length);
+      const showSymbolPopups = result.merges.length >= 2;
       result.merges.forEach((m, i) => {
         setTimeout(
           () => {
             sfx(() => playMergeSound(m.chainDepth));
             haptic([10, 20, 10]);
-            spawnPopup(`+${ELEMENTS[m.resultAtomicNumber - 1]?.symbol ?? "?"}`);
+            if (showSymbolPopups)
+              spawnPopup(`+${ELEMENTS[m.resultAtomicNumber - 1]?.symbol ?? "?"}`);
           },
           80 + i * 120,
         );
       });
+      pushMergeHistory(result.merges);
     }
     const nextHighest = Math.max(highest, result.highestElement);
     setHighest(nextHighest);
@@ -2457,9 +2618,20 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
             marginBottom: 8,
           }}
         >
-          <button onClick={onExit} style={iconBtn}>
-            ← Menu
-          </button>
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <button onClick={onExit} style={iconBtn}>
+              ← Menu
+            </button>
+            <button
+              type="button"
+              onClick={() => setHistoryOpen(true)}
+              title="Open merge history"
+              aria-label="Open merge history log"
+              style={{ ...iconBtn, minWidth: 0, padding: "6px 8px" }}
+            >
+              📜
+            </button>
+          </div>
           <div style={{ textAlign: "center" }}>
             <div style={{ fontSize: 10, letterSpacing: 2, color: "var(--muted-foreground)" }}>
               {getModeLevelLabel(gameMode, level)}
@@ -2748,14 +2920,12 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
                       top: y - b.r,
                       width: size,
                       height: size,
-                      borderRadius: "50%",
-                      background:
-                        "radial-gradient(circle at 30% 28%, oklch(0.55 0.02 60), oklch(0.32 0.02 60) 60%, oklch(0.18 0.02 60))",
+                      borderRadius: stoneBorderRadius,
+                      background: stoneBackground,
                       boxShadow:
-                        "0 6px 14px rgba(0,0,0,0.55), inset 0 -8px 14px rgba(0,0,0,0.45), inset 0 6px 12px rgba(255,255,255,0.12)",
-                      border: "2px solid oklch(0.25 0.02 60)",
+                        "0 6px 14px rgba(0,0,0,0.55), inset 0 -10px 18px rgba(0,0,0,0.55), inset 0 6px 14px rgba(255,255,255,0.10)",
+                      border: "2px solid oklch(0.2 0.015 55)",
                       display: "flex",
-                      flexDirection: "column",
                       alignItems: "center",
                       justifyContent: "center",
                       color: "oklch(0.95 0.02 60)",
@@ -2763,15 +2933,22 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
                       transition: isHit
                         ? "left 180ms ease-out, top 180ms ease-out, width 220ms ease-out, height 220ms ease-out"
                         : "left 180ms ease-out, top 180ms ease-out, width 220ms ease-out, height 220ms ease-out",
-                      textShadow: "0 1px 2px rgba(0,0,0,0.7)",
+                      textShadow: "0 1px 3px rgba(0,0,0,0.85)",
+                      overflow: "hidden",
                     }}
                   >
                     <div
-                      style={{ fontSize: Math.max(10, size * 0.16), opacity: 0.85, lineHeight: 1 }}
-                    >
-                      ⛰
-                    </div>
-                    <div style={{ fontSize: Math.max(14, size * 0.32), lineHeight: 1.05 }}>
+                      aria-hidden="true"
+                      style={{
+                        position: "absolute",
+                        inset: 0,
+                        background:
+                          "linear-gradient(125deg, transparent 38%, oklch(0.08 0.01 50 / 0.45) 39%, transparent 41%)," +
+                          "linear-gradient(70deg, transparent 60%, oklch(0.1 0.01 50 / 0.35) 61%, transparent 63%)",
+                        pointerEvents: "none",
+                      }}
+                    />
+                    <div style={{ fontSize: Math.max(14, size * 0.36), lineHeight: 1.05, zIndex: 1 }}>
                       {hp}
                     </div>
                   </div>
@@ -3335,6 +3512,17 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
             onStart={startWithSelectedInventory}
           />
         )}
+        {shuffleStartOpen && !won && !gameOver && (
+          <ShuffleStartModal
+            atoms={shuffleAtoms}
+            shufflesLeft={shufflesLeft}
+            onReshuffle={reshuffle}
+            onStart={confirmShuffleStart}
+          />
+        )}
+        {historyOpen && (
+          <MergeHistoryModal entries={mergeHistory} onClose={() => setHistoryOpen(false)} />
+        )}
         {discoveryEl !== null && (
           <DiscoveryModal atomicNumber={discoveryEl} onClose={() => setDiscoveryEl(null)} />
         )}
@@ -3684,6 +3872,145 @@ function DiscoveryModal({ atomicNumber, onClose }: { atomicNumber: number; onClo
       </p>
       <button onClick={onClose} style={modalBtn}>
         Continue
+      </button>
+    </Modal>
+  );
+}
+
+function ShuffleStartModal({
+  atoms,
+  shufflesLeft,
+  onReshuffle,
+  onStart,
+}: {
+  atoms: number[];
+  shufflesLeft: number;
+  onReshuffle: () => void;
+  onStart: () => void;
+}) {
+  return (
+    <Modal>
+      <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--accent)", marginBottom: 8 }}>
+        STARTING SHUFFLE
+      </div>
+      <h2 style={{ margin: "0 0 8px", fontSize: 22, fontWeight: 900 }}>Pick your opening atoms</h2>
+      <p style={{ margin: "0 0 14px", color: "var(--muted-foreground)", fontSize: 13 }}>
+        These 4 atoms will be placed across the top of the board to give you a head start.
+        Reshuffle up to 3 times for a different draw.
+      </p>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          gap: 12,
+          padding: "12px 0 16px",
+          flexWrap: "wrap",
+        }}
+      >
+        {atoms.map((a, i) => (
+          <ElementBall key={i} atomicNumber={a} size={56} />
+        ))}
+      </div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <button
+          onClick={onReshuffle}
+          disabled={shufflesLeft <= 0}
+          style={{
+            ...modalBtn,
+            background: "var(--surface-high)",
+            color: "var(--foreground)",
+            opacity: shufflesLeft <= 0 ? 0.5 : 1,
+            cursor: shufflesLeft <= 0 ? "not-allowed" : "pointer",
+          }}
+        >
+          🔀 Reshuffle ({shufflesLeft})
+        </button>
+        <button onClick={onStart} style={modalBtn}>
+          Start
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+function MergeHistoryModal({
+  entries,
+  onClose,
+}: {
+  entries: { id: number; ts: number; atom: number; depth: number; chainSize: number }[];
+  onClose: () => void;
+}) {
+  const t0 = entries[0]?.ts ?? Date.now();
+  return (
+    <Modal>
+      <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--accent)", marginBottom: 8 }}>
+        MERGE HISTORY
+      </div>
+      <h2 style={{ margin: "0 0 12px", fontSize: 22, fontWeight: 900 }}>This run, step by step</h2>
+      {entries.length === 0 ? (
+        <p style={{ color: "var(--muted-foreground)", fontSize: 13 }}>
+          No merges yet — make a fusion to see it logged here.
+        </p>
+      ) : (
+        <div
+          style={{
+            maxHeight: 320,
+            overflowY: "auto",
+            display: "grid",
+            gap: 6,
+            padding: 4,
+            border: "1px solid var(--border)",
+            borderRadius: 10,
+            background: "var(--surface)",
+          }}
+        >
+          {entries
+            .slice()
+            .reverse()
+            .map((e) => {
+              const el = ELEMENTS[e.atom - 1];
+              const dt = (e.ts - t0) / 1000;
+              const mm = Math.floor(dt / 60);
+              const ss = Math.floor(dt % 60).toString().padStart(2, "0");
+              return (
+                <div
+                  key={e.id}
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "44px 1fr auto",
+                    alignItems: "center",
+                    gap: 10,
+                    padding: "6px 8px",
+                    borderRadius: 8,
+                    background: "var(--surface-elevated)",
+                  }}
+                >
+                  <ElementBall atomicNumber={e.atom} size={36} />
+                  <div>
+                    <div style={{ fontWeight: 800, fontSize: 13 }}>
+                      {el?.name ?? "?"} ({el?.symbol ?? "?"})
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--muted-foreground)" }}>
+                      {e.chainSize >= 2 ? `Chain ×${e.chainSize}` : "Single merge"}
+                      {e.depth > 0 ? ` • depth ${e.depth}` : ""}
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      fontVariantNumeric: "tabular-nums",
+                      fontSize: 11,
+                      color: "var(--muted-foreground)",
+                    }}
+                  >
+                    +{mm}:{ss}
+                  </div>
+                </div>
+              );
+            })}
+        </div>
+      )}
+      <button onClick={onClose} style={modalBtn}>
+        Close
       </button>
     </Modal>
   );
