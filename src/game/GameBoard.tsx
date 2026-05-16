@@ -3077,6 +3077,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
               if (hit) {
                 setGrabbing({ id: hit.id, x: px, y: py });
                 setGrabs((g) => g - 1);
+                runPowerUpsUsedRef.current += 1;
               }
               return;
             }
