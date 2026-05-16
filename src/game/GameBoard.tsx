@@ -519,7 +519,9 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
 
   useEffect(() => {
     setNewlyDiscoveredThisRun([]);
-    const initialBalls = createSeededBoard();
+    // For level 10+ we defer seeding until the player confirms their shuffle;
+    // the shuffle modal opens immediately and seeds via confirmShuffleStart().
+    const initialBalls = level.id >= SHUFFLE_MIN_LEVEL ? createEmptyBoard() : createSeededBoard();
     setBalls(initialBalls);
     const initialHighest = Math.max(1, getHighestOnBoard(initialBalls));
     if (initialHighest > 1) setHighestElement(initialHighest);
