@@ -41,7 +41,7 @@ export function MainMenu({
   const highestEl = ELEMENTS[highestElement - 1];
   const nextLevel = LEVELS[Math.min(unlockedLevel - 1, LEVELS.length - 1)];
   const completedDailyQuests = dailyQuests.filter((quest) => quest.completed).length;
-  const dailyComplete = dailyQuests.length > 0 && completedDailyQuests === dailyQuests.length;
+  const dailyComplete = dailyQuests.length > 0 && completedDailyQuests >= 4;
 
   useEffect(() => {
     refreshDailyLab();
