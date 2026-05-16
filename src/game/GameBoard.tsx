@@ -3354,6 +3354,8 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
               )}
               {pendingStone ? (
                 <StoneVisual size={projShotSize} hp={STONE_MAX_HP} />
+              ) : pendingGamma ? (
+                <GammaVisual size={projShotSize} />
               ) : currentIsEGun ? (
                 <EGunVisual size={projShotSize} />
               ) : currentIsBlank ? (
@@ -3387,6 +3389,8 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
             {!projectile &&
               (pendingStone ? (
                 <StoneVisual size={projShotSize} hp={STONE_MAX_HP} />
+              ) : pendingGamma ? (
+                <GammaVisual size={projShotSize} />
               ) : currentIsEGun ? (
                 <EGunVisual size={projShotSize} />
               ) : currentIsBlank ? (
