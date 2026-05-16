@@ -329,6 +329,8 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     reportQuestProgress,
     setBestCombo,
     setLevelStars,
+    incrementLevelAttempt,
+    recordLevelRun,
     setChallengeBestScore,
     powerUpInventory,
     addInventoryPowerUps,
