@@ -2316,7 +2316,14 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     if (currentIsEGun || currentIsBlank) return;
     const maxTier = Math.min(118, Math.max(current + 1, target - 1));
     if (current >= maxTier) return;
-    const atom = current + 1 + Math.floor(Math.random() * (maxTier - current));
+    // Only reroll into atoms the player has already discovered, so Transmute
+    // never hands out a fresh element for free.
+    const candidates = discoveredElements.filter((n) => n > current && n <= maxTier);
+    if (candidates.length === 0) {
+      spawnPopup("🔀 NO HIGHER DISCOVERED");
+      return;
+    }
+    const atom = candidates[Math.floor(Math.random() * candidates.length)];
     setTransmuteCharges((g) => Math.max(0, g - 1));
     setQueue((q) => [atom, ...q.slice(1)]);
     setShimmerQueue((q) => [false, ...q.slice(1)]);
