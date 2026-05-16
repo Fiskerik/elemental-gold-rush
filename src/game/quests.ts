@@ -6,7 +6,8 @@ export type DailyQuestType =
   | "reach_category"
   | "clear_level"
   | "chain_merge"
-  | "earn_stars";
+  | "earn_stars"
+  | "purchase_item";
 
 export interface DailyQuest {
   id: string;
@@ -26,6 +27,7 @@ export interface QuestProgressEvent {
   levelCleared?: boolean;
   maxChainDepth?: number;
   starsEarned?: number;
+  itemsPurchased?: number;
 }
 
 export function getTodayQuestDate(date = new Date()): string {
@@ -37,9 +39,22 @@ function isRemovedDailyQuest(quest: DailyQuest): boolean {
     .toLowerCase()
     .replace(/[^a-z]+/g, " ")
     .trim();
-  return (
-    normalizedTitle === "reqch transition metal" || normalizedTitle === "reach transition metal"
-  );
+  if (
+    normalizedTitle === "reqch transition metal" ||
+    normalizedTitle === "reach transition metal"
+  ) {
+    return true;
+  }
+  // Retire any quests not in the current 6-quest daily set.
+  const allowedIds = new Set([
+    "clear-level",
+    "discover-element",
+    "earn-stars",
+    "chain-merge",
+    "merge-atoms",
+    "purchase-item",
+  ]);
+  return !allowedIds.has(quest.id.split("-").slice(1).join("-"));
 }
 
 function removeRetiredDailyQuests(quests: DailyQuest[]): DailyQuest[] {
@@ -47,21 +62,13 @@ function removeRetiredDailyQuests(quests: DailyQuest[]): DailyQuest[] {
 }
 
 export function createDailyQuests(dateKey = getTodayQuestDate()): DailyQuest[] {
-  const seed = dateKey.split("").reduce((sum, char) => sum + char.charCodeAt(0), 0);
-  const approachableElementGoals = [
-    { atomicNumber: 2, label: "Reach Helium" },
-    { atomicNumber: 3, label: "Reach Lithium" },
-    { atomicNumber: 4, label: "Reach Beryllium" },
-  ];
-  const elementGoal = approachableElementGoals[seed % approachableElementGoals.length];
-
   return [
     {
-      id: `${dateKey}-merge-atoms`,
-      type: "merge_atoms",
-      title: "Merge 25 atoms",
-      description: "Create reactions by merging matching atoms.",
-      target: 25,
+      id: `${dateKey}-clear-level`,
+      type: "clear_level",
+      title: "Clear 1 stage",
+      description: "Complete any campaign level without a game over.",
+      target: 1,
       progress: 0,
       completed: false,
     },
@@ -75,39 +82,38 @@ export function createDailyQuests(dateKey = getTodayQuestDate()): DailyQuest[] {
       completed: false,
     },
     {
-      id: `${dateKey}-reach-element`,
-      type: "reach_category",
-      title: elementGoal.label,
-      description: "Fuse your way to an early element achievable in 1–2 games.",
-      target: elementGoal.atomicNumber,
-      progress: 0,
-      completed: false,
-      category: `element-${elementGoal.atomicNumber}`,
-    },
-    {
       id: `${dateKey}-earn-stars`,
       type: "earn_stars",
-      title: "Earn 3 total stars",
-      description: "Clear levels and collect three stars across today’s runs.",
+      title: "Earn 3 stars",
+      description: "Collect three stars across today's runs.",
       target: 3,
-      progress: 0,
-      completed: false,
-    },
-    {
-      id: `${dateKey}-clear-level`,
-      type: "clear_level",
-      title: "Clear 1 level",
-      description: "Complete any campaign level without a game over.",
-      target: 1,
       progress: 0,
       completed: false,
     },
     {
       id: `${dateKey}-chain-merge`,
       type: "chain_merge",
-      title: "Trigger a 3-step chain",
-      description: "Land a shot that causes three cascading merges.",
-      target: 3,
+      title: "Trigger a 4-step chain",
+      description: "Land a shot that causes four cascading merges.",
+      target: 4,
+      progress: 0,
+      completed: false,
+    },
+    {
+      id: `${dateKey}-merge-atoms`,
+      type: "merge_atoms",
+      title: "Merge 50 atoms",
+      description: "Create reactions by merging matching atoms.",
+      target: 50,
+      progress: 0,
+      completed: false,
+    },
+    {
+      id: `${dateKey}-purchase-item`,
+      type: "purchase_item",
+      title: "Purchase an item from the shop",
+      description: "Spend saved score on any shop power-up.",
+      target: 1,
       progress: 0,
       completed: false,
     },
@@ -173,6 +179,10 @@ export function applyQuestProgress(quests: DailyQuest[], event: QuestProgressEve
       progress += event.starsEarned;
     }
 
+    if (quest.type === "purchase_item" && event.itemsPurchased) {
+      progress += event.itemsPurchased;
+    }
+
     const cappedProgress = Math.min(progress, quest.target);
     return {
       ...quest,
@@ -182,6 +192,10 @@ export function applyQuestProgress(quests: DailyQuest[], event: QuestProgressEve
   });
 }
 
+export const DAILY_QUEST_CLAIM_THRESHOLD = 4;
+
 export function areDailyQuestsComplete(quests: DailyQuest[]): boolean {
-  return quests.length > 0 && quests.every((quest) => quest.completed);
+  if (quests.length === 0) return false;
+  const completed = quests.filter((q) => q.completed).length;
+  return completed >= DAILY_QUEST_CLAIM_THRESHOLD;
 }
