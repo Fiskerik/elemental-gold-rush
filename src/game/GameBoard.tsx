@@ -3866,6 +3866,145 @@ function DiscoveryModal({ atomicNumber, onClose }: { atomicNumber: number; onClo
   );
 }
 
+function ShuffleStartModal({
+  atoms,
+  shufflesLeft,
+  onReshuffle,
+  onStart,
+}: {
+  atoms: number[];
+  shufflesLeft: number;
+  onReshuffle: () => void;
+  onStart: () => void;
+}) {
+  return (
+    <Modal>
+      <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--accent)", marginBottom: 8 }}>
+        STARTING SHUFFLE
+      </div>
+      <h2 style={{ margin: "0 0 8px", fontSize: 22, fontWeight: 900 }}>Pick your opening atoms</h2>
+      <p style={{ margin: "0 0 14px", color: "var(--muted-foreground)", fontSize: 13 }}>
+        These 4 atoms will be placed across the top of the board to give you a head start.
+        Reshuffle up to 3 times for a different draw.
+      </p>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          gap: 12,
+          padding: "12px 0 16px",
+          flexWrap: "wrap",
+        }}
+      >
+        {atoms.map((a, i) => (
+          <ElementBall key={i} atomicNumber={a} size={56} />
+        ))}
+      </div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <button
+          onClick={onReshuffle}
+          disabled={shufflesLeft <= 0}
+          style={{
+            ...modalBtn,
+            background: "var(--surface-high)",
+            color: "var(--foreground)",
+            opacity: shufflesLeft <= 0 ? 0.5 : 1,
+            cursor: shufflesLeft <= 0 ? "not-allowed" : "pointer",
+          }}
+        >
+          🔀 Reshuffle ({shufflesLeft})
+        </button>
+        <button onClick={onStart} style={modalBtn}>
+          Start
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+function MergeHistoryModal({
+  entries,
+  onClose,
+}: {
+  entries: { id: number; ts: number; atom: number; depth: number; chainSize: number }[];
+  onClose: () => void;
+}) {
+  const t0 = entries[0]?.ts ?? Date.now();
+  return (
+    <Modal>
+      <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--accent)", marginBottom: 8 }}>
+        MERGE HISTORY
+      </div>
+      <h2 style={{ margin: "0 0 12px", fontSize: 22, fontWeight: 900 }}>This run, step by step</h2>
+      {entries.length === 0 ? (
+        <p style={{ color: "var(--muted-foreground)", fontSize: 13 }}>
+          No merges yet — make a fusion to see it logged here.
+        </p>
+      ) : (
+        <div
+          style={{
+            maxHeight: 320,
+            overflowY: "auto",
+            display: "grid",
+            gap: 6,
+            padding: 4,
+            border: "1px solid var(--border)",
+            borderRadius: 10,
+            background: "var(--surface)",
+          }}
+        >
+          {entries
+            .slice()
+            .reverse()
+            .map((e) => {
+              const el = ELEMENTS[e.atom - 1];
+              const dt = (e.ts - t0) / 1000;
+              const mm = Math.floor(dt / 60);
+              const ss = Math.floor(dt % 60).toString().padStart(2, "0");
+              return (
+                <div
+                  key={e.id}
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "44px 1fr auto",
+                    alignItems: "center",
+                    gap: 10,
+                    padding: "6px 8px",
+                    borderRadius: 8,
+                    background: "var(--surface-elevated)",
+                  }}
+                >
+                  <ElementBall atomicNumber={e.atom} size={36} />
+                  <div>
+                    <div style={{ fontWeight: 800, fontSize: 13 }}>
+                      {el?.name ?? "?"} ({el?.symbol ?? "?"})
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--muted-foreground)" }}>
+                      {e.chainSize >= 2 ? `Chain ×${e.chainSize}` : "Single merge"}
+                      {e.depth > 0 ? ` • depth ${e.depth}` : ""}
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      fontVariantNumeric: "tabular-nums",
+                      fontSize: 11,
+                      color: "var(--muted-foreground)",
+                    }}
+                  >
+                    +{mm}:{ss}
+                  </div>
+                </div>
+              );
+            })}
+        </div>
+      )}
+      <button onClick={onClose} style={modalBtn}>
+        Close
+      </button>
+    </Modal>
+  );
+}
+
 function ContinueChoiceModal({
   level,
   score,
