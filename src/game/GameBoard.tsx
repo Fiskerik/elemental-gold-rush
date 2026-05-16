@@ -637,6 +637,9 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     setCatalystShotsRemaining(0);
     setPendingReversiblePowerUp(null);
     hasClaimedUnusedInventoryRef.current = false;
+    runPowerUpsUsedRef.current = 0;
+    runRecordedRef.current = false;
+    incrementLevelAttempt(levelId);
     setSelectedInventoryPowerUps(emptyPowerUpInventory());
     setInventoryPickerOpen(hasPowerUps(powerUpInventory));
     setMergeHistory([]);
