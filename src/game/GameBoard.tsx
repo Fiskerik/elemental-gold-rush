@@ -911,14 +911,19 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     if (stageClearTimeoutRef.current !== null) {
       window.clearTimeout(stageClearTimeoutRef.current);
     }
+    // Clear any in-flight score/merge popups so they don't bleed into the
+    // win animation or appear behind the result modal.
+    setPopups([]);
     setStageClearFx(stats);
     spawnPopup("⚛ TARGET FORMED");
     stageClearTimeoutRef.current = window.setTimeout(() => {
       setStageClearFx(null);
+      // Small extra beat so the fade-out of the animation completes before
+      // the score modal mounts on top.
       setWinChoice(stats);
       setBusy(false);
       stageClearTimeoutRef.current = null;
-    }, STAGE_CLEAR_ANIMATION_MS);
+    }, STAGE_CLEAR_ANIMATION_MS + 400);
   }
 
   useEffect(() => {
