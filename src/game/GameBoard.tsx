@@ -4502,7 +4502,7 @@ function ResultStat({ label, value, color }: { label: string; value: string; col
   );
 }
 
-function Modal({ children }: { children: React.ReactNode }) {
+function Modal({ children, zIndex = 100 }: { children: React.ReactNode; zIndex?: number }) {
   return (
     <div
       style={{
@@ -4512,7 +4512,7 @@ function Modal({ children }: { children: React.ReactNode }) {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        zIndex: 100,
+        zIndex,
         padding: 24,
         backdropFilter: "blur(4px)",
       }}
