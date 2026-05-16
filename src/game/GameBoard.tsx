@@ -373,6 +373,9 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
   const [projectile, setProjectile] = useState<{ x: number; y: number } | null>(null);
   const [eGunBeamPath, setEGunBeamPath] = useState<{ x: number; y: number }[] | null>(null);
   const [gravityFxId, setGravityFxId] = useState<number | null>(null);
+  const [fusionJumpFx, setFusionJumpFx] = useState<{ id: number; x: number; y: number } | null>(
+    null,
+  );
   const popupId = useRef(0);
   const eGunCooldownSlots = useRef(0);
 
