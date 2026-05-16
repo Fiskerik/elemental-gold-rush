@@ -442,6 +442,8 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
   } | null>(null);
   const stageClearTimeoutRef = useRef<number | null>(null);
   const hasClaimedUnusedInventoryRef = useRef(false);
+  const runPowerUpsUsedRef = useRef(0);
+  const runRecordedRef = useRef(false);
   const [inventoryPickerOpen, setInventoryPickerOpen] = useState(false);
   const [selectedInventoryPowerUps, setSelectedInventoryPowerUps] = useState<PowerUpInventory>(() =>
     emptyPowerUpInventory(),
