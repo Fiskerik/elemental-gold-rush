@@ -225,7 +225,7 @@ export function MainMenu({
             </button>
           </div>
           <div style={questGrid}>
-            {dailyQuests.slice(0, 4).map((quest) => (
+            {dailyQuests.map((quest) => (
               <div key={quest.id} style={questRow}>
                 <span
                   style={{
