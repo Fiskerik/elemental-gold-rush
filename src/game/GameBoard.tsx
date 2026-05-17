@@ -3255,6 +3255,16 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
             >
               📜
             </button>
+            <button
+              type="button"
+              onClick={() => setPaused(true)}
+              title="Pause"
+              aria-label="Pause game"
+              disabled={gameOver || won}
+              style={{ ...iconBtn, minWidth: 0, padding: "6px 8px" }}
+            >
+              ⏸
+            </button>
           </div>
           <div style={{ textAlign: "center" }}>
             <div style={{ fontSize: 10, letterSpacing: 2, color: "var(--muted-foreground)" }}>
