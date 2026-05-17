@@ -58,6 +58,7 @@ export const COMPOUNDS: CompoundDefinition[] = [
   compound("hydrogen-peroxide", "Hydrogen Peroxide", "H₂O₂", { H: 2, O: 2 }, 2200, "uncommon", "Hydrogen peroxide breaks down into water and oxygen."),
   compound("ozone", "Ozone", "O₃", { O: 3 }, 2000, "uncommon", "Ozone high in the atmosphere helps absorb ultraviolet light."),
   compound("hydrogen-chloride", "Hydrogen Chloride", "HCl", { H: 1, Cl: 1 }, 1700, "common", "Hydrogen chloride forms hydrochloric acid when dissolved in water."),
+  compound("hydrogen-cyanide", "Hydrogen Cyanide", "HCN", { H: 1, C: 1, N: 1 }, 2600, "uncommon", "Hydrogen cyanide is a highly toxic molecule with a faint bitter-almond odor."),
   compound("nitrous-oxide", "Nitrous Oxide", "N₂O", { N: 2, O: 1 }, 2200, "uncommon", "Nitrous oxide is also known as laughing gas."),
   compound("calcium-oxide", "Calcium Oxide", "CaO", { Ca: 1, O: 1 }, 2300, "uncommon", "Calcium oxide is quicklime, used in cement and steelmaking."),
   compound("silicon-dioxide", "Silicon Dioxide", "SiO₂", { Si: 1, O: 2 }, 2600, "uncommon", "Silicon dioxide is the main compound in quartz and sand."),
@@ -70,6 +71,7 @@ export const COMPOUNDS: CompoundDefinition[] = [
   compound("iron-oxide", "Iron Oxide", "Fe₂O₃", { Fe: 2, O: 3 }, 3500, "rare", "Iron oxide is the red-brown chemistry behind rust and many earth pigments."),
   compound("calcium-carbonate", "Calcium Carbonate", "CaCO₃", { Ca: 1, C: 1, O: 3 }, 3300, "rare", "Calcium carbonate makes up limestone, chalk, shells, and pearls."),
   compound("sodium-hydroxide", "Sodium Hydroxide", "NaOH", { Na: 1, O: 1, H: 1 }, 2800, "uncommon", "Sodium hydroxide is also called lye and is used to make soap."),
+  compound("chloroform", "Chloroform", "CHCl₃", { C: 1, H: 1, Cl: 3 }, 4200, "rare", "Chloroform is a heavy, sweet-smelling liquid once used as an anesthetic."),
   compound("hydrogen-sulfide", "Hydrogen Sulfide", "H₂S", { H: 2, S: 1 }, 2100, "uncommon", "Hydrogen sulfide smells like rotten eggs."),
   compound("sulfuric-acid", "Sulfuric Acid", "H₂SO₄", { H: 2, S: 1, O: 4 }, 3800, "rare", "Sulfuric acid is one of the most produced industrial chemicals."),
   compound("methanol", "Methanol", "CH₄O", { C: 1, H: 4, O: 1 }, 3000, "uncommon", "Methanol is a simple alcohol used in fuels, solvents, and chemical manufacturing."),
@@ -104,6 +106,7 @@ export const COMPOUND_HINTS: Record<string, string> = {
   "hydrogen-peroxide": "A bubbling household disinfectant that releases oxygen.",
   "ozone": "A reactive form of oxygen that helps shield Earth high above.",
   "hydrogen-chloride": "A sharp gas that becomes a powerful acid in water.",
+  "hydrogen-cyanide": "A small but dangerous molecule historically linked to bitter almonds.",
   "nitrous-oxide": "A gas famous for whipped cream chargers and laughing gas.",
   "calcium-oxide": "A hot-reacting powder known as quicklime.",
   "silicon-dioxide": "The hard mineral chemistry behind quartz and sand.",
@@ -116,6 +119,7 @@ export const COMPOUND_HINTS: Record<string, string> = {
   "iron-oxide": "The red-brown chemistry of rust and earthy pigments.",
   "calcium-carbonate": "A chalky solid found in shells, limestone, and pearls.",
   "sodium-hydroxide": "A slippery, caustic base used in soap making.",
+  "chloroform": "A heavy sweet-smelling liquid with three halogen atoms.",
   "hydrogen-sulfide": "A foul-smelling gas associated with rotten eggs.",
   "sulfuric-acid": "A heavy industrial acid used around the world.",
   "methanol": "A small alcohol used as fuel and solvent.",
@@ -157,6 +161,10 @@ export const COMPOUND_STRUCTURES: Record<string, CompoundStructure> = {
   "hydrogen-chloride": {
     atoms: [{ symbol: "H", x: -0.36, y: 0 }, { symbol: "Cl", x: 0.36, y: 0 }],
     bonds: [{ from: 0, to: 1 }],
+  },
+  "hydrogen-cyanide": {
+    atoms: [{ symbol: "H", x: -0.62, y: 0 }, { symbol: "C", x: 0, y: 0 }, { symbol: "N", x: 0.62, y: 0 }],
+    bonds: [{ from: 0, to: 1 }, { from: 1, to: 2, order: 3 }],
   },
   "nitrous-oxide": {
     atoms: [{ symbol: "N", x: -0.56, y: 0 }, { symbol: "N", x: 0, y: 0 }, { symbol: "O", x: 0.56, y: 0 }],
@@ -205,6 +213,10 @@ export const COMPOUND_STRUCTURES: Record<string, CompoundStructure> = {
   "sodium-hydroxide": {
     atoms: [{ symbol: "Na", x: -0.55, y: 0 }, { symbol: "O", x: 0.05, y: 0 }, { symbol: "H", x: 0.55, y: 0 }],
     bonds: [{ from: 0, to: 1 }, { from: 1, to: 2 }],
+  },
+  "chloroform": {
+    atoms: [{ symbol: "C", x: 0, y: 0 }, { symbol: "H", x: 0, y: -0.58 }, { symbol: "Cl", x: -0.55, y: 0.32 }, { symbol: "Cl", x: 0.55, y: 0.32 }, { symbol: "Cl", x: 0, y: 0.64 }],
+    bonds: [{ from: 0, to: 1 }, { from: 0, to: 2 }, { from: 0, to: 3 }, { from: 0, to: 4 }],
   },
   "hydrogen-sulfide": {
     atoms: [{ symbol: "S", x: 0, y: -0.1 }, { symbol: "H", x: -0.48, y: 0.36 }, { symbol: "H", x: 0.48, y: 0.36 }],

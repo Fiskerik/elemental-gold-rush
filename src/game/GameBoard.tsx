@@ -167,6 +167,11 @@ function countsForBalls(balls: Ball[]): Record<string, number> {
 // Shared rocky styling — used for both the launcher visual and live stones
 // on the board. Looks like a chunky rock with cracks and uneven shading
 // instead of a smooth grey ball.
+function compoundFormationScore(compound: CompoundDefinition, atoms: { atom: number }[]): number {
+  const atomWeight = atoms.reduce((sum, atom) => sum + Math.max(1, atom.atom), 0);
+  return compound.bonusScore + atomWeight * 125;
+}
+
 const stoneBackground =
   // Multiple radial gradients layered to mimic uneven rocky surface,
   // plus craggy highlights and shadow pockets.
@@ -474,6 +479,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     compound: CompoundDefinition;
     isNew: boolean;
     count: number;
+    bonusScore: number;
   } | null>(null);
   const [newlyDiscoveredThisRun, setNewlyDiscoveredThisRun] = useState<number[]>([]);
   const [highlightId, setHighlightId] = useState<number | null>(null);
@@ -668,6 +674,13 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     () => findCompoundByElements(compoundSelectionCounts),
     [compoundSelectionCounts],
   );
+  const matchingCompoundScore = useMemo(
+    () => (matchingCompound ? compoundFormationScore(matchingCompound, selectedCompoundAtoms) : 0),
+    [matchingCompound, selectedCompoundAtoms],
+  );
+  const matchingCompoundIsNew = matchingCompound
+    ? !discoveredCompounds.includes(matchingCompound.id)
+    : false;
 
   const sfx = (fn: () => void) => {
     if (soundEnabled) fn();
@@ -2644,6 +2657,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     if (selectedAtoms.length === 0) return;
     const selectedKey = compoundKey(countsForBalls(selectedAtoms));
     if (selectedKey !== compoundKey(matchingCompound.elements)) return;
+    const bonusScore = compoundFormationScore(matchingCompound, selectedAtoms);
 
     const spentAt = Date.now();
     saveCompoundChargeState(0, spentAt);
@@ -2666,16 +2680,16 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
       setFormingCompoundIds(new Set());
       setCompoundFx(null);
       recordCompoundDiscovery(matchingCompound.id);
-      setScore((currentScore) => currentScore + matchingCompound.bonusScore);
-      addScore(matchingCompound.bonusScore);
+      setScore((currentScore) => currentScore + bonusScore);
+      addScore(bonusScore);
       pushShotHistory({
         shot: shots,
         action: `Formed ${matchingCompound.name}`,
-        points: matchingCompound.bonusScore,
+        points: bonusScore,
         powerUp: "Compound",
       });
-      spawnPopup(`+${formatScore(matchingCompound.bonusScore)}`);
-      setDiscoveryCompound({ compound: matchingCompound, isNew: wasNew, count: nextCount });
+      spawnPopup(`+${formatScore(bonusScore)}`);
+      setDiscoveryCompound({ compound: matchingCompound, isNew: wasNew, count: nextCount, bonusScore });
       setBusy(false);
     }, 900);
   }
@@ -3487,6 +3501,8 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
               counts={compoundSelectionCounts}
               selectedCount={selectedCompoundAtoms.length}
               match={matchingCompound}
+              matchScore={matchingCompoundScore}
+              matchIsNew={matchingCompoundIsNew}
               onForm={formSelectedCompound}
               onCancel={() => {
                 setCompoundMode(false);
@@ -3882,7 +3898,9 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
             borderRadius: 14,
             border: "1px solid var(--border)",
             display: "flex",
+            flexDirection: "column",
             alignItems: "center",
+            justifyContent: "center",
             gap: 10,
           }}
         >
@@ -3908,14 +3926,14 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
             style={{
               display: "flex",
               alignItems: "center",
-              justifyContent: "flex-end",
+              justifyContent: "flex-start",
               gap: 6,
-              flex: "1 0 100%",
+              width: "100%",
               minWidth: 0,
               overflowX: "auto",
               flexWrap: "nowrap",
-              flexDirection: "row-reverse",
-              paddingTop: 8,
+              flexDirection: "row",
+              padding: "2px 2px 4px",
             }}
           >
             {(transmuteCharges > 0 || pendingReversiblePowerUp === "transmute") && (
@@ -4225,6 +4243,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
             compound={discoveryCompound.compound}
             isNew={discoveryCompound.isNew}
             count={discoveryCompound.count}
+            bonusScore={discoveryCompound.bonusScore}
             onClose={() => setDiscoveryCompound(null)}
           />
         )}
@@ -4600,12 +4619,16 @@ function CompoundSelectionPanel({
   counts,
   selectedCount,
   match,
+  matchScore,
+  matchIsNew,
   onForm,
   onCancel,
 }: {
   counts: Record<string, number>;
   selectedCount: number;
   match: CompoundDefinition | null;
+  matchScore: number;
+  matchIsNew: boolean;
   onForm: () => void;
   onCancel: () => void;
 }) {
@@ -4668,6 +4691,22 @@ function CompoundSelectionPanel({
       >
         {match ? `Form ${match.name}` : "Form Compound"}
       </button>
+      {match && (
+        <div
+          style={{
+            marginTop: 8,
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 10,
+            fontSize: 12,
+            fontWeight: 900,
+            color: "var(--accent)",
+          }}
+        >
+          <span>{matchIsNew ? "NEW compound" : "Already discovered"}</span>
+          <span>+{formatScore(matchScore)}</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -4719,11 +4758,13 @@ function CompoundDiscoveryModal({
   compound,
   isNew,
   count,
+  bonusScore,
   onClose,
 }: {
   compound: CompoundDefinition;
   isNew: boolean;
   count: number;
+  bonusScore: number;
   onClose: () => void;
 }) {
   return (
@@ -4742,7 +4783,7 @@ function CompoundDiscoveryModal({
         {isNew ? "Added to your collection" : `Already discovered - found ${count} times`}
       </div>
       <div style={{ fontSize: 20, fontWeight: 900, color: "var(--primary)", marginBottom: 10 }}>
-        +{formatScore(compound.bonusScore)}
+        +{formatScore(bonusScore)}
       </div>
       <p style={{ fontSize: 13, lineHeight: 1.55, color: "var(--foreground)", margin: 0 }}>
         {compound.fact}
