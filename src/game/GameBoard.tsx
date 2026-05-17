@@ -4309,6 +4309,91 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
           />
         )}
         {historyOpen && <ShotHistoryModal entries={shotHistory} onClose={() => setHistoryOpen(false)} />}
+        {paused && !gameOver && !won && (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Game paused"
+            style={{
+              position: "fixed",
+              inset: 0,
+              background: "rgba(0,0,0,0.72)",
+              backdropFilter: "blur(6px)",
+              zIndex: 1000,
+              display: "grid",
+              placeItems: "center",
+              padding: 20,
+            }}
+          >
+            <div
+              style={{
+                background: "var(--surface-elevated)",
+                border: "1px solid var(--border)",
+                borderRadius: 18,
+                padding: 22,
+                maxWidth: 320,
+                width: "100%",
+                textAlign: "center",
+                boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 11,
+                  letterSpacing: 3,
+                  color: "var(--accent)",
+                  fontWeight: 800,
+                }}
+              >
+                PAUSED
+              </div>
+              <h2 style={{ margin: "6px 0 4px", fontSize: 24 }}>Game paused</h2>
+              <p
+                style={{
+                  margin: "0 0 16px",
+                  color: "var(--muted-foreground)",
+                  fontSize: 13,
+                  lineHeight: 1.45,
+                }}
+              >
+                All power-up timers are frozen until you resume.
+              </p>
+              <div style={{ display: "grid", gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => setPaused(false)}
+                  style={{
+                    border: "none",
+                    borderRadius: 12,
+                    padding: "12px 14px",
+                    background:
+                      "linear-gradient(135deg, var(--accent), var(--primary))",
+                    color: "var(--primary-foreground)",
+                    fontWeight: 800,
+                    cursor: "pointer",
+                  }}
+                >
+                  ▶ Resume
+                </button>
+                <button
+                  type="button"
+                  onClick={onExit}
+                  style={{
+                    border: "1px solid var(--border)",
+                    borderRadius: 12,
+                    padding: "10px 14px",
+                    background: "var(--surface)",
+                    color: "var(--foreground)",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  Exit to menu
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         {discoveryEl !== null && (
           <DiscoveryModal atomicNumber={discoveryEl} onClose={() => setDiscoveryEl(null)} />
         )}
