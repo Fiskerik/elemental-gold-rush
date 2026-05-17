@@ -578,6 +578,12 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
   // === Run timer ===
   const [elapsedMs, setElapsedMs] = useState(0);
   const startTimeRef = useRef<number>(Date.now());
+  const [paused, setPaused] = useState(false);
+
+  // === Queue Shuffle power-up ===
+  // Earned every QUEUE_SHUFFLE_PER_STONE_HITS atom-on-stone hits this run.
+  const [queueShuffleCharges, setQueueShuffleCharges] = useState(0);
+  const [stoneHitTally, setStoneHitTally] = useState(0);
 
   // === Shot history log ===
   // Chronological list of every shot/action in this run.
