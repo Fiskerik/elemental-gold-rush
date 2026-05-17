@@ -81,6 +81,7 @@ interface ProgressState {
   totalScore: number;
   discoveredElements: number[]; // atomic numbers seen
   discoveredCompounds: string[];
+  compoundCounts: Record<string, number>;
   soundEnabled: boolean;
   hapticsEnabled: boolean;
   dailyQuestDate: string;
@@ -133,6 +134,7 @@ export const useProgress = create<ProgressState>()(
       totalScore: 0,
       discoveredElements: [1],
       discoveredCompounds: [],
+      compoundCounts: {},
       soundEnabled: true,
       hapticsEnabled: true,
       dailyQuestDate: initialQuestDate,
@@ -162,11 +164,15 @@ export const useProgress = create<ProgressState>()(
           };
         }),
       recordCompoundDiscovery: (compoundId) =>
-        set((s) =>
-          s.discoveredCompounds.includes(compoundId)
-            ? s
-            : { discoveredCompounds: [...s.discoveredCompounds, compoundId] },
-        ),
+        set((s) => ({
+          discoveredCompounds: s.discoveredCompounds.includes(compoundId)
+            ? s.discoveredCompounds
+            : [...s.discoveredCompounds, compoundId],
+          compoundCounts: {
+            ...s.compoundCounts,
+            [compoundId]: (s.compoundCounts[compoundId] ?? 0) + 1,
+          },
+        })),
       addScore: (n) =>
         set((s) => ({ totalScore: s.totalScore + Math.max(0, Math.floor(n / 10)) })),
       setHighestElement: (n) => set((s) => ({ highestElement: Math.max(s.highestElement, n) })),
@@ -308,6 +314,7 @@ export const useProgress = create<ProgressState>()(
           totalScore: 0,
           discoveredElements: [1],
           discoveredCompounds: [],
+          compoundCounts: {},
           dailyQuestDate: getTodayQuestDate(),
           dailyQuests: createDailyQuests(),
           dailyStreak: 0,
@@ -328,6 +335,10 @@ export const useProgress = create<ProgressState>()(
       merge: (persisted, current) => {
         const persistedState = persisted as Partial<ProgressState> | undefined;
         const discoveredElements = persistedState?.discoveredElements ?? current.discoveredElements;
+        const compoundCounts = {
+          ...Object.fromEntries((persistedState?.discoveredCompounds ?? []).map((id) => [id, 1])),
+          ...(persistedState?.compoundCounts ?? {}),
+        };
         return {
           ...current,
           ...persistedState,
@@ -339,6 +350,7 @@ export const useProgress = create<ProgressState>()(
           bestComboDate: persistedState?.bestComboDate ?? current.bestComboDate,
           earnedBadges: getEarnedBadgeIds(discoveredElements),
           discoveredCompounds: persistedState?.discoveredCompounds ?? current.discoveredCompounds,
+          compoundCounts,
           levelStars: persistedState?.levelStars ?? current.levelStars,
           levelStats: persistedState?.levelStats ?? current.levelStats,
           challengeBestScores: persistedState?.challengeBestScores ?? current.challengeBestScores,

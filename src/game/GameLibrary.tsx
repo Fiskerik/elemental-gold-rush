@@ -88,11 +88,13 @@ export function GameLibrary({ onBack }: Props) {
                 <div style={{ flex: 1 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
                     <h2 style={{ margin: 0, fontSize: 16 }}>{powerUp.name}</h2>
-                    <span style={{ color: "var(--accent)", fontSize: 11, fontWeight: 900 }}>
-                      {powerUp.unlock}
-                    </span>
                   </div>
-                  <p style={{ ...description, marginBottom: 0 }}>{powerUp.description}</p>
+                  <p style={{ ...description, marginBottom: 0 }}>
+                    {"effect" in powerUp ? powerUp.effect : powerUp.description}
+                  </p>
+                  <div style={{ color: "var(--accent)", fontSize: 11, fontWeight: 900 }}>
+                    Obtained: {powerUp.unlock}
+                  </div>
                 </div>
               </article>
             ))}

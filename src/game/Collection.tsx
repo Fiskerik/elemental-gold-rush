@@ -7,7 +7,7 @@ import { COMPOUNDS, getCompoundHint, type CompoundDefinition } from "./compounds
 import { MoleculeVisual } from "./MoleculeVisual";
 
 export function Collection({ onBack }: { onBack: () => void }) {
-  const { discoveredElements, discoveredCompounds, earnedBadges } = useProgress();
+  const { discoveredElements, discoveredCompounds, compoundCounts, earnedBadges } = useProgress();
   const [selected, setSelected] = useState<number | null>(null);
   const [selectedCompound, setSelectedCompound] = useState<CompoundDefinition | null>(null);
   const found = new Set(discoveredElements);
@@ -147,6 +147,7 @@ export function Collection({ onBack }: { onBack: () => void }) {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 8 }}>
             {COMPOUNDS.map((compound) => {
               const unlocked = foundCompounds.has(compound.id);
+              const foundCount = compoundCounts[compound.id] ?? (unlocked ? 1 : 0);
               return (
                 <button
                   key={compound.id}
@@ -176,6 +177,11 @@ export function Collection({ onBack }: { onBack: () => void }) {
                     <span style={{ display: "block", fontSize: 11, color: "var(--muted-foreground)" }}>
                       {unlocked ? compound.formula : getCompoundHint(compound)}
                     </span>
+                    {unlocked && (
+                      <span style={{ display: "block", fontSize: 10, color: "var(--accent)", marginTop: 2 }}>
+                        Found x{foundCount}
+                      </span>
+                    )}
                   </span>
                 </button>
               );
@@ -407,6 +413,12 @@ export function Collection({ onBack }: { onBack: () => void }) {
             <div style={{ fontSize: 16, fontWeight: 900, color: "var(--accent)", textAlign: "center", marginBottom: 12 }}>
               {foundCompounds.has(selectedCompound.id) ? selectedCompound.formula : "???"}
             </div>
+            {foundCompounds.has(selectedCompound.id) && (
+              <div style={{ fontSize: 12, color: "var(--accent)", textAlign: "center", marginBottom: 10 }}>
+                Found {compoundCounts[selectedCompound.id] ?? 1} time
+                {(compoundCounts[selectedCompound.id] ?? 1) === 1 ? "" : "s"}
+              </div>
+            )}
             <p style={{ fontSize: 13, lineHeight: 1.55, margin: 0, color: "var(--foreground)" }}>
               {foundCompounds.has(selectedCompound.id)
                 ? selectedCompound.fact

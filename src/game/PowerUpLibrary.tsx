@@ -1,4 +1,6 @@
 import { ElementBall } from "./ElementBall";
+import { MoleculeVisual } from "./MoleculeVisual";
+import { COMPOUNDS } from "./compounds";
 import { POWER_UPS } from "./powerUps";
 
 interface Props {
@@ -26,6 +28,20 @@ export function ShimmerAtomIcon({ size = 42 }: { size?: number }) {
 export function PowerUpIcon({ icon }: { icon: string }) {
   if (icon === "shimmer") return <ShimmerAtomIcon />;
   if (icon === "H") return <ElementBall atomicNumber={1} size={42} />;
+  if (icon === "molecule") return <MoleculeVisual compound={COMPOUNDS[0]} size={42} />;
+  const iconMap: Record<string, string> = {
+    grab: "G",
+    egun: "E",
+    gravity: "Gr",
+    emission: "Em",
+    transmute: "T",
+    "fusion-jump": "FJ",
+    catalyst: "Ca",
+    stone: "St",
+    gamma: "Ga",
+    blank: "?",
+  };
+  if (iconMap[icon]) return <>{iconMap[icon]}</>;
   return <>{icon}</>;
 }
 
@@ -56,9 +72,6 @@ export function PowerUpLibrary({ onBack }: Props) {
               <div style={{ flex: 1 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
                   <h2 style={{ margin: 0, fontSize: 16 }}>{powerUp.name}</h2>
-                  <span style={{ color: "var(--accent)", fontSize: 11, fontWeight: 800 }}>
-                    {powerUp.unlock}
-                  </span>
                 </div>
                 <p
                   style={{
@@ -68,8 +81,11 @@ export function PowerUpLibrary({ onBack }: Props) {
                     lineHeight: 1.45,
                   }}
                 >
-                  {powerUp.description}
+                  {"effect" in powerUp ? powerUp.effect : powerUp.description}
                 </p>
+                <div style={{ marginTop: 6, color: "var(--accent)", fontSize: 11, fontWeight: 800 }}>
+                  Obtained: {powerUp.unlock}
+                </div>
               </div>
             </article>
           ))}

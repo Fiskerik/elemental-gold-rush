@@ -27,6 +27,7 @@ import { playMergeSound, playShootSound, playWinSound, vibrate } from "./audio";
 import { GameModeId, getGameMode, getModeLevelLabel } from "./challenges";
 import { trackGameOver, trackGameStart, trackLevelWin, trackMerge, trackShot } from "./analytics";
 import {
+  COMPOUNDS,
   type CompoundDefinition,
   compoundKey,
   findCompoundByElements,
@@ -169,8 +170,12 @@ function countsForBalls(balls: Ball[]): Record<string, number> {
 const stoneBackground =
   // Multiple radial gradients layered to mimic uneven rocky surface,
   // plus craggy highlights and shadow pockets.
+  "repeating-linear-gradient(28deg, oklch(0.78 0.018 80 / 0.16) 0 2px, transparent 2px 8px)," +
+  "repeating-linear-gradient(118deg, transparent 0 5px, oklch(0.12 0.012 55 / 0.24) 5px 7px, transparent 7px 13px)," +
   "radial-gradient(circle at 22% 20%, oklch(0.68 0.025 70) 0%, transparent 32%)," +
   "radial-gradient(circle at 78% 30%, oklch(0.52 0.02 60) 0%, transparent 28%)," +
+  "radial-gradient(circle at 58% 42%, oklch(0.86 0.01 80 / 0.18) 0 2px, transparent 3px)," +
+  "radial-gradient(circle at 42% 58%, oklch(0.08 0.01 55 / 0.28) 0 2px, transparent 4px)," +
   "radial-gradient(circle at 30% 75%, oklch(0.22 0.015 55) 0%, transparent 38%)," +
   "radial-gradient(circle at 70% 70%, oklch(0.18 0.015 50) 0%, transparent 36%)," +
   "radial-gradient(circle at 50% 50%, oklch(0.42 0.02 60), oklch(0.28 0.02 55) 70%, oklch(0.16 0.015 50))";
@@ -421,6 +426,8 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     soundEnabled,
     hapticsEnabled,
     discoveredElements,
+    discoveredCompounds,
+    compoundCounts,
     recordCompoundDiscovery,
     reportQuestProgress,
     setBestCombo,
@@ -463,7 +470,11 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
   const [gameOver, setGameOver] = useState(false);
   const [won, setWon] = useState(false);
   const [discoveryEl, setDiscoveryEl] = useState<number | null>(null);
-  const [discoveryCompound, setDiscoveryCompound] = useState<CompoundDefinition | null>(null);
+  const [discoveryCompound, setDiscoveryCompound] = useState<{
+    compound: CompoundDefinition;
+    isNew: boolean;
+    count: number;
+  } | null>(null);
   const [newlyDiscoveredThisRun, setNewlyDiscoveredThisRun] = useState<number[]>([]);
   const [highlightId, setHighlightId] = useState<number | null>(null);
   const [wiggleIds, setWiggleIds] = useState<Set<number>>(new Set());
@@ -562,28 +573,45 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
   const [elapsedMs, setElapsedMs] = useState(0);
   const startTimeRef = useRef<number>(Date.now());
 
-  // === Merge history log ===
-  // Chronological list of every merge in this run. Opened from a button at
-  // the top header so the player can review what happened.
-  const [mergeHistory, setMergeHistory] = useState<
-    { id: number; ts: number; atom: number; depth: number; chainSize: number }[]
+  // === Shot history log ===
+  // Chronological list of every shot/action in this run.
+  const [shotHistory, setShotHistory] = useState<
+    {
+      id: number;
+      ts: number;
+      shot: number;
+      action: string;
+      points: number;
+      powerUp?: string;
+      merges: { atom: number; depth: number }[];
+    }[]
   >([]);
   const [historyOpen, setHistoryOpen] = useState(false);
   const historyIdRef = useRef(0);
-  function pushMergeHistory(merges: { resultAtomicNumber: number; chainDepth: number }[]) {
-    if (merges.length === 0) return;
+  function pushShotHistory(entry: {
+    shot: number;
+    action: string;
+    points: number;
+    powerUp?: string;
+    merges?: { resultAtomicNumber: number; chainDepth: number }[];
+  }) {
     const now = Date.now();
-    setMergeHistory((prev) => {
-      const next = [...prev];
-      merges.forEach((m) => {
-        next.push({
+    setShotHistory((prev) => {
+      const next = [
+        ...prev,
+        {
           id: ++historyIdRef.current,
           ts: now,
-          atom: m.resultAtomicNumber,
-          depth: m.chainDepth,
-          chainSize: merges.length,
-        });
-      });
+          shot: entry.shot,
+          action: entry.action,
+          points: Math.max(0, Math.floor(entry.points)),
+          powerUp: entry.powerUp,
+          merges: (entry.merges ?? []).map((m) => ({
+            atom: m.resultAtomicNumber,
+            depth: m.chainDepth,
+          })),
+        },
+      ];
       // Cap to last 200 entries to avoid runaway memory.
       if (next.length > 200) next.splice(0, next.length - 200);
       return next;
@@ -705,9 +733,9 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
 
   useEffect(() => {
     setNewlyDiscoveredThisRun([]);
-    // For level 10+ we defer seeding until the player confirms their shuffle;
-    // the shuffle modal opens immediately and seeds via confirmShuffleStart().
-    const initialBalls = level.id >= SHUFFLE_MIN_LEVEL ? createEmptyBoard() : createSeededBoard();
+    const initialBalls = level.id >= SHUFFLE_MIN_LEVEL
+      ? buildShuffleStartBoard(generateShuffleAtoms())
+      : createSeededBoard();
     setBalls(initialBalls);
     const initialHighest = Math.max(1, getHighestOnBoard(initialBalls));
     if (initialHighest > 1) setHighestElement(initialHighest);
@@ -789,18 +817,14 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     incrementLevelAttempt(levelId);
     setSelectedInventoryPowerUps(emptyPowerUpInventory());
     setInventoryPickerOpen(hasPowerUps(powerUpInventory));
-    setMergeHistory([]);
+    setShotHistory([]);
     setHistoryOpen(false);
     setGammaCharges(0);
     setPendingGamma(false);
     setSpawnFloorIndex(0);
-    if (level.id >= SHUFFLE_MIN_LEVEL) {
-      setShufflesLeft(SHUFFLE_LIMIT);
-      setShuffleAtoms(generateShuffleAtoms());
-      setShuffleStartOpen(true);
-    } else {
-      setShuffleStartOpen(false);
-    }
+    setShufflesLeft(SHUFFLE_LIMIT);
+    setShuffleAtoms([]);
+    setShuffleStartOpen(false);
     queueUndoRef.current = null;
     eGunCooldownSlots.current = 0;
     startTimeRef.current = Date.now();
@@ -1535,7 +1559,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
   }
 
   function shoot() {
-    if (busy || gameOver || won || inventoryPickerOpen || shuffleStartOpen) return;
+    if (busy || gameOver || won || inventoryPickerOpen) return;
     trackShot(levelId, pendingStone ? -1 : currentIsEGun ? 0 : current, aimDeg, mode);
     queueUndoRef.current = null;
     setPendingReversiblePowerUp(null);
@@ -1650,6 +1674,12 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     }
     spawnPopup(hitIds.size > 0 ? `⚡ E-GUN +${hitIds.size}` : "⚡ E-GUN");
     haptic(hitIds.size > 0 ? [20, 40, 20] : 20);
+    pushShotHistory({
+      shot: nextShots,
+      action: hitIds.size > 0 ? `E-Gun upgraded ${hitIds.size} atom${hitIds.size === 1 ? "" : "s"}` : "E-Gun fired",
+      points: 0,
+      powerUp: "E-Gun",
+    });
     const reachedTarget = Array.from(upgradedAtoms).some((atom) => atom >= target);
     if (reachedTarget && !continuingPastTarget) {
       const nextHighest = Math.max(highest, ...Array.from(upgradedAtoms));
@@ -1714,6 +1744,13 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
 
     spawnPopup(hitIds.size > 0 ? `☢ GAMMA -${hitIds.size}` : "☢ GAMMA");
     haptic([30, 50, 30, 50, 60]);
+
+    pushShotHistory({
+      shot: nextShots,
+      action: hitIds.size > 0 ? `Gamma cleared ${hitIds.size} atom${hitIds.size === 1 ? "" : "s"}` : "Gamma fired",
+      points: gained,
+      powerUp: "Gamma Bomb",
+    });
 
     if (checkGameOver(updated, geo)) {
       trackGameOver(levelId, score, nextShots, highest, mode);
@@ -1983,7 +2020,12 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
         }
         // Hitting a stone breaks the no-merge streak so we don't pile them up.
         setNoMergeStreak(0);
-        finalizePlacement(x, y, updated, impactStoneBonus + directStoneBonus);
+        finalizePlacement(
+          x - dirX * Math.max(4, projR * 0.45),
+          y - dirY * Math.max(4, projR * 0.45),
+          updated,
+          impactStoneBonus + directStoneBonus,
+        );
         return;
       }
     }
@@ -2238,8 +2280,6 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
           80 + i * 120,
         );
       });
-      // Append to history log (single chronological record per merge).
-      pushMergeHistory(result.merges);
     }
     if (shimmerHit) spawnPopup("✦ SHIMMER ×2 ✦");
     if (grabAdd > 0) {
@@ -2284,6 +2324,25 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     const gained = Math.floor(result.scoreGained * level.scoreMultiplier * (shimmerHit ? 2 : 1));
     const nextScore = score + gained + mergeStoneBonus + impactStoneBonus;
     const nextBestCombo = Math.max(runBestCombo, result.merges.length);
+    const shotPowerUps = [
+      pendingReversiblePowerUp === "transmute" ? "Transmute Shot" : null,
+      pendingReversiblePowerUp === "emission" ? "Emission" : null,
+      shimmerHit ? "Shimmer" : null,
+      fusionJumpArmed ? "Fusion Jump" : null,
+      pendingReversiblePowerUp === "catalyst" || catalystShotsRemaining > 0 ? "Catalyst Aura" : null,
+      currentIsBlank ? "Blank Atom" : null,
+      impactStoneBonus > 0 || mergeStoneBonus > 0 ? "Stone break" : null,
+    ].filter((label): label is string => Boolean(label));
+    pushShotHistory({
+      shot: nextShots,
+      action:
+        result.merges.length > 0
+          ? `Merged ${result.merges.length} chain${result.merges.length === 1 ? "" : "s"}`
+          : "Placed without a merge",
+      points: gained + mergeStoneBonus + impactStoneBonus,
+      powerUp: shotPowerUps.join(", ") || undefined,
+      merges: result.merges,
+    });
     setScore(nextScore);
     addScore(gained + impactStoneBonus);
 
@@ -2599,6 +2658,8 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     haptic([25, 50, 25, 75]);
 
     window.setTimeout(() => {
+      const wasNew = !discoveredCompounds.includes(matchingCompound.id);
+      const nextCount = (compoundCounts[matchingCompound.id] ?? (wasNew ? 0 : 1)) + 1;
       setBalls((currentBalls) =>
         relaxBoard(currentBalls.filter((ball) => !selectedAtoms.some((atom) => atom.id === ball.id))),
       );
@@ -2607,8 +2668,14 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
       recordCompoundDiscovery(matchingCompound.id);
       setScore((currentScore) => currentScore + matchingCompound.bonusScore);
       addScore(matchingCompound.bonusScore);
+      pushShotHistory({
+        shot: shots,
+        action: `Formed ${matchingCompound.name}`,
+        points: matchingCompound.bonusScore,
+        powerUp: "Compound",
+      });
       spawnPopup(`+${formatScore(matchingCompound.bonusScore)}`);
-      setDiscoveryCompound(matchingCompound);
+      setDiscoveryCompound({ compound: matchingCompound, isNew: wasNew, count: nextCount });
       setBusy(false);
     }, 900);
   }
@@ -2713,6 +2780,16 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     const gained = Math.floor(result.scoreGained * level.scoreMultiplier) + mergeStoneBonus;
     setScore((s) => s + gained);
     addScore(gained);
+    pushShotHistory({
+      shot: shots,
+      action:
+        result.merges.length > 0
+          ? `Gravity caused ${result.merges.length} merge${result.merges.length === 1 ? "" : "s"}`
+          : "Gravity shifted the board",
+      points: gained,
+      powerUp: "Gravity",
+      merges: result.merges,
+    });
     if (result.merges.length > 0) {
       grantGravityForCombo(result.merges.length);
       setRunBestCombo((best) => Math.max(best, result.merges.length));
@@ -2737,7 +2814,6 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
           80 + i * 120,
         );
       });
-      pushMergeHistory(result.merges);
     } else {
       spawnPopup("🌀 Gravity shift");
     }
@@ -2889,7 +2965,6 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
           80 + i * 120,
         );
       });
-      pushMergeHistory(result.merges);
     }
     const nextHighest = Math.max(highest, result.highestElement);
     setHighest(nextHighest);
@@ -2898,6 +2973,16 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     const nextScore = score + gained + mergeStoneBonus;
     setScore(nextScore);
     addScore(gained);
+    pushShotHistory({
+      shot: shots,
+      action:
+        result.merges.length > 0
+          ? `Grab created ${result.merges.length} merge${result.merges.length === 1 ? "" : "s"}`
+          : "Grab moved an atom",
+      points: gained + mergeStoneBonus,
+      powerUp: "Grab",
+      merges: result.merges,
+    });
     // Grab-and-drop that produces a merge counts as 1 step toward the next
     // Grab charge, matching how a normal merge feeds the grab progress bar.
     if (result.merges.length > 0) {
@@ -3112,8 +3197,8 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
             <button
               type="button"
               onClick={() => setHistoryOpen(true)}
-              title="Open merge history"
-              aria-label="Open merge history log"
+              title="Open shot log"
+              aria-label="Open shot log"
               style={{ ...iconBtn, minWidth: 0, padding: "6px 8px" }}
             >
               📜
@@ -3175,6 +3260,8 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
           style={{
             display: "flex",
             alignItems: "center",
+            justifyContent: "center",
+            flexWrap: "wrap",
             gap: 10,
             padding: "10px 12px",
             background: "var(--surface)",
@@ -3799,10 +3886,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
             gap: 10,
           }}
         >
-          <div style={{ fontSize: 9, letterSpacing: 1.5, color: "var(--muted-foreground)" }}>
-            NEXT →
-          </div>
-          <div style={{ display: "flex", gap: 6, flex: 1 }}>
+          <div style={{ display: "flex", gap: 8, justifyContent: "center", flex: "1 0 100%" }}>
             {queue
               .slice(1)
               .map((n, i) =>
@@ -3826,8 +3910,12 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
               alignItems: "center",
               justifyContent: "flex-end",
               gap: 6,
-              minWidth: 120,
-              flexWrap: "wrap",
+              flex: "1 0 100%",
+              minWidth: 0,
+              overflowX: "auto",
+              flexWrap: "nowrap",
+              flexDirection: "row-reverse",
+              paddingTop: 8,
             }}
           >
             {(transmuteCharges > 0 || pendingReversiblePowerUp === "transmute") && (
@@ -4081,7 +4169,9 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
                   cursor: busy ? "not-allowed" : "pointer",
                 }}
               >
-                <span aria-hidden="true">Co</span>
+                <span aria-hidden="true" style={{ display: "grid", placeItems: "center" }}>
+                  <MoleculeVisual compound={COMPOUNDS[0]} size={24} />
+                </span>
                 <span style={powerUpCount}>{compoundMode ? "×" : compoundCharges}</span>
               </button>
             )}
@@ -4126,23 +4216,15 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
             onBack={onExit}
           />
         )}
-        {shuffleStartOpen && !won && !gameOver && (
-          <ShuffleStartModal
-            atoms={shuffleAtoms}
-            shufflesLeft={shufflesLeft}
-            onReshuffle={reshuffle}
-            onStart={confirmShuffleStart}
-          />
-        )}
-        {historyOpen && (
-          <MergeHistoryModal entries={mergeHistory} onClose={() => setHistoryOpen(false)} />
-        )}
+        {historyOpen && <ShotHistoryModal entries={shotHistory} onClose={() => setHistoryOpen(false)} />}
         {discoveryEl !== null && (
           <DiscoveryModal atomicNumber={discoveryEl} onClose={() => setDiscoveryEl(null)} />
         )}
         {discoveryCompound && (
           <CompoundDiscoveryModal
-            compound={discoveryCompound}
+            compound={discoveryCompound.compound}
+            isNew={discoveryCompound.isNew}
+            count={discoveryCompound.count}
             onClose={() => setDiscoveryCompound(null)}
           />
         )}
@@ -4635,15 +4717,19 @@ function CompoundFormationFx({
 
 function CompoundDiscoveryModal({
   compound,
+  isNew,
+  count,
   onClose,
 }: {
   compound: CompoundDefinition;
+  isNew: boolean;
+  count: number;
   onClose: () => void;
 }) {
   return (
     <Modal zIndex={210}>
       <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--accent)", marginBottom: 8 }}>
-        NEW COMPOUND
+        {isNew ? "NEW COMPOUND" : "COMPOUND FOUND AGAIN"}
       </div>
       <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
         <MoleculeVisual compound={compound} size={118} />
@@ -4651,6 +4737,9 @@ function CompoundDiscoveryModal({
       <div style={{ fontSize: 24, fontWeight: 900, marginBottom: 4 }}>{compound.name}</div>
       <div style={{ fontSize: 18, color: "var(--accent)", fontWeight: 900, marginBottom: 8 }}>
         {compound.formula}
+      </div>
+      <div style={{ fontSize: 12, color: "var(--muted-foreground)", marginBottom: 8 }}>
+        {isNew ? "Added to your collection" : `Already discovered - found ${count} times`}
       </div>
       <div style={{ fontSize: 20, fontWeight: 900, color: "var(--primary)", marginBottom: 10 }}>
         +{formatScore(compound.bonusScore)}
@@ -4665,79 +4754,31 @@ function CompoundDiscoveryModal({
   );
 }
 
-function ShuffleStartModal({
-  atoms,
-  shufflesLeft,
-  onReshuffle,
-  onStart,
-}: {
-  atoms: number[];
-  shufflesLeft: number;
-  onReshuffle: () => void;
-  onStart: () => void;
-}) {
-  return (
-    <Modal>
-      <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--accent)", marginBottom: 8 }}>
-        STARTING SHUFFLE
-      </div>
-      <h2 style={{ margin: "0 0 8px", fontSize: 22, fontWeight: 900 }}>Pick your opening atoms</h2>
-      <p style={{ margin: "0 0 14px", color: "var(--muted-foreground)", fontSize: 13 }}>
-        These 4 atoms will be placed across the top of the board to give you a head start.
-        Reshuffle up to 3 times for a different draw.
-      </p>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "center",
-          gap: 12,
-          padding: "12px 0 16px",
-          flexWrap: "wrap",
-        }}
-      >
-        {atoms.map((a, i) => (
-          <ElementBall key={i} atomicNumber={a} size={56} />
-        ))}
-      </div>
-      <div style={{ display: "flex", gap: 8 }}>
-        <button
-          onClick={onReshuffle}
-          disabled={shufflesLeft <= 0}
-          style={{
-            ...modalBtn,
-            background: "var(--surface-high)",
-            color: "var(--foreground)",
-            opacity: shufflesLeft <= 0 ? 0.5 : 1,
-            cursor: shufflesLeft <= 0 ? "not-allowed" : "pointer",
-          }}
-        >
-          🔀 Reshuffle ({shufflesLeft})
-        </button>
-        <button onClick={onStart} style={modalBtn}>
-          Start
-        </button>
-      </div>
-    </Modal>
-  );
-}
-
-function MergeHistoryModal({
+function ShotHistoryModal({
   entries,
   onClose,
 }: {
-  entries: { id: number; ts: number; atom: number; depth: number; chainSize: number }[];
+  entries: {
+    id: number;
+    ts: number;
+    shot: number;
+    action: string;
+    points: number;
+    powerUp?: string;
+    merges: { atom: number; depth: number }[];
+  }[];
   onClose: () => void;
 }) {
   const t0 = entries[0]?.ts ?? Date.now();
   return (
     <Modal>
       <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--accent)", marginBottom: 8 }}>
-        MERGE HISTORY
+        SHOT LOG
       </div>
       <h2 style={{ margin: "0 0 12px", fontSize: 22, fontWeight: 900 }}>This run, step by step</h2>
       {entries.length === 0 ? (
         <p style={{ color: "var(--muted-foreground)", fontSize: 13 }}>
-          No merges yet — make a fusion to see it logged here.
+          No shots logged yet.
         </p>
       ) : (
         <div
@@ -4756,7 +4797,6 @@ function MergeHistoryModal({
             .slice()
             .reverse()
             .map((e) => {
-              const el = ELEMENTS[e.atom - 1];
               const dt = (e.ts - t0) / 1000;
               const mm = Math.floor(dt / 60);
               const ss = Math.floor(dt % 60).toString().padStart(2, "0");
@@ -4773,14 +4813,31 @@ function MergeHistoryModal({
                     background: "var(--surface-elevated)",
                   }}
                 >
-                  <ElementBall atomicNumber={e.atom} size={36} />
+                  <div
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: 999,
+                      display: "grid",
+                      placeItems: "center",
+                      background: "var(--surface)",
+                      border: "1px solid var(--border)",
+                      color: "var(--accent)",
+                      fontWeight: 900,
+                      fontSize: 12,
+                    }}
+                  >
+                    {e.shot}
+                  </div>
                   <div>
                     <div style={{ fontWeight: 800, fontSize: 13 }}>
-                      {el?.name ?? "?"} ({el?.symbol ?? "?"})
+                      {e.action}
                     </div>
                     <div style={{ fontSize: 11, color: "var(--muted-foreground)" }}>
-                      {e.chainSize >= 2 ? `Chain ×${e.chainSize}` : "Single merge"}
-                      {e.depth > 0 ? ` • depth ${e.depth}` : ""}
+                      {e.powerUp ? `Power-up: ${e.powerUp}` : "No power-up"}
+                      {e.merges.length > 0
+                        ? ` - ${e.merges.map((merge) => ELEMENTS[merge.atom - 1]?.symbol ?? "?").join(", ")}`
+                        : ""}
                     </div>
                   </div>
                   <div
@@ -4790,7 +4847,9 @@ function MergeHistoryModal({
                       color: "var(--muted-foreground)",
                     }}
                   >
-                    +{mm}:{ss}
+                    +{formatScore(e.points)}
+                    <br />
+                    <span style={{ color: "var(--muted-foreground)" }}>{mm}:{ss}</span>
                   </div>
                 </div>
               );
