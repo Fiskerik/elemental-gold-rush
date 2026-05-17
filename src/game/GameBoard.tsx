@@ -1464,7 +1464,9 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
           if (nextDy > 0.12) {
             return { x: lx, y: ly, path, hitId: hitBall.id, dx, dy, stoneHitIds: bouncedStoneIds };
           }
-          if (!bouncedStoneIds.includes(hitBall.id)) bouncedStoneIds.push(hitBall.id);
+          // Push every bounce — repeated hits on the same stone in one shot
+          // should each count as a hit (e.g. stone -> wall -> same stone).
+          bouncedStoneIds.push(hitBall.id);
           recentlyBouncedStoneIds.add(hitBall.id);
           dx = nextDx;
           dy = nextDy;
