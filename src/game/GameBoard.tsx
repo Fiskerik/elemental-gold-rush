@@ -2589,6 +2589,23 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     haptic(20);
   }
 
+  function triggerQueueShufflePowerUp() {
+    if (busy || gameOver || won || queueShuffleCharges <= 0 || pendingStone || pendingGamma) return;
+    const fresh = generateInitialQueue(level.maxQueueElement, QUEUE_SIZE, level.queueDecay);
+    setQueue(fresh);
+    setShimmerQueue(
+      Array.from({ length: QUEUE_SIZE }, () => shimmerEnabled && Math.random() < POWER_UP_CHANCE),
+    );
+    setEGunQueue(Array.from({ length: QUEUE_SIZE }, () => false));
+    setBlankQueue(
+      Array.from({ length: QUEUE_SIZE }, () => blankEnabled && Math.random() < BLANK_ATOM_CHANCE),
+    );
+    setQueueShuffleCharges((g) => Math.max(0, g - 1));
+    runPowerUpsUsedRef.current += 1;
+    spawnPopup("♻ QUEUE REROLLED");
+    haptic([15, 20, 15]);
+  }
+
   function triggerGammaPowerUp() {
     if (busy || gameOver || won) return;
     if (pendingGamma) {
