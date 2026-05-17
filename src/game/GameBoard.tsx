@@ -1944,6 +1944,17 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     if (bouncedStoneHitIds.length > 0) {
       const damage = new Map<number, number>();
       bouncedStoneHitIds.forEach((id) => damage.set(id, (damage.get(id) ?? 0) + 1));
+      // Track stone hits for the Queue Shuffle power-up (every 15th hit).
+      const totalHits = bouncedStoneHitIds.length;
+      setStoneHitTally((prev) => {
+        const next = prev + totalHits;
+        const earned = Math.floor(next / 15) - Math.floor(prev / 15);
+        if (earned > 0) {
+          setQueueShuffleCharges((q) => q + earned);
+          spawnPopup("♻ QUEUE SHUFFLE");
+        }
+        return next;
+      });
       const damaged = damageStones(impactBalls, damage);
       impactBalls = damaged.balls;
       if (damaged.hitIds.size > 0) {
