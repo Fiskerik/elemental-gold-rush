@@ -1582,7 +1582,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
   }
 
   function shoot() {
-    if (busy || gameOver || won || inventoryPickerOpen) return;
+    if (busy || gameOver || won || inventoryPickerOpen || paused) return;
     trackShot(levelId, pendingStone ? -1 : currentIsEGun ? 0 : current, aimDeg, mode);
     queueUndoRef.current = null;
     setPendingReversiblePowerUp(null);
