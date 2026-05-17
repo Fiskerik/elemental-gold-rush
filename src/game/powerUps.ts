@@ -90,4 +90,12 @@ export const POWER_UPS = [
     effect: "Copies the atom it hits, or erases a Stone completely.",
     description: "A rare wildcard that copies the atom it hits, or erases a Stone completely.",
   },
+  {
+    icon: "queue-shuffle",
+    name: "Queue Shuffle",
+    unlock: "Every 15th Stone hit",
+    effect: "Rerolls the 3 atoms currently waiting in your queue.",
+    description:
+      "Recycle your queue: instantly rerolls every atom currently waiting in your queue.",
+  },
 ];

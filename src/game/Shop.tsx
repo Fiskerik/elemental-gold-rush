@@ -82,7 +82,7 @@ export function Shop({ onBack }: { onBack: () => void }) {
     setMessage(
       purchased
         ? `${name} added to your inventory.`
-        : `You need ${cost.toLocaleString()} total score to buy ${name}.`,
+        : `You need ${cost.toLocaleString()} points to buy ${name}.`,
     );
   }
 
@@ -253,11 +253,11 @@ export function Shop({ onBack }: { onBack: () => void }) {
                 fontVariantNumeric: "tabular-nums",
               }}
             >
-              {totalScore.toLocaleString()} score
+              {totalScore.toLocaleString()} points
             </div>
           </div>
           <p style={{ margin: "0 0 14px", color: "var(--muted-foreground)", fontSize: 13 }}>
-            Buy extra inventory copies with your saved score. Before each level, you can choose up
+            Buy extra inventory copies with your saved points. Before each level, you can choose up
             to 3 inventory power-ups to start with.
           </p>
           <div style={{ display: "grid", gap: 10 }}>

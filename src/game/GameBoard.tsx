@@ -578,6 +578,12 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
   // === Run timer ===
   const [elapsedMs, setElapsedMs] = useState(0);
   const startTimeRef = useRef<number>(Date.now());
+  const [paused, setPaused] = useState(false);
+
+  // === Queue Shuffle power-up ===
+  // Earned every QUEUE_SHUFFLE_PER_STONE_HITS atom-on-stone hits this run.
+  const [queueShuffleCharges, setQueueShuffleCharges] = useState(0);
+  const [stoneHitTally, setStoneHitTally] = useState(0);
 
   // === Shot history log ===
   // Chronological list of every shot/action in this run.
@@ -734,6 +740,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
   }
 
   useEffect(() => {
+    if (paused) return;
     const refresh = () => {
       const state = loadCompoundChargeState();
       setCompoundCharges(state.charges);
@@ -742,7 +749,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     refresh();
     const timer = window.setInterval(refresh, 15_000);
     return () => window.clearInterval(timer);
-  }, []);
+  }, [paused]);
 
   useEffect(() => {
     setNewlyDiscoveredThisRun([]);
@@ -902,12 +909,13 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
 
   // Tick the run timer every second while the level is active.
   useEffect(() => {
-    if (gameOver || won) return;
+    if (gameOver || won || paused) return;
     const id = setInterval(() => {
-      setElapsedMs(Date.now() - startTimeRef.current);
+      // Use delta accumulation so paused time doesn't advance powerup timers.
+      setElapsedMs((m) => m + 500);
     }, 500);
     return () => clearInterval(id);
-  }, [gameOver, won, levelId]);
+  }, [gameOver, won, levelId, paused]);
 
   useEffect(() => {
     if (mode !== "gold-rush-timer" || gameOver || won) return;
@@ -1464,7 +1472,9 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
           if (nextDy > 0.12) {
             return { x: lx, y: ly, path, hitId: hitBall.id, dx, dy, stoneHitIds: bouncedStoneIds };
           }
-          if (!bouncedStoneIds.includes(hitBall.id)) bouncedStoneIds.push(hitBall.id);
+          // Push every bounce — repeated hits on the same stone in one shot
+          // should each count as a hit (e.g. stone -> wall -> same stone).
+          bouncedStoneIds.push(hitBall.id);
           recentlyBouncedStoneIds.add(hitBall.id);
           dx = nextDx;
           dy = nextDy;
@@ -1572,7 +1582,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
   }
 
   function shoot() {
-    if (busy || gameOver || won || inventoryPickerOpen) return;
+    if (busy || gameOver || won || inventoryPickerOpen || paused) return;
     trackShot(levelId, pendingStone ? -1 : currentIsEGun ? 0 : current, aimDeg, mode);
     queueUndoRef.current = null;
     setPendingReversiblePowerUp(null);
@@ -1934,6 +1944,17 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     if (bouncedStoneHitIds.length > 0) {
       const damage = new Map<number, number>();
       bouncedStoneHitIds.forEach((id) => damage.set(id, (damage.get(id) ?? 0) + 1));
+      // Track stone hits for the Queue Shuffle power-up (every 15th hit).
+      const totalHits = bouncedStoneHitIds.length;
+      setStoneHitTally((prev) => {
+        const next = prev + totalHits;
+        const earned = Math.floor(next / 15) - Math.floor(prev / 15);
+        if (earned > 0) {
+          setQueueShuffleCharges((q) => q + earned);
+          spawnPopup("♻ QUEUE SHUFFLE");
+        }
+        return next;
+      });
       const damaged = damageStones(impactBalls, damage);
       impactBalls = damaged.balls;
       if (damaged.hitIds.size > 0) {
@@ -2566,6 +2587,23 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     setFusionJumpArmed(true);
     spawnPopup("⏭ JUMP ARMED");
     haptic(20);
+  }
+
+  function triggerQueueShufflePowerUp() {
+    if (busy || gameOver || won || queueShuffleCharges <= 0 || pendingStone || pendingGamma) return;
+    const fresh = generateInitialQueue(level.maxQueueElement, QUEUE_SIZE, level.queueDecay);
+    setQueue(fresh);
+    setShimmerQueue(
+      Array.from({ length: QUEUE_SIZE }, () => shimmerEnabled && Math.random() < POWER_UP_CHANCE),
+    );
+    setEGunQueue(Array.from({ length: QUEUE_SIZE }, () => false));
+    setBlankQueue(
+      Array.from({ length: QUEUE_SIZE }, () => blankEnabled && Math.random() < BLANK_ATOM_CHANCE),
+    );
+    setQueueShuffleCharges((g) => Math.max(0, g - 1));
+    runPowerUpsUsedRef.current += 1;
+    spawnPopup("♻ QUEUE REROLLED");
+    haptic([15, 20, 15]);
   }
 
   function triggerGammaPowerUp() {
@@ -3216,6 +3254,16 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
               style={{ ...iconBtn, minWidth: 0, padding: "6px 8px" }}
             >
               📜
+            </button>
+            <button
+              type="button"
+              onClick={() => setPaused(true)}
+              title="Pause"
+              aria-label="Pause game"
+              disabled={gameOver || won}
+              style={{ ...iconBtn, minWidth: 0, padding: "6px 8px" }}
+            >
+              ⏸
             </button>
           </div>
           <div style={{ textAlign: "center" }}>
@@ -4222,6 +4270,32 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
                 <span style={powerUpCount}>{pendingGamma ? "↩" : gammaCharges}</span>
               </button>
             )}
+            {queueShuffleCharges > 0 && (
+              <button
+                type="button"
+                title="Queue Shuffle: rerolls the 3 atoms waiting in your queue."
+                aria-label={`Use Queue Shuffle power-up (${queueShuffleCharges} available)`}
+                onClick={triggerQueueShufflePowerUp}
+                {...powerUpInfoHandlers(
+                  "♻ Queue Shuffle",
+                  "Rerolls every atom currently waiting in your queue. Earned every 15 atom-on-stone hits.",
+                )}
+                disabled={busy || pendingStone || pendingGamma}
+                style={{
+                  ...powerUpIconBtn,
+                  border: "1px solid oklch(0.78 0.16 175)",
+                  background:
+                    "linear-gradient(135deg, oklch(0.68 0.16 175), oklch(0.48 0.14 200))",
+                  color: "var(--primary-foreground)",
+                  boxShadow: "0 0 14px oklch(0.68 0.16 175 / 0.5)",
+                  opacity: busy || pendingStone || pendingGamma ? 0.65 : 1,
+                  cursor: busy || pendingStone || pendingGamma ? "not-allowed" : "pointer",
+                }}
+              >
+                <span aria-hidden="true">♻</span>
+                <span style={powerUpCount}>{queueShuffleCharges}</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -4235,6 +4309,91 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
           />
         )}
         {historyOpen && <ShotHistoryModal entries={shotHistory} onClose={() => setHistoryOpen(false)} />}
+        {paused && !gameOver && !won && (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Game paused"
+            style={{
+              position: "fixed",
+              inset: 0,
+              background: "rgba(0,0,0,0.72)",
+              backdropFilter: "blur(6px)",
+              zIndex: 1000,
+              display: "grid",
+              placeItems: "center",
+              padding: 20,
+            }}
+          >
+            <div
+              style={{
+                background: "var(--surface-elevated)",
+                border: "1px solid var(--border)",
+                borderRadius: 18,
+                padding: 22,
+                maxWidth: 320,
+                width: "100%",
+                textAlign: "center",
+                boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 11,
+                  letterSpacing: 3,
+                  color: "var(--accent)",
+                  fontWeight: 800,
+                }}
+              >
+                PAUSED
+              </div>
+              <h2 style={{ margin: "6px 0 4px", fontSize: 24 }}>Game paused</h2>
+              <p
+                style={{
+                  margin: "0 0 16px",
+                  color: "var(--muted-foreground)",
+                  fontSize: 13,
+                  lineHeight: 1.45,
+                }}
+              >
+                All power-up timers are frozen until you resume.
+              </p>
+              <div style={{ display: "grid", gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => setPaused(false)}
+                  style={{
+                    border: "none",
+                    borderRadius: 12,
+                    padding: "12px 14px",
+                    background:
+                      "linear-gradient(135deg, var(--accent), var(--primary))",
+                    color: "var(--primary-foreground)",
+                    fontWeight: 800,
+                    cursor: "pointer",
+                  }}
+                >
+                  ▶ Resume
+                </button>
+                <button
+                  type="button"
+                  onClick={onExit}
+                  style={{
+                    border: "1px solid var(--border)",
+                    borderRadius: 12,
+                    padding: "10px 14px",
+                    background: "var(--surface)",
+                    color: "var(--foreground)",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  Exit to menu
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         {discoveryEl !== null && (
           <DiscoveryModal atomicNumber={discoveryEl} onClose={() => setDiscoveryEl(null)} />
         )}
