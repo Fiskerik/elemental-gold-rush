@@ -908,12 +908,13 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
 
   // Tick the run timer every second while the level is active.
   useEffect(() => {
-    if (gameOver || won) return;
+    if (gameOver || won || paused) return;
     const id = setInterval(() => {
-      setElapsedMs(Date.now() - startTimeRef.current);
+      // Use delta accumulation so paused time doesn't advance powerup timers.
+      setElapsedMs((m) => m + 500);
     }, 500);
     return () => clearInterval(id);
-  }, [gameOver, won, levelId]);
+  }, [gameOver, won, levelId, paused]);
 
   useEffect(() => {
     if (mode !== "gold-rush-timer" || gameOver || won) return;
