@@ -740,6 +740,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
   }
 
   useEffect(() => {
+    if (paused) return;
     const refresh = () => {
       const state = loadCompoundChargeState();
       setCompoundCharges(state.charges);
@@ -748,7 +749,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     refresh();
     const timer = window.setInterval(refresh, 15_000);
     return () => window.clearInterval(timer);
-  }, []);
+  }, [paused]);
 
   useEffect(() => {
     setNewlyDiscoveredThisRun([]);
