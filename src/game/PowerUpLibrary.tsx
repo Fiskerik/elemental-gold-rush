@@ -1,3 +1,17 @@
+import {
+  Bomb,
+  FlaskConical,
+  Hand,
+  HelpCircle,
+  Magnet,
+  Mountain,
+  Radiation,
+  Recycle,
+  Shuffle,
+  SkipForward,
+  Zap,
+  type LucideIcon,
+} from "lucide-react";
 import { ElementBall } from "./ElementBall";
 import { MoleculeVisual } from "./MoleculeVisual";
 import { COMPOUNDS } from "./compounds";
@@ -29,19 +43,21 @@ export function PowerUpIcon({ icon }: { icon: string }) {
   if (icon === "shimmer") return <ShimmerAtomIcon />;
   if (icon === "H") return <ElementBall atomicNumber={1} size={42} />;
   if (icon === "molecule") return <MoleculeVisual compound={COMPOUNDS[0]} size={42} />;
-  const iconMap: Record<string, string> = {
-    grab: "G",
-    egun: "E",
-    gravity: "Gr",
-    emission: "Em",
-    transmute: "T",
-    "fusion-jump": "FJ",
-    catalyst: "Ca",
-    stone: "St",
-    gamma: "Ga",
-    blank: "?",
+  const map: Record<string, { Icon: LucideIcon; color: string }> = {
+    grab: { Icon: Hand, color: "oklch(0.78 0.16 50)" },
+    egun: { Icon: Zap, color: "oklch(0.85 0.18 95)" },
+    gravity: { Icon: Magnet, color: "oklch(0.7 0.18 260)" },
+    emission: { Icon: Radiation, color: "oklch(0.78 0.2 55)" },
+    transmute: { Icon: Shuffle, color: "oklch(0.78 0.18 320)" },
+    "fusion-jump": { Icon: SkipForward, color: "oklch(0.8 0.18 145)" },
+    catalyst: { Icon: FlaskConical, color: "oklch(0.78 0.18 115)" },
+    stone: { Icon: Mountain, color: "oklch(0.7 0.04 60)" },
+    gamma: { Icon: Bomb, color: "oklch(0.65 0.2 145)" },
+    blank: { Icon: HelpCircle, color: "oklch(0.78 0.04 250)" },
+    "queue-shuffle": { Icon: Recycle, color: "oklch(0.78 0.16 175)" },
   };
-  if (iconMap[icon]) return <>{iconMap[icon]}</>;
+  const entry = map[icon];
+  if (entry) return <entry.Icon size={28} color={entry.color} strokeWidth={2.4} />;
   return <>{icon}</>;
 }
 
@@ -81,7 +97,7 @@ export function PowerUpLibrary({ onBack }: Props) {
                     lineHeight: 1.45,
                   }}
                 >
-                  {"effect" in powerUp ? powerUp.effect : powerUp.description}
+                  {powerUp.effect}
                 </p>
                 <div style={{ marginTop: 6, color: "var(--accent)", fontSize: 11, fontWeight: 800 }}>
                   Obtained: {powerUp.unlock}
