@@ -4260,6 +4260,32 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
                 <span style={powerUpCount}>{pendingGamma ? "↩" : gammaCharges}</span>
               </button>
             )}
+            {queueShuffleCharges > 0 && (
+              <button
+                type="button"
+                title="Queue Shuffle: rerolls the 3 atoms waiting in your queue."
+                aria-label={`Use Queue Shuffle power-up (${queueShuffleCharges} available)`}
+                onClick={triggerQueueShufflePowerUp}
+                {...powerUpInfoHandlers(
+                  "♻ Queue Shuffle",
+                  "Rerolls every atom currently waiting in your queue. Earned every 15 atom-on-stone hits.",
+                )}
+                disabled={busy || pendingStone || pendingGamma}
+                style={{
+                  ...powerUpIconBtn,
+                  border: "1px solid oklch(0.78 0.16 175)",
+                  background:
+                    "linear-gradient(135deg, oklch(0.68 0.16 175), oklch(0.48 0.14 200))",
+                  color: "var(--primary-foreground)",
+                  boxShadow: "0 0 14px oklch(0.68 0.16 175 / 0.5)",
+                  opacity: busy || pendingStone || pendingGamma ? 0.65 : 1,
+                  cursor: busy || pendingStone || pendingGamma ? "not-allowed" : "pointer",
+                }}
+              >
+                <span aria-hidden="true">♻</span>
+                <span style={powerUpCount}>{queueShuffleCharges}</span>
+              </button>
+            )}
           </div>
         </div>
 
