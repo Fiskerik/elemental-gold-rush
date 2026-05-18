@@ -439,6 +439,25 @@
   animation: target-claim-flash 1.1s ease-in-out infinite;
 }
 
+@keyframes compound-ready-flash {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+    filter: saturate(1);
+    outline-color: oklch(0.84 0.18 155 / 0.45);
+  }
+  50% {
+    transform: translateY(-1px) scale(1.06);
+    filter: saturate(1.25);
+    outline-color: oklch(0.84 0.18 155 / 0.95);
+  }
+}
+
+.compound-ready-flash {
+  outline: 2px solid oklch(0.84 0.18 155 / 0.7);
+  outline-offset: 3px;
+  animation: compound-ready-flash 0.95s ease-in-out infinite;
+}
+
 /* === Isotope-decay shot warning flash === */
 @keyframes decay-warn-flash {
   0%, 100% { opacity: 1; text-shadow: 0 0 4px var(--destructive); }

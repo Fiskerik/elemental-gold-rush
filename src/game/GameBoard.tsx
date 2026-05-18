@@ -250,6 +250,17 @@ function countsForBalls(balls: Ball[]): Record<string, number> {
   return counts;
 }
 
+function atomsForCompound(compound: CompoundDefinition): number[] {
+  return Object.entries(compound.elements).flatMap(([symbol, count]) => {
+    const atomicNumber = ELEMENTS.find((element) => element.symbol === symbol)?.atomicNumber ?? 1;
+    return Array.from({ length: count }, () => atomicNumber);
+  });
+}
+
+function hasCompoundRecipe(counts: Record<string, number>, compound: CompoundDefinition): boolean {
+  return Object.entries(compound.elements).every(([symbol, count]) => (counts[symbol] ?? 0) >= count);
+}
+
 // Shared rocky styling — used for both the launcher visual and live stones
 // on the board. Looks like a chunky rock with cracks and uneven shading
 // instead of a smooth grey ball.
@@ -594,6 +605,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
   );
   const popupId = useRef(0);
   const eGunCooldownSlots = useRef(0);
+  const challengeQueuePlanRef = useRef<number[]>([]);
 
   // === Grab power-up ===
   // Earned by making 8 merge progress in a row.
@@ -812,9 +824,13 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
       const entries = Object.entries(compound.elements);
       const atomCount = entries.reduce((total, [, count]) => total + count, 0);
       if (atomCount > COMPOUND_MAX_SELECTION || entries.length > COMPOUND_MAX_ELEMENT_TYPES) return false;
-      return entries.every(([symbol, count]) => (boardCounts[symbol] ?? 0) >= count);
+      return hasCompoundRecipe(boardCounts, compound);
     });
   }, [balls]);
+  const challengeCompoundReady = useMemo(() => {
+    if (!isMoleculeChallenge || !moleculeObjective) return false;
+    return hasCompoundRecipe(countsForBalls(balls.filter((ball) => ball.stoneHp == null)), moleculeObjective);
+  }, [balls, isMoleculeChallenge, moleculeObjective]);
   const availableDiscoveredCompoundHint =
     availableCompoundHints.find((compound) => discoveredCompounds.includes(compound.id)) ??
     availableCompoundHints[0] ??
@@ -1023,6 +1039,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
         setShuffleAtoms([]);
         setShuffleStartOpen(false);
         queueUndoRef.current = null;
+        challengeQueuePlanRef.current = [];
         eGunCooldownSlots.current = 0;
         startTimeRef.current = Date.now() - saved.elapsedMs;
         setElapsedMs(saved.elapsedMs);
@@ -1047,6 +1064,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     const challengeQueuePrefix = isMoleculeChallenge
       ? moleculeChallengeQueuePrefix(moleculeObjective)
       : [];
+    challengeQueuePlanRef.current = challengeQueuePrefix.slice(QUEUE_SIZE);
     const initialQueue = [
       ...challengeQueuePrefix,
       ...generateInitialQueue(level.maxQueueElement, QUEUE_SIZE, currentQueueDecay()),
@@ -1147,6 +1165,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     setShuffleAtoms([]);
     setShuffleStartOpen(false);
     queueUndoRef.current = null;
+    challengeQueuePlanRef.current = [];
     eGunCooldownSlots.current = 0;
     startTimeRef.current = Date.now();
     setElapsedMs(0);
@@ -1375,7 +1394,18 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     shimmer: boolean;
     eGun: boolean;
     blank: boolean;
+    unstable: boolean;
   } {
+    const plannedChallengeAtom = isMoleculeChallenge ? challengeQueuePlanRef.current.shift() : undefined;
+    if (plannedChallengeAtom != null) {
+      return {
+        atom: plannedChallengeAtom,
+        shimmer: false,
+        eGun: false,
+        blank: false,
+        unstable: false,
+      };
+    }
     const eGunEligible = eGunEnabled && eGunCooldownSlots.current <= 0;
     const eGun = eGunEligible && Math.random() < EGUN_CHANCE;
     if (eGun) eGunCooldownSlots.current = EGUN_MIN_SHOT_GAP;
@@ -1638,12 +1668,9 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
 
   function createMoleculeChallengeBoard(compound: CompoundDefinition | null): Board {
     if (!compound) return createSeededBoard();
-    const recipeAtoms = Object.entries(compound.elements).flatMap(([symbol, count]) => {
-      const atomicNumber = ELEMENTS.find((element) => element.symbol === symbol)?.atomicNumber ?? 1;
-      return Array.from({ length: count }, () => atomicNumber);
-    });
+    const recipeAtoms = atomsForCompound(compound);
     const highestRecipeAtom = Math.max(...recipeAtoms, 1);
-    const atoms = [highestRecipeAtom, ...recipeAtoms.filter((atom) => atom !== highestRecipeAtom)];
+    const atoms = compound.id === "water" ? [7, 7, 1, 1] : [highestRecipeAtom];
     const count = atoms.length;
     const maxR = Math.max(...atoms.map((atom) => radiusFor(atom)), radiusFor(1));
     const cols = Math.min(4, Math.max(2, Math.ceil(Math.sqrt(count))));
@@ -1668,12 +1695,17 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
 
   function moleculeChallengeQueuePrefix(compound: CompoundDefinition | null): number[] {
     if (!compound) return [];
-    const recipeAtoms = Object.entries(compound.elements).flatMap(([symbol, count]) => {
-      const atomicNumber = ELEMENTS.find((element) => element.symbol === symbol)?.atomicNumber ?? 1;
-      return Array.from({ length: count }, () => atomicNumber);
-    });
+    if (compound.id === "water") return [];
+    const recipeAtoms = atomsForCompound(compound);
     const highestRecipeAtom = Math.max(...recipeAtoms, 1);
-    return recipeAtoms.filter((atom) => atom === highestRecipeAtom).slice(1);
+    let skippedHighest = false;
+    return recipeAtoms.filter((atom) => {
+      if (atom === highestRecipeAtom && !skippedHighest) {
+        skippedHighest = true;
+        return false;
+      }
+      return true;
+    });
   }
 
   // Place the 4 shuffle atoms across the top border of the board.
@@ -4754,6 +4786,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
             {(compoundEnabled || isMoleculeChallenge) && (compoundCharges > 0 || compoundMode || isMoleculeChallenge) && (
               <button
                 type="button"
+                className={challengeCompoundReady && !compoundMode ? "compound-ready-flash" : undefined}
                 title="Compound: select atoms to form a known compound."
                 aria-label={`Use Compound power-up (${compoundCharges} available)`}
                 onClick={triggerCompoundPowerUp}
@@ -4778,7 +4811,9 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
                     ? "linear-gradient(135deg, var(--accent), oklch(0.55 0.16 145))"
                     : "linear-gradient(135deg, oklch(0.62 0.16 145), oklch(0.42 0.13 185))",
                   color: "var(--primary-foreground)",
-                  boxShadow: compoundMode
+                  boxShadow: challengeCompoundReady && !compoundMode
+                    ? "0 0 20px var(--success, var(--accent)), 0 0 34px var(--accent-glow)"
+                    : compoundMode
                     ? "0 0 16px var(--accent-glow)"
                     : "0 0 14px oklch(0.62 0.16 145 / 0.45)",
                   opacity: busy ? 0.65 : 1,
