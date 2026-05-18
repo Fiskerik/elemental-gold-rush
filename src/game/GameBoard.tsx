@@ -82,6 +82,7 @@ const CATALYST_ADJ_FACTOR = 2.3;
 const DISCOVERY_DECAY_STEP = 5;
 const DISCOVERY_DECAY_BOOST = 0.04;
 const STAGE_CLEAR_ANIMATION_MS = 6200;
+const STONE_GRACE_SHOTS = 15;
 
 const INVENTORY_PICK_LIMIT = 3;
 
@@ -2570,17 +2571,21 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     }
 
     // === Stone spawn check ===
-    // Track shots that produce zero merges. After 3 in a row, load the
-    // launcher with a Stone projectile that the player must shoot.
+    // Track shots that produce zero merges. Stones are delayed for the first
+    // 15 shots of a new run; after that, 3 no-merge shots in a row loads one.
     if (result.merges.length === 0) {
-      setNoMergeStreak((s) => {
-        const next = s + 1;
-        if (next >= STONE_NO_MERGE_TRIGGER) {
-          setTimeout(() => loadStoneIntoLauncher(), 220);
-          return 0;
-        }
-        return next;
-      });
+      if (nextShots <= STONE_GRACE_SHOTS) {
+        setNoMergeStreak(0);
+      } else {
+        setNoMergeStreak((s) => {
+          const next = s + 1;
+          if (next >= STONE_NO_MERGE_TRIGGER) {
+            setTimeout(() => loadStoneIntoLauncher(), 220);
+            return 0;
+          }
+          return next;
+        });
+      }
     } else {
       setNoMergeStreak(0);
     }
@@ -3793,6 +3798,9 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
               borderTop: "1px dashed var(--destructive)",
               borderRadius: 4,
               pointerEvents: "none",
+              userSelect: "none",
+              WebkitUserSelect: "none",
+              touchAction: "none",
               zIndex: 0,
             }}
           />
@@ -4282,7 +4290,9 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
                       : "pointer",
                 }}
               >
-                <span aria-hidden="true">🔀</span>
+                <span aria-hidden="true" style={{ display: "grid", placeItems: "center" }}>
+                  <PowerUpIcon icon="transmute" size={24} />
+                </span>
                 <span style={powerUpCount}>{transmuteCharges}</span>
               </button>
             )}
@@ -4314,7 +4324,9 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
                   cursor: busy ? "not-allowed" : "pointer",
                 }}
               >
-                <span aria-hidden="true">⏭</span>
+                <span aria-hidden="true" style={{ display: "grid", placeItems: "center" }}>
+                  <PowerUpIcon icon="fusion-jump" size={24} />
+                </span>
                 <span style={powerUpCount}>{fusionJumpArmed ? "↩" : fusionJumpCharges}</span>
               </button>
             )}
@@ -4348,7 +4360,9 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
                   cursor: busy || catalystShotsRemaining > 0 ? "not-allowed" : "pointer",
                 }}
               >
-                <span aria-hidden="true">🧪</span>
+                <span aria-hidden="true" style={{ display: "grid", placeItems: "center" }}>
+                  <PowerUpIcon icon="catalyst" size={24} />
+                </span>
                 <span style={powerUpCount}>
                   {pendingReversiblePowerUp === "catalyst"
                     ? "↩"
@@ -4407,7 +4421,9 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
                       : "pointer",
                 }}
               >
-                <span aria-hidden="true">☢</span>
+                <span aria-hidden="true" style={{ display: "grid", placeItems: "center" }}>
+                  <PowerUpIcon icon="emission" size={24} />
+                </span>
                 <span style={powerUpCount}>
                   {pendingReversiblePowerUp === "emission" ? "↩" : emissionCharges}
                 </span>
@@ -4434,7 +4450,9 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
                   cursor: busy ? "not-allowed" : "pointer",
                 }}
               >
-                <span aria-hidden="true">🌀</span>
+                <span aria-hidden="true" style={{ display: "grid", placeItems: "center" }}>
+                  <PowerUpIcon icon="gravity" size={24} />
+                </span>
                 <span style={powerUpCount}>{gravityCharges}</span>
               </button>
             )}
@@ -4458,7 +4476,9 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
                   boxShadow: grabMode ? "0 0 14px var(--accent-glow)" : undefined,
                 }}
               >
-                <span aria-hidden="true">🤚</span>
+                <span aria-hidden="true" style={{ display: "grid", placeItems: "center" }}>
+                  <PowerUpIcon icon="grab" size={24} />
+                </span>
                 <span style={powerUpCount}>{grabs}</span>
               </button>
             )}
@@ -4526,7 +4546,9 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
                   cursor: busy ? "not-allowed" : "pointer",
                 }}
               >
-                <span aria-hidden="true">☢</span>
+                <span aria-hidden="true" style={{ display: "grid", placeItems: "center" }}>
+                  <PowerUpIcon icon="gamma" size={24} />
+                </span>
                 <span style={powerUpCount}>{pendingGamma ? "↩" : gammaCharges}</span>
               </button>
             )}
@@ -4552,7 +4574,9 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
                   cursor: busy || pendingStone || pendingGamma ? "not-allowed" : "pointer",
                 }}
               >
-                <span aria-hidden="true">♻</span>
+                <span aria-hidden="true" style={{ display: "grid", placeItems: "center" }}>
+                  <PowerUpIcon icon="queue-shuffle" size={24} />
+                </span>
                 <span style={powerUpCount}>{queueShuffleCharges}</span>
               </button>
             )}

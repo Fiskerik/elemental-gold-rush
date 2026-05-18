@@ -115,9 +115,64 @@ const CHALLENGE_ICONS: Record<string, LucideIcon> = {
   "isotope-decay": Atom,
 };
 
+const CHALLENGE_ICON_STYLES: Record<string, { color: string; background: string; glow: string }> = {
+  survival: {
+    color: "oklch(0.88 0.18 150)",
+    background: "radial-gradient(circle at 30% 22%, oklch(0.9 0.19 150), transparent 34%), linear-gradient(135deg, oklch(0.46 0.18 155), oklch(0.3 0.12 200))",
+    glow: "oklch(0.72 0.16 155 / 0.5)",
+  },
+  "unstable-isotopes": {
+    color: "oklch(0.9 0.19 55)",
+    background: "radial-gradient(circle at 30% 24%, oklch(0.95 0.2 65), transparent 35%), linear-gradient(135deg, oklch(0.58 0.21 35), oklch(0.36 0.16 330))",
+    glow: "oklch(0.76 0.18 42 / 0.52)",
+  },
+  "gravity-surge": {
+    color: "oklch(0.9 0.15 255)",
+    background: "radial-gradient(circle at 70% 22%, oklch(0.86 0.16 245), transparent 34%), linear-gradient(135deg, oklch(0.5 0.17 260), oklch(0.34 0.14 300))",
+    glow: "oklch(0.68 0.16 260 / 0.52)",
+  },
+  "pure-hydrogen": {
+    color: "oklch(0.95 0.13 205)",
+    background: "radial-gradient(circle at 28% 22%, white, transparent 32%), linear-gradient(135deg, oklch(0.7 0.14 205), oklch(0.38 0.12 230))",
+    glow: "oklch(0.78 0.14 210 / 0.52)",
+  },
+  "noble-gas-lock": {
+    color: "oklch(0.91 0.13 305)",
+    background: "radial-gradient(circle at 32% 20%, oklch(0.88 0.18 315), transparent 33%), linear-gradient(135deg, oklch(0.48 0.16 305), oklch(0.3 0.1 255))",
+    glow: "oklch(0.7 0.15 305 / 0.5)",
+  },
+  "gold-rush-timer": {
+    color: "oklch(0.92 0.18 88)",
+    background: "radial-gradient(circle at 72% 22%, oklch(0.98 0.18 95), transparent 35%), linear-gradient(135deg, oklch(0.68 0.18 75), oklch(0.45 0.16 35))",
+    glow: "oklch(0.78 0.18 80 / 0.55)",
+  },
+  "isotope-decay": {
+    color: "oklch(0.9 0.18 135)",
+    background: "radial-gradient(circle at 32% 26%, oklch(0.9 0.19 135), transparent 34%), linear-gradient(135deg, oklch(0.5 0.17 135), oklch(0.34 0.14 175))",
+    glow: "oklch(0.72 0.17 140 / 0.52)",
+  },
+};
+
 function ChallengeIcon({ id }: { id: string }) {
   const Icon = CHALLENGE_ICONS[id] ?? FlaskConical;
-  return <Icon size={26} strokeWidth={2.4} aria-hidden="true" />;
+  const style = CHALLENGE_ICON_STYLES[id] ?? CHALLENGE_ICON_STYLES.survival;
+  return (
+    <div
+      aria-hidden="true"
+      style={{
+        width: 42,
+        height: 42,
+        borderRadius: 14,
+        display: "grid",
+        placeItems: "center",
+        background: style.background,
+        boxShadow: `0 8px 20px ${style.glow}, inset 0 1px 0 rgba(255,255,255,0.24)`,
+        border: "1px solid rgba(255,255,255,0.18)",
+      }}
+    >
+      <Icon size={25} color={style.color} strokeWidth={2.7} />
+    </div>
+  );
 }
 
 const backBtn: React.CSSProperties = {
