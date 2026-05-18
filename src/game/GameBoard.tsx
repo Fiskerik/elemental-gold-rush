@@ -2955,7 +2955,10 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     setBlankQueue(undo.blankQueue);
     setUnstableQueue(undo.unstableQueue);
       if (powerUp === "transmute") setTransmuteCharges((g) => g + 1);
-      if (powerUp === "emission") setEmissionCharges((g) => g + 1);
+      if (powerUp === "emission") {
+        setEmissionCharges((g) => g + 1);
+        setManualEmissionFloor((f) => Math.max(0, f - 1));
+      }
       queueUndoRef.current = null;
     }
     if (powerUp === "fusion-jump") {
