@@ -1027,11 +1027,13 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
       .map((b) => b.atom)
       .filter((n, i, atoms) => n > 1 && atoms.indexOf(n) === i && !discoveredElements.includes(n));
     if (initialDiscoveries.length > 0) registerDiscoveries(initialDiscoveries);
-    const initialQueue = generateInitialQueue(
-      level.maxQueueElement,
-      QUEUE_SIZE,
-      currentQueueDecay(),
-    );
+    const challengeQueuePrefix = isMoleculeChallenge
+      ? moleculeChallengeQueuePrefix(moleculeObjective)
+      : [];
+    const initialQueue = [
+      ...challengeQueuePrefix,
+      ...generateInitialQueue(level.maxQueueElement, QUEUE_SIZE, currentQueueDecay()),
+    ].slice(0, QUEUE_SIZE);
     const initialEGun = Array.from({ length: QUEUE_SIZE }, () => false);
     const initialBlank = initialEGun.map(
       (isEGun) => !isEGun && blankEnabled && Math.random() < BLANK_ATOM_CHANCE,
@@ -1613,10 +1615,12 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
 
   function createMoleculeChallengeBoard(compound: CompoundDefinition | null): Board {
     if (!compound) return createSeededBoard();
-    const atoms = Object.entries(compound.elements).flatMap(([symbol, count]) => {
+    const recipeAtoms = Object.entries(compound.elements).flatMap(([symbol, count]) => {
       const atomicNumber = ELEMENTS.find((element) => element.symbol === symbol)?.atomicNumber ?? 1;
       return Array.from({ length: count }, () => atomicNumber);
     });
+    const highestRecipeAtom = Math.max(...recipeAtoms, 1);
+    const atoms = [highestRecipeAtom, ...recipeAtoms.filter((atom) => atom !== highestRecipeAtom)];
     const count = atoms.length;
     const maxR = Math.max(...atoms.map((atom) => radiusFor(atom)), radiusFor(1));
     const cols = Math.min(4, Math.max(2, Math.ceil(Math.sqrt(count))));
@@ -1629,17 +1633,24 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
       const col = index % cols;
       const row = Math.floor(index / cols);
       const r = radiusFor(atom);
-      return maybeMakeUnstable(
-        {
-          id: nextBallId(),
-          x: Math.max(SIDE_PAD + r, Math.min(boardW - SIDE_PAD - r, startX + col * spacingX)),
-          y: startY + row * spacingY + (rows > 1 && col % 2 === 1 ? maxR * 0.18 : 0),
-          atom,
-          r,
-        },
-        0.18,
-      );
+      return {
+        id: nextBallId(),
+        x: Math.max(SIDE_PAD + r, Math.min(boardW - SIDE_PAD - r, startX + col * spacingX)),
+        y: startY + row * spacingY + (rows > 1 && col % 2 === 1 ? maxR * 0.18 : 0),
+        atom,
+        r,
+      };
     });
+  }
+
+  function moleculeChallengeQueuePrefix(compound: CompoundDefinition | null): number[] {
+    if (!compound) return [];
+    const recipeAtoms = Object.entries(compound.elements).flatMap(([symbol, count]) => {
+      const atomicNumber = ELEMENTS.find((element) => element.symbol === symbol)?.atomicNumber ?? 1;
+      return Array.from({ length: count }, () => atomicNumber);
+    });
+    const highestRecipeAtom = Math.max(...recipeAtoms, 1);
+    return recipeAtoms.filter((atom) => atom === highestRecipeAtom).slice(1);
   }
 
   // Place the 4 shuffle atoms across the top border of the board.

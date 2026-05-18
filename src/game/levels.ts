@@ -354,7 +354,8 @@ const ATOM_LEVELS: Level[] = LEVEL_SEEDS.map((seed, index) => {
 
 const CHALLENGE_LEVELS: Level[] = Object.keys(MOLECULE_CHALLENGE_BY_LEVEL).map((key) => {
   const id = Number(key);
-  const previousAtom = ATOM_LEVELS.filter((level) => level.id < id).at(-1) ?? ATOM_LEVELS[0];
+  const previousAtoms = ATOM_LEVELS.filter((level) => level.id < id);
+  const previousAtom = previousAtoms[previousAtoms.length - 1] ?? ATOM_LEVELS[0];
   const difficulty = id - 1;
   const parShots = 18 + Math.floor(id * 0.8);
   return {

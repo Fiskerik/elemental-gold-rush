@@ -183,7 +183,7 @@ export function LevelSelect({
                       position: "relative",
                       width: 50,
                       height: 50,
-                      borderRadius: "50%",
+                      borderRadius: isChallenge ? 13 : "50%",
                       background: "var(--surface)",
                       border: `2px solid ${
                         isCurrent
@@ -205,8 +205,10 @@ export function LevelSelect({
                   >
                     {locked ? (
                       <div style={{ fontSize: 22 }}>🔒</div>
+                    ) : isChallenge && challenge ? (
+                      <ChallengeMapNode compound={challenge} />
                     ) : (
-                        <ElementBall atomicNumber={lvl.targetElement} size={38} glow />
+                      <ElementBall atomicNumber={lvl.targetElement} size={38} glow />
                     )}
                     <div
                       style={{
@@ -278,7 +280,24 @@ export function LevelSelect({
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <ElementBall atomicNumber={selected.targetElement} size={56} glow />
+                {selectedChallenge ? (
+                  <div
+                    style={{
+                      width: 58,
+                      height: 58,
+                      borderRadius: 14,
+                      display: "grid",
+                      placeItems: "center",
+                      background: "var(--surface)",
+                      border: "2px solid var(--accent)",
+                      boxShadow: "0 0 18px var(--accent-glow)",
+                    }}
+                  >
+                    <MoleculeVisual compound={selectedChallenge} size={46} />
+                  </div>
+                ) : (
+                  <ElementBall atomicNumber={selected.targetElement} size={56} glow />
+                )}
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 11, color: "var(--muted-foreground)", letterSpacing: 1 }}>
                     LEVEL {selected.id} → {ELEMENTS[selected.targetElement - 1]?.symbol}
@@ -370,6 +389,26 @@ export function LevelSelect({
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function ChallengeMapNode({ compound }: { compound: CompoundDefinition }) {
+  return (
+    <div
+      aria-hidden="true"
+      style={{
+        width: 40,
+        height: 40,
+        borderRadius: 11,
+        display: "grid",
+        placeItems: "center",
+        background:
+          "linear-gradient(135deg, color-mix(in oklch, var(--accent) 28%, var(--surface)), var(--surface-high))",
+        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.28)",
+      }}
+    >
+      <MoleculeVisual compound={compound} size={34} />
     </div>
   );
 }
