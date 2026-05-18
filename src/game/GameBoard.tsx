@@ -651,6 +651,10 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
   const [gravityCharges, setGravityCharges] = useState(0);
   const [emissionCharges, setEmissionCharges] = useState(0);
   const [emissionUnlockIndex, setEmissionUnlockIndex] = useState(0);
+  // Tracks how many times the player has manually used Emission this run.
+  // Each use removes the next-lowest tier from the spawn pool (unless an atom
+  // of that tier is still on the board, in which case it stays).
+  const [manualEmissionFloor, setManualEmissionFloor] = useState(0);
   const [transmuteCharges, setTransmuteCharges] = useState(0);
   const [fusionJumpCharges, setFusionJumpCharges] = useState(0);
   const [fusionJumpArmed, setFusionJumpArmed] = useState(false);
