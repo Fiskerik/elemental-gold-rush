@@ -33,12 +33,14 @@ import {
   findCompoundByElements,
 } from "./compounds";
 import { MoleculeVisual } from "./MoleculeVisual";
+import { PowerUpIcon } from "./PowerUpLibrary";
 
 interface Props {
   levelId: number;
   onExit: () => void;
   onWin: (nextId: number | null) => void;
   mode?: GameModeId;
+  resumeSavedRun?: boolean;
 }
 
 const QUEUE_SIZE = 4;
@@ -67,6 +69,9 @@ const COMPOUND_REGEN_MS = 5 * 60 * 1000;
 const COMPOUND_MAX_SELECTION = 8;
 const COMPOUND_MAX_ELEMENT_TYPES = 3;
 const COMPOUND_STORAGE_KEY = "elemental-gold-rush-compound-charge";
+export const SAVED_RUN_STORAGE_KEY = "elemental-gold-rush-saved-run";
+const COMPOUND_HINT_COST = 50_000;
+const COMPOUND_SUPER_HINT_COST = 100_000;
 const SEEDED_BOARD_MIN_TARGET = 10;
 const SEEDED_BOARD_MIN_ATOMS = 3;
 const SEEDED_BOARD_MAX_ATOMS = 8;
@@ -79,6 +84,73 @@ const DISCOVERY_DECAY_BOOST = 0.04;
 const STAGE_CLEAR_ANIMATION_MS = 6200;
 
 const INVENTORY_PICK_LIMIT = 3;
+
+interface SavedRunSnapshot {
+  version: 1;
+  savedAt: number;
+  levelId: number;
+  mode?: GameModeId;
+  balls: Board;
+  queue: number[];
+  shimmerQueue: boolean[];
+  eGunQueue: boolean[];
+  blankQueue: boolean[];
+  score: number;
+  highest: number;
+  shots: number;
+  runBestCombo: number;
+  earnedStars: number;
+  elapsedMs: number;
+  grabs: number;
+  grabProgress: number;
+  compoundCharges: number;
+  gravityCharges: number;
+  emissionCharges: number;
+  emissionUnlockIndex: number;
+  transmuteCharges: number;
+  fusionJumpCharges: number;
+  fusionJumpArmed: boolean;
+  catalystCharges: number;
+  catalystShotsRemaining: number;
+  queueShuffleCharges: number;
+  stoneHitTally: number;
+  gammaCharges: number;
+  pendingGamma: boolean;
+  pendingStone: boolean;
+  noMergeStreak: number;
+  stoneSpawnCount: number;
+  spawnFloorIndex: number;
+  continuingPastTarget: boolean;
+  continueStartedElapsedMs: number | null;
+  newlyDiscoveredThisRun: number[];
+  runPowerUpsUsed: number;
+}
+
+export function getSavedRunSummary():
+  | { levelId: number; mode?: GameModeId; score: number; shots: number; savedAt: number }
+  | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(SAVED_RUN_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<SavedRunSnapshot>;
+    if (parsed.version !== 1 || typeof parsed.levelId !== "number") return null;
+    return {
+      levelId: parsed.levelId,
+      mode: parsed.mode,
+      score: Math.max(0, Math.floor(parsed.score ?? 0)),
+      shots: Math.max(0, Math.floor(parsed.shots ?? 0)),
+      savedAt: typeof parsed.savedAt === "number" ? parsed.savedAt : Date.now(),
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function clearSavedRun(): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(SAVED_RUN_STORAGE_KEY);
+}
 
 const POWER_UP_INVENTORY_META: Record<
   InventoryPowerUpId,
@@ -416,7 +488,7 @@ function calculateStars(
   return 1;
 }
 
-export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) {
+export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSavedRun = false }: Props) {
   const level = getLevelById(levelId) ?? LEVELS[0];
   const gameMode = getGameMode(mode);
   const shimmerEnabled = level.id >= SHIMMER_MIN_LEVEL;
@@ -434,6 +506,8 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     discoveredCompounds,
     compoundCounts,
     recordCompoundDiscovery,
+    totalScore,
+    spendScore,
     reportQuestProgress,
     setBestCombo,
     setLevelStars,
@@ -687,6 +761,21 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
   const matchingCompoundIsNew = matchingCompound
     ? !discoveredCompounds.includes(matchingCompound.id)
     : false;
+  const availableCompoundHints = useMemo(() => {
+    const boardCounts = countsForBalls(balls.filter((ball) => ball.stoneHp == null));
+    return COMPOUNDS.filter((compound) => {
+      const entries = Object.entries(compound.elements);
+      const atomCount = entries.reduce((total, [, count]) => total + count, 0);
+      if (atomCount > COMPOUND_MAX_SELECTION || entries.length > COMPOUND_MAX_ELEMENT_TYPES) return false;
+      return entries.every(([symbol, count]) => (boardCounts[symbol] ?? 0) >= count);
+    });
+  }, [balls]);
+  const availableDiscoveredCompoundHint =
+    availableCompoundHints.find((compound) => discoveredCompounds.includes(compound.id)) ??
+    availableCompoundHints[0] ??
+    null;
+  const availableNewCompoundHint =
+    availableCompoundHints.find((compound) => !discoveredCompounds.includes(compound.id)) ?? null;
 
   const sfx = (fn: () => void) => {
     if (soundEnabled) fn();
@@ -739,6 +828,73 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     });
   }
 
+  function loadSavedRunSnapshot(): SavedRunSnapshot | null {
+    if (typeof window === "undefined") return null;
+    try {
+      const raw = window.localStorage.getItem(SAVED_RUN_STORAGE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as SavedRunSnapshot;
+      if (parsed.version !== 1 || parsed.levelId !== levelId || parsed.mode !== mode) return null;
+      if (!Array.isArray(parsed.balls) || !Array.isArray(parsed.queue)) return null;
+      return parsed;
+    } catch {
+      return null;
+    }
+  }
+
+  function buildSavedRunSnapshot(): SavedRunSnapshot {
+    return {
+      version: 1,
+      savedAt: Date.now(),
+      levelId,
+      mode,
+      balls,
+      queue,
+      shimmerQueue,
+      eGunQueue,
+      blankQueue,
+      score,
+      highest,
+      shots,
+      runBestCombo,
+      earnedStars,
+      elapsedMs,
+      grabs,
+      grabProgress,
+      compoundCharges,
+      gravityCharges,
+      emissionCharges,
+      emissionUnlockIndex,
+      transmuteCharges,
+      fusionJumpCharges,
+      fusionJumpArmed,
+      catalystCharges,
+      catalystShotsRemaining,
+      queueShuffleCharges,
+      stoneHitTally,
+      gammaCharges,
+      pendingGamma,
+      pendingStone,
+      noMergeStreak,
+      stoneSpawnCount,
+      spawnFloorIndex,
+      continuingPastTarget,
+      continueStartedElapsedMs,
+      newlyDiscoveredThisRun,
+      runPowerUpsUsed: runPowerUpsUsedRef.current,
+    };
+  }
+
+  function saveRunSnapshot() {
+    if (typeof window === "undefined" || won || gameOver) return;
+    window.localStorage.setItem(SAVED_RUN_STORAGE_KEY, JSON.stringify(buildSavedRunSnapshot()));
+  }
+
+  function exitToMenu() {
+    saveRunSnapshot();
+    onExit();
+  }
+
   useEffect(() => {
     if (paused) return;
     const refresh = () => {
@@ -752,6 +908,80 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
   }, [paused]);
 
   useEffect(() => {
+    if (resumeSavedRun) {
+      const saved = loadSavedRunSnapshot();
+      if (saved) {
+        setNewlyDiscoveredThisRun(saved.newlyDiscoveredThisRun ?? []);
+        setBalls(saved.balls.map((b) => (b.stoneHp != null ? b : { ...b, r: radiusFor(b.atom) })));
+        setQueue(saved.queue);
+        setShimmerQueue(saved.shimmerQueue);
+        setEGunQueue(saved.eGunQueue);
+        setBlankQueue(saved.blankQueue);
+        setScore(saved.score);
+        setHighest(saved.highest);
+        setShots(saved.shots);
+        setRunBestCombo(saved.runBestCombo);
+        setEarnedStars(saved.earnedStars);
+        setGameOver(false);
+        setWon(false);
+        setDiscoveryEl(null);
+        setHighlightId(null);
+        setWiggleIds(new Set());
+        setProjectile(null);
+        setGravityFxId(null);
+        setBusy(false);
+        setAimDeg(0);
+        setGrabs(saved.grabs);
+        setGrabMode(false);
+        setGrabbing(null);
+        setCompoundMode(false);
+        setSelectedCompoundIds(new Set());
+        setCompoundFx(null);
+        setFormingCompoundIds(new Set());
+        setDiscoveryCompound(null);
+        setGrabProgress(saved.grabProgress);
+        setContinuingPastTarget(saved.continuingPastTarget);
+        setContinueStartedElapsedMs(saved.continueStartedElapsedMs);
+        setContinueClaimPromptOpen(false);
+        setWinChoice(null);
+        setStageClearFx(null);
+        setNoMergeStreak(saved.noMergeStreak);
+        setStoneHitIds(new Set());
+        setPendingStone(saved.pendingStone);
+        setStoneSpawnCount(saved.stoneSpawnCount);
+        setGravityCharges(saved.gravityCharges);
+        setEmissionCharges(saved.emissionCharges);
+        setEmissionUnlockIndex(saved.emissionUnlockIndex);
+        setTransmuteCharges(saved.transmuteCharges);
+        setFusionJumpCharges(saved.fusionJumpCharges);
+        setFusionJumpArmed(saved.fusionJumpArmed);
+        setCatalystCharges(saved.catalystCharges);
+        setCatalystShotsRemaining(saved.catalystShotsRemaining);
+        setPendingReversiblePowerUp(null);
+        hasClaimedUnusedInventoryRef.current = false;
+        runPowerUpsUsedRef.current = saved.runPowerUpsUsed;
+        runRecordedRef.current = false;
+        setSelectedInventoryPowerUps(emptyPowerUpInventory());
+        setInventoryPickerOpen(false);
+        setShotHistory([]);
+        setHistoryOpen(false);
+        setQueueShuffleCharges(saved.queueShuffleCharges);
+        setStoneHitTally(saved.stoneHitTally);
+        setGammaCharges(saved.gammaCharges);
+        setPendingGamma(saved.pendingGamma);
+        setSpawnFloorIndex(saved.spawnFloorIndex);
+        setShufflesLeft(SHUFFLE_LIMIT);
+        setShuffleAtoms([]);
+        setShuffleStartOpen(false);
+        queueUndoRef.current = null;
+        eGunCooldownSlots.current = 0;
+        startTimeRef.current = Date.now() - saved.elapsedMs;
+        setElapsedMs(saved.elapsedMs);
+        clearSavedRun();
+        trackGameStart(levelId, mode);
+        return;
+      }
+    }
     setNewlyDiscoveredThisRun([]);
     const initialBalls = level.id >= SHUFFLE_MIN_LEVEL
       ? buildShuffleStartBoard(generateShuffleAtoms())
@@ -878,7 +1108,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
       );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [levelId, level.gridRows, level.gridCols, level.maxQueueElement, mode]);
+  }, [levelId, level.gridRows, level.gridCols, level.maxQueueElement, mode, resumeSavedRun]);
 
   // Show a one-time tooltip the first time a shimmer atom appears in the queue.
   useEffect(() => {
@@ -1124,7 +1354,10 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
   }, []);
 
   useEffect(() => {
-    if (won || gameOver) claimUnusedPowerUps();
+    if (won || gameOver) {
+      clearSavedRun();
+      claimUnusedPowerUps();
+    }
     if ((won || gameOver) && !runRecordedRef.current) {
       runRecordedRef.current = true;
       recordLevelRun(levelId, {
@@ -2732,6 +2965,27 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
     }, 900);
   }
 
+  function revealCompoundHint(compound: CompoundDefinition, cost: number) {
+    if (!compoundMode || busy) return;
+    if (!spendScore(cost)) {
+      spawnPopup(`Need ${formatScore(cost)} score`);
+      haptic(12);
+      return;
+    }
+    const remaining = { ...compound.elements };
+    const hintedIds = new Set<number>();
+    for (const ball of balls) {
+      if (ball.stoneHp != null) continue;
+      const symbol = ELEMENTS[ball.atom - 1]?.symbol;
+      if (!symbol || !remaining[symbol]) continue;
+      hintedIds.add(ball.id);
+      remaining[symbol] -= 1;
+    }
+    setSelectedCompoundIds(hintedIds);
+    spawnPopup(`Hint: ${compound.formula}`);
+    haptic([15, 25, 15]);
+  }
+
   function triggerCatalystPowerUp() {
     if (cancelPendingPowerUp("catalyst")) return;
     if (
@@ -3243,7 +3497,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
           }}
         >
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-            <button onClick={onExit} style={iconBtn}>
+            <button onClick={exitToMenu} style={iconBtn}>
               ← Menu
             </button>
             <button
@@ -3551,6 +3805,12 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
               match={matchingCompound}
               matchScore={matchingCompoundScore}
               matchIsNew={matchingCompoundIsNew}
+              discoveredHint={availableDiscoveredCompoundHint}
+              newHint={availableNewCompoundHint}
+              canAffordHint={totalScore >= COMPOUND_HINT_COST}
+              canAffordSuperHint={totalScore >= COMPOUND_SUPER_HINT_COST}
+              onHint={(compound) => revealCompoundHint(compound, COMPOUND_HINT_COST)}
+              onSuperHint={(compound) => revealCompoundHint(compound, COMPOUND_SUPER_HINT_COST)}
               onForm={formSelectedCompound}
               onCancel={() => {
                 setCompoundMode(false);
@@ -3946,13 +4206,13 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
             borderRadius: 14,
             border: "1px solid var(--border)",
             display: "flex",
-            flexDirection: "column",
+            flexDirection: "row",
             alignItems: "center",
-            justifyContent: "center",
+            justifyContent: "space-between",
             gap: 10,
           }}
         >
-          <div style={{ display: "flex", gap: 8, justifyContent: "center", flex: "1 0 100%" }}>
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-start", flex: "0 0 auto" }}>
             {queue
               .slice(1)
               .map((n, i) =>
@@ -3974,9 +4234,9 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
             style={{
               display: "flex",
               alignItems: "center",
-              justifyContent: "flex-start",
+              justifyContent: "flex-end",
               gap: 6,
-              width: "100%",
+              flex: "1 1 auto",
               minWidth: 0,
               overflowX: "auto",
               flexWrap: "nowrap",
@@ -4236,7 +4496,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
                 }}
               >
                 <span aria-hidden="true" style={{ display: "grid", placeItems: "center" }}>
-                  <MoleculeVisual compound={COMPOUNDS[0]} size={24} />
+                  <PowerUpIcon icon="molecule" size={24} />
                 </span>
                 <span style={powerUpCount}>{compoundMode ? "×" : compoundCharges}</span>
               </button>
@@ -4305,7 +4565,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
             selected={selectedInventoryPowerUps}
             onChange={changeInventorySelection}
             onStart={startWithSelectedInventory}
-            onBack={onExit}
+            onBack={exitToMenu}
           />
         )}
         {historyOpen && <ShotHistoryModal entries={shotHistory} onClose={() => setHistoryOpen(false)} />}
@@ -4377,7 +4637,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign" }: Props) 
                 </button>
                 <button
                   type="button"
-                  onClick={onExit}
+                  onClick={exitToMenu}
                   style={{
                     border: "1px solid var(--border)",
                     borderRadius: 12,
@@ -4653,8 +4913,8 @@ function InventoryStartModal({
                 textAlign: "left",
               }}
             >
-              <span style={{ fontSize: 24, textAlign: "center" }} aria-hidden="true">
-                {meta.icon}
+              <span style={{ display: "grid", placeItems: "center" }} aria-hidden="true">
+                <PowerUpIcon icon={id} size={28} />
               </span>
               <span>
                 <span style={{ display: "block", fontWeight: 900, fontSize: 13 }}>{meta.name}</span>
@@ -4780,6 +5040,12 @@ function CompoundSelectionPanel({
   match,
   matchScore,
   matchIsNew,
+  discoveredHint,
+  newHint,
+  canAffordHint,
+  canAffordSuperHint,
+  onHint,
+  onSuperHint,
   onForm,
   onCancel,
 }: {
@@ -4788,6 +5054,12 @@ function CompoundSelectionPanel({
   match: CompoundDefinition | null;
   matchScore: number;
   matchIsNew: boolean;
+  discoveredHint: CompoundDefinition | null;
+  newHint: CompoundDefinition | null;
+  canAffordHint: boolean;
+  canAffordSuperHint: boolean;
+  onHint: (compound: CompoundDefinition) => void;
+  onSuperHint: (compound: CompoundDefinition) => void;
   onForm: () => void;
   onCancel: () => void;
 }) {
@@ -4832,6 +5104,42 @@ function CompoundSelectionPanel({
           ))
         )}
       </div>
+      {(discoveredHint || newHint) && (
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+          {discoveredHint && (
+            <button
+              type="button"
+              onClick={() => onHint(discoveredHint)}
+              disabled={!canAffordHint}
+              style={{
+                ...miniPanelBtn,
+                flex: "1 1 120px",
+                opacity: canAffordHint ? 1 : 0.55,
+                cursor: canAffordHint ? "pointer" : "not-allowed",
+              }}
+            >
+              Hint 50K
+            </button>
+          )}
+          {newHint && (
+            <button
+              type="button"
+              onClick={() => onSuperHint(newHint)}
+              disabled={!canAffordSuperHint}
+              style={{
+                ...miniPanelBtn,
+                flex: "1 1 140px",
+                border: "1px solid var(--accent)",
+                color: "var(--accent)",
+                opacity: canAffordSuperHint ? 1 : 0.55,
+                cursor: canAffordSuperHint ? "pointer" : "not-allowed",
+              }}
+            >
+              Super Hint 100K
+            </button>
+          )}
+        </div>
+      )}
       <button
         type="button"
         onClick={onForm}

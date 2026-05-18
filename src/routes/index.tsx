@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
+import type { CSSProperties } from "react";
 import { useState } from "react";
 import { MainMenu } from "@/game/MainMenu";
-import { GameBoard } from "@/game/GameBoard";
+import { clearSavedRun, GameBoard, getSavedRunSummary } from "@/game/GameBoard";
 import { LevelSelect } from "@/game/LevelSelect";
 import { Collection } from "@/game/Collection";
 import { Settings } from "@/game/Settings";
@@ -35,7 +36,7 @@ export const Route = createFileRoute("/")({
 type Screen =
   | { name: "menu" }
   | { name: "levels" }
-  | { name: "game"; levelId: number; mode?: GameModeId }
+  | { name: "game"; levelId: number; mode?: GameModeId; resumeSavedRun?: boolean }
   | { name: "collection" }
   | { name: "shop" }
   | { name: "lab" }
@@ -46,20 +47,52 @@ type Screen =
 function Index() {
   const unlockedLevel = useProgress((s) => s.unlockedLevel);
   const [screen, setScreen] = useState<Screen>({ name: "menu" });
+  const [resumePrompt, setResumePrompt] = useState<ReturnType<typeof getSavedRunSummary>>(null);
+
+  function startCampaign() {
+    const saved = getSavedRunSummary();
+    if (saved) {
+      setResumePrompt(saved);
+      return;
+    }
+    setScreen({ name: "game", levelId: unlockedLevel });
+  }
 
   switch (screen.name) {
     case "menu":
       return (
-        <MainMenu
-          onPlay={() => setScreen({ name: "game", levelId: unlockedLevel })}
-          onLevels={() => setScreen({ name: "levels" })}
-          onCollection={() => setScreen({ name: "collection" })}
-          onSettings={() => setScreen({ name: "settings" })}
-          onShop={() => setScreen({ name: "shop" })}
-          onLab={() => setScreen({ name: "lab" })}
-          onLibrary={() => setScreen({ name: "library" })}
-          onProfile={() => setScreen({ name: "profile" })}
-        />
+        <>
+          <MainMenu
+            onPlay={startCampaign}
+            onLevels={() => setScreen({ name: "levels" })}
+            onCollection={() => setScreen({ name: "collection" })}
+            onSettings={() => setScreen({ name: "settings" })}
+            onShop={() => setScreen({ name: "shop" })}
+            onLab={() => setScreen({ name: "lab" })}
+            onLibrary={() => setScreen({ name: "library" })}
+            onProfile={() => setScreen({ name: "profile" })}
+          />
+          {resumePrompt && (
+            <ResumeRunPrompt
+              saved={resumePrompt}
+              onContinue={() => {
+                setScreen({
+                  name: "game",
+                  levelId: resumePrompt.levelId,
+                  mode: resumePrompt.mode,
+                  resumeSavedRun: true,
+                });
+                setResumePrompt(null);
+              }}
+              onStartOver={() => {
+                clearSavedRun();
+                setScreen({ name: "game", levelId: unlockedLevel });
+                setResumePrompt(null);
+              }}
+              onCancel={() => setResumePrompt(null)}
+            />
+          )}
+        </>
       );
     case "levels":
       return (
@@ -73,6 +106,7 @@ function Index() {
         <GameBoard
           levelId={screen.levelId}
           mode={screen.mode}
+          resumeSavedRun={screen.resumeSavedRun}
           onExit={() => setScreen({ name: "menu" })}
           onWin={(nextId) => {
             if (nextId) setScreen({ name: "game", levelId: nextId });
@@ -99,3 +133,95 @@ function Index() {
       return <Settings onBack={() => setScreen({ name: "menu" })} />;
   }
 }
+
+function ResumeRunPrompt({
+  saved,
+  onContinue,
+  onStartOver,
+  onCancel,
+}: {
+  saved: NonNullable<ReturnType<typeof getSavedRunSummary>>;
+  onContinue: () => void;
+  onStartOver: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Resume saved run"
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 2000,
+        display: "grid",
+        placeItems: "center",
+        padding: 20,
+        background: "rgba(0,0,0,0.72)",
+        backdropFilter: "blur(6px)",
+      }}
+    >
+      <div
+        style={{
+          width: "100%",
+          maxWidth: 340,
+          padding: 20,
+          borderRadius: 16,
+          border: "1px solid var(--border)",
+          background: "var(--surface-elevated)",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+          textAlign: "center",
+        }}
+      >
+        <div style={{ fontSize: 11, letterSpacing: 3, color: "var(--accent)", fontWeight: 800 }}>
+          SAVED RUN
+        </div>
+        <h2 style={{ margin: "6px 0 4px", fontSize: 23 }}>Continue previous run?</h2>
+        <p style={{ margin: "0 0 16px", color: "var(--muted-foreground)", fontSize: 13 }}>
+          Level {saved.levelId} · {saved.shots} shots · {saved.score.toLocaleString()} score
+        </p>
+        <div style={{ display: "grid", gap: 8 }}>
+          <button type="button" onClick={onContinue} style={promptPrimaryBtn}>
+            Continue Run
+          </button>
+          <button type="button" onClick={onStartOver} style={promptSecondaryBtn}>
+            Start Over
+          </button>
+          <button type="button" onClick={onCancel} style={promptGhostBtn}>
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const promptPrimaryBtn: CSSProperties = {
+  border: "none",
+  borderRadius: 12,
+  padding: "12px 14px",
+  background: "linear-gradient(135deg, var(--accent), var(--primary))",
+  color: "var(--primary-foreground)",
+  fontWeight: 800,
+  cursor: "pointer",
+};
+
+const promptSecondaryBtn: CSSProperties = {
+  border: "1px solid var(--border)",
+  borderRadius: 12,
+  padding: "10px 14px",
+  background: "var(--surface)",
+  color: "var(--foreground)",
+  fontWeight: 750,
+  cursor: "pointer",
+};
+
+const promptGhostBtn: CSSProperties = {
+  border: "none",
+  borderRadius: 12,
+  padding: "8px 14px",
+  background: "transparent",
+  color: "var(--muted-foreground)",
+  fontWeight: 700,
+  cursor: "pointer",
+};

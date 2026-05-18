@@ -102,6 +102,7 @@ interface ProgressState {
   recordDiscovery: (atomicNumbers: number[]) => void;
   recordCompoundDiscovery: (compoundId: string) => void;
   addScore: (n: number) => void;
+  spendScore: (cost: number) => boolean;
   setHighestElement: (n: number) => void;
   refreshDailyLab: () => void;
   reportQuestProgress: (event: QuestProgressEvent) => void;
@@ -175,6 +176,16 @@ export const useProgress = create<ProgressState>()(
         })),
       addScore: (n) =>
         set((s) => ({ totalScore: s.totalScore + Math.max(0, Math.floor(n / 10)) })),
+      spendScore: (cost) => {
+        let spent = false;
+        set((s) => {
+          const normalizedCost = Math.max(0, Math.floor(cost));
+          if (s.totalScore < normalizedCost) return s;
+          spent = true;
+          return { totalScore: s.totalScore - normalizedCost };
+        });
+        return spent;
+      },
       setHighestElement: (n) => set((s) => ({ highestElement: Math.max(s.highestElement, n) })),
       refreshDailyLab: () =>
         set((s) => refreshDailyQuests(s.dailyQuestDate, s.dailyQuests, s.claimedDailyReward)),

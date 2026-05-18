@@ -39,10 +39,10 @@ export function ShimmerAtomIcon({ size = 42 }: { size?: number }) {
   );
 }
 
-export function PowerUpIcon({ icon }: { icon: string }) {
-  if (icon === "shimmer") return <ShimmerAtomIcon />;
-  if (icon === "H") return <ElementBall atomicNumber={1} size={42} />;
-  if (icon === "molecule") return <MoleculeVisual compound={COMPOUNDS[0]} size={42} />;
+export function PowerUpIcon({ icon, size = 42 }: { icon: string; size?: number }) {
+  if (icon === "shimmer") return <ShimmerAtomIcon size={size} />;
+  if (icon === "H") return <ElementBall atomicNumber={1} size={size} />;
+  if (icon === "molecule") return <MoleculeVisual compound={COMPOUNDS[0]} size={size} />;
   const map: Record<string, { Icon: LucideIcon; color: string }> = {
     grab: { Icon: Hand, color: "oklch(0.78 0.16 50)" },
     egun: { Icon: Zap, color: "oklch(0.85 0.18 95)" },
@@ -57,7 +57,7 @@ export function PowerUpIcon({ icon }: { icon: string }) {
     "queue-shuffle": { Icon: Recycle, color: "oklch(0.78 0.16 175)" },
   };
   const entry = map[icon];
-  if (entry) return <entry.Icon size={28} color={entry.color} strokeWidth={2.4} />;
+  if (entry) return <entry.Icon size={Math.round(size * 0.68)} color={entry.color} strokeWidth={2.4} />;
   return <>{icon}</>;
 }
 
