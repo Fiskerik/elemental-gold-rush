@@ -1164,6 +1164,10 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     setCatalystCharges(0);
     setCatalystShotsRemaining(0);
     setPendingReversiblePowerUp(null);
+    // Compound: each new game starts with 1 charge (capped at 1).
+    setCompoundCharges(1);
+    saveCompoundChargeState(1, null);
+    compoundSpentAtElapsedRef.current = 0;
     hasClaimedUnusedInventoryRef.current = false;
     runPowerUpsUsedRef.current = 0;
     runRecordedRef.current = false;
