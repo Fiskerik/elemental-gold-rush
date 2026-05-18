@@ -5236,105 +5236,125 @@ function InventoryStartModal({
   const availablePowerUps = (Object.keys(POWER_UP_INVENTORY_META) as InventoryPowerUpId[]).filter(
     (id) => inventory[id] > 0,
   );
+  const [tipId, setTipId] = useState<InventoryPowerUpId | null>(null);
+  const longPressRef = useRef<number | null>(null);
+  const longPressFiredRef = useRef(false);
+  const clearLongPress = () => {
+    if (longPressRef.current !== null) {
+      window.clearTimeout(longPressRef.current);
+      longPressRef.current = null;
+    }
+  };
+  const startLongPress = (id: InventoryPowerUpId) => {
+    longPressFiredRef.current = false;
+    clearLongPress();
+    longPressRef.current = window.setTimeout(() => {
+      longPressFiredRef.current = true;
+      setTipId(id);
+    }, 400);
+  };
 
   return (
     <Modal>
       <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--accent)", marginBottom: 8 }}>
         POWER-UP INVENTORY
       </div>
-      <h2 style={{ margin: "0 0 8px", fontSize: 24, fontWeight: 900 }}>Pick up to 3 boosts</h2>
-      <p style={{ margin: "0 0 14px", color: "var(--muted-foreground)", fontSize: 13 }}>
-        Saved unused power-ups can be loaded before a level starts. Tap a selected card again to add
-        copies, or use minus to remove them.
+      <h2 style={{ margin: "0 0 4px", fontSize: 20, fontWeight: 900 }}>Pick up to 3 boosts</h2>
+      <p style={{ margin: "0 0 12px", color: "var(--muted-foreground)", fontSize: 11 }}>
+        Tap an icon to add it to this level. Long-press for details.
       </p>
-      <div style={{ display: "grid", gap: 8 }}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+          gap: 8,
+        }}
+      >
         {availablePowerUps.map((id) => {
           const meta = POWER_UP_INVENTORY_META[id];
           const selectedAmount = selected[id];
           const isSelected = selectedAmount > 0;
           const disabled = !isSelected && selectedCount >= INVENTORY_PICK_LIMIT;
+          const handleClick = () => {
+            if (longPressFiredRef.current) {
+              longPressFiredRef.current = false;
+              return;
+            }
+            if (isSelected) onChange(id, -1);
+            else if (!disabled) onChange(id, 1);
+          };
           return (
             <button
               key={id}
               type="button"
-              onClick={() => onChange(id, 1)}
-              disabled={disabled}
+              onClick={handleClick}
+              onPointerDown={() => startLongPress(id)}
+              onPointerUp={clearLongPress}
+              onPointerLeave={clearLongPress}
+              onPointerCancel={clearLongPress}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                setTipId(id);
+              }}
+              disabled={disabled && !isSelected}
+              aria-label={`${meta.name} (${inventory[id]} available)${isSelected ? `, selected ${selectedAmount}` : ""}`}
               style={{
+                position: "relative",
+                aspectRatio: "1 / 1",
                 display: "grid",
-                gridTemplateColumns: "36px 1fr auto",
-                alignItems: "center",
-                gap: 10,
-                padding: 10,
-                borderRadius: 12,
+                placeItems: "center",
+                padding: 6,
+                borderRadius: 14,
                 border: `1px solid ${isSelected ? "var(--accent)" : "var(--border)"}`,
                 background: isSelected
                   ? "color-mix(in oklch, var(--accent) 18%, var(--surface-elevated))"
                   : "var(--surface)",
                 color: "var(--foreground)",
-                opacity: disabled ? 0.55 : 1,
-                cursor: disabled ? "not-allowed" : "pointer",
-                textAlign: "left",
+                opacity: disabled && !isSelected ? 0.45 : 1,
+                cursor: disabled && !isSelected ? "not-allowed" : "pointer",
+                touchAction: "manipulation",
               }}
             >
-              <span style={{ display: "grid", placeItems: "center" }} aria-hidden="true">
-                <PowerUpBadge icon={id} size={34} />
-              </span>
-              <span>
-                <span style={{ display: "block", fontWeight: 900, fontSize: 13 }}>{meta.name}</span>
-                <span style={{ display: "block", color: "var(--muted-foreground)", fontSize: 11 }}>
-                  {meta.description}
-                </span>
-              </span>
+              <PowerUpBadge icon={id} size={40} />
               <span
                 style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "flex-end",
-                  gap: 6,
-                  minWidth: 76,
-                  color: isSelected ? "var(--accent)" : "var(--muted-foreground)",
+                  position: "absolute",
+                  bottom: 4,
+                  right: 6,
+                  fontSize: 10,
                   fontWeight: 900,
                   fontVariantNumeric: "tabular-nums",
+                  color: isSelected ? "var(--accent)" : "var(--muted-foreground)",
                 }}
               >
-                {isSelected && (
-                  <span
-                    role="button"
-                    tabIndex={0}
-                    aria-label={`Remove ${meta.name} from selected inventory`}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onChange(id, -1);
-                    }}
-                    onKeyDown={(event) => {
-                      if (event.key !== "Enter" && event.key !== " ") return;
-                      event.preventDefault();
-                      event.stopPropagation();
-                      onChange(id, -1);
-                    }}
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      width: 24,
-                      height: 24,
-                      borderRadius: 8,
-                      background: "var(--surface-elevated)",
-                      border: "1px solid var(--border)",
-                      color: "var(--foreground)",
-                    }}
-                  >
-                    −
-                  </span>
-                )}
-                <span>
-                  {isSelected ? `${selectedAmount}/${inventory[id]}` : `×${inventory[id]}`}
-                </span>
+                {isSelected ? `${selectedAmount}/${inventory[id]}` : `×${inventory[id]}`}
               </span>
             </button>
           );
         })}
       </div>
+      {tipId && (
+        <div
+          role="status"
+          onClick={() => setTipId(null)}
+          style={{
+            marginTop: 10,
+            padding: "8px 10px",
+            borderRadius: 10,
+            background: "var(--surface-elevated)",
+            border: "1px solid var(--border)",
+            color: "var(--foreground)",
+            fontSize: 12,
+            lineHeight: 1.4,
+            cursor: "pointer",
+          }}
+        >
+          <div style={{ fontWeight: 900, marginBottom: 2 }}>{POWER_UP_INVENTORY_META[tipId].name}</div>
+          <div style={{ color: "var(--muted-foreground)" }}>
+            {POWER_UP_INVENTORY_META[tipId].description}
+          </div>
+        </div>
+      )}
       <div
         style={{
           marginTop: 14,
