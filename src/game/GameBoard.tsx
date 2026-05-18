@@ -1048,6 +1048,9 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
         setGammaCharges(saved.gammaCharges);
         setPendingGamma(saved.pendingGamma);
         setSpawnFloorIndex(saved.spawnFloorIndex);
+        // On resume, if the player has no compound charge, restart the 5-min
+        // regen window from the current elapsed time.
+        compoundSpentAtElapsedRef.current = saved.compoundCharges >= 1 ? 0 : saved.elapsedMs;
         setShufflesLeft(SHUFFLE_LIMIT);
         setShuffleAtoms([]);
         setShuffleStartOpen(false);
