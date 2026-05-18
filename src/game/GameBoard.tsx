@@ -1276,6 +1276,19 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [elapsedMs, gameOver, won, emissionUnlockIndex, emissionEnabled]);
 
+  // Compound regen — give back 1 charge after 5 minutes of active game time
+  // since the last spend. Capped at 1 charge at a time.
+  useEffect(() => {
+    if (!compoundEnabled) return;
+    if (gameOver || won) return;
+    if (compoundCharges >= 1) return;
+    if (elapsedMs - compoundSpentAtElapsedRef.current < COMPOUND_REGEN_MS) return;
+    setCompoundCharges(1);
+    saveCompoundChargeState(1, null);
+    spawnPopup("🧬 COMPOUND READY");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [elapsedMs, gameOver, won, compoundCharges, compoundEnabled]);
+
   // Spawn-floor scaling — level 10+: every 2 minutes raise the lowest
   // spawnable tier so runs don't drag on with low-value atoms.
   useEffect(() => {
