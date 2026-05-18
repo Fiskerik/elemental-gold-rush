@@ -41,15 +41,17 @@ export function LevelSelect({
   const mapH = 112 + (mapRows - 1) * ROW_H;
 
   // Molecule challenge nodes are interleaved every 5 levels and sit between
-  // the surrounding level dots along the winding path.
+  // the surrounding level dots, placed exactly on the winding path.
   const challengeNodes = useMemo(() => {
     const list: { idx: number; x: number; y: number; afterLevel: number; compound: typeof COMPOUNDS[number] }[] = [];
     for (let i = 4; i < nodes.length; i += 5) {
       const a = nodes[i];
       const b = nodes[i + 1];
-      const target = b ?? a;
-      const x = b ? (a.x + target.x) / 2 : a.x;
-      const y = b ? (a.y + target.y) / 2 : a.y + ROW_H * 0.55;
+      // Place at the midpoint of the segment connecting level N → N+1.
+      // For the segment's cubic Bezier (control points at midY), the curve
+      // midpoint is exactly ((a.x + b.x)/2, (a.y + b.y)/2).
+      const x = b ? (a.x + b.x) / 2 : a.x;
+      const y = b ? (a.y + b.y) / 2 : a.y + ROW_H * 0.55;
       const compound = COMPOUNDS[(list.length * 3) % COMPOUNDS.length];
       list.push({ idx: list.length, x, y, afterLevel: a.lvl.id, compound });
     }
@@ -59,18 +61,31 @@ export function LevelSelect({
   const selectedChallenge =
     selectedChallengeIdx != null ? challengeNodes[selectedChallengeIdx] : null;
 
-  // Smooth path between nodes
+  // Smooth path between nodes — passes directly through every challenge
+  // waypoint by routing the curve as N → challenge → N+1.
   const pathD = useMemo(() => {
     if (nodes.length === 0) return "";
+    const challengeAfter = new Map<number, { x: number; y: number }>();
+    for (const c of challengeNodes) challengeAfter.set(c.afterLevel, { x: c.x, y: c.y });
     let d = `M ${nodes[0].x} ${nodes[0].y}`;
     for (let i = 1; i < nodes.length; i++) {
       const prev = nodes[i - 1];
       const cur = nodes[i];
       const midY = (prev.y + cur.y) / 2;
-      d += ` C ${prev.x} ${midY}, ${cur.x} ${midY}, ${cur.x} ${cur.y}`;
+      const challenge = challengeAfter.get(prev.lvl.id);
+      if (challenge) {
+        // Route prev → challenge → cur using two cubic segments so the
+        // path visibly stops at the challenge waypoint.
+        const midY1 = (prev.y + challenge.y) / 2;
+        const midY2 = (challenge.y + cur.y) / 2;
+        d += ` C ${prev.x} ${midY1}, ${challenge.x} ${midY1}, ${challenge.x} ${challenge.y}`;
+        d += ` C ${challenge.x} ${midY2}, ${cur.x} ${midY2}, ${cur.x} ${cur.y}`;
+      } else {
+        d += ` C ${prev.x} ${midY}, ${cur.x} ${midY}, ${cur.x} ${cur.y}`;
+      }
     }
     return d;
-  }, [nodes]);
+  }, [nodes, challengeNodes]);
 
   const selected = selectedId != null ? LEVELS.find((l) => l.id === selectedId) : null;
   const selectedStats = selectedId != null ? levelStats[selectedId] : undefined;
