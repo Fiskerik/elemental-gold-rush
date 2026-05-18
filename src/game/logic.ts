@@ -13,6 +13,8 @@ export interface Ball {
   /** When set, this ball is a Stone obstacle — never merges. */
   stoneHp?: number;
   stoneMaxHp?: number;
+  /** Unstable isotope countdown. It stabilizes when merged, or decays at 0. */
+  unstableShots?: number;
 }
 export type Board = Ball[];
 
@@ -98,7 +100,7 @@ function resolveAdjacentMerges(
         const mergeStep = jumpAvailable ? 2 : 1;
         const next = Math.min(maxElement, list[s].atom + mergeStep);
         jumpAvailable = false;
-        const survivor = { ...list[s], atom: next };
+        const survivor = { ...list[s], atom: next, unstableShots: undefined };
         list[s] = survivor;
         list.splice(a, 1);
         // After splice, survivor index shifts if a < s

@@ -81,7 +81,7 @@ export const POWER_UPS = [
     unlock: "1 charge / 5 minutes",
     effect: "Select board atoms to form a known compound, remove them, and earn a big bonus.",
     description:
-      "Select up to 8 board atoms with no more than 3 element types to form a known compound for a big bonus.",
+      "Select board atoms with no more than 3 element types to form a known compound for a big bonus.",
   },
   {
     icon: "blank",

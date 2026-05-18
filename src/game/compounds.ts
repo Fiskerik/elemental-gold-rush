@@ -53,6 +53,7 @@ export const COMPOUNDS: CompoundDefinition[] = [
   compound("water", "Water", "H₂O", { H: 2, O: 1 }, 1500, "common", "Water is essential for life and covers about 71% of Earth's surface."),
   compound("carbon-dioxide", "Carbon Dioxide", "CO₂", { C: 1, O: 2 }, 1800, "common", "Carbon dioxide is used by plants in photosynthesis and gives fizzy drinks their bubbles."),
   compound("ammonia", "Ammonia", "NH₃", { N: 1, H: 3 }, 1700, "common", "Ammonia is a key ingredient for fertilizer production."),
+  compound("ammonium", "Ammonium", "NH₄", { N: 1, H: 4 }, 1900, "common", "Ammonium is a positively charged nitrogen-hydrogen ion found in many salts and fertilizers."),
   compound("methane", "Methane", "CH₄", { C: 1, H: 4 }, 1800, "common", "Methane is the main component of natural gas."),
   compound("sodium-chloride", "Sodium Chloride", "NaCl", { Na: 1, Cl: 1 }, 1900, "common", "Sodium chloride is ordinary table salt."),
   compound("hydrogen-peroxide", "Hydrogen Peroxide", "H₂O₂", { H: 2, O: 2 }, 2200, "uncommon", "Hydrogen peroxide breaks down into water and oxygen."),
@@ -96,6 +97,7 @@ export const COMPOUNDS: CompoundDefinition[] = [
   compound("calcium-hydroxide", "Calcium Hydroxide", "Ca(OH)₂", { Ca: 1, O: 2, H: 2 }, 3300, "rare", "Calcium hydroxide is slaked lime, used in mortar, water treatment, and food processing."),
   compound("nitric-acid", "Nitric Acid", "HNO₃", { H: 1, N: 1, O: 3 }, 3400, "rare", "Nitric acid is a strong oxidizing acid used to make fertilizers and explosives."),
   compound("sodium-carbonate", "Sodium Carbonate", "Na₂CO₃", { Na: 2, C: 1, O: 3 }, 3500, "rare", "Sodium carbonate, or soda ash, is used in glassmaking and cleaning products."),
+  compound("ethanol", "Ethanol", "C₂H₆O", { C: 2, H: 6, O: 1 }, 3600, "rare", "Ethanol is the alcohol in beverages and is also used as a fuel and solvent."),
 ];
 
 export function compoundKey(elements: Record<string, number>): string {
@@ -118,6 +120,7 @@ export const COMPOUND_HINTS: Record<string, string> = {
   "water": "A clear liquid that covers oceans, clouds, and cells.",
   "carbon-dioxide": "An invisible gas made by breathing, fire, and fizzy drinks.",
   "ammonia": "A sharp-smelling gas used to make fertilizers.",
+  "ammonium": "A nitrogen center surrounded by four hydrogens.",
   "methane": "A simple fuel gas found in natural gas.",
   "sodium-chloride": "A familiar white crystal sprinkled on food.",
   "hydrogen-peroxide": "A bubbling household disinfectant that releases oxygen.",
@@ -161,6 +164,7 @@ export const COMPOUND_HINTS: Record<string, string> = {
   "calcium-hydroxide": "A lime compound with calcium and two hydroxide groups.",
   "nitric-acid": "A strong acid with hydrogen, nitrogen, and three oxygens.",
   "sodium-carbonate": "A soda-ash compound used in glass and cleaning.",
+  "ethanol": "A two-carbon alcohol with six hydrogens and one oxygen.",
 };
 
 export const COMPOUND_STRUCTURES: Record<string, CompoundStructure> = {
@@ -175,6 +179,10 @@ export const COMPOUND_STRUCTURES: Record<string, CompoundStructure> = {
   "ammonia": {
     atoms: [{ symbol: "N", x: 0, y: 0 }, { symbol: "H", x: -0.5, y: 0.28 }, { symbol: "H", x: 0.5, y: 0.28 }, { symbol: "H", x: 0, y: -0.54 }],
     bonds: [{ from: 0, to: 1 }, { from: 0, to: 2 }, { from: 0, to: 3 }],
+  },
+  "ammonium": {
+    atoms: [{ symbol: "N", x: 0, y: 0 }, { symbol: "H", x: -0.5, y: -0.34 }, { symbol: "H", x: 0.5, y: -0.34 }, { symbol: "H", x: -0.5, y: 0.36 }, { symbol: "H", x: 0.5, y: 0.36 }],
+    bonds: [{ from: 0, to: 1 }, { from: 0, to: 2 }, { from: 0, to: 3 }, { from: 0, to: 4 }],
   },
   "methane": {
     atoms: [{ symbol: "C", x: 0, y: 0 }, { symbol: "H", x: -0.5, y: -0.42 }, { symbol: "H", x: 0.5, y: -0.42 }, { symbol: "H", x: -0.5, y: 0.42 }, { symbol: "H", x: 0.5, y: 0.42 }],
@@ -263,6 +271,10 @@ export const COMPOUND_STRUCTURES: Record<string, CompoundStructure> = {
   "methanol": {
     atoms: [{ symbol: "C", x: -0.24, y: 0 }, { symbol: "O", x: 0.32, y: 0 }, { symbol: "H", x: -0.62, y: -0.36 }, { symbol: "H", x: -0.66, y: 0.28 }, { symbol: "H", x: -0.22, y: 0.54 }, { symbol: "H", x: 0.7, y: 0 }],
     bonds: [{ from: 0, to: 1 }, { from: 0, to: 2 }, { from: 0, to: 3 }, { from: 0, to: 4 }, { from: 1, to: 5 }],
+  },
+  "ethanol": {
+    atoms: [{ symbol: "C", x: -0.42, y: 0 }, { symbol: "C", x: 0.04, y: 0 }, { symbol: "O", x: 0.5, y: 0 }, { symbol: "H", x: -0.78, y: -0.32 }, { symbol: "H", x: -0.78, y: 0.32 }, { symbol: "H", x: -0.42, y: 0.52 }, { symbol: "H", x: 0.04, y: -0.48 }, { symbol: "H", x: 0.04, y: 0.48 }, { symbol: "H", x: 0.84, y: 0 }],
+    bonds: [{ from: 0, to: 1 }, { from: 1, to: 2 }, { from: 0, to: 3 }, { from: 0, to: 4 }, { from: 0, to: 5 }, { from: 1, to: 6 }, { from: 1, to: 7 }, { from: 2, to: 8 }],
   },
   "carbonic-acid": {
     atoms: [{ symbol: "C", x: 0, y: 0 }, { symbol: "O", x: 0, y: -0.55 }, { symbol: "O", x: -0.5, y: 0.28 }, { symbol: "O", x: 0.5, y: 0.28 }, { symbol: "H", x: -0.78, y: 0.52 }, { symbol: "H", x: 0.78, y: 0.52 }],

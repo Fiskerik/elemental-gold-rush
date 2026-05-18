@@ -49,11 +49,12 @@ export const GAME_MODES: GameModeConfig[] = [
     name: "Unstable Isotopes",
     emoji: "☢️",
     kind: "challenge",
-    description: "Random atoms decay by 1 tier after several shots.",
+    description: "Some atoms become unstable isotopes with an 8-shot decay ring.",
     unlockedAtLevel: 2,
     rules: [
-      "Every 6 shots, a few random atoms drop by 1 tier",
-      "Hydrogen and Stones are unaffected",
+      "Unstable atoms lose 1 ring segment after each shot",
+      "Merging stabilizes the isotope into the new atom",
+      "At 0 segments, it decays down by 1 element tier",
     ],
   },
   {

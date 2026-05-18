@@ -11,6 +11,7 @@ interface Props {
   highlight?: boolean;
   wiggle?: boolean;
   shimmer?: boolean;
+  unstableShots?: number;
 }
 
 export function ElementBall({
@@ -24,6 +25,7 @@ export function ElementBall({
   highlight,
   wiggle,
   shimmer,
+  unstableShots,
 }: Props) {
   const el = ELEMENTS[atomicNumber - 1];
   if (!el) return null;
@@ -34,6 +36,14 @@ export function ElementBall({
   size = size * periodScale;
   const symbolSize = Math.max(10, size * 0.42);
   const numberSize = Math.max(8, size * 0.22);
+  const unstableSegments = Math.max(0, Math.min(8, Math.floor(unstableShots ?? 0)));
+  const unstableCircumference = 100;
+  const unstableSegment = unstableCircumference / 8;
+  const unstableDash = unstableSegment * 0.72;
+  const unstableGap = unstableSegment - unstableDash;
+  const unstableDashArray = Array.from({ length: 8 }, (_, index) =>
+    index < unstableSegments ? `${unstableDash} ${unstableGap}` : `0 ${unstableSegment}`,
+  ).join(" ");
   return (
     <div
       onClick={onClick}
@@ -64,6 +74,34 @@ export function ElementBall({
         ...style,
       }}
     >
+      {unstableSegments > 0 && (
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 36 36"
+          style={{
+            position: "absolute",
+            inset: -4,
+            width: size + 8,
+            height: size + 8,
+            overflow: "visible",
+            pointerEvents: "none",
+            transform: "rotate(-90deg)",
+            filter: "drop-shadow(0 0 5px oklch(0.78 0.2 55 / 0.8))",
+          }}
+        >
+          <circle
+            cx="18"
+            cy="18"
+            r="15.92"
+            fill="none"
+            pathLength={unstableCircumference}
+            stroke="oklch(0.92 0.2 65)"
+            strokeWidth="2.6"
+            strokeLinecap="round"
+            strokeDasharray={unstableDashArray}
+          />
+        </svg>
+      )}
       <div style={{ fontSize: numberSize, lineHeight: 1, opacity: 0.85 }}>
         {el.atomicNumber}
       </div>

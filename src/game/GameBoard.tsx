@@ -66,7 +66,7 @@ const GAMMA_MIN_LEVEL = 12;
 const GAMMA_SHOT_INTERVAL = 40;
 const GAMMA_RADIUS_MULT = 3.5;
 const COMPOUND_REGEN_MS = 5 * 60 * 1000;
-const COMPOUND_MAX_SELECTION = 8;
+const COMPOUND_MAX_SELECTION = 9;
 const COMPOUND_MAX_ELEMENT_TYPES = 3;
 const COMPOUND_STORAGE_KEY = "elemental-gold-rush-compound-charge";
 export const SAVED_RUN_STORAGE_KEY = "elemental-gold-rush-saved-run";
@@ -83,6 +83,20 @@ const DISCOVERY_DECAY_STEP = 5;
 const DISCOVERY_DECAY_BOOST = 0.04;
 const STAGE_CLEAR_ANIMATION_MS = 6200;
 const STONE_GRACE_SHOTS = 15;
+const UNSTABLE_UNLOCK_LEVEL = 15;
+const UNSTABLE_SEGMENTS = 8;
+const UNSTABLE_SPAWN_CHANCE = 0.16;
+
+const MOLECULE_CHALLENGE_BY_LEVEL: Record<number, string> = {
+  5: "ammonium",
+  10: "water",
+  15: "carbon-dioxide",
+  20: "hydrogen-sulfide",
+  25: "ethanol",
+  30: "carbonic-acid",
+  35: "magnesium-chloride",
+  40: "sulfuric-acid",
+};
 
 const INVENTORY_PICK_LIMIT = 3;
 
@@ -739,6 +753,13 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
 
   const target = level.targetElement;
   const targetEl = ELEMENTS[target - 1];
+  const moleculeObjective = useMemo(
+    () =>
+      COMPOUNDS.find((compound) => compound.id === MOLECULE_CHALLENGE_BY_LEVEL[level.id]) ?? null,
+    [level.id],
+  );
+  const isMoleculeChallenge = moleculeObjective != null && mode === "campaign";
+  const unstableEnabled = level.id >= UNSTABLE_UNLOCK_LEVEL;
   const current = queue[0];
   const currentIsShimmer = shimmerQueue[0] ?? false;
   const currentIsEGun = eGunQueue[0] ?? false;
@@ -984,9 +1005,11 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
       }
     }
     setNewlyDiscoveredThisRun([]);
-    const initialBalls = level.id >= SHUFFLE_MIN_LEVEL
-      ? buildShuffleStartBoard(generateShuffleAtoms())
-      : createSeededBoard();
+    const initialBalls = isMoleculeChallenge
+      ? createMoleculeChallengeBoard(moleculeObjective)
+      : level.id >= SHUFFLE_MIN_LEVEL
+        ? buildShuffleStartBoard(generateShuffleAtoms())
+        : createSeededBoard();
     setBalls(initialBalls);
     const initialHighest = Math.max(1, getHighestOnBoard(initialBalls));
     if (initialHighest > 1) setHighestElement(initialHighest);
@@ -1109,7 +1132,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
       );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [levelId, level.gridRows, level.gridCols, level.maxQueueElement, mode, resumeSavedRun]);
+  }, [levelId, level.gridRows, level.gridCols, level.maxQueueElement, mode, resumeSavedRun, isMoleculeChallenge, moleculeObjective]);
 
   // Show a one-time tooltip the first time a shimmer atom appears in the queue.
   useEffect(() => {
@@ -1527,15 +1550,51 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
       const r = radiusFor(atom);
       const laneX = SIDE_PAD + minAtomRadius + (usableWidth * (i + 0.5)) / count;
       const jitter = (Math.random() - 0.5) * Math.max(0, usableWidth / count - r * 2);
-      seeded.push({
+      seeded.push(maybeMakeUnstable({
         id: nextBallId(),
         x: Math.max(SIDE_PAD + r, Math.min(boardW - SIDE_PAD - r, laneX + jitter)),
         y: TOP_PAD + r + Math.random() * Math.max(4, r * 0.35),
         atom,
         r,
-      });
+      }));
     }
     return seeded;
+  }
+
+  function maybeMakeUnstable(ball: Ball, chance = UNSTABLE_SPAWN_CHANCE): Ball {
+    if (!unstableEnabled || ball.stoneHp != null || ball.atom <= 1 || Math.random() >= chance) return ball;
+    return { ...ball, unstableShots: UNSTABLE_SEGMENTS };
+  }
+
+  function createMoleculeChallengeBoard(compound: CompoundDefinition | null): Board {
+    if (!compound) return createSeededBoard();
+    const atoms = Object.entries(compound.elements).flatMap(([symbol, count]) => {
+      const atomicNumber = ELEMENTS.find((element) => element.symbol === symbol)?.atomicNumber ?? 1;
+      return Array.from({ length: count }, () => atomicNumber);
+    });
+    const count = atoms.length;
+    const maxR = Math.max(...atoms.map((atom) => radiusFor(atom)), radiusFor(1));
+    const cols = Math.min(4, Math.max(2, Math.ceil(Math.sqrt(count))));
+    const rows = Math.ceil(count / cols);
+    const spacingX = Math.max(maxR * 2.4, Math.min(boardW / (cols + 1), maxR * 3.2));
+    const spacingY = Math.max(maxR * 2.25, maxR * 2.7);
+    const startX = boardW / 2 - ((cols - 1) * spacingX) / 2;
+    const startY = TOP_PAD + maxR + Math.max(8, maxR * 0.5);
+    return atoms.map((atom, index) => {
+      const col = index % cols;
+      const row = Math.floor(index / cols);
+      const r = radiusFor(atom);
+      return maybeMakeUnstable(
+        {
+          id: nextBallId(),
+          x: Math.max(SIDE_PAD + r, Math.min(boardW - SIDE_PAD - r, startX + col * spacingX)),
+          y: startY + row * spacingY + (rows > 1 && col % 2 === 1 ? maxR * 0.18 : 0),
+          atom,
+          r,
+        },
+        0.18,
+      );
+    });
   }
 
   // Place the 4 shuffle atoms across the top border of the board.
@@ -1547,13 +1606,13 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     return atoms.map((atom, i) => {
       const r = radiusFor(atom);
       const laneX = SIDE_PAD + minR + (usableWidth * (i + 0.5)) / count;
-      return {
+      return maybeMakeUnstable({
         id: nextBallId(),
         x: Math.max(SIDE_PAD + r, Math.min(boardW - SIDE_PAD - r, laneX)),
         y: TOP_PAD + r + 2,
         atom,
         r,
-      };
+      });
     });
   }
 
@@ -1914,7 +1973,8 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     const nextShots = shots + 1;
     setShots(nextShots);
     applyShotMilestones(nextShots);
-    setBalls(updated);
+    const updatedWithEffects = applyShotModeEffects(updated, nextShots);
+    setBalls(updatedWithEffects);
     setWiggleIds(hitIds);
     setTimeout(() => setWiggleIds(new Set()), 380);
     setNoMergeStreak(0);
@@ -1938,7 +1998,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
       powerUp: "E-Gun",
     });
     const reachedTarget = Array.from(upgradedAtoms).some((atom) => atom >= target);
-    if (reachedTarget && !continuingPastTarget) {
+    if (reachedTarget && !isMoleculeChallenge && !continuingPastTarget) {
       const nextHighest = Math.max(highest, ...Array.from(upgradedAtoms));
       const timeSec = (Date.now() - startTimeRef.current) / 1000;
       const stars = calculateStars(level, score, nextShots, runBestCombo, timeSec);
@@ -1953,12 +2013,12 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
       showStageClearAnimation({ stars, score, shots: nextShots, bestCombo: runBestCombo });
       return;
     }
-    const nextSlot = makeNextQueueSlot(dynamicMaxQueue(updated.length), updated);
+    const nextSlot = makeNextQueueSlot(dynamicMaxQueue(updatedWithEffects.length), updatedWithEffects);
     setQueue((q) => [...q.slice(1), nextSlot.atom]);
     setShimmerQueue((s) => [...s.slice(1), nextSlot.shimmer]);
     setEGunQueue((e) => [...e.slice(1), nextSlot.eGun]);
     setBlankQueue((b) => [...b.slice(1), nextSlot.blank]);
-    if (checkGameOver(updated, geo)) {
+    if (checkGameOver(updatedWithEffects, geo)) {
       trackGameOver(levelId, score, nextShots, highest, mode);
       setGameOver(true);
       haptic([50, 80, 50, 80, 200]);
@@ -1986,7 +2046,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     setShots(nextShots);
     applyShotMilestones(nextShots);
     setPendingGamma(false);
-    const updated = relaxBoard(remaining);
+    const updated = applyShotModeEffects(relaxBoard(remaining), nextShots);
     setBalls(updated);
     setWiggleIds(hitIds);
     setTimeout(() => setWiggleIds(new Set()), 380);
@@ -2017,13 +2077,33 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     setBusy(false);
   }
 
-  function applyShotModeEffects(source: Board, nextShots: number): Board {
+  function applyShotModeEffects(
+    source: Board,
+    nextShots: number,
+    unstableExemptIds: Set<number> = new Set(),
+  ): Board {
     let updated = source;
+    if (unstableEnabled && nextShots > 0) {
+      let decayed = 0;
+      updated = updated.map((b) => {
+        if (b.stoneHp != null || b.unstableShots == null || unstableExemptIds.has(b.id)) return b;
+        const remaining = b.unstableShots - 1;
+        if (remaining > 0) return { ...b, unstableShots: remaining };
+        if (b.atom <= 1) return { ...b, unstableShots: undefined };
+        decayed += 1;
+        const atom = b.atom - 1;
+        return { ...b, atom, r: radiusFor(atom), unstableShots: undefined };
+      });
+      if (decayed > 0) {
+        spawnPopup(`☢ ${decayed} isotope${decayed === 1 ? "" : "s"} decayed`);
+        haptic([18, 24, 18]);
+      }
+    }
     if (mode === "isotope-decay" && nextShots > 0 && nextShots % 20 === 0) {
       updated = updated.map((b) => {
         if (b.stoneHp != null || b.atom <= 1) return b;
         const atom = b.atom - 1;
-        return { ...b, atom, r: radiusFor(atom) };
+        return { ...b, atom, r: radiusFor(atom), unstableShots: undefined };
       });
       spawnPopup("🧪 ISOTOPE DECAY −1");
       haptic([20, 35, 20]);
@@ -2031,10 +2111,9 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     if (mode === "unstable-isotopes" && nextShots > 0 && nextShots % 6 === 0) {
       let remaining = 3;
       updated = updated.map((b) => {
-        if (remaining <= 0 || b.stoneHp != null || b.atom <= 1 || Math.random() > 0.45) return b;
+        if (remaining <= 0 || b.stoneHp != null || b.atom <= 1 || b.unstableShots != null || Math.random() > 0.45) return b;
         remaining -= 1;
-        const atom = b.atom - 1;
-        return { ...b, atom, r: radiusFor(atom) };
+        return { ...b, unstableShots: UNSTABLE_SEGMENTS };
       });
       spawnPopup("☢ UNSTABLE DECAY");
     }
@@ -2208,7 +2287,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     if (currentIsBlank && hitId !== null) {
       const blankStone = impactBalls.find((b) => b.id === hitId && b.stoneHp != null);
       if (blankStone) {
-        const updated = impactBalls.filter((b) => b.id !== blankStone.id);
+        const updated = applyShotModeEffects(impactBalls.filter((b) => b.id !== blankStone.id), shots + 1);
         const nextShots = shots + 1;
         setShots(nextShots);
         applyShotMilestones(nextShots);
@@ -2463,13 +2542,13 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     impactStoneBonus = 0,
     atomOverride = current,
   ) {
-    const newBall: Ball = {
+    const newBall: Ball = maybeMakeUnstable({
       id: nextBallId(),
       x,
       y,
       atom: atomOverride,
       r: radiusFor(atomOverride),
-    };
+    });
     if (currentBalls !== balls) setBalls(currentBalls);
     let result = placeAndMerge(
       currentBalls,
@@ -2521,7 +2600,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
       haptic([20, 30, 30]);
     }
 
-    result = { ...result, balls: applyShotModeEffects(result.balls, nextShots) };
+    result = { ...result, balls: applyShotModeEffects(result.balls, nextShots, new Set([newBall.id])) };
     result = { ...result, balls: relaxBoard(result.balls) };
     // Refresh radii on any merged survivors (their atom changed).
     setBalls(result.balls.map((b) => (b.stoneHp != null ? b : { ...b, r: radiusFor(b.atom) })));
@@ -2630,7 +2709,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     setTimeout(
       () => {
         setHighlightId(null);
-        if (result.levelComplete && !continuingPastTarget) {
+        if (result.levelComplete && !isMoleculeChallenge && !continuingPastTarget) {
           const timeSec = (Date.now() - startTimeRef.current) / 1000;
           const stars = calculateStars(level, nextScore, nextShots, nextBestCombo, timeSec);
           setEarnedStars(stars);
@@ -2869,7 +2948,13 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
       spawnPopup("Compound canceled");
       return;
     }
-    if (compoundCharges <= 0 || pendingStone || pendingGamma || currentIsEGun || pendingReversiblePowerUp)
+    if (
+      (!isMoleculeChallenge && compoundCharges <= 0) ||
+      pendingStone ||
+      pendingGamma ||
+      currentIsEGun ||
+      pendingReversiblePowerUp
+    )
       return;
     setGrabMode(false);
     setCompoundMode(true);
@@ -2877,7 +2962,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     showTip(
       "feature-compound-powerup",
       "Compound ready",
-      "Select up to 8 atoms on the board using no more than 3 element types. If the recipe matches a known compound, form it for a big bonus.",
+      "Select the atoms on the board using no more than 3 element types. If the recipe matches a known compound, form it for a big bonus.",
     );
     spawnPopup("Compound select");
     haptic(20);
@@ -2906,7 +2991,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
         return next;
       }
       if (next.size >= COMPOUND_MAX_SELECTION) {
-        spawnPopup("Max 8 atoms");
+        spawnPopup(`Max ${COMPOUND_MAX_SELECTION} atoms`);
         haptic(12);
         return selected;
       }
@@ -2933,11 +3018,18 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     if (selectedAtoms.length === 0) return;
     const selectedKey = compoundKey(countsForBalls(selectedAtoms));
     if (selectedKey !== compoundKey(matchingCompound.elements)) return;
+    if (isMoleculeChallenge && moleculeObjective && matchingCompound.id !== moleculeObjective.id) {
+      spawnPopup(`Need ${moleculeObjective.formula}`);
+      haptic(12);
+      return;
+    }
     const bonusScore = compoundFormationScore(matchingCompound, selectedAtoms);
 
-    const spentAt = Date.now();
-    saveCompoundChargeState(0, spentAt);
-    setCompoundCharges(0);
+    if (!isMoleculeChallenge) {
+      const spentAt = Date.now();
+      saveCompoundChargeState(0, spentAt);
+      setCompoundCharges(0);
+    }
     setCompoundMode(false);
     setSelectedCompoundIds(new Set());
     setFormingCompoundIds(new Set(selectedAtoms.map((atom) => atom.id)));
@@ -2966,6 +3058,21 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
       });
       spawnPopup(`+${formatScore(bonusScore)}`);
       setDiscoveryCompound({ compound: matchingCompound, isNew: wasNew, count: nextCount, bonusScore });
+      if (isMoleculeChallenge && moleculeObjective && matchingCompound.id === moleculeObjective.id) {
+        const timeSec = (Date.now() - startTimeRef.current) / 1000;
+        const stars = calculateStars(level, score + bonusScore, shots, runBestCombo, timeSec);
+        setEarnedStars(stars);
+        setLevelStars(levelId, stars);
+        reportQuestProgress({ levelCleared: true, starsEarned: stars });
+        unlockLevel(levelId + 1);
+        trackLevelWin(levelId, score + bonusScore, shots, Math.max(highest, getHighestOnBoard(balls)), mode);
+        showStageClearAnimation({
+          stars,
+          score: score + bonusScore,
+          shots,
+          bestCombo: runBestCombo,
+        });
+      }
       setBusy(false);
     }, 900);
   }
@@ -3141,7 +3248,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     setTimeout(
       () => {
         setHighlightId(null);
-        if (result.levelComplete && !continuingPastTarget) {
+        if (result.levelComplete && !isMoleculeChallenge && !continuingPastTarget) {
           const timeSec = (Date.now() - startTimeRef.current) / 1000;
           const stars = calculateStars(
             level,
@@ -3316,7 +3423,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     setTimeout(() => setHighlightId(null), 200 + result.merges.length * 120);
     // Grabbed-and-merged into the target element? Trigger the same win flow
     // a regular shot does so the level actually clears.
-    if (result.levelComplete && !continuingPastTarget) {
+    if (result.levelComplete && !isMoleculeChallenge && !continuingPastTarget) {
       const timeSec = (Date.now() - startTimeRef.current) / 1000;
       const nextBestCombo = Math.max(runBestCombo, result.merges.length);
       const stars = calculateStars(level, nextScore, shots, nextBestCombo, timeSec);
@@ -3650,6 +3757,31 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
           </button>
         </div>
 
+        {isMoleculeChallenge && moleculeObjective && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              padding: "8px 10px",
+              background: "color-mix(in oklch, var(--accent) 12%, var(--surface))",
+              borderRadius: 10,
+              border: "1px solid color-mix(in oklch, var(--accent) 45%, var(--border))",
+              marginBottom: 10,
+            }}
+          >
+            <MoleculeVisual compound={moleculeObjective} size={38} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 10, letterSpacing: 1.5, color: "var(--accent)", fontWeight: 900 }}>
+                LAB CHALLENGE
+              </div>
+              <div style={{ fontSize: 13, fontWeight: 900 }}>
+                Form {moleculeObjective.name} ({moleculeObjective.formula}) to clear
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* GRAB COMBO BAR */}
         {grabEnabled && (
           <div
@@ -3813,6 +3945,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
               match={matchingCompound}
               matchScore={matchingCompoundScore}
               matchIsNew={matchingCompoundIsNew}
+              objective={isMoleculeChallenge ? moleculeObjective : null}
               discoveredHint={availableDiscoveredCompoundHint}
               newHint={availableNewCompoundHint}
               canAffordHint={totalScore >= COMPOUND_HINT_COST}
@@ -3916,6 +4049,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
                     highlight={highlightId === b.id || eGunPreviewHitIds.has(b.id)}
                     wiggle={wiggleIds.has(b.id) || isCompoundSelected}
                     glow={isDrag || isCompoundSelected}
+                    unstableShots={b.unstableShots}
                   />
                 </div>
               );
@@ -4482,7 +4616,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
                 <span style={powerUpCount}>{grabs}</span>
               </button>
             )}
-            {(compoundCharges > 0 || compoundMode) && (
+            {(compoundCharges > 0 || compoundMode || isMoleculeChallenge) && (
               <button
                 type="button"
                 title="Compound: select atoms to form a known compound."
@@ -4490,12 +4624,14 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
                 onClick={triggerCompoundPowerUp}
                 {...powerUpInfoHandlers(
                   "Compound",
-                  "Select up to 8 atoms using no more than 3 element types. Match a known recipe to form a compound, remove those atoms, and earn a big bonus.",
+                  isMoleculeChallenge && moleculeObjective
+                    ? `Form ${moleculeObjective.formula} to clear this lab challenge.`
+                    : "Select atoms using no more than 3 element types. Match a known recipe to form a compound, remove those atoms, and earn a big bonus.",
                 )}
                 disabled={
                   busy ||
                   (!compoundMode &&
-                    (compoundCharges <= 0 ||
+                    ((!isMoleculeChallenge && compoundCharges <= 0) ||
                       pendingStone ||
                       pendingGamma ||
                       currentIsEGun ||
@@ -5064,6 +5200,7 @@ function CompoundSelectionPanel({
   match,
   matchScore,
   matchIsNew,
+  objective,
   discoveredHint,
   newHint,
   canAffordHint,
@@ -5078,6 +5215,7 @@ function CompoundSelectionPanel({
   match: CompoundDefinition | null;
   matchScore: number;
   matchIsNew: boolean;
+  objective: CompoundDefinition | null;
   discoveredHint: CompoundDefinition | null;
   newHint: CompoundDefinition | null;
   canAffordHint: boolean;
@@ -5088,6 +5226,8 @@ function CompoundSelectionPanel({
   onCancel: () => void;
 }) {
   const entries = Object.entries(counts).sort(([a], [b]) => a.localeCompare(b));
+  const objectiveMismatch = objective != null && match != null && match.id !== objective.id;
+  const canForm = match != null && !objectiveMismatch;
   return (
     <div
       style={{
@@ -5167,20 +5307,26 @@ function CompoundSelectionPanel({
       <button
         type="button"
         onClick={onForm}
-        disabled={!match}
+        disabled={!canForm}
         style={{
           ...modalBtn,
           width: "100%",
           marginTop: 10,
-          background: match
+          background: canForm
             ? "linear-gradient(135deg, var(--accent), oklch(0.58 0.16 145))"
             : "var(--surface-high)",
-          color: match ? "var(--primary-foreground)" : "var(--muted-foreground)",
-          cursor: match ? "pointer" : "not-allowed",
-          boxShadow: match ? "0 0 18px var(--accent-glow)" : undefined,
+          color: canForm ? "var(--primary-foreground)" : "var(--muted-foreground)",
+          cursor: canForm ? "pointer" : "not-allowed",
+          boxShadow: canForm ? "0 0 18px var(--accent-glow)" : undefined,
         }}
       >
-        {match ? `Form ${match.name}` : "Form Compound"}
+        {objectiveMismatch
+          ? `Need ${objective?.formula ?? "target"}`
+          : match
+            ? `Form ${match.name}`
+            : objective
+              ? `Form ${objective.formula}`
+              : "Form Compound"}
       </button>
       {match && (
         <div
