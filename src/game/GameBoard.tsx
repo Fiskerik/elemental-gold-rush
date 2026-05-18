@@ -2393,112 +2393,12 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
       if (Math.hypot(b.x - x, b.y - y) <= (projR + b.r) * ADJ_F) matches.push(b.id);
     }
     // Tactical nudge: if we hit an existing ball that won't fuse with us,
-    // push it slightly along the projectile trajectory so it can drift
-    // toward a same-type neighbor.
-    let nudged = impactBalls;
-    if (hitId !== null) {
-      const hb = impactBalls.find((b) => b.id === hitId);
-      if (hb && hb.atom !== activeAtom) {
-        // Heavier elements (lower in the periodic table) hit harder.
-        const projPeriod = Math.max(1, Math.min(8, ELEMENTS[activeAtom - 1]?.period ?? 4));
-        const NUDGE = projR * (0.15 + projPeriod * 0.12);
-        const minX = SIDE_PAD + hb.r;
-        const maxX = boardW - SIDE_PAD - hb.r;
-        const ceilingY = TOP_PAD + hb.r;
-        let nx = hb.x + dirX * NUDGE;
-        let ny = hb.y + dirY * NUDGE;
-        nx = Math.max(minX, Math.min(maxX, nx));
-        ny = Math.max(ceilingY, ny);
-
-        // Secondary collisions: any ball the primary now overlaps gets a
-        // weaker push along the same trajectory (~40% force), and overlaps
-        // are resolved geometrically.
-        const SECONDARY_FACTOR = 0.4;
-        const moved = new Map<number, { x: number; y: number }>();
-        moved.set(hb.id, { x: nx, y: ny });
-        for (const o of impactBalls) {
-          if (o.id === hb.id) continue;
-          const dd = Math.hypot(nx - o.x, ny - o.y);
-          const min = hb.r + o.r;
-          if (dd < min) {
-            const oMinX = SIDE_PAD + o.r;
-            const oMaxX = boardW - SIDE_PAD - o.r;
-            const oCeil = TOP_PAD + o.r;
-            // start with directional shove
-            let ox = o.x + dirX * NUDGE * SECONDARY_FACTOR;
-            let oy = o.y + dirY * NUDGE * SECONDARY_FACTOR;
-            // resolve residual overlap with the primary
-            const ndd = Math.hypot(ox - nx, oy - ny) || 0.001;
-            if (ndd < min) {
-              const push = min - ndd + 0.5;
-              ox += ((ox - nx) / ndd) * push;
-              oy += ((oy - ny) / ndd) * push;
-            }
-            ox = Math.max(oMinX, Math.min(oMaxX, ox));
-            oy = Math.max(oCeil, oy);
-            moved.set(o.id, { x: ox, y: oy });
-          }
-        }
-        nudged = impactBalls.map((b) => {
-          const m = moved.get(b.id);
-          return m ? { ...b, x: m.x, y: m.y } : b;
-        });
-        // Stones take damage from any collision wave that reaches them
-        // (primary, secondary, or tertiary pushes).
-        const stones = nudged.filter((b) => b.stoneHp != null);
-        if (stones.length > 0) {
-          const stoneDamage = new Map<number, number>();
-          for (const [movedId] of moved) {
-            const mb = nudged.find((b) => b.id === movedId);
-            if (!mb || mb.stoneHp != null) continue;
-            for (const st of stones) {
-              const d = Math.hypot(mb.x - st.x, mb.y - st.y);
-              if (d < (mb.r + st.r) * 1.15) {
-                stoneDamage.set(st.id, (stoneDamage.get(st.id) ?? 0) + 1);
-              }
-            }
-          }
-          if (stoneDamage.size > 0) {
-            const hitSet = new Set<number>();
-            let totalBonus = 0;
-            let destroyedCount = 0;
-            const initialR = (ballSize / 2) * (1 + (8 - 4) * 0.11);
-            nudged = nudged
-              .map((b) => {
-                if (b.stoneHp == null) return b;
-                const dmg = stoneDamage.get(b.id) ?? 0;
-                if (dmg <= 0) return b;
-                hitSet.add(b.id);
-                const newHp = (b.stoneHp ?? STONE_MAX_HP) - dmg;
-                const maxHp = b.stoneMaxHp ?? STONE_MAX_HP;
-                if (newHp <= 0) {
-                  destroyedCount += 1;
-                  totalBonus += Math.floor(maxHp * 250 * level.scoreMultiplier);
-                  return null;
-                }
-                const newR = Math.max(initialR * 0.35, initialR * (newHp / maxHp));
-                return { ...b, stoneHp: newHp, r: newR };
-              })
-              .filter((b): b is Ball => b !== null);
-            if (hitSet.size > 0) {
-              setStoneHitIds(hitSet);
-              setTimeout(() => setStoneHitIds(new Set()), 380);
-              haptic([20, 30, 30]);
-            }
-            if (totalBonus > 0) {
-              grantFusionJump(destroyedCount);
-              setScore((s) => s + totalBonus);
-              addScore(totalBonus);
-              spawnPopup(`⛰ +${formatScore(totalBonus)}`);
-              haptic([40, 60, 40, 60, 100]);
-            } else {
-              spawnPopup(`💥 stone hit`);
-            }
-            setNoMergeStreak(0);
-          }
-        }
-      }
-    }
+    // push it slightly along the projectile trajectory. Disabled: caused
+    // random displacements and unintended cascade merges when the displaced
+    // atom landed next to a same-type neighbor on the board.
+    void dirX;
+    void dirY;
+    const nudged = impactBalls;
     if (matches.length === 0) {
       finalizePlacement(x, y, nudged, impactStoneBonus, activeAtom);
       return;
