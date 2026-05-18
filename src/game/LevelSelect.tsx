@@ -4,6 +4,7 @@ import { ELEMENTS } from "./elements";
 import { useProgress, type LevelStats } from "./store";
 import { ElementBall } from "./ElementBall";
 import { formatScore } from "./logic";
+import { COMPOUNDS } from "./compounds";
 
 export function LevelSelect({
   onPick,
@@ -15,6 +16,7 @@ export function LevelSelect({
   const { unlockedLevel, levelStars, levelStats } = useProgress();
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [statsOpen, setStatsOpen] = useState(false);
+  const [selectedChallengeIdx, setSelectedChallengeIdx] = useState<number | null>(null);
 
   // Compact winding route: four stops per row keeps 40 levels readable without
   // stretching the campaign map into a long corridor.
@@ -37,6 +39,25 @@ export function LevelSelect({
   );
   const mapRows = Math.ceil(LEVELS.length / COLS.length);
   const mapH = 112 + (mapRows - 1) * ROW_H;
+
+  // Molecule challenge nodes are interleaved every 5 levels and sit between
+  // the surrounding level dots along the winding path.
+  const challengeNodes = useMemo(() => {
+    const list: { idx: number; x: number; y: number; afterLevel: number; compound: typeof COMPOUNDS[number] }[] = [];
+    for (let i = 4; i < nodes.length; i += 5) {
+      const a = nodes[i];
+      const b = nodes[i + 1];
+      const target = b ?? a;
+      const x = b ? (a.x + target.x) / 2 : a.x;
+      const y = b ? (a.y + target.y) / 2 : a.y + ROW_H * 0.55;
+      const compound = COMPOUNDS[(list.length * 3) % COMPOUNDS.length];
+      list.push({ idx: list.length, x, y, afterLevel: a.lvl.id, compound });
+    }
+    return list;
+  }, [nodes]);
+
+  const selectedChallenge =
+    selectedChallengeIdx != null ? challengeNodes[selectedChallengeIdx] : null;
 
   // Smooth path between nodes
   const pathD = useMemo(() => {
@@ -232,6 +253,60 @@ export function LevelSelect({
                 </button>
               );
             })}
+            {challengeNodes.map((c) => {
+              const locked = c.afterLevel > unlockedLevel;
+              return (
+                <button
+                  key={`challenge-${c.idx}`}
+                  type="button"
+                  disabled={locked}
+                  onClick={() => setSelectedChallengeIdx(c.idx)}
+                  style={{
+                    position: "absolute",
+                    left: `${(c.x / MAP_W) * 100}%`,
+                    top: `${(c.y / mapH) * 100}%`,
+                    transform: "translate(-50%, -50%)",
+                    background: "transparent",
+                    border: "none",
+                    padding: 0,
+                    cursor: locked ? "not-allowed" : "pointer",
+                    filter: locked ? "grayscale(0.85) brightness(0.6)" : undefined,
+                  }}
+                  aria-label={`Molecule challenge: ${c.compound.name}`}
+                >
+                  <div
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 12,
+                      transform: "rotate(45deg)",
+                      background:
+                        "linear-gradient(135deg, oklch(0.72 0.18 145), oklch(0.55 0.2 200))",
+                      border: "2px solid oklch(0.85 0.18 150)",
+                      boxShadow: "0 0 18px oklch(0.65 0.2 160 / 0.7)",
+                      display: "grid",
+                      placeItems: "center",
+                    }}
+                  >
+                    <div style={{ transform: "rotate(-45deg)", fontSize: 22, lineHeight: 1 }}>
+                      🧬
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      marginTop: 4,
+                      textAlign: "center",
+                      fontSize: 10,
+                      letterSpacing: 1,
+                      color: "oklch(0.85 0.16 150)",
+                      fontWeight: 800,
+                    }}
+                  >
+                    CHALLENGE
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -356,6 +431,79 @@ export function LevelSelect({
                   Play ▶
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {selectedChallenge && (
+          <div
+            role="dialog"
+            aria-modal="true"
+            style={{
+              position: "fixed",
+              inset: 0,
+              background: "rgba(0,0,0,0.6)",
+              display: "flex",
+              alignItems: "flex-end",
+              justifyContent: "center",
+              zIndex: 50,
+              padding: 16,
+            }}
+            onClick={() => setSelectedChallengeIdx(null)}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                width: "100%",
+                maxWidth: 440,
+                background: "var(--surface-elevated)",
+                border: "1px solid oklch(0.55 0.2 160)",
+                borderRadius: 18,
+                padding: 18,
+                color: "var(--foreground)",
+                boxShadow: "0 16px 40px rgba(0,0,0,0.5)",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 11,
+                  letterSpacing: 2,
+                  color: "oklch(0.78 0.18 150)",
+                  fontWeight: 800,
+                }}
+              >
+                🧬 MOLECULE CHALLENGE
+              </div>
+              <h2 style={{ margin: "4px 0 6px", fontSize: 20, fontWeight: 900 }}>
+                Form {selectedChallenge.compound.name}
+              </h2>
+              <div style={{ fontSize: 16, fontWeight: 700, color: "var(--accent)", marginBottom: 8 }}>
+                {selectedChallenge.compound.formula}
+              </div>
+              <p style={{ fontSize: 13, color: "var(--muted-foreground)", lineHeight: 1.45 }}>
+                {selectedChallenge.compound.fact}
+              </p>
+              <p style={{ fontSize: 12, color: "var(--muted-foreground)", marginTop: 8 }}>
+                Unlocks after Level {selectedChallenge.afterLevel}. Bonus:{" "}
+                <strong>+{formatScore(selectedChallenge.compound.bonusScore)} pts</strong>
+              </p>
+              <button
+                type="button"
+                onClick={() => setSelectedChallengeIdx(null)}
+                style={{
+                  marginTop: 14,
+                  width: "100%",
+                  background: "var(--surface)",
+                  border: "1px solid var(--border)",
+                  color: "var(--foreground)",
+                  borderRadius: 12,
+                  padding: "12px 14px",
+                  fontWeight: 800,
+                  cursor: "pointer",
+                }}
+              >
+                Close
+              </button>
             </div>
           </div>
         )}
