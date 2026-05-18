@@ -46,6 +46,7 @@ function withinAdj(a: Ball, b: Ball, adjacencyFactor = ADJ_FACTOR): boolean {
 
 export interface MergeEvent {
   resultAtomicNumber: number;
+  sourceAtomicNumber: number;
   chainDepth: number;
   x: number;
   y: number;
@@ -70,6 +71,7 @@ function resolveAdjacentMerges(
   initialSurvivorId: number | null,
   adjacencyFactor = ADJ_FACTOR,
   fusionJump = false,
+  survivorRadiusBonus = 0,
 ): MergeResult {
   const list: Ball[] = source.map((b) => ({ ...b }));
   const merges: MergeEvent[] = [];
@@ -83,36 +85,51 @@ function resolveAdjacentMerges(
   let changed = true;
   while (changed) {
     changed = false;
-    for (let i = 0; i < list.length && !changed; i++) {
+    let best: { s: number; a: number } | null = null;
+    for (let i = 0; i < list.length; i++) {
       if (list[i].stoneHp != null) continue;
       if (list[i].atom >= maxElement) continue;
-      for (let j = i + 1; j < list.length && !changed; j++) {
+      for (let j = i + 1; j < list.length; j++) {
         if (list[j].stoneHp != null) continue;
         if (list[j].atom !== list[i].atom) continue;
-        if (!withinAdj(list[i], list[j], adjacencyFactor)) continue;
-        // Survivor: always the upper ball (smaller y); tiebreak smaller x.
+        const survivorInPair = survivorId != null && (list[i].id === survivorId || list[j].id === survivorId);
+        const reachBonus = survivorInPair ? survivorRadiusBonus : 0;
+        const closeEnough =
+          Math.hypot(list[i].x - list[j].x, list[i].y - list[j].y) <=
+          (list[i].r + list[j].r) * adjacencyFactor + reachBonus;
+        if (!closeEnough) continue;
         let s = i,
           a = j;
         if (list[j].y < list[i].y || (list[j].y === list[i].y && list[j].x < list[i].x)) {
           s = j;
           a = i;
         }
-        const mergeStep = jumpAvailable ? 2 : 1;
-        const next = Math.min(maxElement, list[s].atom + mergeStep);
-        jumpAvailable = false;
-        const survivor = { ...list[s], atom: next, unstableShots: undefined };
-        list[s] = survivor;
-        list.splice(a, 1);
-        // After splice, survivor index shifts if a < s
-        const newS = a < s ? s - 1 : s;
-        merges.push({ resultAtomicNumber: next, chainDepth, x: list[newS].x, y: list[newS].y });
-        score += next * 10 * Math.pow(2, chainDepth);
-        highest = Math.max(highest, next);
-        if (next >= targetElement) levelComplete = true;
-        chainDepth++;
-        survivorId = list[newS].id;
-        changed = true;
+        if (
+          !best ||
+          list[s].y < list[best.s].y ||
+          (list[s].y === list[best.s].y && list[s].x < list[best.s].x)
+        ) {
+          best = { s, a };
+        }
       }
+    }
+    if (best) {
+      const { s, a } = best;
+      const mergeStep = jumpAvailable ? 2 : 1;
+      const sourceAtomicNumber = list[s].atom;
+      const next = Math.min(maxElement, sourceAtomicNumber + mergeStep);
+      jumpAvailable = false;
+      const survivor = { ...list[s], atom: next, unstableShots: undefined };
+      list[s] = survivor;
+      list.splice(a, 1);
+      const newS = a < s ? s - 1 : s;
+      merges.push({ resultAtomicNumber: next, sourceAtomicNumber, chainDepth, x: list[newS].x, y: list[newS].y });
+      score += next * 10 * Math.pow(2, chainDepth);
+      highest = Math.max(highest, next);
+      if (next >= targetElement) levelComplete = true;
+      chainDepth++;
+      survivorId = list[newS].id;
+      changed = true;
     }
   }
 
@@ -138,6 +155,7 @@ export function placeAndMerge(
   maxElement: number = 118,
   adjacencyFactor = ADJ_FACTOR,
   fusionJump = false,
+  survivorRadiusBonus = 0,
 ): MergeResult {
   return resolveAdjacentMerges(
     [...balls, { ...newBall }],
@@ -149,6 +167,7 @@ export function placeAndMerge(
     newBall.id,
     adjacencyFactor,
     fusionJump,
+    survivorRadiusBonus,
   );
 }
 
@@ -160,6 +179,7 @@ export function mergeSettledBoard(
   maxElement: number = 118,
   adjacencyFactor = ADJ_FACTOR,
   fusionJump = false,
+  survivorRadiusBonus = 0,
 ): MergeResult {
   void geo;
   return resolveAdjacentMerges(
@@ -172,6 +192,7 @@ export function mergeSettledBoard(
     null,
     adjacencyFactor,
     fusionJump,
+    survivorRadiusBonus,
   );
 }
 

@@ -308,10 +308,24 @@ const LEVEL_SEEDS: LevelSeed[] = [
   },
 ];
 
-export const LEVELS: Level[] = LEVEL_SEEDS.map((seed, index) => {
-  const id = index + 1;
+export const MOLECULE_CHALLENGE_BY_LEVEL: Record<number, string> = {
+  5: "ammonium",
+  10: "water",
+  15: "carbon-dioxide",
+  20: "hydrogen-sulfide",
+  25: "ethanol",
+  30: "carbonic-acid",
+  35: "magnesium-chloride",
+  40: "sulfuric-acid",
+  45: "calcium-carbonate",
+  50: "sulfuric-acid",
+};
+
+const ATOM_LEVELS: Level[] = LEVEL_SEEDS.map((seed, index) => {
+  const atomStage = index + 1;
+  const id = atomStage + Math.floor((atomStage - 1) / 4);
   const target = seed.targetElement;
-  const difficulty = id - 1;
+  const difficulty = atomStage - 1;
   const maxQueueElement =
     id <= 2
       ? id
@@ -334,16 +348,43 @@ export const LEVELS: Level[] = LEVEL_SEEDS.map((seed, index) => {
     starShotsTwo,
     parTimeSec: parShots * 5,
     scoreGoal: Math.round((520 + target * 290 + difficulty * 420) * scoreMultiplier),
-    comboGoal: Math.min(6, 2 + Math.floor(id / 10)),
+    comboGoal: Math.min(6, 2 + Math.floor(atomStage / 10)),
   };
 });
+
+const CHALLENGE_LEVELS: Level[] = Object.keys(MOLECULE_CHALLENGE_BY_LEVEL).map((key) => {
+  const id = Number(key);
+  const previousAtom = ATOM_LEVELS.filter((level) => level.id < id).at(-1) ?? ATOM_LEVELS[0];
+  const difficulty = id - 1;
+  const parShots = 18 + Math.floor(id * 0.8);
+  return {
+    id,
+    name: `Compound Challenge ${id / 5}`,
+    description: "Form the target molecule using atoms already on the board.",
+    lore: "A lab stage breaks up the climb: select the right atoms, form the compound, and bank the bonus.",
+    targetElement: previousAtom.targetElement,
+    maxQueueElement: previousAtom.maxQueueElement,
+    queueDecay: previousAtom.queueDecay,
+    gridCols: previousAtom.gridCols,
+    gridRows: previousAtom.gridRows,
+    scoreMultiplier: Number((previousAtom.scoreMultiplier + 0.4).toFixed(1)),
+    parShots,
+    starShotsThree: parShots,
+    starShotsTwo: Math.round(parShots * 1.35),
+    parTimeSec: parShots * 5,
+    scoreGoal: Math.round((900 + difficulty * 380) * previousAtom.scoreMultiplier),
+    comboGoal: previousAtom.comboGoal,
+  };
+});
+
+export const LEVELS: Level[] = [...ATOM_LEVELS, ...CHALLENGE_LEVELS].sort((a, b) => a.id - b.id);
 
 export function getLevelById(id: number): Level | undefined {
   return LEVELS.find((l) => l.id === id);
 }
 
 export function getNextLevel(currentId: number): Level | undefined {
-  return LEVELS.find((l) => l.id === currentId + 1);
+  return LEVELS.find((l) => l.id > currentId);
 }
 
 export const MAX_LEVEL = LEVELS.length;

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Atom, Clock, FlaskConical, LockKeyhole, Map, RotateCcw, Shield, type LucideIcon } from "lucide-react";
 import { GAME_MODES } from "./challenges";
-import { PowerUpIcon } from "./PowerUpLibrary";
+import { PowerUpBadge } from "./PowerUpLibrary";
 import { POWER_UPS } from "./powerUps";
 import { useProgress } from "./store";
 
@@ -83,7 +83,7 @@ export function GameLibrary({ onBack }: Props) {
             {POWER_UPS.map((powerUp) => (
               <article key={powerUp.name} style={rowCard}>
                 <div style={iconWrap}>
-                  <PowerUpIcon icon={powerUp.icon} />
+                  <PowerUpBadge icon={powerUp.icon} size={46} />
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>

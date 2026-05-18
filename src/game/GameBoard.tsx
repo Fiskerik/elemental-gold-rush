@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import { ELEMENTS } from "./elements";
-import { LEVELS, getLevelById, getNextLevel } from "./levels";
+import { LEVELS, MOLECULE_CHALLENGE_BY_LEVEL, getLevelById, getNextLevel } from "./levels";
 import {
   Ball,
   Board,
@@ -33,7 +33,7 @@ import {
   findCompoundByElements,
 } from "./compounds";
 import { MoleculeVisual } from "./MoleculeVisual";
-import { PowerUpIcon } from "./PowerUpLibrary";
+import { PowerUpBadge } from "./PowerUpLibrary";
 
 interface Props {
   levelId: number;
@@ -79,24 +79,14 @@ const SEEDED_BOARD_TARGET_OFFSET = 3;
 const TRANSMUTE_SHOT_INTERVAL = 30;
 const CATALYST_AURA_SHOTS = 5;
 const CATALYST_ADJ_FACTOR = 2.3;
+const SHOT_MERGE_RADIUS_BONUS_FACTOR = 0.25;
 const DISCOVERY_DECAY_STEP = 5;
 const DISCOVERY_DECAY_BOOST = 0.04;
 const STAGE_CLEAR_ANIMATION_MS = 6200;
 const STONE_GRACE_SHOTS = 15;
 const UNSTABLE_UNLOCK_LEVEL = 15;
 const UNSTABLE_SEGMENTS = 8;
-const UNSTABLE_SPAWN_CHANCE = 0.16;
-
-const MOLECULE_CHALLENGE_BY_LEVEL: Record<number, string> = {
-  5: "ammonium",
-  10: "water",
-  15: "carbon-dioxide",
-  20: "hydrogen-sulfide",
-  25: "ethanol",
-  30: "carbonic-acid",
-  35: "magnesium-chloride",
-  40: "sulfuric-acid",
-};
+const UNSTABLE_SPAWN_CHANCE = 0.06;
 
 const INVENTORY_PICK_LIMIT = 3;
 
@@ -110,6 +100,7 @@ interface SavedRunSnapshot {
   shimmerQueue: boolean[];
   eGunQueue: boolean[];
   blankQueue: boolean[];
+  unstableQueue: boolean[];
   score: number;
   highest: number;
   shots: number;
@@ -553,6 +544,12 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
   const [blankQueue, setBlankQueue] = useState<boolean[]>(() =>
     Array.from({ length: QUEUE_SIZE }, () => blankEnabled && Math.random() < BLANK_ATOM_CHANCE),
   );
+  const [unstableQueue, setUnstableQueue] = useState<boolean[]>(() =>
+    Array.from(
+      { length: QUEUE_SIZE },
+      () => level.id >= UNSTABLE_UNLOCK_LEVEL && Math.random() < UNSTABLE_SPAWN_CHANCE,
+    ),
+  );
   const [score, setScore] = useState(0);
   const [highest, setHighest] = useState(1);
   const [shots, setShots] = useState(0);
@@ -571,6 +568,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     bonusScore: number;
   } | null>(null);
   const [newlyDiscoveredThisRun, setNewlyDiscoveredThisRun] = useState<number[]>([]);
+  const [formedCompoundsThisRun, setFormedCompoundsThisRun] = useState<string[]>([]);
   const [highlightId, setHighlightId] = useState<number | null>(null);
   const [wiggleIds, setWiggleIds] = useState<Set<number>>(new Set());
   const [projectile, setProjectile] = useState<{ x: number; y: number } | null>(null);
@@ -594,6 +592,11 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
   const [compoundFx, setCompoundFx] = useState<{
     compound: CompoundDefinition;
     atoms: { id: number; x: number; y: number; atom: number; r: number }[];
+  } | null>(null);
+  const [compoundTextFx, setCompoundTextFx] = useState<{
+    id: number;
+    compound: CompoundDefinition;
+    isNew: boolean;
   } | null>(null);
   const [formingCompoundIds, setFormingCompoundIds] = useState<Set<number>>(new Set());
 
@@ -632,6 +635,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     shimmerQueue: boolean[];
     eGunQueue: boolean[];
     blankQueue: boolean[];
+    unstableQueue: boolean[];
     powerUp: "transmute" | "emission";
   }>(null);
   const longPressTimerRef = useRef<number | null>(null);
@@ -684,7 +688,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
       action: string;
       points: number;
       powerUp?: string;
-      merges: { atom: number; depth: number }[];
+      merges: { sourceAtom: number; atom: number; depth: number }[];
     }[]
   >([]);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -694,7 +698,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     action: string;
     points: number;
     powerUp?: string;
-    merges?: { resultAtomicNumber: number; chainDepth: number }[];
+    merges?: { resultAtomicNumber: number; sourceAtomicNumber?: number; chainDepth: number }[];
   }) {
     const now = Date.now();
     setShotHistory((prev) => {
@@ -708,6 +712,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
           points: Math.max(0, Math.floor(entry.points)),
           powerUp: entry.powerUp,
           merges: (entry.merges ?? []).map((m) => ({
+            sourceAtom: m.sourceAtomicNumber ?? Math.max(1, m.resultAtomicNumber - 1),
             atom: m.resultAtomicNumber,
             depth: m.chainDepth,
           })),
@@ -764,6 +769,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
   const currentIsShimmer = shimmerQueue[0] ?? false;
   const currentIsEGun = eGunQueue[0] ?? false;
   const currentIsBlank = blankQueue[0] ?? false;
+  const currentIsUnstable = unstableQueue[0] ?? false;
   const selectedCompoundAtoms = useMemo(
     () => balls.filter((b) => selectedCompoundIds.has(b.id) && b.stoneHp == null),
     [balls, selectedCompoundIds],
@@ -875,6 +881,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
       shimmerQueue,
       eGunQueue,
       blankQueue,
+      unstableQueue,
       score,
       highest,
       shots,
@@ -939,6 +946,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
         setShimmerQueue(saved.shimmerQueue);
         setEGunQueue(saved.eGunQueue);
         setBlankQueue(saved.blankQueue);
+        setUnstableQueue(saved.unstableQueue ?? Array.from({ length: QUEUE_SIZE }, () => false));
         setScore(saved.score);
         setHighest(saved.highest);
         setShots(saved.shots);
@@ -959,8 +967,10 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
         setCompoundMode(false);
         setSelectedCompoundIds(new Set());
         setCompoundFx(null);
+        setCompoundTextFx(null);
         setFormingCompoundIds(new Set());
         setDiscoveryCompound(null);
+        setFormedCompoundsThisRun([]);
         setGrabProgress(saved.grabProgress);
         setContinuingPastTarget(saved.continuingPastTarget);
         setContinueStartedElapsedMs(saved.continueStartedElapsedMs);
@@ -1030,6 +1040,13 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
       (isEGun, i) =>
         !isEGun && !initialBlank[i] && shimmerEnabled && Math.random() < POWER_UP_CHANCE,
     );
+    const initialUnstable = initialEGun.map(
+      (isEGun, i) =>
+        !isEGun &&
+        !initialBlank[i] &&
+        level.id >= UNSTABLE_UNLOCK_LEVEL &&
+        Math.random() < UNSTABLE_SPAWN_CHANCE,
+    );
     setQueue(
       initialQueue.map((atom, i) =>
         initialShimmer[i]
@@ -1040,6 +1057,15 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     setShimmerQueue(initialShimmer);
     setEGunQueue(initialEGun);
     setBlankQueue(initialBlank);
+    setUnstableQueue(initialUnstable);
+    if (initialUnstable.some(Boolean)) {
+      showTip(
+        "feature-unstable-isotope-first-spawn",
+        "Unstable isotope",
+        "A radioactive queue atom has appeared. Its ring ticks down after shots; merge it before it decays.",
+        "danger",
+      );
+    }
     setScore(0);
     setHighest(initialHighest);
     setShots(0);
@@ -1060,8 +1086,10 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     setCompoundMode(false);
     setSelectedCompoundIds(new Set());
     setCompoundFx(null);
+    setCompoundTextFx(null);
     setFormingCompoundIds(new Set());
     setDiscoveryCompound(null);
+    setFormedCompoundsThisRun([]);
     setGrabProgress(0);
     setContinuingPastTarget(false);
     setContinueStartedElapsedMs(null);
@@ -1331,11 +1359,22 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     const blank = !eGun && blankEnabled && Math.random() < BLANK_ATOM_CHANCE;
     const shimmer = !eGun && !blank && shimmerEnabled && Math.random() < POWER_UP_CHANCE;
     const atom = generateQueueAtom(maxElement, board, shimmer);
+    const unstable =
+      !eGun && !blank && unstableEnabled && atom > 1 && Math.random() < UNSTABLE_SPAWN_CHANCE;
+    if (unstable) {
+      showTip(
+        "feature-unstable-isotope-first-spawn",
+        "Unstable isotope",
+        "A radioactive queue atom has appeared. Its ring ticks down after shots; merge it before it decays.",
+        "danger",
+      );
+    }
     return {
       atom,
       shimmer,
       eGun,
       blank,
+      unstable,
     };
   }
 
@@ -1563,6 +1602,12 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
 
   function maybeMakeUnstable(ball: Ball, chance = UNSTABLE_SPAWN_CHANCE): Ball {
     if (!unstableEnabled || ball.stoneHp != null || ball.atom <= 1 || Math.random() >= chance) return ball;
+    showTip(
+      "feature-unstable-isotope-first-spawn",
+      "Unstable isotope",
+      "A radioactive atom has appeared. Its ring ticks down after shots; merge it before it decays.",
+      "danger",
+    );
     return { ...ball, unstableShots: UNSTABLE_SEGMENTS };
   }
 
@@ -2005,7 +2050,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
       setEarnedStars(stars);
       setLevelStars(levelId, stars);
       reportQuestProgress({ levelCleared: true, starsEarned: stars });
-      unlockLevel(levelId + 1);
+      unlockLevel(getNextLevel(levelId)?.id ?? levelId + 1);
       sfx(playWinSound);
       haptic([30, 60, 30, 60, 80]);
       trackLevelWin(levelId, score, nextShots, nextHighest, mode);
@@ -2018,6 +2063,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     setShimmerQueue((s) => [...s.slice(1), nextSlot.shimmer]);
     setEGunQueue((e) => [...e.slice(1), nextSlot.eGun]);
     setBlankQueue((b) => [...b.slice(1), nextSlot.blank]);
+    setUnstableQueue((u) => [...u.slice(1), nextSlot.unstable]);
     if (checkGameOver(updatedWithEffects, geo)) {
       trackGameOver(levelId, score, nextShots, highest, mode);
       setGameOver(true);
@@ -2302,6 +2348,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
         setShimmerQueue((sq) => [...sq.slice(1), nextSlot.shimmer]);
         setEGunQueue((eq) => [...eq.slice(1), nextSlot.eGun]);
         setBlankQueue((bq) => [...bq.slice(1), nextSlot.blank]);
+        setUnstableQueue((uq) => [...uq.slice(1), nextSlot.unstable]);
         setBusy(false);
         return;
       }
@@ -2532,7 +2579,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     setTimeout(() => {
       setWiggleIds(new Set());
       finalizePlacement(placeX, placeY, nudged, impactStoneBonus, activeAtom);
-    }, 220);
+    }, 360);
   }
 
   function finalizePlacement(
@@ -2542,13 +2589,15 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     impactStoneBonus = 0,
     atomOverride = current,
   ) {
-    const newBall: Ball = maybeMakeUnstable({
+    const baseNewBall: Ball = {
       id: nextBallId(),
       x,
       y,
       atom: atomOverride,
       r: radiusFor(atomOverride),
-    });
+      unstableShots: currentIsUnstable ? UNSTABLE_SEGMENTS : undefined,
+    };
+    const newBall: Ball = baseNewBall;
     if (currentBalls !== balls) setBalls(currentBalls);
     let result = placeAndMerge(
       currentBalls,
@@ -2558,6 +2607,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
       isNobleGasLocked(atomOverride) ? atomOverride : 118,
       catalystShotsRemaining > 0 ? CATALYST_ADJ_FACTOR : undefined,
       fusionJumpArmed,
+      newBall.r * SHOT_MERGE_RADIUS_BONUS_FACTOR,
     );
     if (fusionJumpArmed && result.merges.length > 0) {
       setFusionJumpArmed(false);
@@ -2624,7 +2674,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
               spawnPopup(`+${ELEMENTS[m.resultAtomicNumber - 1]?.symbol ?? "?"}`);
             }
           },
-          80 + i * 120,
+          180 + i * 260,
         );
       });
     }
@@ -2715,7 +2765,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
           setEarnedStars(stars);
           setLevelStars(levelId, stars);
           reportQuestProgress({ levelCleared: true, starsEarned: stars });
-          unlockLevel(levelId + 1);
+          unlockLevel(getNextLevel(levelId)?.id ?? levelId + 1);
           sfx(playWinSound);
           haptic([30, 60, 30, 60, 80]);
           // Offer a choice — claim the win or keep playing for score.
@@ -2733,6 +2783,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
           setShimmerQueue((s) => [...s.slice(1), nextSlot.shimmer]);
           setEGunQueue((e) => [...e.slice(1), nextSlot.eGun]);
           setBlankQueue((b) => [...b.slice(1), nextSlot.blank]);
+          setUnstableQueue((u) => [...u.slice(1), nextSlot.unstable]);
           return;
         }
         if (firstDiscovery && firstDiscovery > 1) {
@@ -2744,6 +2795,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
         setShimmerQueue((s) => [...s.slice(1), nextSlot.shimmer]);
         setEGunQueue((e) => [...e.slice(1), nextSlot.eGun]);
         setBlankQueue((b) => [...b.slice(1), nextSlot.blank]);
+        setUnstableQueue((u) => [...u.slice(1), nextSlot.unstable]);
         if (checkGameOver(result.balls, geo)) {
           trackGameOver(levelId, nextScore, nextShots, nextHighest, mode);
           setGameOver(true);
@@ -2751,7 +2803,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
         }
         setBusy(false);
       },
-      200 + result.merges.length * 120,
+      420 + result.merges.length * 260,
     );
   }
 
@@ -2822,10 +2874,11 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
       queueUndoRef.current?.powerUp === powerUp
     ) {
       const undo = queueUndoRef.current;
-      setQueue(undo.queue);
-      setShimmerQueue(undo.shimmerQueue);
-      setEGunQueue(undo.eGunQueue);
-      setBlankQueue(undo.blankQueue);
+    setQueue(undo.queue);
+    setShimmerQueue(undo.shimmerQueue);
+    setEGunQueue(undo.eGunQueue);
+    setBlankQueue(undo.blankQueue);
+    setUnstableQueue(undo.unstableQueue);
       if (powerUp === "transmute") setTransmuteCharges((g) => g + 1);
       if (powerUp === "emission") setEmissionCharges((g) => g + 1);
       queueUndoRef.current = null;
@@ -2869,7 +2922,6 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
       busy ||
       gameOver ||
       won ||
-      pendingStone ||
       transmuteCharges <= 0 ||
       pendingReversiblePowerUp
     )
@@ -2891,6 +2943,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     setShimmerQueue((q) => [false, ...q.slice(1)]);
     setEGunQueue((q) => [false, ...q.slice(1)]);
     setBlankQueue((q) => [false, ...q.slice(1)]);
+    setUnstableQueue((q) => [false, ...q.slice(1)]);
     spawnPopup(`🔀 ${ELEMENTS[atom - 1]?.symbol ?? "?"}`);
     haptic([20, 30, 20]);
   }
@@ -2907,7 +2960,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
   }
 
   function triggerQueueShufflePowerUp() {
-    if (busy || gameOver || won || queueShuffleCharges <= 0 || pendingStone || pendingGamma) return;
+    if (busy || gameOver || won || queueShuffleCharges <= 0 || pendingGamma) return;
     const fresh = generateInitialQueue(level.maxQueueElement, QUEUE_SIZE, level.queueDecay);
     setQueue(fresh);
     setShimmerQueue(
@@ -2916,6 +2969,12 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     setEGunQueue(Array.from({ length: QUEUE_SIZE }, () => false));
     setBlankQueue(
       Array.from({ length: QUEUE_SIZE }, () => blankEnabled && Math.random() < BLANK_ATOM_CHANCE),
+    );
+    setUnstableQueue(
+      Array.from(
+        { length: QUEUE_SIZE },
+        () => unstableEnabled && Math.random() < UNSTABLE_SPAWN_CHANCE,
+      ),
     );
     setQueueShuffleCharges((g) => Math.max(0, g - 1));
     runPowerUpsUsedRef.current += 1;
@@ -2932,7 +2991,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
       spawnPopup("☢ CANCELED");
       return;
     }
-    if (gammaCharges <= 0 || pendingStone || currentIsEGun || pendingReversiblePowerUp) return;
+    if (gammaCharges <= 0 || currentIsEGun || pendingReversiblePowerUp) return;
     setGammaCharges((g) => Math.max(0, g - 1));
     runPowerUpsUsedRef.current += 1;
     setPendingGamma(true);
@@ -2950,7 +3009,6 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     }
     if (
       (!isMoleculeChallenge && compoundCharges <= 0) ||
-      pendingStone ||
       pendingGamma ||
       currentIsEGun ||
       pendingReversiblePowerUp
@@ -3048,6 +3106,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
       setFormingCompoundIds(new Set());
       setCompoundFx(null);
       recordCompoundDiscovery(matchingCompound.id);
+      setFormedCompoundsThisRun((current) => [...current, matchingCompound.id]);
       setScore((currentScore) => currentScore + bonusScore);
       addScore(bonusScore);
       pushShotHistory({
@@ -3057,6 +3116,12 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
         powerUp: "Compound",
       });
       spawnPopup(`+${formatScore(bonusScore)}`);
+      const textFxId = Date.now();
+      setCompoundTextFx({ id: textFxId, compound: matchingCompound, isNew: wasNew });
+      window.setTimeout(
+        () => setCompoundTextFx((fx) => (fx?.id === textFxId ? null : fx)),
+        1800,
+      );
       setDiscoveryCompound({ compound: matchingCompound, isNew: wasNew, count: nextCount, bonusScore });
       if (isMoleculeChallenge && moleculeObjective && matchingCompound.id === moleculeObjective.id) {
         const timeSec = (Date.now() - startTimeRef.current) / 1000;
@@ -3064,7 +3129,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
         setEarnedStars(stars);
         setLevelStars(levelId, stars);
         reportQuestProgress({ levelCleared: true, starsEarned: stars });
-        unlockLevel(levelId + 1);
+        unlockLevel(getNextLevel(levelId)?.id ?? levelId + 1);
         trackLevelWin(levelId, score + bonusScore, shots, Math.max(highest, getHighestOnBoard(balls)), mode);
         showStageClearAnimation({
           stars,
@@ -3074,7 +3139,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
         });
       }
       setBusy(false);
-    }, 900);
+    }, 1450);
   }
 
   function revealCompoundHint(compound: CompoundDefinition, cost: number) {
@@ -3119,7 +3184,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
 
   function triggerEmissionPowerUp() {
     if (cancelPendingPowerUp("emission")) return;
-    if (busy || gameOver || won || emissionCharges <= 0 || pendingStone || pendingReversiblePowerUp)
+    if (busy || gameOver || won || emissionCharges <= 0 || pendingReversiblePowerUp)
       return;
 
     const raisedQueue = queue.map((atom, i) =>
@@ -3127,7 +3192,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     );
     if (raisedQueue.every((atom, i) => atom === queue[i])) return;
 
-    queueUndoRef.current = { queue, shimmerQueue, eGunQueue, blankQueue, powerUp: "emission" };
+    queueUndoRef.current = { queue, shimmerQueue, eGunQueue, blankQueue, unstableQueue, powerUp: "emission" };
     setPendingReversiblePowerUp("emission");
     setEmissionCharges((g) => Math.max(0, g - 1));
     runPowerUpsUsedRef.current += 1;
@@ -3260,7 +3325,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
           setEarnedStars(stars);
           setLevelStars(levelId, stars);
           reportQuestProgress({ levelCleared: true, starsEarned: stars });
-          unlockLevel(levelId + 1);
+          unlockLevel(getNextLevel(levelId)?.id ?? levelId + 1);
           showStageClearAnimation({
             stars,
             score: score + gained,
@@ -3430,7 +3495,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
       setEarnedStars(stars);
       setLevelStars(levelId, stars);
       reportQuestProgress({ levelCleared: true, starsEarned: stars });
-      unlockLevel(levelId + 1);
+      unlockLevel(getNextLevel(levelId)?.id ?? levelId + 1);
       sfx(playWinSound);
       haptic([30, 60, 30, 60, 80]);
       if (mode !== "campaign") setChallengeBestScore(mode, nextScore);
@@ -3731,8 +3796,38 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
                 }}
               />
             </div>
+      </div>
+      {match && (
+        <div
+          style={{
+            marginTop: 10,
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            padding: 8,
+            borderRadius: 10,
+            background: "var(--surface)",
+            border: "1px solid var(--border)",
+          }}
+        >
+          <MoleculeVisual compound={match} size={62} />
+          <div style={{ minWidth: 0 }}>
+            <div
+              style={{
+                fontSize: 11,
+                letterSpacing: 1.4,
+                color: matchIsNew ? "var(--success, oklch(0.78 0.16 145))" : "var(--accent)",
+                fontWeight: 900,
+              }}
+            >
+              {matchIsNew ? "NEW COMPOUND PREVIEW" : "COMPOUND PREVIEW"}
+            </div>
+            <div style={{ fontSize: 14, fontWeight: 900 }}>{match.name}</div>
+            <div style={{ fontSize: 12, color: "var(--muted-foreground)" }}>{match.formula}</div>
           </div>
-          <button
+        </div>
+      )}
+      <button
             type="button"
             className={continuingPastTarget ? "target-claim-flash" : undefined}
             title={
@@ -4064,6 +4159,22 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
             />
           )}
 
+          {compoundTextFx && (
+            <div
+              className="new-compound-text-fx"
+              style={{
+                position: "absolute",
+                left: "50%",
+                top: Math.max(TOP_PAD + 42, boardH * 0.2),
+                zIndex: 10,
+                pointerEvents: "none",
+              }}
+            >
+              {compoundTextFx.isNew ? "New compound: " : "Formed "}
+              {compoundTextFx.compound.name}
+            </div>
+          )}
+
           {gravityFxId && (
             <div
               className="gravity-fx"
@@ -4278,6 +4389,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
                   size={ballSize}
                   glow
                   shimmer={currentIsShimmer}
+                  unstableShots={currentIsUnstable ? UNSTABLE_SEGMENTS : undefined}
                 />
               )}
             </div>
@@ -4313,6 +4425,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
                   size={ballSize}
                   glow
                   shimmer={currentIsShimmer}
+                  unstableShots={currentIsUnstable ? UNSTABLE_SEGMENTS : undefined}
                 />
               ))}
           </div>
@@ -4368,6 +4481,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
                     atomicNumber={n}
                     size={32 - i * 3}
                     shimmer={shimmerQueue[i + 1]}
+                    unstableShots={unstableQueue[i + 1] ? UNSTABLE_SEGMENTS : undefined}
                   />
                 ),
               )}
@@ -4399,8 +4513,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
                 disabled={
                   busy ||
                   (pendingReversiblePowerUp !== "transmute" &&
-                    (pendingStone ||
-                      currentIsEGun ||
+                    (currentIsEGun ||
                       currentIsBlank ||
                       current >= target - 1 ||
                       pendingReversiblePowerUp != null))
@@ -4415,17 +4528,17 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
                   color: "var(--primary-foreground)",
                   boxShadow: "0 0 14px oklch(0.66 0.2 305 / 0.5)",
                   opacity:
-                    busy || pendingStone || currentIsEGun || currentIsBlank || current >= target - 1
+                    busy || currentIsEGun || currentIsBlank || current >= target - 1
                       ? 0.55
                       : 1,
                   cursor:
-                    busy || pendingStone || currentIsEGun || currentIsBlank || current >= target - 1
+                    busy || currentIsEGun || currentIsBlank || current >= target - 1
                       ? "not-allowed"
                       : "pointer",
                 }}
               >
                 <span aria-hidden="true" style={{ display: "grid", placeItems: "center" }}>
-                  <PowerUpIcon icon="transmute" size={24} />
+                  <PowerUpBadge icon="transmute" size={32} />
                 </span>
                 <span style={powerUpCount}>{transmuteCharges}</span>
               </button>
@@ -4459,7 +4572,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
                 }}
               >
                 <span aria-hidden="true" style={{ display: "grid", placeItems: "center" }}>
-                  <PowerUpIcon icon="fusion-jump" size={24} />
+                  <PowerUpBadge icon="fusion-jump" size={32} />
                 </span>
                 <span style={powerUpCount}>{fusionJumpArmed ? "↩" : fusionJumpCharges}</span>
               </button>
@@ -4495,7 +4608,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
                 }}
               >
                 <span aria-hidden="true" style={{ display: "grid", placeItems: "center" }}>
-                  <PowerUpIcon icon="catalyst" size={24} />
+                  <PowerUpBadge icon="catalyst" size={32} />
                 </span>
                 <span style={powerUpCount}>
                   {pendingReversiblePowerUp === "catalyst"
@@ -4519,8 +4632,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
                 disabled={
                   busy ||
                   (pendingReversiblePowerUp !== "emission" &&
-                    (pendingStone ||
-                      queue.every(
+                    (queue.every(
                         (atom, i) =>
                           eGunQueue[i] || blankQueue[i] || raiseAtomForEmission(atom) === atom,
                       ) ||
@@ -4537,7 +4649,6 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
                   boxShadow: "0 0 14px oklch(0.72 0.19 55 / 0.5)",
                   opacity:
                     busy ||
-                    pendingStone ||
                     queue.every(
                       (atom, i) =>
                         eGunQueue[i] || blankQueue[i] || raiseAtomForEmission(atom) === atom,
@@ -4546,7 +4657,6 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
                       : 1,
                   cursor:
                     busy ||
-                    pendingStone ||
                     queue.every(
                       (atom, i) =>
                         eGunQueue[i] || blankQueue[i] || raiseAtomForEmission(atom) === atom,
@@ -4556,7 +4666,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
                 }}
               >
                 <span aria-hidden="true" style={{ display: "grid", placeItems: "center" }}>
-                  <PowerUpIcon icon="emission" size={24} />
+                  <PowerUpBadge icon="emission" size={32} />
                 </span>
                 <span style={powerUpCount}>
                   {pendingReversiblePowerUp === "emission" ? "↩" : emissionCharges}
@@ -4585,7 +4695,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
                 }}
               >
                 <span aria-hidden="true" style={{ display: "grid", placeItems: "center" }}>
-                  <PowerUpIcon icon="gravity" size={24} />
+                  <PowerUpBadge icon="gravity" size={32} />
                 </span>
                 <span style={powerUpCount}>{gravityCharges}</span>
               </button>
@@ -4611,7 +4721,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
                 }}
               >
                 <span aria-hidden="true" style={{ display: "grid", placeItems: "center" }}>
-                  <PowerUpIcon icon="grab" size={24} />
+                  <PowerUpBadge icon="grab" size={32} />
                 </span>
                 <span style={powerUpCount}>{grabs}</span>
               </button>
@@ -4632,7 +4742,6 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
                   busy ||
                   (!compoundMode &&
                     ((!isMoleculeChallenge && compoundCharges <= 0) ||
-                      pendingStone ||
                       pendingGamma ||
                       currentIsEGun ||
                       pendingReversiblePowerUp != null))
@@ -4652,7 +4761,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
                 }}
               >
                 <span aria-hidden="true" style={{ display: "grid", placeItems: "center" }}>
-                  <PowerUpIcon icon="molecule" size={24} />
+                  <PowerUpBadge icon="molecule" size={32} />
                 </span>
                 <span style={powerUpCount}>{compoundMode ? "×" : compoundCharges}</span>
               </button>
@@ -4667,7 +4776,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
                   "☢ Gamma Bomb",
                   "Arms a slow, heavy projectile. On impact it clears every non-stone atom inside a wide radius. Tap again before shooting to cancel and refund the charge.",
                 )}
-                disabled={busy || (!pendingGamma && (pendingStone || currentIsEGun))}
+                disabled={busy || (!pendingGamma && currentIsEGun)}
                 style={{
                   ...powerUpIconBtn,
                   border: `1px solid ${pendingGamma ? "var(--accent)" : "oklch(0.7 0.2 145)"}`,
@@ -4683,7 +4792,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
                 }}
               >
                 <span aria-hidden="true" style={{ display: "grid", placeItems: "center" }}>
-                  <PowerUpIcon icon="gamma" size={24} />
+                  <PowerUpBadge icon="gamma" size={32} />
                 </span>
                 <span style={powerUpCount}>{pendingGamma ? "↩" : gammaCharges}</span>
               </button>
@@ -4698,7 +4807,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
                   "♻ Queue Shuffle",
                   "Rerolls every atom currently waiting in your queue. Earned every 15 atom-on-stone hits.",
                 )}
-                disabled={busy || pendingStone || pendingGamma}
+                disabled={busy || pendingGamma}
                 style={{
                   ...powerUpIconBtn,
                   border: "1px solid oklch(0.78 0.16 175)",
@@ -4706,12 +4815,12 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
                     "linear-gradient(135deg, oklch(0.68 0.16 175), oklch(0.48 0.14 200))",
                   color: "var(--primary-foreground)",
                   boxShadow: "0 0 14px oklch(0.68 0.16 175 / 0.5)",
-                  opacity: busy || pendingStone || pendingGamma ? 0.65 : 1,
-                  cursor: busy || pendingStone || pendingGamma ? "not-allowed" : "pointer",
+                  opacity: busy || pendingGamma ? 0.65 : 1,
+                  cursor: busy || pendingGamma ? "not-allowed" : "pointer",
                 }}
               >
                 <span aria-hidden="true" style={{ display: "grid", placeItems: "center" }}>
-                  <PowerUpIcon icon="queue-shuffle" size={24} />
+                  <PowerUpBadge icon="queue-shuffle" size={32} />
                 </span>
                 <span style={powerUpCount}>{queueShuffleCharges}</span>
               </button>
@@ -4866,6 +4975,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
             bestCombo={runBestCombo}
             stars={earnedStars}
             newDiscoveries={newlyDiscoveredThisRun}
+            formedCompounds={formedCompoundsThisRun}
             onDiscoveryClick={setDiscoveryEl}
             onMain={onExit}
             onNext={() => onWin(getNextLevel(levelId)?.id ?? null)}
@@ -4881,6 +4991,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
             bestCombo={runBestCombo}
             stars={0}
             newDiscoveries={newlyDiscoveredThisRun}
+            formedCompounds={formedCompoundsThisRun}
             onDiscoveryClick={setDiscoveryEl}
             onMain={onExit}
             onNext={() => onWin(levelId)}
@@ -5074,7 +5185,7 @@ function InventoryStartModal({
               }}
             >
               <span style={{ display: "grid", placeItems: "center" }} aria-hidden="true">
-                <PowerUpIcon icon={id} size={28} />
+                <PowerUpBadge icon={id} size={34} />
               </span>
               <span>
                 <span style={{ display: "block", fontWeight: 900, fontSize: 13 }}>{meta.name}</span>
@@ -5443,11 +5554,10 @@ function ShotHistoryModal({
     action: string;
     points: number;
     powerUp?: string;
-    merges: { atom: number; depth: number }[];
+    merges: { sourceAtom: number; atom: number; depth: number }[];
   }[];
   onClose: () => void;
 }) {
-  const t0 = entries[0]?.ts ?? Date.now();
   return (
     <Modal>
       <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--accent)", marginBottom: 8 }}>
@@ -5474,11 +5584,7 @@ function ShotHistoryModal({
           {entries
             .slice()
             .reverse()
-            .map((e) => {
-              const dt = (e.ts - t0) / 1000;
-              const mm = Math.floor(dt / 60);
-              const ss = Math.floor(dt % 60).toString().padStart(2, "0");
-              return (
+            .map((e) => (
                 <div
                   key={e.id}
                   style={{
@@ -5513,10 +5619,14 @@ function ShotHistoryModal({
                     </div>
                     <div style={{ fontSize: 11, color: "var(--muted-foreground)" }}>
                       {e.powerUp ? `Power-up: ${e.powerUp}` : "No power-up"}
-                      {e.merges.length > 0
-                        ? ` - ${e.merges.map((merge) => ELEMENTS[merge.atom - 1]?.symbol ?? "?").join(", ")}`
-                        : ""}
                     </div>
+                    {e.merges.length > 0 && (
+                      <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginTop: 6 }}>
+                        {e.merges.map((merge, index) => (
+                          <MergeAtomFormula key={`${e.id}-${index}`} merge={merge} />
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <div
                     style={{
@@ -5526,18 +5636,37 @@ function ShotHistoryModal({
                     }}
                   >
                     +{formatScore(e.points)}
-                    <br />
-                    <span style={{ color: "var(--muted-foreground)" }}>{mm}:{ss}</span>
                   </div>
                 </div>
-              );
-            })}
+              ))}
         </div>
       )}
       <button onClick={onClose} style={modalBtn}>
         Close
       </button>
     </Modal>
+  );
+}
+
+function MergeAtomFormula({ merge }: { merge: { sourceAtom: number; atom: number } }) {
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 3,
+        padding: "3px 5px",
+        borderRadius: 999,
+        background: "var(--surface)",
+        border: "1px solid var(--border)",
+      }}
+    >
+      <ElementBall atomicNumber={merge.sourceAtom} size={22} />
+      <span style={{ fontSize: 10, fontWeight: 900, color: "var(--muted-foreground)" }}>+</span>
+      <ElementBall atomicNumber={merge.sourceAtom} size={22} />
+      <span style={{ fontSize: 10, fontWeight: 900, color: "var(--accent)" }}>→</span>
+      <ElementBall atomicNumber={merge.atom} size={24} glow />
+    </span>
   );
 }
 
@@ -5631,6 +5760,7 @@ function ResultModal({
   bestCombo,
   stars,
   newDiscoveries = [],
+  formedCompounds = [],
   onDiscoveryClick,
   onMain,
   onNext,
@@ -5644,11 +5774,15 @@ function ResultModal({
   bestCombo: number;
   stars: number;
   newDiscoveries?: number[];
+  formedCompounds?: string[];
   onDiscoveryClick?: (atomicNumber: number) => void;
   onMain: () => void;
   onNext: () => void;
   nextLabel?: string;
 }) {
+  const formedCompoundDefinitions = formedCompounds
+    .map((id) => COMPOUNDS.find((compound) => compound.id === id))
+    .filter((compound): compound is CompoundDefinition => Boolean(compound));
   return (
     <Modal>
       <div
@@ -5727,6 +5861,38 @@ function ResultModal({
                 glow
                 onClick={() => onDiscoveryClick?.(atomicNumber)}
               />
+            ))}
+          </div>
+        </div>
+      )}
+      {formedCompoundDefinitions.length > 0 && (
+        <div
+          style={{
+            background: "var(--surface)",
+            border: "1px solid var(--border)",
+            borderRadius: 14,
+            padding: 10,
+            marginBottom: 12,
+          }}
+        >
+          <div
+            style={{
+              fontSize: 10,
+              letterSpacing: 1.6,
+              color: "var(--success, var(--accent))",
+              fontWeight: 800,
+              marginBottom: 8,
+              textAlign: "center",
+            }}
+          >
+            COMPOUNDS FORMED
+          </div>
+          <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+            {formedCompoundDefinitions.map((compound, index) => (
+              <div key={`${compound.id}-${index}`} style={{ width: 78, textAlign: "center" }}>
+                <MoleculeVisual compound={compound} size={48} />
+                <div style={{ marginTop: 4, fontSize: 10, fontWeight: 900 }}>{compound.formula}</div>
+              </div>
             ))}
           </div>
         </div>

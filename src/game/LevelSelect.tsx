@@ -1,9 +1,16 @@
 import { useMemo, useState } from "react";
-import { LEVELS } from "./levels";
+import { LEVELS, MOLECULE_CHALLENGE_BY_LEVEL } from "./levels";
 import { ELEMENTS } from "./elements";
 import { useProgress, type LevelStats } from "./store";
 import { ElementBall } from "./ElementBall";
 import { formatScore } from "./logic";
+import { COMPOUNDS, type CompoundDefinition } from "./compounds";
+import { MoleculeVisual } from "./MoleculeVisual";
+
+function getMoleculeChallenge(levelId: number): CompoundDefinition | null {
+  const id = MOLECULE_CHALLENGE_BY_LEVEL[levelId];
+  return id ? (COMPOUNDS.find((compound) => compound.id === id) ?? null) : null;
+}
 
 export function LevelSelect({
   onPick,
@@ -52,6 +59,7 @@ export function LevelSelect({
   }, [nodes]);
 
   const selected = selectedId != null ? LEVELS.find((l) => l.id === selectedId) : null;
+  const selectedChallenge = selected ? getMoleculeChallenge(selected.id) : null;
   const selectedStats = selectedId != null ? levelStats[selectedId] : undefined;
   const selectedStars = selectedId != null ? (levelStars[selectedId] ?? 0) : 0;
 
@@ -149,6 +157,8 @@ export function LevelSelect({
               const locked = lvl.id > unlockedLevel;
               const stars = levelStars[lvl.id] ?? 0;
               const isCurrent = lvl.id === unlockedLevel && !locked;
+              const challenge = getMoleculeChallenge(lvl.id);
+              const isChallenge = challenge != null;
               return (
                 <button
                   key={lvl.id}

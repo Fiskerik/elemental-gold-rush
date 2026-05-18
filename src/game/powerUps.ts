@@ -8,6 +8,14 @@ export const POWER_UPS = [
       "A glowing atom that gives 2x score and fills the Grab bar twice as fast when it merges.",
   },
   {
+    icon: "unstable",
+    name: "Unstable Isotope",
+    unlock: "Level 15",
+    effect: "Rare queue atoms spawn with an 8-shot decay ring. Merge them to stabilize them.",
+    description:
+      "A rare radioactive queue atom. Its ring counts down after shots; merging stabilizes it into the new atom.",
+  },
+  {
     icon: "grab",
     name: "Grab",
     unlock: "Level 4 / merge streak",
