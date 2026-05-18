@@ -1312,7 +1312,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     // Combine two depletion drivers:
     //  - emissionUnlockIndex (every 5 min, all levels)
     //  - spawnFloorIndex     (every 2 min, lvl 10+)
-    const depletionTier = Math.max(0, emissionUnlockIndex, spawnFloorIndex);
+    const depletionTier = Math.max(0, emissionUnlockIndex, spawnFloorIndex, manualEmissionFloor);
     for (let atom = 1; atom <= depletionTier; atom++) {
       const stillOnBoard = board.some((ball) => ball.stoneHp == null && ball.atom === atom);
       if (stillOnBoard) {
