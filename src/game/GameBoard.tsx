@@ -617,6 +617,10 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
   const [grabbing, setGrabbing] = useState<{ id: number; x: number; y: number } | null>(null);
 
   const [compoundCharges, setCompoundCharges] = useState(() => loadCompoundChargeState().charges);
+  // Elapsed-time (ms) within the current run when the player last spent their
+  // compound charge. Used by the in-game regen timer so the timer only ticks
+  // while the game is actually being played (paused time does not count).
+  const compoundSpentAtElapsedRef = useRef<number>(0);
   const [compoundMode, setCompoundMode] = useState(false);
   const [selectedCompoundIds, setSelectedCompoundIds] = useState<Set<number>>(new Set());
   const [compoundFx, setCompoundFx] = useState<{
