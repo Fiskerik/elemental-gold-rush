@@ -969,17 +969,9 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     onExit();
   }
 
-  useEffect(() => {
-    if (paused) return;
-    const refresh = () => {
-      const state = loadCompoundChargeState();
-      setCompoundCharges(state.charges);
-      if (state.charges > 0 && state.spentAt == null) saveCompoundChargeState(1, null);
-    };
-    refresh();
-    const timer = window.setInterval(refresh, 15_000);
-    return () => window.clearInterval(timer);
-  }, [paused]);
+  // Compound charge is per-run now: granted at the start of a new game and
+  // regenerated after 5 minutes of active game time (see the regen effect
+  // below). We no longer poll real-world time from localStorage.
 
   useEffect(() => {
     if (resumeSavedRun) {
