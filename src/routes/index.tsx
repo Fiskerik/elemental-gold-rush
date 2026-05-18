@@ -11,6 +11,7 @@ import { LabModes } from "@/game/LabModes";
 import { GameLibrary } from "@/game/GameLibrary";
 import { Profile } from "@/game/Profile";
 import { GameModeId } from "@/game/challenges";
+import { getLevelById } from "@/game/levels";
 import { useProgress } from "@/game/store";
 
 export const Route = createFileRoute("/")({
@@ -55,7 +56,7 @@ function Index() {
       setResumePrompt(saved);
       return;
     }
-    setScreen({ name: "game", levelId: unlockedLevel });
+    setScreen({ name: "game", levelId: getLevelById(unlockedLevel)?.id ?? 1 });
   }
 
   switch (screen.name) {
@@ -86,7 +87,7 @@ function Index() {
               }}
               onStartOver={() => {
                 clearSavedRun();
-                setScreen({ name: "game", levelId: unlockedLevel });
+                setScreen({ name: "game", levelId: getLevelById(unlockedLevel)?.id ?? 1 });
                 setResumePrompt(null);
               }}
               onCancel={() => setResumePrompt(null)}

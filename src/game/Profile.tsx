@@ -10,7 +10,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { ELEMENTS } from "./elements";
-import { LEVELS } from "./levels";
+import { MAX_LEVEL } from "./levels";
 import { formatScore } from "./logic";
 import { useProgress } from "./store";
 
@@ -63,7 +63,7 @@ export function Profile({ onBack }: Props) {
               Gold Rush Chemist
             </h1>
             <p style={{ margin: 0, color: "var(--muted-foreground)", fontSize: 13 }}>
-              {hasProPack ? "Pro Lab active" : "Free Lab"} • Level {unlockedLevel} / {LEVELS.length}
+              {hasProPack ? "Pro Lab active" : "Free Lab"} • Level {unlockedLevel} / {MAX_LEVEL}
             </p>
           </div>
         </header>
@@ -144,7 +144,7 @@ export function Profile({ onBack }: Props) {
             <RecordRow label="Badges earned" value={`${earnedBadges.length}`} />
             <RecordRow
               label="Campaign levels unlocked"
-              value={`${unlockedLevel}/${LEVELS.length}`}
+              value={`${unlockedLevel}/${MAX_LEVEL}`}
             />
             <RecordRow
               label="Periodic table progress"

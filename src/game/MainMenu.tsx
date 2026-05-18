@@ -15,7 +15,7 @@ import {
   User,
   type LucideIcon,
 } from "lucide-react";
-import { LEVELS } from "./levels";
+import { LEVELS, MAX_LEVEL, getLevelById } from "./levels";
 import { useProgress } from "./store";
 import { formatScore } from "./logic";
 import { ELEMENTS } from "./elements";
@@ -56,11 +56,11 @@ export function MainMenu({
     claimDailyReward,
   } = useProgress();
   const highestEl = ELEMENTS[highestElement - 1];
-  const nextLevel = LEVELS[Math.min(unlockedLevel - 1, LEVELS.length - 1)];
+  const nextLevel = getLevelById(unlockedLevel) ?? LEVELS[LEVELS.length - 1];
   const targetEl = ELEMENTS[(nextLevel?.targetElement ?? 1) - 1];
   const completedDailyQuests = dailyQuests.filter((quest) => quest.completed).length;
   const dailyComplete = dailyQuests.length > 0 && completedDailyQuests >= 4;
-  const campaignProgress = Math.round((Math.min(unlockedLevel, LEVELS.length) / LEVELS.length) * 100);
+  const campaignProgress = Math.round((Math.min(unlockedLevel, MAX_LEVEL) / MAX_LEVEL) * 100);
 
   useEffect(() => {
     refreshDailyLab();
@@ -83,7 +83,7 @@ export function MainMenu({
       >
         <header style={heroPanel}>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={eyebrow}>LEVEL {unlockedLevel} OF {LEVELS.length}</div>
+            <div style={eyebrow}>LEVEL {unlockedLevel} OF {MAX_LEVEL}</div>
             <h1 className="gold-text" style={titleStyle}>
               Elemental Gold Rush
             </h1>

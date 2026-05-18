@@ -1,5 +1,5 @@
 import { Atom, Clock, FlaskConical, LockKeyhole, Map, RotateCcw, Shield, type LucideIcon } from "lucide-react";
-import { LEVELS } from "./levels";
+import { MAX_LEVEL } from "./levels";
 import { GAME_MODES, GameModeId, getUnlockedGameModes } from "./challenges";
 import { useProgress } from "./store";
 
@@ -11,7 +11,7 @@ interface Props {
 export function LabModes({ onBack, onStart }: Props) {
   const unlockedLevel = useProgress((s) => s.unlockedLevel);
   const unlockedModes = new Set(getUnlockedGameModes(unlockedLevel).map((mode) => mode.id));
-  const levelId = Math.min(unlockedLevel, LEVELS.length);
+  const levelId = Math.min(unlockedLevel, MAX_LEVEL);
 
   return (
     <div className="app-shell" style={{ padding: 20, paddingTop: 32, minHeight: "100dvh" }}>

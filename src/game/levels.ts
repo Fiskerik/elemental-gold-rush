@@ -387,4 +387,4 @@ export function getNextLevel(currentId: number): Level | undefined {
   return LEVELS.find((l) => l.id > currentId);
 }
 
-export const MAX_LEVEL = LEVELS.length;
+export const MAX_LEVEL = LEVELS[LEVELS.length - 1]?.id ?? 1;
