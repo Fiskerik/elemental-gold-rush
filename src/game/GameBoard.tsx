@@ -5346,6 +5346,7 @@ function ShotHistoryModal({
   onClose: () => void;
 }) {
   const t0 = entries[0]?.ts ?? Date.now();
+  const [expandedId, setExpandedId] = useState<number | null>(null);
   return (
     <Modal>
       <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--accent)", marginBottom: 8 }}>
@@ -5376,17 +5377,32 @@ function ShotHistoryModal({
               const dt = (e.ts - t0) / 1000;
               const mm = Math.floor(dt / 60);
               const ss = Math.floor(dt % 60).toString().padStart(2, "0");
+              const isOpen = expandedId === e.id;
+              const maxDepth = e.merges.reduce((m, x) => Math.max(m, x.depth), 0);
+              const comboLabel = e.merges.length >= 2 ? `${e.merges.length}× combo` : null;
               return (
-                <div
+                <button
                   key={e.id}
+                  type="button"
+                  onClick={() => setExpandedId(isOpen ? null : e.id)}
+                  style={{
+                    display: "block",
+                    textAlign: "left",
+                    width: "100%",
+                    cursor: "pointer",
+                    border: isOpen ? "1px solid var(--accent)" : "1px solid transparent",
+                    background: "var(--surface-elevated)",
+                    padding: 0,
+                    borderRadius: 8,
+                  }}
+                >
+                <div
                   style={{
                     display: "grid",
                     gridTemplateColumns: "44px 1fr auto",
                     alignItems: "center",
                     gap: 10,
                     padding: "6px 8px",
-                    borderRadius: 8,
-                    background: "var(--surface-elevated)",
                   }}
                 >
                   <div
@@ -5421,6 +5437,7 @@ function ShotHistoryModal({
                       fontVariantNumeric: "tabular-nums",
                       fontSize: 11,
                       color: "var(--muted-foreground)",
+                      textAlign: "right",
                     }}
                   >
                     +{formatScore(e.points)}
@@ -5428,6 +5445,62 @@ function ShotHistoryModal({
                     <span style={{ color: "var(--muted-foreground)" }}>{mm}:{ss}</span>
                   </div>
                 </div>
+                {isOpen && (
+                  <div
+                    style={{
+                      padding: "8px 12px 10px",
+                      borderTop: "1px solid var(--border)",
+                      display: "grid",
+                      gap: 6,
+                      fontSize: 12,
+                    }}
+                  >
+                    <DetailRow label="Time" value={`${mm}:${ss} into the run`} />
+                    <DetailRow label="Action" value={e.action} />
+                    <DetailRow label="Points gained" value={`+${formatScore(e.points)}`} />
+                    <DetailRow label="Power-up" value={e.powerUp ?? "None"} />
+                    <DetailRow
+                      label="Merges"
+                      value={
+                        e.merges.length === 0
+                          ? "None"
+                          : `${e.merges.length} (max depth ${maxDepth})${comboLabel ? ` — ${comboLabel}` : ""}`
+                      }
+                    />
+                    {e.merges.length > 0 && (
+                      <div
+                        style={{
+                          display: "flex",
+                          flexWrap: "wrap",
+                          gap: 6,
+                          marginTop: 4,
+                        }}
+                      >
+                        {e.merges.map((m, i) => {
+                          const el = ELEMENTS[m.atom - 1];
+                          return (
+                            <span
+                              key={i}
+                              style={{
+                                background: "var(--surface)",
+                                border: "1px solid var(--border)",
+                                borderRadius: 999,
+                                padding: "3px 8px",
+                                fontWeight: 700,
+                              }}
+                            >
+                              {el?.symbol ?? "?"}{" "}
+                              <span style={{ color: "var(--muted-foreground)", fontWeight: 600 }}>
+                                #{m.atom} · d{m.depth}
+                              </span>
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+                </button>
               );
             })}
         </div>
@@ -5436,6 +5509,15 @@ function ShotHistoryModal({
         Close
       </button>
     </Modal>
+  );
+}
+
+function DetailRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+      <span style={{ color: "var(--muted-foreground)", fontWeight: 600 }}>{label}</span>
+      <span style={{ fontWeight: 700, textAlign: "right" }}>{value}</span>
+    </div>
   );
 }
 
