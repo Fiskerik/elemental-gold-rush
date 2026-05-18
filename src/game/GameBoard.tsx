@@ -55,7 +55,9 @@ const EMISSION_MIN_LEVEL = POWER_UP_UNLOCK_LEVELS.emission;
 const TRANSMUTE_MIN_LEVEL = POWER_UP_UNLOCK_LEVELS.transmute;
 const FUSION_JUMP_MIN_LEVEL = POWER_UP_UNLOCK_LEVELS["fusion-jump"];
 const CATALYST_MIN_LEVEL = POWER_UP_UNLOCK_LEVELS.catalyst;
-const STONE_MIN_LEVEL = POWER_UP_UNLOCK_LEVELS.stone;
+// In-game stone spawn trigger is available much earlier than the library's
+// listed unlock level so the no-merge fallback works on most stages.
+const STONE_MIN_LEVEL = 5;
 const GAMMA_MIN_LEVEL = POWER_UP_UNLOCK_LEVELS.gamma;
 const COMPOUND_MIN_LEVEL = POWER_UP_UNLOCK_LEVELS.molecule;
 const BLANK_MIN_LEVEL = POWER_UP_UNLOCK_LEVELS.blank;
@@ -92,7 +94,7 @@ const SHOT_MERGE_RADIUS_BONUS_FACTOR = 0.25;
 const DISCOVERY_DECAY_STEP = 5;
 const DISCOVERY_DECAY_BOOST = 0.04;
 const STAGE_CLEAR_ANIMATION_MS = 6200;
-const STONE_GRACE_SHOTS = 15;
+const STONE_GRACE_SHOTS = 10;
 const UNSTABLE_SEGMENTS = 8;
 const UNSTABLE_SPAWN_CHANCE = 0.06;
 
