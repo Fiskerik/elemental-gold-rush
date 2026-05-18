@@ -123,6 +123,7 @@ interface SavedRunSnapshot {
   gravityCharges: number;
   emissionCharges: number;
   emissionUnlockIndex: number;
+  manualEmissionFloor?: number;
   transmuteCharges: number;
   fusionJumpCharges: number;
   fusionJumpArmed: boolean;
