@@ -2393,112 +2393,10 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
       if (Math.hypot(b.x - x, b.y - y) <= (projR + b.r) * ADJ_F) matches.push(b.id);
     }
     // Tactical nudge: if we hit an existing ball that won't fuse with us,
-    // push it slightly along the projectile trajectory so it can drift
-    // toward a same-type neighbor.
-    let nudged = impactBalls;
-    if (hitId !== null) {
-      const hb = impactBalls.find((b) => b.id === hitId);
-      if (hb && hb.atom !== activeAtom) {
-        // Heavier elements (lower in the periodic table) hit harder.
-        const projPeriod = Math.max(1, Math.min(8, ELEMENTS[activeAtom - 1]?.period ?? 4));
-        const NUDGE = projR * (0.15 + projPeriod * 0.12);
-        const minX = SIDE_PAD + hb.r;
-        const maxX = boardW - SIDE_PAD - hb.r;
-        const ceilingY = TOP_PAD + hb.r;
-        let nx = hb.x + dirX * NUDGE;
-        let ny = hb.y + dirY * NUDGE;
-        nx = Math.max(minX, Math.min(maxX, nx));
-        ny = Math.max(ceilingY, ny);
-
-        // Secondary collisions: any ball the primary now overlaps gets a
-        // weaker push along the same trajectory (~40% force), and overlaps
-        // are resolved geometrically.
-        const SECONDARY_FACTOR = 0.4;
-        const moved = new Map<number, { x: number; y: number }>();
-        moved.set(hb.id, { x: nx, y: ny });
-        for (const o of impactBalls) {
-          if (o.id === hb.id) continue;
-          const dd = Math.hypot(nx - o.x, ny - o.y);
-          const min = hb.r + o.r;
-          if (dd < min) {
-            const oMinX = SIDE_PAD + o.r;
-            const oMaxX = boardW - SIDE_PAD - o.r;
-            const oCeil = TOP_PAD + o.r;
-            // start with directional shove
-            let ox = o.x + dirX * NUDGE * SECONDARY_FACTOR;
-            let oy = o.y + dirY * NUDGE * SECONDARY_FACTOR;
-            // resolve residual overlap with the primary
-            const ndd = Math.hypot(ox - nx, oy - ny) || 0.001;
-            if (ndd < min) {
-              const push = min - ndd + 0.5;
-              ox += ((ox - nx) / ndd) * push;
-              oy += ((oy - ny) / ndd) * push;
-            }
-            ox = Math.max(oMinX, Math.min(oMaxX, ox));
-            oy = Math.max(oCeil, oy);
-            moved.set(o.id, { x: ox, y: oy });
-          }
-        }
-        nudged = impactBalls.map((b) => {
-          const m = moved.get(b.id);
-          return m ? { ...b, x: m.x, y: m.y } : b;
-        });
-        // Stones take damage from any collision wave that reaches them
-        // (primary, secondary, or tertiary pushes).
-        const stones = nudged.filter((b) => b.stoneHp != null);
-        if (stones.length > 0) {
-          const stoneDamage = new Map<number, number>();
-          for (const [movedId] of moved) {
-            const mb = nudged.find((b) => b.id === movedId);
-            if (!mb || mb.stoneHp != null) continue;
-            for (const st of stones) {
-              const d = Math.hypot(mb.x - st.x, mb.y - st.y);
-              if (d < (mb.r + st.r) * 1.15) {
-                stoneDamage.set(st.id, (stoneDamage.get(st.id) ?? 0) + 1);
-              }
-            }
-          }
-          if (stoneDamage.size > 0) {
-            const hitSet = new Set<number>();
-            let totalBonus = 0;
-            let destroyedCount = 0;
-            const initialR = (ballSize / 2) * (1 + (8 - 4) * 0.11);
-            nudged = nudged
-              .map((b) => {
-                if (b.stoneHp == null) return b;
-                const dmg = stoneDamage.get(b.id) ?? 0;
-                if (dmg <= 0) return b;
-                hitSet.add(b.id);
-                const newHp = (b.stoneHp ?? STONE_MAX_HP) - dmg;
-                const maxHp = b.stoneMaxHp ?? STONE_MAX_HP;
-                if (newHp <= 0) {
-                  destroyedCount += 1;
-                  totalBonus += Math.floor(maxHp * 250 * level.scoreMultiplier);
-                  return null;
-                }
-                const newR = Math.max(initialR * 0.35, initialR * (newHp / maxHp));
-                return { ...b, stoneHp: newHp, r: newR };
-              })
-              .filter((b): b is Ball => b !== null);
-            if (hitSet.size > 0) {
-              setStoneHitIds(hitSet);
-              setTimeout(() => setStoneHitIds(new Set()), 380);
-              haptic([20, 30, 30]);
-            }
-            if (totalBonus > 0) {
-              grantFusionJump(destroyedCount);
-              setScore((s) => s + totalBonus);
-              addScore(totalBonus);
-              spawnPopup(`⛰ +${formatScore(totalBonus)}`);
-              haptic([40, 60, 40, 60, 100]);
-            } else {
-              spawnPopup(`💥 stone hit`);
-            }
-            setNoMergeStreak(0);
-          }
-        }
-      }
-    }
+    // push it slightly along the projectile trajectory. Disabled: caused
+    // random displacements and unintended cascade merges when the displaced
+    // atom landed next to a same-type neighbor on the board.
+    const nudged = impactBalls;
     if (matches.length === 0) {
       finalizePlacement(x, y, nudged, impactStoneBonus, activeAtom);
       return;
@@ -5448,6 +5346,7 @@ function ShotHistoryModal({
   onClose: () => void;
 }) {
   const t0 = entries[0]?.ts ?? Date.now();
+  const [expandedId, setExpandedId] = useState<number | null>(null);
   return (
     <Modal>
       <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--accent)", marginBottom: 8 }}>
@@ -5478,17 +5377,32 @@ function ShotHistoryModal({
               const dt = (e.ts - t0) / 1000;
               const mm = Math.floor(dt / 60);
               const ss = Math.floor(dt % 60).toString().padStart(2, "0");
+              const isOpen = expandedId === e.id;
+              const maxDepth = e.merges.reduce((m, x) => Math.max(m, x.depth), 0);
+              const comboLabel = e.merges.length >= 2 ? `${e.merges.length}× combo` : null;
               return (
-                <div
+                <button
                   key={e.id}
+                  type="button"
+                  onClick={() => setExpandedId(isOpen ? null : e.id)}
+                  style={{
+                    display: "block",
+                    textAlign: "left",
+                    width: "100%",
+                    cursor: "pointer",
+                    border: isOpen ? "1px solid var(--accent)" : "1px solid transparent",
+                    background: "var(--surface-elevated)",
+                    padding: 0,
+                    borderRadius: 8,
+                  }}
+                >
+                <div
                   style={{
                     display: "grid",
                     gridTemplateColumns: "44px 1fr auto",
                     alignItems: "center",
                     gap: 10,
                     padding: "6px 8px",
-                    borderRadius: 8,
-                    background: "var(--surface-elevated)",
                   }}
                 >
                   <div
@@ -5523,6 +5437,7 @@ function ShotHistoryModal({
                       fontVariantNumeric: "tabular-nums",
                       fontSize: 11,
                       color: "var(--muted-foreground)",
+                      textAlign: "right",
                     }}
                   >
                     +{formatScore(e.points)}
@@ -5530,6 +5445,62 @@ function ShotHistoryModal({
                     <span style={{ color: "var(--muted-foreground)" }}>{mm}:{ss}</span>
                   </div>
                 </div>
+                {isOpen && (
+                  <div
+                    style={{
+                      padding: "8px 12px 10px",
+                      borderTop: "1px solid var(--border)",
+                      display: "grid",
+                      gap: 6,
+                      fontSize: 12,
+                    }}
+                  >
+                    <DetailRow label="Time" value={`${mm}:${ss} into the run`} />
+                    <DetailRow label="Action" value={e.action} />
+                    <DetailRow label="Points gained" value={`+${formatScore(e.points)}`} />
+                    <DetailRow label="Power-up" value={e.powerUp ?? "None"} />
+                    <DetailRow
+                      label="Merges"
+                      value={
+                        e.merges.length === 0
+                          ? "None"
+                          : `${e.merges.length} (max depth ${maxDepth})${comboLabel ? ` — ${comboLabel}` : ""}`
+                      }
+                    />
+                    {e.merges.length > 0 && (
+                      <div
+                        style={{
+                          display: "flex",
+                          flexWrap: "wrap",
+                          gap: 6,
+                          marginTop: 4,
+                        }}
+                      >
+                        {e.merges.map((m, i) => {
+                          const el = ELEMENTS[m.atom - 1];
+                          return (
+                            <span
+                              key={i}
+                              style={{
+                                background: "var(--surface)",
+                                border: "1px solid var(--border)",
+                                borderRadius: 999,
+                                padding: "3px 8px",
+                                fontWeight: 700,
+                              }}
+                            >
+                              {el?.symbol ?? "?"}{" "}
+                              <span style={{ color: "var(--muted-foreground)", fontWeight: 600 }}>
+                                #{m.atom} · d{m.depth}
+                              </span>
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+                </button>
               );
             })}
         </div>
@@ -5538,6 +5509,15 @@ function ShotHistoryModal({
         Close
       </button>
     </Modal>
+  );
+}
+
+function DetailRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+      <span style={{ color: "var(--muted-foreground)", fontWeight: 600 }}>{label}</span>
+      <span style={{ fontWeight: 700, textAlign: "right" }}>{value}</span>
+    </div>
   );
 }
 
