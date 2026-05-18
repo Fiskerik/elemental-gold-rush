@@ -3274,6 +3274,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     queueUndoRef.current = { queue, shimmerQueue, eGunQueue, blankQueue, unstableQueue, powerUp: "emission" };
     setPendingReversiblePowerUp("emission");
     setEmissionCharges((g) => Math.max(0, g - 1));
+    setManualEmissionFloor((f) => f + 1);
     runPowerUpsUsedRef.current += 1;
     setQueue(raisedQueue);
 
