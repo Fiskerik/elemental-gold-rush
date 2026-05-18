@@ -55,7 +55,9 @@ const EMISSION_MIN_LEVEL = POWER_UP_UNLOCK_LEVELS.emission;
 const TRANSMUTE_MIN_LEVEL = POWER_UP_UNLOCK_LEVELS.transmute;
 const FUSION_JUMP_MIN_LEVEL = POWER_UP_UNLOCK_LEVELS["fusion-jump"];
 const CATALYST_MIN_LEVEL = POWER_UP_UNLOCK_LEVELS.catalyst;
-const STONE_MIN_LEVEL = POWER_UP_UNLOCK_LEVELS.stone;
+// In-game stone spawn trigger is available much earlier than the library's
+// listed unlock level so the no-merge fallback works on most stages.
+const STONE_MIN_LEVEL = 5;
 const GAMMA_MIN_LEVEL = POWER_UP_UNLOCK_LEVELS.gamma;
 const COMPOUND_MIN_LEVEL = POWER_UP_UNLOCK_LEVELS.molecule;
 const BLANK_MIN_LEVEL = POWER_UP_UNLOCK_LEVELS.blank;
@@ -92,7 +94,7 @@ const SHOT_MERGE_RADIUS_BONUS_FACTOR = 0.25;
 const DISCOVERY_DECAY_STEP = 5;
 const DISCOVERY_DECAY_BOOST = 0.04;
 const STAGE_CLEAR_ANIMATION_MS = 6200;
-const STONE_GRACE_SHOTS = 15;
+const STONE_GRACE_SHOTS = 10;
 const UNSTABLE_SEGMENTS = 8;
 const UNSTABLE_SPAWN_CHANCE = 0.06;
 
@@ -121,6 +123,7 @@ interface SavedRunSnapshot {
   gravityCharges: number;
   emissionCharges: number;
   emissionUnlockIndex: number;
+  manualEmissionFloor?: number;
   transmuteCharges: number;
   fusionJumpCharges: number;
   fusionJumpArmed: boolean;
@@ -614,6 +617,10 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
   const [grabbing, setGrabbing] = useState<{ id: number; x: number; y: number } | null>(null);
 
   const [compoundCharges, setCompoundCharges] = useState(() => loadCompoundChargeState().charges);
+  // Elapsed-time (ms) within the current run when the player last spent their
+  // compound charge. Used by the in-game regen timer so the timer only ticks
+  // while the game is actually being played (paused time does not count).
+  const compoundSpentAtElapsedRef = useRef<number>(0);
   const [compoundMode, setCompoundMode] = useState(false);
   const [selectedCompoundIds, setSelectedCompoundIds] = useState<Set<number>>(new Set());
   const [compoundFx, setCompoundFx] = useState<{
@@ -649,6 +656,10 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
   const [gravityCharges, setGravityCharges] = useState(0);
   const [emissionCharges, setEmissionCharges] = useState(0);
   const [emissionUnlockIndex, setEmissionUnlockIndex] = useState(0);
+  // Tracks how many times the player has manually used Emission this run.
+  // Each use removes the next-lowest tier from the spawn pool (unless an atom
+  // of that tier is still on the board, in which case it stays).
+  const [manualEmissionFloor, setManualEmissionFloor] = useState(0);
   const [transmuteCharges, setTransmuteCharges] = useState(0);
   const [fusionJumpCharges, setFusionJumpCharges] = useState(0);
   const [fusionJumpArmed, setFusionJumpArmed] = useState(false);
@@ -927,6 +938,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
       gravityCharges,
       emissionCharges,
       emissionUnlockIndex,
+      manualEmissionFloor,
       transmuteCharges,
       fusionJumpCharges,
       fusionJumpArmed,
@@ -957,17 +969,9 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     onExit();
   }
 
-  useEffect(() => {
-    if (paused) return;
-    const refresh = () => {
-      const state = loadCompoundChargeState();
-      setCompoundCharges(state.charges);
-      if (state.charges > 0 && state.spentAt == null) saveCompoundChargeState(1, null);
-    };
-    refresh();
-    const timer = window.setInterval(refresh, 15_000);
-    return () => window.clearInterval(timer);
-  }, [paused]);
+  // Compound charge is per-run now: granted at the start of a new game and
+  // regenerated after 5 minutes of active game time (see the regen effect
+  // below). We no longer poll real-world time from localStorage.
 
   useEffect(() => {
     if (resumeSavedRun) {
@@ -1017,6 +1021,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
         setGravityCharges(saved.gravityCharges);
         setEmissionCharges(saved.emissionCharges);
         setEmissionUnlockIndex(saved.emissionUnlockIndex);
+        setManualEmissionFloor(saved.manualEmissionFloor ?? 0);
         setTransmuteCharges(saved.transmuteCharges);
         setFusionJumpCharges(saved.fusionJumpCharges);
         setFusionJumpArmed(saved.fusionJumpArmed);
@@ -1035,6 +1040,9 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
         setGammaCharges(saved.gammaCharges);
         setPendingGamma(saved.pendingGamma);
         setSpawnFloorIndex(saved.spawnFloorIndex);
+        // On resume, if the player has no compound charge, restart the 5-min
+        // regen window from the current elapsed time.
+        compoundSpentAtElapsedRef.current = saved.compoundCharges >= 1 ? 0 : saved.elapsedMs;
         setShufflesLeft(SHUFFLE_LIMIT);
         setShuffleAtoms([]);
         setShuffleStartOpen(false);
@@ -1144,12 +1152,17 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     setGravityCharges(0);
     setEmissionCharges(0);
     setEmissionUnlockIndex(0);
+    setManualEmissionFloor(0);
     setTransmuteCharges(0);
     setFusionJumpCharges(0);
     setFusionJumpArmed(false);
     setCatalystCharges(0);
     setCatalystShotsRemaining(0);
     setPendingReversiblePowerUp(null);
+    // Compound: each new game starts with 1 charge (capped at 1).
+    setCompoundCharges(1);
+    saveCompoundChargeState(1, null);
+    compoundSpentAtElapsedRef.current = 0;
     hasClaimedUnusedInventoryRef.current = false;
     runPowerUpsUsedRef.current = 0;
     runRecordedRef.current = false;
@@ -1262,6 +1275,19 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [elapsedMs, gameOver, won, emissionUnlockIndex, emissionEnabled]);
 
+  // Compound regen — give back 1 charge after 5 minutes of active game time
+  // since the last spend. Capped at 1 charge at a time.
+  useEffect(() => {
+    if (!compoundEnabled) return;
+    if (gameOver || won) return;
+    if (compoundCharges >= 1) return;
+    if (elapsedMs - compoundSpentAtElapsedRef.current < COMPOUND_REGEN_MS) return;
+    setCompoundCharges(1);
+    saveCompoundChargeState(1, null);
+    spawnPopup("🧬 COMPOUND READY");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [elapsedMs, gameOver, won, compoundCharges, compoundEnabled]);
+
   // Spawn-floor scaling — level 10+: every 2 minutes raise the lowest
   // spawnable tier so runs don't drag on with low-value atoms.
   useEffect(() => {
@@ -1306,7 +1332,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     // Combine two depletion drivers:
     //  - emissionUnlockIndex (every 5 min, all levels)
     //  - spawnFloorIndex     (every 2 min, lvl 10+)
-    const depletionTier = Math.max(0, emissionUnlockIndex, spawnFloorIndex);
+    const depletionTier = Math.max(0, emissionUnlockIndex, spawnFloorIndex, manualEmissionFloor);
     for (let atom = 1; atom <= depletionTier; atom++) {
       const stillOnBoard = board.some((ball) => ball.stoneHp == null && ball.atom === atom);
       if (stillOnBoard) {
@@ -2948,7 +2974,10 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     setBlankQueue(undo.blankQueue);
     setUnstableQueue(undo.unstableQueue);
       if (powerUp === "transmute") setTransmuteCharges((g) => g + 1);
-      if (powerUp === "emission") setEmissionCharges((g) => g + 1);
+      if (powerUp === "emission") {
+        setEmissionCharges((g) => g + 1);
+        setManualEmissionFloor((f) => Math.max(0, f - 1));
+      }
       queueUndoRef.current = null;
     }
     if (powerUp === "fusion-jump") {
@@ -3158,6 +3187,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
       const spentAt = Date.now();
       saveCompoundChargeState(0, spentAt);
       setCompoundCharges(0);
+      compoundSpentAtElapsedRef.current = elapsedMs;
     }
     setCompoundMode(false);
     setSelectedCompoundIds(new Set());
@@ -3268,6 +3298,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     queueUndoRef.current = { queue, shimmerQueue, eGunQueue, blankQueue, unstableQueue, powerUp: "emission" };
     setPendingReversiblePowerUp("emission");
     setEmissionCharges((g) => Math.max(0, g - 1));
+    setManualEmissionFloor((f) => f + 1);
     runPowerUpsUsedRef.current += 1;
     setQueue(raisedQueue);
 
@@ -5205,105 +5236,125 @@ function InventoryStartModal({
   const availablePowerUps = (Object.keys(POWER_UP_INVENTORY_META) as InventoryPowerUpId[]).filter(
     (id) => inventory[id] > 0,
   );
+  const [tipId, setTipId] = useState<InventoryPowerUpId | null>(null);
+  const longPressRef = useRef<number | null>(null);
+  const longPressFiredRef = useRef(false);
+  const clearLongPress = () => {
+    if (longPressRef.current !== null) {
+      window.clearTimeout(longPressRef.current);
+      longPressRef.current = null;
+    }
+  };
+  const startLongPress = (id: InventoryPowerUpId) => {
+    longPressFiredRef.current = false;
+    clearLongPress();
+    longPressRef.current = window.setTimeout(() => {
+      longPressFiredRef.current = true;
+      setTipId(id);
+    }, 400);
+  };
 
   return (
     <Modal>
       <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--accent)", marginBottom: 8 }}>
         POWER-UP INVENTORY
       </div>
-      <h2 style={{ margin: "0 0 8px", fontSize: 24, fontWeight: 900 }}>Pick up to 3 boosts</h2>
-      <p style={{ margin: "0 0 14px", color: "var(--muted-foreground)", fontSize: 13 }}>
-        Saved unused power-ups can be loaded before a level starts. Tap a selected card again to add
-        copies, or use minus to remove them.
+      <h2 style={{ margin: "0 0 4px", fontSize: 20, fontWeight: 900 }}>Pick up to 3 boosts</h2>
+      <p style={{ margin: "0 0 12px", color: "var(--muted-foreground)", fontSize: 11 }}>
+        Tap an icon to add it to this level. Long-press for details.
       </p>
-      <div style={{ display: "grid", gap: 8 }}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+          gap: 8,
+        }}
+      >
         {availablePowerUps.map((id) => {
           const meta = POWER_UP_INVENTORY_META[id];
           const selectedAmount = selected[id];
           const isSelected = selectedAmount > 0;
           const disabled = !isSelected && selectedCount >= INVENTORY_PICK_LIMIT;
+          const handleClick = () => {
+            if (longPressFiredRef.current) {
+              longPressFiredRef.current = false;
+              return;
+            }
+            if (isSelected) onChange(id, -1);
+            else if (!disabled) onChange(id, 1);
+          };
           return (
             <button
               key={id}
               type="button"
-              onClick={() => onChange(id, 1)}
-              disabled={disabled}
+              onClick={handleClick}
+              onPointerDown={() => startLongPress(id)}
+              onPointerUp={clearLongPress}
+              onPointerLeave={clearLongPress}
+              onPointerCancel={clearLongPress}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                setTipId(id);
+              }}
+              disabled={disabled && !isSelected}
+              aria-label={`${meta.name} (${inventory[id]} available)${isSelected ? `, selected ${selectedAmount}` : ""}`}
               style={{
+                position: "relative",
+                aspectRatio: "1 / 1",
                 display: "grid",
-                gridTemplateColumns: "36px 1fr auto",
-                alignItems: "center",
-                gap: 10,
-                padding: 10,
-                borderRadius: 12,
+                placeItems: "center",
+                padding: 6,
+                borderRadius: 14,
                 border: `1px solid ${isSelected ? "var(--accent)" : "var(--border)"}`,
                 background: isSelected
                   ? "color-mix(in oklch, var(--accent) 18%, var(--surface-elevated))"
                   : "var(--surface)",
                 color: "var(--foreground)",
-                opacity: disabled ? 0.55 : 1,
-                cursor: disabled ? "not-allowed" : "pointer",
-                textAlign: "left",
+                opacity: disabled && !isSelected ? 0.45 : 1,
+                cursor: disabled && !isSelected ? "not-allowed" : "pointer",
+                touchAction: "manipulation",
               }}
             >
-              <span style={{ display: "grid", placeItems: "center" }} aria-hidden="true">
-                <PowerUpBadge icon={id} size={34} />
-              </span>
-              <span>
-                <span style={{ display: "block", fontWeight: 900, fontSize: 13 }}>{meta.name}</span>
-                <span style={{ display: "block", color: "var(--muted-foreground)", fontSize: 11 }}>
-                  {meta.description}
-                </span>
-              </span>
+              <PowerUpBadge icon={id} size={40} />
               <span
                 style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "flex-end",
-                  gap: 6,
-                  minWidth: 76,
-                  color: isSelected ? "var(--accent)" : "var(--muted-foreground)",
+                  position: "absolute",
+                  bottom: 4,
+                  right: 6,
+                  fontSize: 10,
                   fontWeight: 900,
                   fontVariantNumeric: "tabular-nums",
+                  color: isSelected ? "var(--accent)" : "var(--muted-foreground)",
                 }}
               >
-                {isSelected && (
-                  <span
-                    role="button"
-                    tabIndex={0}
-                    aria-label={`Remove ${meta.name} from selected inventory`}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onChange(id, -1);
-                    }}
-                    onKeyDown={(event) => {
-                      if (event.key !== "Enter" && event.key !== " ") return;
-                      event.preventDefault();
-                      event.stopPropagation();
-                      onChange(id, -1);
-                    }}
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      width: 24,
-                      height: 24,
-                      borderRadius: 8,
-                      background: "var(--surface-elevated)",
-                      border: "1px solid var(--border)",
-                      color: "var(--foreground)",
-                    }}
-                  >
-                    −
-                  </span>
-                )}
-                <span>
-                  {isSelected ? `${selectedAmount}/${inventory[id]}` : `×${inventory[id]}`}
-                </span>
+                {isSelected ? `${selectedAmount}/${inventory[id]}` : `×${inventory[id]}`}
               </span>
             </button>
           );
         })}
       </div>
+      {tipId && (
+        <div
+          role="status"
+          onClick={() => setTipId(null)}
+          style={{
+            marginTop: 10,
+            padding: "8px 10px",
+            borderRadius: 10,
+            background: "var(--surface-elevated)",
+            border: "1px solid var(--border)",
+            color: "var(--foreground)",
+            fontSize: 12,
+            lineHeight: 1.4,
+            cursor: "pointer",
+          }}
+        >
+          <div style={{ fontWeight: 900, marginBottom: 2 }}>{POWER_UP_INVENTORY_META[tipId].name}</div>
+          <div style={{ color: "var(--muted-foreground)" }}>
+            {POWER_UP_INVENTORY_META[tipId].description}
+          </div>
+        </div>
+      )}
       <div
         style={{
           marginTop: 14,
