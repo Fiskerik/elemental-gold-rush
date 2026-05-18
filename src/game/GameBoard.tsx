@@ -1025,6 +1025,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
         setGravityCharges(saved.gravityCharges);
         setEmissionCharges(saved.emissionCharges);
         setEmissionUnlockIndex(saved.emissionUnlockIndex);
+        setManualEmissionFloor(saved.manualEmissionFloor ?? 0);
         setTransmuteCharges(saved.transmuteCharges);
         setFusionJumpCharges(saved.fusionJumpCharges);
         setFusionJumpArmed(saved.fusionJumpArmed);
