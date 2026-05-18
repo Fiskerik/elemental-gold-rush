@@ -53,7 +53,7 @@ export const COMPOUNDS: CompoundDefinition[] = [
   compound("water", "Water", "H₂O", { H: 2, O: 1 }, 1500, "common", "Water is essential for life and covers about 71% of Earth's surface."),
   compound("carbon-dioxide", "Carbon Dioxide", "CO₂", { C: 1, O: 2 }, 1800, "common", "Carbon dioxide is used by plants in photosynthesis and gives fizzy drinks their bubbles."),
   compound("ammonia", "Ammonia", "NH₃", { N: 1, H: 3 }, 1700, "common", "Ammonia is a key ingredient for fertilizer production."),
-  compound("ammonium", "Ammonium", "NH₄", { N: 1, H: 4 }, 1900, "common", "Ammonium is a positively charged nitrogen-hydrogen ion found in many salts and fertilizers."),
+  compound("ammonium", "Ammonium", "NH₄⁺", { N: 1, H: 4 }, 1900, "common", "Ammonium is a positively charged nitrogen-hydrogen ion found in many salts and fertilizers."),
   compound("methane", "Methane", "CH₄", { C: 1, H: 4 }, 1800, "common", "Methane is the main component of natural gas."),
   compound("sodium-chloride", "Sodium Chloride", "NaCl", { Na: 1, Cl: 1 }, 1900, "common", "Sodium chloride is ordinary table salt."),
   compound("hydrogen-peroxide", "Hydrogen Peroxide", "H₂O₂", { H: 2, O: 2 }, 2200, "uncommon", "Hydrogen peroxide breaks down into water and oxygen."),

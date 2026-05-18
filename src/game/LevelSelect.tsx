@@ -203,12 +203,33 @@ export function LevelSelect({
                       animation: isCurrent ? "decay-warn-flash 1.6s ease-in-out infinite" : undefined,
                     }}
                   >
-                    {locked ? (
-                      <div style={{ fontSize: 22 }}>🔒</div>
-                    ) : isChallenge && challenge ? (
+                    {isChallenge && challenge ? (
                       <ChallengeMapNode compound={challenge} />
+                    ) : locked ? (
+                      <div style={{ fontSize: 22 }}>🔒</div>
                     ) : (
                       <ElementBall atomicNumber={lvl.targetElement} size={38} glow />
+                    )}
+                    {locked && isChallenge && (
+                      <div
+                        aria-hidden="true"
+                        style={{
+                          position: "absolute",
+                          right: -5,
+                          bottom: -5,
+                          width: 20,
+                          height: 20,
+                          borderRadius: 999,
+                          display: "grid",
+                          placeItems: "center",
+                          background: "var(--surface-elevated)",
+                          border: "1px solid var(--border)",
+                          fontSize: 11,
+                          fontWeight: 900,
+                        }}
+                      >
+                        🔒
+                      </div>
                     )}
                     <div
                       style={{

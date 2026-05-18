@@ -1,8 +1,25 @@
+export const POWER_UP_UNLOCK_LEVELS = {
+  shimmer: 3,
+  unstable: 5,
+  grab: 7,
+  egun: 9,
+  gravity: 11,
+  emission: 13,
+  transmute: 15,
+  "fusion-jump": 17,
+  catalyst: 19,
+  stone: 21,
+  gamma: 23,
+  molecule: 25,
+  blank: 27,
+  "queue-shuffle": 29,
+} as const;
+
 export const POWER_UPS = [
   {
     icon: "shimmer",
     name: "Shimmer Atom",
-    unlock: "Level 5",
+    unlock: `Level ${POWER_UP_UNLOCK_LEVELS.shimmer}`,
     effect: "A glowing atom gives 2x score and fills the Grab bar twice as fast when it merges.",
     description:
       "A glowing atom that gives 2x score and fills the Grab bar twice as fast when it merges.",
@@ -10,15 +27,15 @@ export const POWER_UPS = [
   {
     icon: "unstable",
     name: "Unstable Isotope",
-    unlock: "Level 15",
-    effect: "Rare queue atoms spawn with an 8-shot decay ring. Merge them to stabilize them.",
+    unlock: `Level ${POWER_UP_UNLOCK_LEVELS.unstable}`,
+    effect: "Rare queue atoms have a 6% spawn chance with an 8-shot decay ring. Merge them to stabilize them.",
     description:
-      "A rare radioactive queue atom. Its ring counts down after shots; merging stabilizes it into the new atom.",
+      "A rare radioactive queue atom with a 6% spawn chance. Its ring counts down after shots; merging stabilizes it into the new atom.",
   },
   {
     icon: "grab",
     name: "Grab",
-    unlock: "Level 4 / merge streak",
+    unlock: `Level ${POWER_UP_UNLOCK_LEVELS.grab} / merge streak`,
     effect: "Drag one atom to a new position and set up reactions.",
     description:
       "Earned after 8 consecutive merge progress. Drag one atom to reposition it and set up reactions.",
@@ -26,28 +43,28 @@ export const POWER_UPS = [
   {
     icon: "egun",
     name: "E-Gun",
-    unlock: "Level 6",
+    unlock: `Level ${POWER_UP_UNLOCK_LEVELS.egun}`,
     effect: "Fires a straight beam that upgrades each atom it touches by 1 tier.",
     description: "A straight beam that upgrades each atom it touches by 1 tier.",
   },
   {
     icon: "gravity",
     name: "Gravity",
-    unlock: "4x combo",
+    unlock: `Level ${POWER_UP_UNLOCK_LEVELS.gravity} / 4x combo`,
     effect: "Pulls atoms upward and immediately resolves any newly touching matches.",
     description: "Pulls atoms upward and lets any newly touching matches merge immediately.",
   },
   {
     icon: "emission",
     name: "Emission",
-    unlock: "Every 5 minutes",
+    unlock: `Level ${POWER_UP_UNLOCK_LEVELS.emission} / every 5 minutes`,
     effect: "Raises every atom currently waiting in your queue by 1 tier.",
     description: "Raises every atom currently waiting in your queue by 1 tier.",
   },
   {
     icon: "transmute",
     name: "Transmute Shot",
-    unlock: "Every 30 shots",
+    unlock: `Level ${POWER_UP_UNLOCK_LEVELS.transmute} / every 30 shots`,
     effect: "Rerolls the current queued atom into a higher tier.",
     description:
       "Rerolls the current queued atom into a higher tier. It cannot be canceled after use.",
@@ -55,14 +72,14 @@ export const POWER_UPS = [
   {
     icon: "fusion-jump",
     name: "Fusion Jump",
-    unlock: "Break a Stone",
+    unlock: `Level ${POWER_UP_UNLOCK_LEVELS["fusion-jump"]} / break a Stone`,
     effect: "Arms your next successful merge to skip one extra element tier.",
     description: "Arms your next successful merge to skip one extra element tier.",
   },
   {
     icon: "catalyst",
     name: "Catalyst Aura",
-    unlock: "4x combo",
+    unlock: `Level ${POWER_UP_UNLOCK_LEVELS.catalyst} / 4x combo`,
     effect: "Doubles fusion radius for the next 5 shots.",
     description:
       "Doubles fusion radius for the next 5 shots, shown by a green ring around the loaded atom.",
@@ -70,7 +87,7 @@ export const POWER_UPS = [
   {
     icon: "stone",
     name: "Stone",
-    unlock: "3 missed shots",
+    unlock: `Level ${POWER_UP_UNLOCK_LEVELS.stone} / 3 missed shots`,
     effect: "Loads a heavy obstacle projectile that shoves clusters and can be cracked for bonus points.",
     description:
       "A heavy obstacle projectile that shoves clusters and can be cracked for bonus points.",
@@ -78,7 +95,7 @@ export const POWER_UPS = [
   {
     icon: "gamma",
     name: "Gamma Bomb",
-    unlock: "Level 12 / every 40 shots",
+    unlock: `Level ${POWER_UP_UNLOCK_LEVELS.gamma} / every 40 shots`,
     effect: "Clears every non-stone atom in a wide blast radius.",
     description:
       "Arms a slow heavy projectile that clears every non-stone atom in a wide blast radius.",
@@ -86,7 +103,7 @@ export const POWER_UPS = [
   {
     icon: "molecule",
     name: "Compound",
-    unlock: "1 charge / 5 minutes",
+    unlock: `Level ${POWER_UP_UNLOCK_LEVELS.molecule} / 1 charge per 5 minutes`,
     effect: "Select board atoms to form a known compound, remove them, and earn a big bonus.",
     description:
       "Select board atoms with no more than 3 element types to form a known compound for a big bonus.",
@@ -94,14 +111,14 @@ export const POWER_UPS = [
   {
     icon: "blank",
     name: "Blank Atom",
-    unlock: "Level 10",
+    unlock: `Level ${POWER_UP_UNLOCK_LEVELS.blank}`,
     effect: "Copies the atom it hits, or erases a Stone completely.",
     description: "A rare wildcard that copies the atom it hits, or erases a Stone completely.",
   },
   {
     icon: "queue-shuffle",
     name: "Queue Shuffle",
-    unlock: "Every 15th Stone hit",
+    unlock: `Level ${POWER_UP_UNLOCK_LEVELS["queue-shuffle"]} / every 15th Stone hit`,
     effect: "Rerolls the 3 atoms currently waiting in your queue.",
     description:
       "Recycle your queue: instantly rerolls every atom currently waiting in your queue.",
