@@ -1150,6 +1150,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     setGravityCharges(0);
     setEmissionCharges(0);
     setEmissionUnlockIndex(0);
+    setManualEmissionFloor(0);
     setTransmuteCharges(0);
     setFusionJumpCharges(0);
     setFusionJumpArmed(false);
