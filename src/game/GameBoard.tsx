@@ -2396,8 +2396,6 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     // push it slightly along the projectile trajectory. Disabled: caused
     // random displacements and unintended cascade merges when the displaced
     // atom landed next to a same-type neighbor on the board.
-    void dirX;
-    void dirY;
     const nudged = impactBalls;
     if (matches.length === 0) {
       finalizePlacement(x, y, nudged, impactStoneBonus, activeAtom);
