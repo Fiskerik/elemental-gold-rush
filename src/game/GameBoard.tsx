@@ -3808,36 +3808,6 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
               />
             </div>
       </div>
-      {match && (
-        <div
-          style={{
-            marginTop: 10,
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            padding: 8,
-            borderRadius: 10,
-            background: "var(--surface)",
-            border: "1px solid var(--border)",
-          }}
-        >
-          <MoleculeVisual compound={match} size={62} />
-          <div style={{ minWidth: 0 }}>
-            <div
-              style={{
-                fontSize: 11,
-                letterSpacing: 1.4,
-                color: matchIsNew ? "var(--success, oklch(0.78 0.16 145))" : "var(--accent)",
-                fontWeight: 900,
-              }}
-            >
-              {matchIsNew ? "NEW COMPOUND PREVIEW" : "COMPOUND PREVIEW"}
-            </div>
-            <div style={{ fontSize: 14, fontWeight: 900 }}>{match.name}</div>
-            <div style={{ fontSize: 12, color: "var(--muted-foreground)" }}>{match.formula}</div>
-          </div>
-        </div>
-      )}
       <button
             type="button"
             className={continuingPastTarget ? "target-claim-flash" : undefined}
@@ -5424,6 +5394,36 @@ function CompoundSelectionPanel({
               Super Hint 100K
             </button>
           )}
+        </div>
+      )}
+      {match && (
+        <div
+          style={{
+            marginTop: 10,
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            padding: 8,
+            borderRadius: 10,
+            background: "var(--surface)",
+            border: "1px solid var(--border)",
+          }}
+        >
+          <MoleculeVisual compound={match} size={62} />
+          <div style={{ minWidth: 0 }}>
+            <div
+              style={{
+                fontSize: 11,
+                letterSpacing: 1.2,
+                color: matchIsNew ? "var(--success, oklch(0.78 0.16 145))" : "var(--accent)",
+                fontWeight: 900,
+              }}
+            >
+              {matchIsNew ? "NEW COMPOUND PREVIEW" : "COMPOUND PREVIEW"}
+            </div>
+            <div style={{ fontSize: 14, fontWeight: 900 }}>{match.name}</div>
+            <div style={{ fontSize: 12, color: "var(--muted-foreground)" }}>{match.formula}</div>
+          </div>
         </div>
       )}
       <button
