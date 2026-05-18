@@ -3175,6 +3175,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
       const spentAt = Date.now();
       saveCompoundChargeState(0, spentAt);
       setCompoundCharges(0);
+      compoundSpentAtElapsedRef.current = elapsedMs;
     }
     setCompoundMode(false);
     setSelectedCompoundIds(new Set());
