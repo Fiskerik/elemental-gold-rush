@@ -1473,17 +1473,17 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
   const eGunSize = eGunR * 2;
   const gammaR = Math.max(stoneR * 0.85, ballSize * 0.55);
   const gammaSize = gammaR * 2;
-  const projShotR = pendingStone
-    ? stoneR
-    : pendingGamma
+  const projShotR = pendingGamma
       ? gammaR
+    : pendingStone
+      ? stoneR
       : currentIsEGun
         ? eGunR
         : radiusFor(current);
-  const projShotSize = pendingStone
-    ? stoneSize
-    : pendingGamma
+  const projShotSize = pendingGamma
       ? gammaSize
+    : pendingStone
+      ? stoneSize
       : currentIsEGun
         ? eGunSize
         : sizeFor(current);
@@ -1924,7 +1924,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     trackShot(levelId, pendingStone ? -1 : currentIsEGun ? 0 : current, aimDeg, mode);
     queueUndoRef.current = null;
     setPendingReversiblePowerUp(null);
-    if (pendingGamma && !pendingStone) {
+    if (pendingGamma) {
       const hit = castRay(aimDeg);
       if (!hit) return;
       setBusy(true);
@@ -4375,10 +4375,10 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
               {showCatalystShotRadius && (
                 <CatalystRadiusRing radius={catalystShotRadius} size={projShotSize} />
               )}
-              {pendingStone ? (
-                <StoneVisual size={projShotSize} hp={STONE_MAX_HP} />
-              ) : pendingGamma ? (
+              {pendingGamma ? (
                 <GammaVisual size={projShotSize} />
+              ) : pendingStone ? (
+                <StoneVisual size={projShotSize} hp={STONE_MAX_HP} />
               ) : currentIsEGun ? (
                 <EGunVisual size={projShotSize} />
               ) : currentIsBlank ? (
@@ -4411,10 +4411,10 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
               <CatalystRadiusRing radius={catalystShotRadius} size={projShotSize} />
             )}
             {!projectile &&
-              (pendingStone ? (
-                <StoneVisual size={projShotSize} hp={STONE_MAX_HP} />
-              ) : pendingGamma ? (
+              (pendingGamma ? (
                 <GammaVisual size={projShotSize} />
+              ) : pendingStone ? (
+                <StoneVisual size={projShotSize} hp={STONE_MAX_HP} />
               ) : currentIsEGun ? (
                 <EGunVisual size={projShotSize} />
               ) : currentIsBlank ? (
