@@ -934,6 +934,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
       gravityCharges,
       emissionCharges,
       emissionUnlockIndex,
+      manualEmissionFloor,
       transmuteCharges,
       fusionJumpCharges,
       fusionJumpArmed,
