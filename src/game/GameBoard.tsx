@@ -1141,8 +1141,8 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     if (canIntroducePowerUps && initialUnstable.some(Boolean)) {
       showTip(
         "feature-unstable-isotope-first-spawn",
-        "Unstable isotope",
-        "A radioactive queue atom has appeared. Its ring ticks down after shots; merge it before it decays.",
+        "Unstable atom",
+        "An unstable atom is shielded like electron shells — row 1 takes 2 hits, row 2 takes 8, the rest 16. Merge it before the shells decay for 2× points.",
         "danger",
       );
     }
@@ -1167,8 +1167,14 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     if (isMoleculeChallenge) {
       setCompoundCharges(1);
     } else {
-      setCompoundCharges(0);
-      if (compoundEnabled) saveCompoundChargeState(0, Date.now());
+      // Every new run starts with 1 Compound charge when unlocked,
+      // regardless of pre-selected inventory power-ups.
+      if (compoundEnabled) {
+        setCompoundCharges(1);
+        saveCompoundChargeState(1, null);
+      } else {
+        setCompoundCharges(0);
+      }
     }
     setCompoundMode(false);
     setSelectedCompoundIds(new Set());
@@ -1480,8 +1486,8 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     if (canIntroducePowerUps && unstable) {
       showTip(
         "feature-unstable-isotope-first-spawn",
-        "Unstable isotope",
-        "A radioactive queue atom has appeared. Its ring ticks down after shots; merge it before it decays.",
+        "Unstable atom",
+        "An unstable atom is shielded like electron shells — row 1 takes 2 hits, row 2 takes 8, the rest 16. Merge it before the shells decay for 2× points.",
         "danger",
       );
     }
@@ -1537,6 +1543,17 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
   }) {
     if (stageClearTimeoutRef.current !== null) {
       window.clearTimeout(stageClearTimeoutRef.current);
+    }
+    // Record the cleared run immediately so campaign-map stats update
+    // even if the player exits before the result modal is dismissed.
+    if (!runRecordedRef.current) {
+      runRecordedRef.current = true;
+      recordLevelRun(levelId, {
+        score: stats.score,
+        shots: stats.shots,
+        powerUpsUsed: runPowerUpsUsedRef.current,
+        won: true,
+      });
     }
     // Clear any in-flight score/merge popups so they don't bleed into the
     // win animation or appear behind the result modal.
@@ -1750,8 +1767,8 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     if (!unstableEnabled || ball.stoneHp != null || ball.atom <= 1 || Math.random() >= chance) return ball;
     showTip(
       "feature-unstable-isotope-first-spawn",
-      "Unstable isotope",
-      "A radioactive atom has appeared. Its ring ticks down after shots; merge it before it decays.",
+      "Unstable atom",
+      "An unstable atom is shielded like electron shells — row 1 takes 2 hits, row 2 takes 8, the rest 16. Merge it before the shells decay for 2× points.",
       "danger",
     );
     return { ...ball, unstableShots: isotopeChargeCapacity(ball.atom) };
@@ -1761,7 +1778,8 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     if (!compound) return createSeededBoard();
     const recipeAtoms = atomsForCompound(compound);
     const highestRecipeAtom = Math.max(...recipeAtoms, 1);
-    const atoms = compound.id === "water" ? [7, 7, 1, 1] : [highestRecipeAtom];
+    const startingAtom = level.id >= 15 ? Math.max(1, highestRecipeAtom - 1) : highestRecipeAtom;
+    const atoms = compound.id === "water" ? [7, 7, 1, 1] : [startingAtom];
     const count = atoms.length;
     const maxR = Math.max(...atoms.map((atom) => radiusFor(atom)), radiusFor(1));
     const cols = Math.min(4, Math.max(2, Math.ceil(Math.sqrt(count))));

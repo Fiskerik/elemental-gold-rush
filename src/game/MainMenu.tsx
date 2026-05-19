@@ -204,6 +204,9 @@ export function MainMenu({
               <div style={{ fontSize: 12, color: "var(--muted-foreground)" }}>
                 Streak {dailyStreak} - {completedDailyQuests}/{dailyQuests.length} quests
               </div>
+              <div style={{ fontSize: 11, color: "var(--muted-foreground)", marginTop: 2 }}>
+                Complete 4 of 6 quests to claim 20,000 points.
+              </div>
             </div>
             <button
               onClick={claimDailyReward}

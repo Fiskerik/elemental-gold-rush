@@ -105,6 +105,9 @@ export function Profile({ onBack }: Props) {
           <div style={sectionHeading}>Daily Lab</div>
           <div style={{ color: "var(--muted-foreground)", fontSize: 13, marginBottom: 12 }}>
             {completedDailyQuests}/{dailyQuests.length} quests complete today.
+            <div style={{ fontSize: 12, marginTop: 4 }}>
+              Complete 4 of 6 quests to claim the daily prize of 20,000 points.
+            </div>
           </div>
           <div style={{ display: "grid", gap: 8 }}>
             {dailyQuests.map((quest) => (
