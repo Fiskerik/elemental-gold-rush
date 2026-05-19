@@ -2,12 +2,14 @@ import { useState } from "react";
 import { PRODUCT_IDS, getProductById } from "./products";
 import { purchaseProduct, restorePurchases } from "./purchases";
 import { type InventoryPowerUpId, useProgress } from "./store";
+import { POWER_UP_UNLOCK_LEVELS } from "./powerUps";
 
 const SHOP_POWER_UPS: Array<{
   id: InventoryPowerUpId;
   icon: string;
   name: string;
   cost: number;
+  unlockLevel: number;
   description: string;
 }> = [
   {
@@ -15,6 +17,7 @@ const SHOP_POWER_UPS: Array<{
     icon: "🔀",
     name: "Transmute Shot",
     cost: 10000,
+    unlockLevel: POWER_UP_UNLOCK_LEVELS.transmute,
     description: "Reroll the loaded atom into a higher tier at the start of a run.",
   },
   {
@@ -22,6 +25,7 @@ const SHOP_POWER_UPS: Array<{
     icon: "⏭",
     name: "Fusion Jump",
     cost: 6000,
+    unlockLevel: POWER_UP_UNLOCK_LEVELS["fusion-jump"],
     description: "Save a tier-skipping merge for a future level opening.",
   },
   {
@@ -29,6 +33,7 @@ const SHOP_POWER_UPS: Array<{
     icon: "🧪",
     name: "Catalyst Aura",
     cost: 10000,
+    unlockLevel: POWER_UP_UNLOCK_LEVELS.catalyst,
     description: "Start a level with 5 shots of wider fusion radius available.",
   },
   {
@@ -36,6 +41,7 @@ const SHOP_POWER_UPS: Array<{
     icon: "☢",
     name: "Emission",
     cost: 15000,
+    unlockLevel: POWER_UP_UNLOCK_LEVELS.emission,
     description: "Raise your starting queue when a level needs a quick push.",
   },
   {
@@ -43,6 +49,7 @@ const SHOP_POWER_UPS: Array<{
     icon: "🌀",
     name: "Gravity",
     cost: 6000,
+    unlockLevel: POWER_UP_UNLOCK_LEVELS.gravity,
     description: "Bank a board-lifting move for a difficult future board.",
   },
   {
@@ -50,6 +57,7 @@ const SHOP_POWER_UPS: Array<{
     icon: "🤚",
     name: "Grab",
     cost: 20000,
+    unlockLevel: POWER_UP_UNLOCK_LEVELS.grab,
     description: "Bring a saved reposition move into your next level.",
   },
   {
@@ -57,12 +65,13 @@ const SHOP_POWER_UPS: Array<{
     icon: "☢",
     name: "Gamma Bomb",
     cost: 15000,
+    unlockLevel: POWER_UP_UNLOCK_LEVELS.gamma,
     description: "Stock a wide-radius blast that clears surrounding non-stone atoms.",
   },
 ];
 
 export function Shop({ onBack }: { onBack: () => void }) {
-  const { hasProPack, grantProPack, totalScore, powerUpInventory, purchaseInventoryPowerUp } =
+  const { hasProPack, grantProPack, totalScore, unlockedLevel, powerUpInventory, purchaseInventoryPowerUp } =
     useProgress();
   const [message, setMessage] = useState("");
   const proPack = getProductById(PRODUCT_IDS.proLabPack);
@@ -77,7 +86,16 @@ export function Shop({ onBack }: { onBack: () => void }) {
     setMessage("Native App Store purchase support is not available in this web build yet.");
   }
 
-  function handlePowerUpPurchase(powerUp: InventoryPowerUpId, cost: number, name: string) {
+  function handlePowerUpPurchase(
+    powerUp: InventoryPowerUpId,
+    cost: number,
+    name: string,
+    unlockLevel: number,
+  ) {
+    if (unlockedLevel < unlockLevel) {
+      setMessage(`${name} unlocks at level ${unlockLevel}.`);
+      return;
+    }
     const purchased = purchaseInventoryPowerUp(powerUp, cost);
     setMessage(
       purchased
@@ -262,7 +280,9 @@ export function Shop({ onBack }: { onBack: () => void }) {
           </p>
           <div style={{ display: "grid", gap: 10 }}>
             {SHOP_POWER_UPS.map((powerUp) => {
+              const isUnlocked = unlockedLevel >= powerUp.unlockLevel;
               const canAfford = totalScore >= powerUp.cost;
+              const canPurchase = isUnlocked && canAfford;
               return (
                 <div
                   key={powerUp.id}
@@ -288,22 +308,31 @@ export function Shop({ onBack }: { onBack: () => void }) {
                       {powerUp.description}
                     </div>
                     <div style={{ fontSize: 11, color: "var(--accent)", marginTop: 3 }}>
-                      Owned: {powerUpInventory[powerUp.id]}
+                      {isUnlocked
+                        ? `Owned: ${powerUpInventory[powerUp.id]}`
+                        : `Unlocks at level ${powerUp.unlockLevel}`}
                     </div>
                   </div>
                   <button
                     type="button"
-                    onClick={() => handlePowerUpPurchase(powerUp.id, powerUp.cost, powerUp.name)}
-                    disabled={!canAfford}
+                    onClick={() =>
+                      handlePowerUpPurchase(
+                        powerUp.id,
+                        powerUp.cost,
+                        powerUp.name,
+                        powerUp.unlockLevel,
+                      )
+                    }
+                    disabled={!canPurchase}
                     style={{
                       ...shopButton,
                       padding: "9px 10px",
                       minWidth: 78,
-                      opacity: canAfford ? 1 : 0.55,
-                      cursor: canAfford ? "pointer" : "not-allowed",
+                      opacity: canPurchase ? 1 : 0.55,
+                      cursor: canPurchase ? "pointer" : "not-allowed",
                     }}
                   >
-                    {powerUp.cost.toLocaleString()}
+                    {isUnlocked ? powerUp.cost.toLocaleString() : `Level ${powerUp.unlockLevel}`}
                   </button>
                 </div>
               );

@@ -216,19 +216,19 @@ function hasPowerUps(inventory: Partial<Record<InventoryPowerUpId, number>>): bo
 }
 
 function loadCompoundChargeState(): { charges: number; spentAt: number | null } {
-  if (typeof window === "undefined") return { charges: 1, spentAt: null };
+  if (typeof window === "undefined") return { charges: 0, spentAt: null };
   try {
     const raw = window.localStorage.getItem(COMPOUND_STORAGE_KEY);
-    if (!raw) return { charges: 1, spentAt: null };
+    if (!raw) return { charges: 0, spentAt: null };
     const parsed = JSON.parse(raw) as { charges?: number; spentAt?: number | null };
     const spentAt = typeof parsed.spentAt === "number" ? parsed.spentAt : null;
-    const charges = Math.min(1, Math.max(0, Math.floor(parsed.charges ?? 1)));
+    const charges = Math.min(1, Math.max(0, Math.floor(parsed.charges ?? 0)));
     if (charges <= 0 && spentAt != null && Date.now() - spentAt >= COMPOUND_REGEN_MS) {
       return { charges: 1, spentAt: null };
     }
     return { charges, spentAt };
   } catch {
-    return { charges: 1, spentAt: null };
+    return { charges: 0, spentAt: null };
   }
 }
 
@@ -793,6 +793,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     [level.id],
   );
   const isMoleculeChallenge = moleculeObjective != null && mode === "campaign";
+  const canIntroducePowerUps = mode === "campaign" && !isMoleculeChallenge;
   const unstableEnabled = level.id >= UNSTABLE_UNLOCK_LEVEL;
   const current = queue[0];
   const currentIsShimmer = shimmerQueue[0] ?? false;
@@ -958,6 +959,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
   }
 
   useEffect(() => {
+    if (isMoleculeChallenge || !compoundEnabled) return;
     if (paused) return;
     const refresh = () => {
       const state = loadCompoundChargeState();
@@ -967,7 +969,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     refresh();
     const timer = window.setInterval(refresh, 15_000);
     return () => window.clearInterval(timer);
-  }, [paused]);
+  }, [compoundEnabled, isMoleculeChallenge, paused]);
 
   useEffect(() => {
     if (resumeSavedRun) {
@@ -997,6 +999,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
         setGrabs(saved.grabs);
         setGrabMode(false);
         setGrabbing(null);
+        setCompoundCharges(saved.compoundCharges);
         setCompoundMode(false);
         setSelectedCompoundIds(new Set());
         setCompoundFx(null);
@@ -1095,7 +1098,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     setEGunQueue(initialEGun);
     setBlankQueue(initialBlank);
     setUnstableQueue(initialUnstable);
-    if (initialUnstable.some(Boolean)) {
+    if (canIntroducePowerUps && initialUnstable.some(Boolean)) {
       showTip(
         "feature-unstable-isotope-first-spawn",
         "Unstable isotope",
@@ -1120,6 +1123,12 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     setGrabs(0);
     setGrabMode(false);
     setGrabbing(null);
+    if (isMoleculeChallenge) {
+      setCompoundCharges(1);
+    } else {
+      setCompoundCharges(0);
+      if (compoundEnabled) saveCompoundChargeState(0, Date.now());
+    }
     setCompoundMode(false);
     setSelectedCompoundIds(new Set());
     setCompoundFx(null);
@@ -1171,14 +1180,14 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     setElapsedMs(0);
     trackGameStart(levelId, mode);
     // Per-level intro tooltips for newly unlocked features.
-    if (level.id >= SHIMMER_MIN_LEVEL) {
+    if (canIntroducePowerUps && level.id >= SHIMMER_MIN_LEVEL) {
       showTip(
         "feature-shimmer-unlock",
         "✦ Shimmering atoms unlocked",
         "Some atoms in your queue now shimmer with a rainbow halo. Land a successful merge with one to score 2× points and fill the Grab combo bar twice as fast.",
       );
     }
-    if (level.id >= GRAB_MIN_LEVEL) {
+    if (canIntroducePowerUps && level.id >= GRAB_MIN_LEVEL) {
       // First-ever Grab unlock: give one free charge so the player can try it immediately.
       if (!seenTips.includes("feature-grab-unlock")) {
         setGrabs((g) => g + 1);
@@ -1190,7 +1199,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
         "Build the Grab combo bar by making 8 merge progress in a row. When it fills, tap the Grab button (bottom-right), then drag any atom on the board to a new position — surrounding atoms slide out of the way to make room. Use it to set up huge merge chains.",
       );
     }
-    if (level.id >= BLANK_MIN_LEVEL) {
+    if (canIntroducePowerUps && level.id >= BLANK_MIN_LEVEL) {
       showTip(
         "feature-blank-unlock",
         "✦ Blank atom unlocked!",
@@ -1202,7 +1211,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
 
   // Show a one-time tooltip the first time a shimmer atom appears in the queue.
   useEffect(() => {
-    if (!shimmerEnabled) return;
+    if (!canIntroducePowerUps || !shimmerEnabled) return;
     if (shimmerQueue.some(Boolean)) {
       showTip(
         "feature-shimmer-spawn",
@@ -1211,12 +1220,12 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
       );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shimmerQueue, shimmerEnabled]);
+  }, [shimmerQueue, shimmerEnabled, canIntroducePowerUps]);
 
   // Show the E-gun explanation the first time an E-gun shot actually appears
   // in the queue (not on every level 6+ start).
   useEffect(() => {
-    if (!eGunEnabled) return;
+    if (!canIntroducePowerUps || !eGunEnabled) return;
     if (eGunQueue.some(Boolean)) {
       showTip(
         "feature-egun-unlock",
@@ -1225,7 +1234,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
       );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [eGunQueue, eGunEnabled]);
+  }, [eGunQueue, eGunEnabled, canIntroducePowerUps]);
 
   // Tick the run timer every second while the level is active.
   useEffect(() => {
@@ -1254,13 +1263,15 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     setEmissionCharges((g) => g + 1);
     setEmissionUnlockIndex((i) => i + 1);
     spawnPopup("☢ EMISSION READY");
-    showTip(
-      "feature-emission-powerup",
-      "☢ Emission power-up ready!",
-      "Emission unlocks every 5 minutes. Tap it to raise every atom currently waiting in your queue by 1 tier.",
-    );
+    if (canIntroducePowerUps) {
+      showTip(
+        "feature-emission-powerup",
+        "☢ Emission power-up ready!",
+        "Emission unlocks every 5 minutes. Tap it to raise every atom currently waiting in your queue by 1 tier.",
+      );
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [elapsedMs, gameOver, won, emissionUnlockIndex, emissionEnabled]);
+  }, [elapsedMs, gameOver, won, emissionUnlockIndex, emissionEnabled, canIntroducePowerUps]);
 
   // Spawn-floor scaling — level 10+: every 2 minutes raise the lowest
   // spawnable tier so runs don't drag on with low-value atoms.
@@ -1336,20 +1347,24 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     if (gravityEnabled) {
       setGravityCharges((g) => g + 1);
       spawnPopup("GRAVITY READY");
-      showTip(
-        "feature-gravity-powerup",
-        "Gravity power-up ready!",
-        "A 4x combo unlocks Gravity. Tap the Gravity button to make every atom fall upward; any combinations formed still count toward Grab progress and quest progress.",
-      );
+      if (canIntroducePowerUps) {
+        showTip(
+          "feature-gravity-powerup",
+          "Gravity power-up ready!",
+          "A 4x combo unlocks Gravity. Tap the Gravity button to make every atom fall upward; any combinations formed still count toward Grab progress and quest progress.",
+        );
+      }
     }
     if (catalystEnabled) {
       setCatalystCharges((g) => g + 1);
       spawnPopup("CATALYST READY");
-      showTip(
-        "feature-catalyst-powerup",
-        "Catalyst Aura ready!",
-        "A 4x combo unlocked Catalyst Aura. Activate it to double fusion range for your next 5 shots.",
-      );
+      if (canIntroducePowerUps) {
+        showTip(
+          "feature-catalyst-powerup",
+          "Catalyst Aura ready!",
+          "A 4x combo unlocked Catalyst Aura. Activate it to double fusion range for your next 5 shots.",
+        );
+      }
     }
   }
 
@@ -1357,31 +1372,37 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     if (!fusionJumpEnabled || count <= 0) return;
     setFusionJumpCharges((g) => g + count);
     spawnPopup(count > 1 ? `⏭ FUSION JUMP ×${count}` : "⏭ FUSION JUMP READY");
-    showTip(
-      "feature-fusion-jump-powerup",
-      "⏭ Fusion Jump ready!",
-      "Breaking a Stone completely unlocks Fusion Jump. Arm it to make your next merge skip one element tier.",
-    );
+    if (canIntroducePowerUps) {
+      showTip(
+        "feature-fusion-jump-powerup",
+        "⏭ Fusion Jump ready!",
+        "Breaking a Stone completely unlocks Fusion Jump. Arm it to make your next merge skip one element tier.",
+      );
+    }
   }
 
   function applyShotMilestones(nextShots: number) {
     if (transmuteEnabled && nextShots > 0 && nextShots % TRANSMUTE_SHOT_INTERVAL === 0) {
       setTransmuteCharges((g) => g + 1);
       spawnPopup("🔀 TRANSMUTE READY");
-      showTip(
-        "feature-transmute-powerup",
-        "🔀 Transmute Shot ready!",
-        "Every 30 shots earns Transmute. Activate it to reroll your queued atom into a higher-tier atom.",
-      );
+      if (canIntroducePowerUps) {
+        showTip(
+          "feature-transmute-powerup",
+          "🔀 Transmute Shot ready!",
+          "Every 30 shots earns Transmute. Activate it to reroll your queued atom into a higher-tier atom.",
+        );
+      }
     }
     if (gammaEnabled && nextShots > 0 && nextShots % GAMMA_SHOT_INTERVAL === 0) {
       setGammaCharges((g) => g + 1);
       spawnPopup("☢ GAMMA READY");
-      showTip(
-        "feature-gamma-powerup",
-        "☢ Gamma Bomb ready!",
-        "Every 40 shots after level 12 earns a Gamma Bomb. Activate it, aim, and fire: a slow heavy projectile clears every non-stone atom in a wide radius.",
-      );
+      if (canIntroducePowerUps) {
+        showTip(
+          "feature-gamma-powerup",
+          "☢ Gamma Bomb ready!",
+          "Every 40 shots after level 12 earns a Gamma Bomb. Activate it, aim, and fire: a slow heavy projectile clears every non-stone atom in a wide radius.",
+        );
+      }
     }
     setCatalystShotsRemaining((remaining) => Math.max(0, remaining - 1));
   }
@@ -1415,7 +1436,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     const atom = generateQueueAtom(maxElement, board, shimmer);
     const unstable =
       !eGun && !blank && unstableEnabled && atom > 1 && Math.random() < UNSTABLE_SPAWN_CHANCE;
-    if (unstable) {
+    if (canIntroducePowerUps && unstable) {
       showTip(
         "feature-unstable-isotope-first-spawn",
         "Unstable isotope",
@@ -1430,6 +1451,15 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
       blank,
       unstable,
     };
+  }
+
+  function advanceQueueAfterFiredShot(board: Board = balls) {
+    const nextSlot = makeNextQueueSlot(dynamicMaxQueue(board.length), board);
+    setQueue((q) => [...q.slice(1), nextSlot.atom]);
+    setShimmerQueue((s) => [...s.slice(1), nextSlot.shimmer]);
+    setEGunQueue((e) => [...e.slice(1), nextSlot.eGun]);
+    setBlankQueue((b) => [...b.slice(1), nextSlot.blank]);
+    setUnstableQueue((u) => [...u.slice(1), nextSlot.unstable]);
   }
 
   function spawnPopup(text: string) {
@@ -2030,6 +2060,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
         i++;
         if (i >= beam.path.length) {
           clearInterval(interval);
+          advanceQueueAfterFiredShot();
           setProjectile(null);
           setEGunBeamPath(null);
           setGravityFxId(null);
@@ -2055,12 +2086,13 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     let i = 0;
     setProjectile(path[0]);
     const interval = setInterval(() => {
-      i++;
-      if (i >= path.length) {
-        clearInterval(interval);
-        setProjectile(null);
-        setGravityFxId(null);
-        triggerImpact(hit.x, hit.y, hit.hitId, hit.dx, hit.dy, hit.stoneHitIds);
+        i++;
+        if (i >= path.length) {
+          clearInterval(interval);
+          if (!pendingStone) advanceQueueAfterFiredShot();
+          setProjectile(null);
+          setGravityFxId(null);
+          triggerImpact(hit.x, hit.y, hit.hitId, hit.dx, hit.dy, hit.stoneHitIds);
       } else {
         setProjectile(path[i]);
       }
@@ -2124,12 +2156,6 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
       showStageClearAnimation({ stars, score, shots: nextShots, bestCombo: runBestCombo });
       return;
     }
-    const nextSlot = makeNextQueueSlot(dynamicMaxQueue(updatedWithEffects.length), updatedWithEffects);
-    setQueue((q) => [...q.slice(1), nextSlot.atom]);
-    setShimmerQueue((s) => [...s.slice(1), nextSlot.shimmer]);
-    setEGunQueue((e) => [...e.slice(1), nextSlot.eGun]);
-    setBlankQueue((b) => [...b.slice(1), nextSlot.blank]);
-    setUnstableQueue((u) => [...u.slice(1), nextSlot.unstable]);
     if (checkGameOver(updatedWithEffects, geo)) {
       trackGameOver(levelId, score, nextShots, highest, mode);
       setGameOver(true);
@@ -2411,12 +2437,6 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
         setNoMergeStreak(0);
         spawnPopup("✦ STONE ERASED");
         haptic([30, 60, 30, 90]);
-        const nextSlot = makeNextQueueSlot(dynamicMaxQueue(updated.length), updated);
-        setQueue((q) => [...q.slice(1), nextSlot.atom]);
-        setShimmerQueue((sq) => [...sq.slice(1), nextSlot.shimmer]);
-        setEGunQueue((eq) => [...eq.slice(1), nextSlot.eGun]);
-        setBlankQueue((bq) => [...bq.slice(1), nextSlot.blank]);
-        setUnstableQueue((uq) => [...uq.slice(1), nextSlot.unstable]);
         setBusy(false);
         return;
       }
@@ -2845,25 +2865,11 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
             shots: nextShots,
             bestCombo: nextBestCombo,
           });
-          // Advance the queue so play can resume if the user keeps going.
-          const nextSlot = makeNextQueueSlot(dynamicMaxQueue(result.balls.length), result.balls);
-          setQueue((q) => [...q.slice(1), nextSlot.atom]);
-          setShimmerQueue((s) => [...s.slice(1), nextSlot.shimmer]);
-          setEGunQueue((e) => [...e.slice(1), nextSlot.eGun]);
-          setBlankQueue((b) => [...b.slice(1), nextSlot.blank]);
-          setUnstableQueue((u) => [...u.slice(1), nextSlot.unstable]);
           return;
         }
         if (firstDiscovery && firstDiscovery > 1) {
           setDiscoveryEl(firstDiscovery);
         }
-        // Advance queue (functional update — guarantees fresh state)
-        const nextSlot = makeNextQueueSlot(dynamicMaxQueue(result.balls.length), result.balls);
-        setQueue((q) => [...q.slice(1), nextSlot.atom]);
-        setShimmerQueue((s) => [...s.slice(1), nextSlot.shimmer]);
-        setEGunQueue((e) => [...e.slice(1), nextSlot.eGun]);
-        setBlankQueue((b) => [...b.slice(1), nextSlot.blank]);
-        setUnstableQueue((u) => [...u.slice(1), nextSlot.unstable]);
         if (checkGameOver(result.balls, geo)) {
           trackGameOver(levelId, nextScore, nextShots, nextHighest, mode);
           setGameOver(true);
@@ -2924,11 +2930,13 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     setGammaCharges((count) => count + selectedInventoryPowerUps.gamma);
     if (selectedCount > 0) {
       spawnPopup(`🎒 LOADED ×${selectedCount}`);
-      showTip(
-        "feature-inventory-start",
-        "🎒 Inventory loaded",
-        "Unused power-ups are saved after a run. At the start of a level, choose up to 3 from your inventory to begin with an early strategy boost.",
-      );
+      if (canIntroducePowerUps) {
+        showTip(
+          "feature-inventory-start",
+          "🎒 Inventory loaded",
+          "Unused power-ups are saved after a run. At the start of a level, choose up to 3 from your inventory to begin with an early strategy boost.",
+        );
+      }
     }
     setSelectedInventoryPowerUps(emptyPowerUpInventory());
     setInventoryPickerOpen(false);
@@ -4527,18 +4535,20 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-start", flex: "0 0 auto" }}>
             {queue
               .slice(1)
-              .map((n, i) =>
-                eGunQueue[i + 1] ? (
-                  <EGunVisual key={i} size={32 - i * 3} />
-                ) : blankQueue[i + 1] ? (
-                  <BlankAtomVisual key={i} size={32 - i * 3} />
+              .map((atom, index) => ({ atom, queueIndex: index + 1, distance: index }))
+              .reverse()
+              .map(({ atom, queueIndex, distance }) =>
+                eGunQueue[queueIndex] ? (
+                  <EGunVisual key={queueIndex} size={32 - distance * 3} />
+                ) : blankQueue[queueIndex] ? (
+                  <BlankAtomVisual key={queueIndex} size={32 - distance * 3} />
                 ) : (
                   <ElementBall
-                    key={i}
-                    atomicNumber={n}
-                    size={32 - i * 3}
-                    shimmer={shimmerQueue[i + 1]}
-                    unstableShots={unstableQueue[i + 1] ? UNSTABLE_SEGMENTS : undefined}
+                    key={queueIndex}
+                    atomicNumber={atom}
+                    size={32 - distance * 3}
+                    shimmer={shimmerQueue[queueIndex]}
+                    unstableShots={unstableQueue[queueIndex] ? UNSTABLE_SEGMENTS : undefined}
                   />
                 ),
               )}
@@ -5188,6 +5198,16 @@ function FeatureTip({
   );
 }
 
+function selectedPowerUpSlots(selected: PowerUpInventory): InventoryPowerUpId[] {
+  const slots: InventoryPowerUpId[] = [];
+  for (const id of Object.keys(POWER_UP_INVENTORY_META) as InventoryPowerUpId[]) {
+    for (let i = 0; i < selected[id] && slots.length < INVENTORY_PICK_LIMIT; i++) {
+      slots.push(id);
+    }
+  }
+  return slots;
+}
+
 function InventoryStartModal({
   inventory,
   selected,
@@ -5202,6 +5222,7 @@ function InventoryStartModal({
   onBack: () => void;
 }) {
   const selectedCount = countPowerUps(selected);
+  const selectedSlots = selectedPowerUpSlots(selected);
   const availablePowerUps = (Object.keys(POWER_UP_INVENTORY_META) as InventoryPowerUpId[]).filter(
     (id) => inventory[id] > 0,
   );
@@ -5213,9 +5234,54 @@ function InventoryStartModal({
       </div>
       <h2 style={{ margin: "0 0 8px", fontSize: 24, fontWeight: 900 }}>Pick up to 3 boosts</h2>
       <p style={{ margin: "0 0 14px", color: "var(--muted-foreground)", fontSize: 13 }}>
-        Saved unused power-ups can be loaded before a level starts. Tap a selected card again to add
-        copies, or use minus to remove them.
+        Fill up to 3 starting slots from your saved power-ups. Tap a filled slot to remove it.
       </p>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: `repeat(${INVENTORY_PICK_LIMIT}, minmax(0, 1fr))`,
+          gap: 8,
+          marginBottom: 12,
+        }}
+      >
+        {Array.from({ length: INVENTORY_PICK_LIMIT }, (_, i) => {
+          const id = selectedSlots[i];
+          const meta = id ? POWER_UP_INVENTORY_META[id] : null;
+          return (
+            <button
+              key={i}
+              type="button"
+              onClick={() => {
+                if (id) onChange(id, -1);
+              }}
+              aria-label={id ? `Remove ${meta?.name} from slot ${i + 1}` : `Empty slot ${i + 1}`}
+              style={{
+                minHeight: 82,
+                borderRadius: 12,
+                border: `1px solid ${id ? "var(--accent)" : "var(--border)"}`,
+                background: id
+                  ? "color-mix(in oklch, var(--accent) 16%, var(--surface-elevated))"
+                  : "var(--surface)",
+                color: id ? "var(--foreground)" : "var(--muted-foreground)",
+                display: "grid",
+                placeItems: "center",
+                gap: 4,
+                cursor: id ? "pointer" : "default",
+                fontWeight: 900,
+              }}
+            >
+              {id ? (
+                <>
+                  <PowerUpBadge icon={id} size={34} />
+                  <span style={{ fontSize: 10 }}>{meta?.name}</span>
+                </>
+              ) : (
+                <span style={{ fontSize: 11 }}>Empty</span>
+              )}
+            </button>
+          );
+        })}
+      </div>
       <div style={{ display: "grid", gap: 8 }}>
         {availablePowerUps.map((id) => {
           const meta = POWER_UP_INVENTORY_META[id];
