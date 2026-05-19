@@ -1141,8 +1141,8 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     if (canIntroducePowerUps && initialUnstable.some(Boolean)) {
       showTip(
         "feature-unstable-isotope-first-spawn",
-        "Unstable isotope",
-        "A radioactive queue atom has appeared. Its ring ticks down after shots; merge it before it decays.",
+        "Unstable atom",
+        "An unstable atom is shielded like electron shells — row 1 takes 2 hits, row 2 takes 8, the rest 16. Merge it before the shells decay for 2× points.",
         "danger",
       );
     }
@@ -1480,8 +1480,8 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     if (canIntroducePowerUps && unstable) {
       showTip(
         "feature-unstable-isotope-first-spawn",
-        "Unstable isotope",
-        "A radioactive queue atom has appeared. Its ring ticks down after shots; merge it before it decays.",
+        "Unstable atom",
+        "An unstable atom is shielded like electron shells — row 1 takes 2 hits, row 2 takes 8, the rest 16. Merge it before the shells decay for 2× points.",
         "danger",
       );
     }
@@ -1749,8 +1749,8 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     if (!unstableEnabled || ball.stoneHp != null || ball.atom <= 1 || Math.random() >= chance) return ball;
     showTip(
       "feature-unstable-isotope-first-spawn",
-      "Unstable isotope",
-      "A radioactive atom has appeared. Its ring ticks down after shots; merge it before it decays.",
+      "Unstable atom",
+      "An unstable atom is shielded like electron shells — row 1 takes 2 hits, row 2 takes 8, the rest 16. Merge it before the shells decay for 2× points.",
       "danger",
     );
     return { ...ball, unstableShots: isotopeChargeCapacity(ball.atom) };
