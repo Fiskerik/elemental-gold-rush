@@ -10,7 +10,7 @@ export const POWER_UP_UNLOCK_LEVELS = {
   catalyst: 14,
   stone: 16,
   gamma: 17,
-  molecule: 18,
+  molecule: 1,
   blank: 19,
   "queue-shuffle": 21,
 } as const;
@@ -103,10 +103,10 @@ export const POWER_UPS = [
   {
     icon: "molecule",
     name: "Compound",
-    unlock: `Level ${POWER_UP_UNLOCK_LEVELS.molecule} / 1 charge per 5 minutes`,
+    unlock: `Level ${POWER_UP_UNLOCK_LEVELS.molecule}`,
     effect: "Select board atoms to form a known compound, remove them, and earn a big bonus.",
     description:
-      "Select board atoms with no more than 3 element types to form a known compound for a big bonus.",
+      "Available from the start of campaign runs. Select board atoms with no more than 3 element types to form a known compound for a big bonus.",
   },
   {
     icon: "blank",

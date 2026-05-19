@@ -1,40 +1,25 @@
-export type WeeklyPlayMilestoneId = "mon-wed" | "thu-sat" | "full-week";
-
 export interface WeeklyPlayBonusState {
-  weekStartDate: string;
+  lastClaimDate: string | null;
+  currentStreak: number;
   claimedDates: string[];
-  awardedMilestones: WeeklyPlayMilestoneId[];
 }
 
 export interface WeeklyPlayBonusDay {
-  dateKey: string;
+  index: number;
   label: string;
   rewardLabel: string;
   claimed: boolean;
   isToday: boolean;
-  isPast: boolean;
 }
 
 export interface WeeklyPlayBonusView {
   days: WeeklyPlayBonusDay[];
-  claimedCount: number;
-  weekCoinsEarned: number;
+  currentStreak: number;
+  cycleProgress: number;
   todayClaimed: boolean;
+  coinsEarnedToday: number;
   nextRewardText: string;
 }
-
-const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
-const WEEKDAY_REWARD_LABELS = ["1/3", "2/3", "+1", "1/3", "2/3", "+1", "+2"] as const;
-
-const WEEKLY_PLAY_MILESTONES: Array<{
-  id: WeeklyPlayMilestoneId;
-  dayIndices: number[];
-  coins: number;
-}> = [
-  { id: "mon-wed", dayIndices: [0, 1, 2], coins: 1 },
-  { id: "thu-sat", dayIndices: [3, 4, 5], coins: 1 },
-  { id: "full-week", dayIndices: [0, 1, 2, 3, 4, 5, 6], coins: 2 },
-];
 
 function pad2(value: number): string {
   return String(value).padStart(2, "0");
@@ -49,48 +34,28 @@ function fromDateKey(dateKey: string): Date {
   return new Date(year, month - 1, day);
 }
 
-function addDays(date: Date, days: number): Date {
-  const next = new Date(date);
-  next.setDate(next.getDate() + days);
-  return next;
+function daysBetween(fromDateKeyValue: string, toDateKeyValue: string): number {
+  const from = fromDateKey(fromDateKeyValue);
+  const to = fromDateKey(toDateKeyValue);
+  const msPerDay = 24 * 60 * 60 * 1000;
+  return Math.round((to.getTime() - from.getTime()) / msPerDay);
 }
 
-export function getWeeklyPlayWeekStart(date = new Date()): string {
-  const start = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  const mondayOffset = (start.getDay() + 6) % 7;
-  start.setDate(start.getDate() - mondayOffset);
-  return toDateKey(start);
-}
-
-export function createWeeklyPlayBonus(date = new Date()): WeeklyPlayBonusState {
+export function createWeeklyPlayBonus(): WeeklyPlayBonusState {
   return {
-    weekStartDate: getWeeklyPlayWeekStart(date),
+    lastClaimDate: null,
+    currentStreak: 0,
     claimedDates: [],
-    awardedMilestones: [],
   };
-}
-
-function getWeekDateKeys(weekStartDate: string): string[] {
-  const weekStart = fromDateKey(weekStartDate);
-  return WEEKDAY_LABELS.map((_, index) => toDateKey(addDays(weekStart, index)));
 }
 
 function normalizeWeeklyPlayBonus(
   bonus: Partial<WeeklyPlayBonusState> | undefined,
-  date = new Date(),
 ): WeeklyPlayBonusState {
-  const weekStartDate = getWeeklyPlayWeekStart(date);
-  if (bonus?.weekStartDate !== weekStartDate) return createWeeklyPlayBonus(date);
-
-  const weekDates = new Set(getWeekDateKeys(weekStartDate));
   return {
-    weekStartDate,
-    claimedDates: Array.from(new Set(bonus.claimedDates ?? [])).filter((day) =>
-      weekDates.has(day),
-    ),
-    awardedMilestones: Array.from(new Set(bonus.awardedMilestones ?? [])).filter((id) =>
-      WEEKLY_PLAY_MILESTONES.some((milestone) => milestone.id === id),
-    ) as WeeklyPlayMilestoneId[],
+    lastClaimDate: bonus?.lastClaimDate ?? null,
+    currentStreak: Math.max(0, Math.floor(bonus?.currentStreak ?? 0)),
+    claimedDates: Array.from(new Set(bonus?.claimedDates ?? [])).slice(-7),
   };
 }
 
@@ -100,36 +65,27 @@ export function claimWeeklyPlayBonus(
 ): {
   weeklyPlayBonus: WeeklyPlayBonusState;
   coinsAwarded: number;
-  awardedMilestones: WeeklyPlayMilestoneId[];
+  bonusAwarded: number;
 } {
   const today = toDateKey(date);
-  const normalized = normalizeWeeklyPlayBonus(bonus, date);
-  const claimedDates = normalized.claimedDates.includes(today)
-    ? normalized.claimedDates
-    : [...normalized.claimedDates, today];
-  const weekDates = getWeekDateKeys(normalized.weekStartDate);
-  const claimedSet = new Set(claimedDates);
-  const awardedMilestones = [...normalized.awardedMilestones];
-  const awardedNow: WeeklyPlayMilestoneId[] = [];
-  let coinsAwarded = 0;
-
-  for (const milestone of WEEKLY_PLAY_MILESTONES) {
-    if (awardedMilestones.includes(milestone.id)) continue;
-    const complete = milestone.dayIndices.every((index) => claimedSet.has(weekDates[index]));
-    if (!complete) continue;
-    awardedMilestones.push(milestone.id);
-    awardedNow.push(milestone.id);
-    coinsAwarded += milestone.coins;
+  const normalized = normalizeWeeklyPlayBonus(bonus);
+  if (normalized.lastClaimDate === today) {
+    return { weeklyPlayBonus: normalized, coinsAwarded: 0, bonusAwarded: 0 };
   }
+
+  const continuedStreak =
+    normalized.lastClaimDate != null && daysBetween(normalized.lastClaimDate, today) === 1;
+  const currentStreak = continuedStreak ? normalized.currentStreak + 1 : 1;
+  const bonusAwarded = currentStreak % 7 === 0 ? 5 : 0;
 
   return {
     weeklyPlayBonus: {
-      ...normalized,
-      claimedDates,
-      awardedMilestones,
+      lastClaimDate: today,
+      currentStreak,
+      claimedDates: [...(continuedStreak ? normalized.claimedDates : []), today].slice(-7),
     },
-    coinsAwarded,
-    awardedMilestones: awardedNow,
+    coinsAwarded: 1 + bonusAwarded,
+    bonusAwarded,
   };
 }
 
@@ -137,34 +93,35 @@ export function getWeeklyPlayBonusView(
   bonus: Partial<WeeklyPlayBonusState> | undefined,
   date = new Date(),
 ): WeeklyPlayBonusView {
-  const normalized = normalizeWeeklyPlayBonus(bonus, date);
+  const normalized = normalizeWeeklyPlayBonus(bonus);
   const today = toDateKey(date);
-  const weekDates = getWeekDateKeys(normalized.weekStartDate);
-  const claimedSet = new Set(normalized.claimedDates);
-  const todayIndex = weekDates.indexOf(today);
-  const weekCoinsEarned = WEEKLY_PLAY_MILESTONES.reduce(
-    (sum, milestone) =>
-      normalized.awardedMilestones.includes(milestone.id) ? sum + milestone.coins : sum,
-    0,
-  );
-  const nextMilestone = WEEKLY_PLAY_MILESTONES.find(
-    (milestone) => !normalized.awardedMilestones.includes(milestone.id),
-  );
+  const todayClaimed = normalized.lastClaimDate === today;
+  const cycleProgress = normalized.currentStreak === 0 ? 0 : ((normalized.currentStreak - 1) % 7) + 1;
+  const nextProgress = todayClaimed ? cycleProgress : Math.min(7, cycleProgress + 1);
+  const remainingToBonus = Math.max(0, 7 - cycleProgress);
 
   return {
-    days: weekDates.map((dateKey, index) => ({
-      dateKey,
-      label: WEEKDAY_LABELS[index],
-      rewardLabel: WEEKDAY_REWARD_LABELS[index],
-      claimed: claimedSet.has(dateKey),
-      isToday: dateKey === today,
-      isPast: todayIndex >= 0 && index < todayIndex,
-    })),
-    claimedCount: normalized.claimedDates.length,
-    weekCoinsEarned,
-    todayClaimed: claimedSet.has(today),
-    nextRewardText: nextMilestone
-      ? `${nextMilestone.coins} coin${nextMilestone.coins === 1 ? "" : "s"} at ${WEEKDAY_LABELS[nextMilestone.dayIndices.at(-1) ?? 0]}`
-      : "Full week complete",
+    days: Array.from({ length: 7 }, (_, index) => {
+      const dayNumber = index + 1;
+      const claimed = cycleProgress >= dayNumber;
+      return {
+        index: dayNumber,
+        label: `Day ${dayNumber}`,
+        rewardLabel: dayNumber === 7 ? "+1 +5" : "+1",
+        claimed,
+        isToday: todayClaimed ? cycleProgress === dayNumber : nextProgress === dayNumber,
+      };
+    }),
+    currentStreak: normalized.currentStreak,
+    cycleProgress,
+    todayClaimed,
+    coinsEarnedToday:
+      todayClaimed && normalized.currentStreak > 0
+        ? 1 + (normalized.currentStreak % 7 === 0 ? 5 : 0)
+        : 0,
+    nextRewardText:
+      remainingToBonus <= 0
+        ? "5 bonus coins earned"
+        : `${remainingToBonus} day${remainingToBonus === 1 ? "" : "s"} to +5 bonus coins`,
   };
 }

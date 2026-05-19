@@ -56,7 +56,7 @@ function Index() {
       setResumePrompt(saved);
       return;
     }
-    setScreen({ name: "game", levelId: getLevelById(unlockedLevel)?.id ?? 1 });
+    setScreen({ name: "game", levelId: getLevelById(unlockedLevel)?.id ?? 1, mode: "campaign" });
   }
 
   switch (screen.name) {
@@ -87,7 +87,7 @@ function Index() {
               }}
               onStartOver={() => {
                 clearSavedRun();
-                setScreen({ name: "game", levelId: getLevelById(unlockedLevel)?.id ?? 1 });
+                setScreen({ name: "game", levelId: getLevelById(unlockedLevel)?.id ?? 1, mode: "campaign" });
                 setResumePrompt(null);
               }}
               onCancel={() => setResumePrompt(null)}
@@ -98,19 +98,20 @@ function Index() {
     case "levels":
       return (
         <LevelSelect
-          onPick={(id) => setScreen({ name: "game", levelId: id })}
+          onPick={(id) => setScreen({ name: "game", levelId: id, mode: "campaign" })}
           onBack={() => setScreen({ name: "menu" })}
         />
       );
     case "game":
       return (
         <GameBoard
+          key={`${screen.mode ?? "campaign"}-${screen.levelId}-${screen.resumeSavedRun ? "resume" : "new"}`}
           levelId={screen.levelId}
           mode={screen.mode}
           resumeSavedRun={screen.resumeSavedRun}
           onExit={() => setScreen({ name: "menu" })}
           onWin={(nextId) => {
-            if (nextId) setScreen({ name: "game", levelId: nextId });
+            if (nextId) setScreen({ name: "game", levelId: nextId, mode: screen.mode ?? "campaign" });
             else setScreen({ name: "menu" });
           }}
         />

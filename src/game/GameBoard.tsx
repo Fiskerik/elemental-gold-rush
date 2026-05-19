@@ -29,6 +29,7 @@ import {
   playMergeSound,
   playShootSound,
   playWinSound,
+  primeAudio,
   startAmbientMusic,
   stopAmbientMusic,
   vibrate,
@@ -106,9 +107,10 @@ const UNSTABLE_SPAWN_CHANCE = 0.04;
 const MERGE_COMBO_START_MS = 240;
 const MERGE_COMBO_STEP_MS = 460;
 const MERGE_COMBO_END_PAD_MS = 560;
+const MERGE_COMBO_SOUND_STEP_MS = 130;
 
 function mergeComboCueDelay(index: number): number {
-  return index === 0 ? 0 : MERGE_COMBO_START_MS + (index - 1) * MERGE_COMBO_STEP_MS;
+  return index * MERGE_COMBO_SOUND_STEP_MS;
 }
 
 const INVENTORY_PICK_LIMIT = 3;
@@ -563,7 +565,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
   const fusionJumpEnabled = level.id >= FUSION_JUMP_MIN_LEVEL;
   const catalystEnabled = level.id >= CATALYST_MIN_LEVEL;
   const stoneEnabled = level.id >= STONE_MIN_LEVEL;
-  const compoundEnabled = level.id >= COMPOUND_MIN_LEVEL;
+  const compoundEnabled = mode === "campaign";
   const blankEnabled = level.id >= BLANK_MIN_LEVEL;
   const {
     recordDiscovery,
@@ -736,6 +738,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
   const stageClearTimeoutRef = useRef<number | null>(null);
   const projectileFrameRef = useRef<number | null>(null);
   const hasClaimedUnusedInventoryRef = useRef(false);
+  const [claimedResultPowerUp, setClaimedResultPowerUp] = useState<InventoryPowerUpId | null>(null);
   const runPowerUpsUsedRef = useRef(0);
   const runRecordedRef = useRef(false);
   const inventoryCompoundChargesRef = useRef(0);
@@ -899,6 +902,11 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
   };
   const haptic = (ms: number | number[]) => {
     if (hapticsEnabled) vibrate(ms);
+  };
+  const toggleInGameMusic = () => {
+    if (!musicEnabled) startAmbientMusic();
+    else stopAmbientMusic();
+    toggleMusic();
   };
 
   useEffect(() => {
@@ -1091,6 +1099,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
         setCatalystShotsRemaining(saved.catalystShotsRemaining);
         setPendingReversiblePowerUp(null);
         hasClaimedUnusedInventoryRef.current = false;
+        setClaimedResultPowerUp(null);
         runPowerUpsUsedRef.current = saved.runPowerUpsUsed;
         runRecordedRef.current = false;
         setSelectedInventoryPowerUps(emptyPowerUpInventory());
@@ -1195,8 +1204,8 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
       setCompoundCharges(1);
     } else {
       if (compoundEnabled) {
-        setCompoundCharges(0);
-        saveCompoundChargeState(0, Date.now());
+        setCompoundCharges(1);
+        saveCompoundChargeState(1, null);
       } else {
         setCompoundCharges(0);
       }
@@ -1232,6 +1241,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     setCatalystShotsRemaining(0);
     setPendingReversiblePowerUp(null);
     hasClaimedUnusedInventoryRef.current = false;
+    setClaimedResultPowerUp(null);
     runPowerUpsUsedRef.current = 0;
     runRecordedRef.current = false;
     incrementLevelAttempt(levelId);
@@ -1482,7 +1492,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
         showTip(
           "feature-gamma-powerup",
           "☢ Gamma Bomb ready!",
-          "Every 40 shots after level 12 earns a Gamma Bomb. Activate it, aim, and fire: a slow heavy projectile clears every non-stone atom in a wide radius.",
+          `Every 40 shots after level ${GAMMA_MIN_LEVEL} earns a Gamma Bomb. Activate it, aim, and fire: a slow heavy projectile clears every non-stone atom in a wide radius.`,
         );
       }
     }
@@ -1593,7 +1603,6 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     // Clear any in-flight score/merge popups so they don't bleed into the
     // win animation or appear behind the result modal.
     setPopups([]);
-    claimUnusedPowerUps({ consume: true });
     setStageClearFx(stats);
     spawnPopup(stats.compound ? "COMPOUND FORMED" : "TARGET FORMED");
     stageClearTimeoutRef.current = window.setTimeout(() => {
@@ -1620,7 +1629,6 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
   useEffect(() => {
     if (won || gameOver) {
       clearSavedRun();
-      claimUnusedPowerUps();
     }
     if ((won || gameOver) && !runRecordedRef.current) {
       runRecordedRef.current = true;
@@ -2178,6 +2186,8 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
 
   function shoot() {
     if (busy || gameOver || won || inventoryPickerOpen || paused || settingsOpen) return;
+    primeAudio();
+    if (musicEnabled) startAmbientMusic();
     trackShot(levelId, pendingStone ? -1 : currentIsEGun ? 0 : current, aimDeg, mode);
     queueUndoRef.current = null;
     setPendingReversiblePowerUp(null);
@@ -2223,7 +2233,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
 
     // animate projectile along path
     const path = hit.path;
-    const baseMs = Math.min(360, 60 + path.length * 4);
+    const baseMs = Math.min(560, 100 + path.length * 6);
     // Stones fly twice as fast.
     const totalMs = pendingStone ? baseMs / 2 : baseMs;
     animateProjectilePath(path, totalMs, () => {
@@ -3036,41 +3046,14 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     };
   }
 
-  function consumeClaimedPowerUps(unused: Partial<Record<InventoryPowerUpId, number>>) {
-    if (!hasPowerUps(unused)) return;
-    setTransmuteCharges(0);
-    setFusionJumpCharges(0);
-    setFusionJumpArmed(false);
-    setCatalystCharges(0);
-    setEmissionCharges(0);
-    setGravityCharges(0);
-    setGrabs(0);
-    setGammaCharges(0);
-    setPendingGamma(false);
-
-    const claimedCompound = Math.max(0, Math.floor(unused.molecule ?? 0));
-    if (claimedCompound > 0) {
-      inventoryCompoundChargesRef.current = Math.max(
-        0,
-        inventoryCompoundChargesRef.current - claimedCompound,
-      );
-      const naturalCompoundCharge = !isMoleculeChallenge ? loadCompoundChargeState().charges : 0;
-      setCompoundCharges(Math.max(naturalCompoundCharge, inventoryCompoundChargesRef.current));
-    }
-  }
-
-  function claimUnusedPowerUps(options: { consume?: boolean } = {}) {
+  function claimResultPowerUp(powerUp: InventoryPowerUpId) {
     if (hasClaimedUnusedInventoryRef.current) return;
     const unused = collectUnusedPowerUps();
-    const totalUnused = countPowerUps(unused);
-    if (totalUnused <= 0) {
-      hasClaimedUnusedInventoryRef.current = true;
-      return;
-    }
-    addInventoryPowerUps(unused);
-    if (options.consume) consumeClaimedPowerUps(unused);
+    if ((unused[powerUp] ?? 0) <= 0) return;
+    addInventoryPowerUps({ [powerUp]: 1 });
     hasClaimedUnusedInventoryRef.current = true;
-    spawnPopup(`🎒 SAVED ×${totalUnused}`);
+    setClaimedResultPowerUp(powerUp);
+    spawnPopup(`${POWER_UP_INVENTORY_META[powerUp].name} saved`);
   }
 
   function changeInventorySelection(powerUp: InventoryPowerUpId, delta: 1 | -1) {
@@ -5133,7 +5116,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
           <InGameSettingsModal
             musicEnabled={musicEnabled}
             soundEnabled={soundEnabled}
-            onToggleMusic={toggleMusic}
+            onToggleMusic={toggleInGameMusic}
             onToggleSound={toggleSound}
             onClose={() => setSettingsOpen(false)}
             onLeave={exitToMenu}
@@ -5262,6 +5245,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
               setContinuingPastTarget(true);
               setContinueStartedElapsedMs((startedAt) => startedAt ?? elapsedMs);
               hasClaimedUnusedInventoryRef.current = false;
+              setClaimedResultPowerUp(null);
               setWinChoice(null);
               setContinueClaimPromptOpen(false);
               spawnPopup("Keep going! Score mode 🚀");
@@ -5279,6 +5263,11 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
             stars={earnedStars}
             newDiscoveries={newlyDiscoveredThisRun}
             formedCompounds={formedCompoundsThisRun}
+            claimablePowerUps={
+              hasClaimedUnusedInventoryRef.current ? {} : collectUnusedPowerUps()
+            }
+            claimedPowerUp={claimedResultPowerUp}
+            onClaimPowerUp={claimResultPowerUp}
             onDiscoveryClick={setDiscoveryEl}
             onMain={onExit}
             onNext={() => onWin(getNextLevel(levelId)?.id ?? null)}
@@ -6206,6 +6195,9 @@ function ResultModal({
   stars,
   newDiscoveries = [],
   formedCompounds = [],
+  claimablePowerUps = {},
+  claimedPowerUp = null,
+  onClaimPowerUp,
   onDiscoveryClick,
   onMain,
   onNext,
@@ -6220,14 +6212,21 @@ function ResultModal({
   stars: number;
   newDiscoveries?: number[];
   formedCompounds?: string[];
+  claimablePowerUps?: Partial<Record<InventoryPowerUpId, number>>;
+  claimedPowerUp?: InventoryPowerUpId | null;
+  onClaimPowerUp?: (powerUp: InventoryPowerUpId) => void;
   onDiscoveryClick?: (atomicNumber: number) => void;
   onMain: () => void;
   onNext: () => void;
   nextLabel?: string;
 }) {
+  const [selectedSavePowerUp, setSelectedSavePowerUp] = useState<InventoryPowerUpId | null>(null);
   const formedCompoundDefinitions = formedCompounds
     .map((id) => COMPOUNDS.find((compound) => compound.id === id))
     .filter((compound): compound is CompoundDefinition => Boolean(compound));
+  const claimableOptions = (Object.keys(POWER_UP_INVENTORY_META) as InventoryPowerUpId[]).filter(
+    (id) => (claimablePowerUps[id] ?? 0) > 0,
+  );
   return (
     <Modal>
       <div
@@ -6340,6 +6339,82 @@ function ResultModal({
               </div>
             ))}
           </div>
+        </div>
+      )}
+      {onClaimPowerUp && (claimableOptions.length > 0 || claimedPowerUp) && (
+        <div
+          style={{
+            background: "var(--surface)",
+            border: "1px solid var(--border)",
+            borderRadius: 14,
+            padding: 10,
+            marginBottom: 12,
+          }}
+        >
+          <div
+            style={{
+              fontSize: 10,
+              letterSpacing: 1.6,
+              color: "var(--accent)",
+              fontWeight: 800,
+              marginBottom: 8,
+              textAlign: "center",
+            }}
+          >
+            KEEP ONE POWER-UP
+          </div>
+          {claimedPowerUp ? (
+            <div style={{ textAlign: "center", fontSize: 12, color: "var(--success)", fontWeight: 900 }}>
+              Saved {POWER_UP_INVENTORY_META[claimedPowerUp].name} to inventory
+            </div>
+          ) : (
+            <>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 8 }}>
+                {claimableOptions.map((powerUp) => {
+                  const meta = POWER_UP_INVENTORY_META[powerUp];
+                  const selected = selectedSavePowerUp === powerUp;
+                  return (
+                    <button
+                      key={powerUp}
+                      type="button"
+                      onClick={() => setSelectedSavePowerUp((current) => (current === powerUp ? null : powerUp))}
+                      style={{
+                        border: `1px solid ${selected ? "var(--accent)" : "var(--border)"}`,
+                        borderRadius: 12,
+                        background: selected ? "color-mix(in oklch, var(--accent) 18%, var(--surface))" : "var(--surface-high)",
+                        color: "var(--foreground)",
+                        padding: 7,
+                        display: "grid",
+                        justifyItems: "center",
+                        gap: 4,
+                        cursor: "pointer",
+                      }}
+                    >
+                      <PowerUpBadge icon={powerUp} size={30} />
+                      <span style={{ fontSize: 9, fontWeight: 900, lineHeight: 1.1 }}>{meta.name}</span>
+                      <small style={{ color: "var(--muted-foreground)", fontSize: 9 }}>
+                        x{claimablePowerUps[powerUp]}
+                      </small>
+                    </button>
+                  );
+                })}
+              </div>
+              <button
+                type="button"
+                disabled={!selectedSavePowerUp}
+                onClick={() => selectedSavePowerUp && onClaimPowerUp(selectedSavePowerUp)}
+                style={{
+                  ...modalBtn,
+                  width: "100%",
+                  marginTop: 10,
+                  opacity: selectedSavePowerUp ? 1 : 0.5,
+                  cursor: selectedSavePowerUp ? "pointer" : "not-allowed",
+                }}
+              >
+                Save selected
+              </button>
+            </>
+          )}
         </div>
       )}
       {level.scoreGoal && (

@@ -1,8 +1,14 @@
 import { useProgress } from "./store";
+import { startAmbientMusic, stopAmbientMusic } from "./audio";
 
 export function Settings({ onBack }: { onBack: () => void }) {
   const { soundEnabled, musicEnabled, hapticsEnabled, toggleSound, toggleMusic, toggleHaptics, reset } =
     useProgress();
+  const handleMusicToggle = () => {
+    if (!musicEnabled) startAmbientMusic();
+    else stopAmbientMusic();
+    toggleMusic();
+  };
   return (
     <div className="app-shell" style={{ padding: 16 }}>
       <div style={{ position: "relative", zIndex: 1, maxWidth: 480, margin: "0 auto" }}>
@@ -11,7 +17,7 @@ export function Settings({ onBack }: { onBack: () => void }) {
           <h1 style={{ fontSize: 22, margin: 0, fontWeight: 800 }}>Settings</h1>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <Row label="Music" value={musicEnabled} onToggle={toggleMusic} />
+          <Row label="Music" value={musicEnabled} onToggle={handleMusicToggle} />
           <Row label="Sound effects" value={soundEnabled} onToggle={toggleSound} />
           <Row label="Haptics" value={hapticsEnabled} onToggle={toggleHaptics} />
           <button
@@ -29,16 +35,6 @@ export function Settings({ onBack }: { onBack: () => void }) {
               fontWeight: 700,
             }}
           >Reset Progress</button>
-        </div>
-        <div style={{ marginTop: 28, padding: 14, background: "var(--surface)", borderRadius: 12, border: "1px solid var(--border)" }}>
-          <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--muted-foreground)", marginBottom: 6 }}>HOW TO PLAY</div>
-          <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, lineHeight: 1.7 }}>
-            <li>Tap a column to drop your current element.</li>
-            <li>Two identical neighbors fuse into the next element.</li>
-            <li>Cascades multiply your score.</li>
-            <li>Reach the level's target element to win.</li>
-            <li>If a column reaches the top, the level ends.</li>
-          </ul>
         </div>
       </div>
     </div>

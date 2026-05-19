@@ -13,58 +13,58 @@ const SHOP_POWER_UPS: Array<{
   {
     id: "transmute",
     name: "Transmute Shot",
-    coinCost: 2,
+    coinCost: 4,
     unlockLevel: POWER_UP_UNLOCK_LEVELS.transmute,
     description: "Reroll the loaded atom into a higher tier at the start of a run.",
   },
   {
     id: "fusion-jump",
     name: "Fusion Jump",
-    coinCost: 2,
+    coinCost: 4,
     unlockLevel: POWER_UP_UNLOCK_LEVELS["fusion-jump"],
     description: "Save a tier-skipping merge for a future level opening.",
   },
   {
     id: "catalyst",
     name: "Catalyst Aura",
-    coinCost: 4,
+    coinCost: 8,
     unlockLevel: POWER_UP_UNLOCK_LEVELS.catalyst,
     description: "Start a level with 5 shots of wider fusion radius available.",
   },
   {
     id: "emission",
     name: "Emission",
-    coinCost: 5,
+    coinCost: 10,
     unlockLevel: POWER_UP_UNLOCK_LEVELS.emission,
     description: "Raise your starting queue when a level needs a quick push.",
   },
   {
     id: "gravity",
     name: "Gravity",
-    coinCost: 4,
+    coinCost: 8,
     unlockLevel: POWER_UP_UNLOCK_LEVELS.gravity,
     description: "Bank a board-lifting move for a difficult future board.",
   },
   {
     id: "grab",
     name: "Grab",
-    coinCost: 4,
+    coinCost: 8,
     unlockLevel: POWER_UP_UNLOCK_LEVELS.grab,
     description: "Bring a saved reposition move into your next level.",
   },
   {
     id: "gamma",
     name: "Gamma Bomb",
-    coinCost: 4,
+    coinCost: 8,
     unlockLevel: POWER_UP_UNLOCK_LEVELS.gamma,
     description: "Stock a wide-radius blast that clears surrounding non-stone atoms.",
   },
   {
     id: "molecule",
     name: "Compound",
-    coinCost: 5,
-    unlockLevel: POWER_UP_UNLOCK_LEVELS.molecule,
-    description: "Start a run with one Compound charge ready for molecule formation.",
+    coinCost: 10,
+    unlockLevel: 1,
+    description: "Compound is available at the start of every campaign run.",
   },
 ];
 
@@ -73,9 +73,11 @@ const SHOP_POWER_UPS_BY_PRICE = [...SHOP_POWER_UPS].sort(
 );
 
 const GOLD_COIN_PACKS = [
-  { coins: 1, pointCost: 10_000 },
-  { coins: 5, pointCost: 40_000 },
-  { coins: 10, pointCost: 75_000 },
+  { coins: 1, pointCost: 20_000 },
+  { coins: 5, pointCost: 80_000 },
+  { coins: 10, pointCost: 150_000 },
+  { coins: 20, pointCost: 250_000 },
+  { coins: 50, pointCost: 500_000 },
 ] as const;
 
 export function Shop({ onBack }: { onBack: () => void }) {
@@ -96,7 +98,7 @@ export function Shop({ onBack }: { onBack: () => void }) {
     unlockLevel: number,
   ) {
     if (unlockedLevel < unlockLevel) {
-      setMessage(`${name} unlocks at level ${unlockLevel}.`);
+      setMessage(`${name} is introduced at level ${unlockLevel}.`);
       return;
     }
     const purchased = purchaseInventoryPowerUp(powerUp, coinCost);
@@ -188,7 +190,7 @@ export function Shop({ onBack }: { onBack: () => void }) {
               />
             </div>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(92px, 1fr))", gap: 8 }}>
             {GOLD_COIN_PACKS.map((pack) => {
               const canAfford = totalScore >= pack.pointCost;
               return (
@@ -290,7 +292,7 @@ export function Shop({ onBack }: { onBack: () => void }) {
                     <div style={{ fontSize: 11, color: "var(--accent)", marginTop: 3 }}>
                       {isUnlocked
                         ? `Owned: ${powerUpInventory[powerUp.id]}`
-                        : `Unlocks at level ${powerUp.unlockLevel}`}
+                        : `Introduced at level ${powerUp.unlockLevel}`}
                     </div>
                   </div>
                   <button

@@ -138,8 +138,15 @@ function playAmbientStep(c: AudioContext, now: number) {
 export function startAmbientMusic() {
   const c = getCtx();
   if (!c || musicTimer != null) return;
+  if (c.state === "suspended") {
+    void c
+      .resume()
+      .then(() => startAmbientMusic())
+      .catch((error) => console.log("Audio context resume failed", error));
+    return;
+  }
   musicMaster = c.createGain();
-  musicMaster.gain.setValueAtTime(0.055, c.currentTime);
+  musicMaster.gain.setValueAtTime(0.09, c.currentTime);
   musicMaster.connect(c.destination);
   playAmbientStep(c, c.currentTime + 0.02);
   musicTimer = window.setInterval(() => {
@@ -166,6 +173,12 @@ export function stopAmbientMusic() {
       musicMaster = null;
     }
   }
+}
+
+export function primeAudio() {
+  const c = getCtx();
+  if (!c || c.state !== "suspended") return;
+  void c.resume().catch((error) => console.log("Audio context resume failed", error));
 }
 
 export function vibrate(ms: number | number[]) {

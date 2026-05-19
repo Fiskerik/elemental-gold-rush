@@ -273,25 +273,27 @@ export function MainMenu({
               <div>
                 <div style={sectionLabel}>PLAY A GAME A DAY</div>
                 <div style={{ fontSize: 12, color: "var(--muted-foreground)", marginTop: 2 }}>
-                  {weeklyBonus.weekCoinsEarned}/4 coins formed this week
+                  Streak {weeklyBonus.currentStreak} - {weeklyBonus.cycleProgress}/7 toward +5
                 </div>
               </div>
               <div style={weeklyBonusPill}>
-                {weeklyBonus.todayClaimed ? "Today claimed" : "Claim today"}
+                {weeklyBonus.todayClaimed
+                  ? `Today +${weeklyBonus.coinsEarnedToday}`
+                  : "Play today +1"}
               </div>
             </div>
-            <div style={weeklyBonusTrack} aria-label={`${weeklyBonus.claimedCount} of 7 days claimed`}>
+            <div style={weeklyBonusTrack} aria-label={`${weeklyBonus.cycleProgress} of 7 streak days claimed`}>
               <span
                 style={{
                   ...weeklyBonusFill,
-                  width: `${Math.max(4, (weeklyBonus.claimedCount / 7) * 100)}%`,
+                  width: `${Math.max(4, (weeklyBonus.cycleProgress / 7) * 100)}%`,
                 }}
               />
             </div>
             <div style={weeklyDayGrid}>
               {weeklyBonus.days.map((day) => (
                 <div
-                  key={day.dateKey}
+                  key={day.index}
                   style={{
                     ...weeklyDayCell,
                     borderColor: day.claimed
@@ -304,12 +306,12 @@ export function MainMenu({
                 >
                   <span>{day.label}</span>
                   <strong>{day.rewardLabel}</strong>
-                  <small>{day.claimed ? "Claimed" : day.isPast ? "Missed" : day.isToday ? "Today" : "Soon"}</small>
+                  <small>{day.claimed ? "Claimed" : day.isToday ? "Today" : "Next"}</small>
                 </div>
               ))}
             </div>
             <div style={{ fontSize: 10, color: "var(--muted-foreground)", lineHeight: 1.35 }}>
-              Next reward: {weeklyBonus.nextRewardText}. Monday starts a fresh week.
+              1 coin each day you play. {weeklyBonus.nextRewardText}.
             </div>
           </div>
           <div style={questGrid}>
