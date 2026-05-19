@@ -1541,6 +1541,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     // Clear any in-flight score/merge popups so they don't bleed into the
     // win animation or appear behind the result modal.
     setPopups([]);
+    claimUnusedPowerUps({ consume: true });
     setStageClearFx(stats);
     spawnPopup(stats.compound ? "COMPOUND FORMED" : "TARGET FORMED");
     stageClearTimeoutRef.current = window.setTimeout(() => {
@@ -2961,7 +2962,30 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     };
   }
 
-  function claimUnusedPowerUps() {
+  function consumeClaimedPowerUps(unused: Partial<Record<InventoryPowerUpId, number>>) {
+    if (!hasPowerUps(unused)) return;
+    setTransmuteCharges(0);
+    setFusionJumpCharges(0);
+    setFusionJumpArmed(false);
+    setCatalystCharges(0);
+    setEmissionCharges(0);
+    setGravityCharges(0);
+    setGrabs(0);
+    setGammaCharges(0);
+    setPendingGamma(false);
+
+    const claimedCompound = Math.max(0, Math.floor(unused.molecule ?? 0));
+    if (claimedCompound > 0) {
+      inventoryCompoundChargesRef.current = Math.max(
+        0,
+        inventoryCompoundChargesRef.current - claimedCompound,
+      );
+      const naturalCompoundCharge = !isMoleculeChallenge ? loadCompoundChargeState().charges : 0;
+      setCompoundCharges(Math.max(naturalCompoundCharge, inventoryCompoundChargesRef.current));
+    }
+  }
+
+  function claimUnusedPowerUps(options: { consume?: boolean } = {}) {
     if (hasClaimedUnusedInventoryRef.current) return;
     const unused = collectUnusedPowerUps();
     const totalUnused = countPowerUps(unused);
@@ -2970,6 +2994,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
       return;
     }
     addInventoryPowerUps(unused);
+    if (options.consume) consumeClaimedPowerUps(unused);
     hasClaimedUnusedInventoryRef.current = true;
     spawnPopup(`🎒 SAVED ×${totalUnused}`);
   }
@@ -5144,6 +5169,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
             onContinue={() => {
               setContinuingPastTarget(true);
               setContinueStartedElapsedMs((startedAt) => startedAt ?? elapsedMs);
+              hasClaimedUnusedInventoryRef.current = false;
               setWinChoice(null);
               setContinueClaimPromptOpen(false);
               spawnPopup("Keep going! Score mode 🚀");
@@ -5487,10 +5513,17 @@ function InventoryStartModal({
       <div
         style={{
           marginTop: 14,
+          position: "sticky",
+          bottom: -24,
+          zIndex: 2,
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
+          flexWrap: "wrap",
           gap: 12,
+          padding: "12px 0 2px",
+          background:
+            "linear-gradient(180deg, transparent 0%, var(--surface-elevated) 28%, var(--surface-elevated) 100%)",
           color: "var(--muted-foreground)",
           fontSize: 12,
         }}
@@ -5510,10 +5543,10 @@ function InventoryStartModal({
         >
           ← Back
         </button>
-        <span>
+        <span style={{ flex: "1 1 70px", textAlign: "center" }}>
           Selected {selectedCount}/{INVENTORY_PICK_LIMIT}
         </span>
-        <button onClick={onStart} style={{ ...modalBtn, marginTop: 0, flex: "0 0 auto" }}>
+        <button onClick={onStart} style={{ ...modalBtn, marginTop: 0, flex: "1 1 150px" }}>
           {selectedCount > 0 ? "Start with boosts" : "Start without boosts"}
         </button>
       </div>
@@ -6276,6 +6309,7 @@ function Modal({ children, zIndex = 100 }: { children: React.ReactNode; zIndex?:
         zIndex,
         padding: 24,
         backdropFilter: "blur(4px)",
+        boxSizing: "border-box",
       }}
     >
       <div
@@ -6286,6 +6320,10 @@ function Modal({ children, zIndex = 100 }: { children: React.ReactNode; zIndex?:
           padding: 24,
           maxWidth: 360,
           width: "100%",
+          maxHeight: "calc(100dvh - 32px)",
+          overflowY: "auto",
+          overscrollBehavior: "contain",
+          boxSizing: "border-box",
           boxShadow: "0 20px 60px rgba(0,0,0,0.6), 0 0 40px var(--primary-glow)",
           animation: "pop-in 280ms ease-out",
         }}
