@@ -3,10 +3,10 @@ import { PRODUCT_IDS, getProductById } from "./products";
 import { purchaseProduct, restorePurchases } from "./purchases";
 import { type InventoryPowerUpId, useProgress } from "./store";
 import { POWER_UP_UNLOCK_LEVELS } from "./powerUps";
+import { PowerUpBadge } from "./PowerUpLibrary";
 
 const SHOP_POWER_UPS: Array<{
   id: InventoryPowerUpId;
-  icon: string;
   name: string;
   cost: number;
   unlockLevel: number;
@@ -14,7 +14,6 @@ const SHOP_POWER_UPS: Array<{
 }> = [
   {
     id: "transmute",
-    icon: "🔀",
     name: "Transmute Shot",
     cost: 10000,
     unlockLevel: POWER_UP_UNLOCK_LEVELS.transmute,
@@ -22,7 +21,6 @@ const SHOP_POWER_UPS: Array<{
   },
   {
     id: "fusion-jump",
-    icon: "⏭",
     name: "Fusion Jump",
     cost: 6000,
     unlockLevel: POWER_UP_UNLOCK_LEVELS["fusion-jump"],
@@ -30,7 +28,6 @@ const SHOP_POWER_UPS: Array<{
   },
   {
     id: "catalyst",
-    icon: "🧪",
     name: "Catalyst Aura",
     cost: 10000,
     unlockLevel: POWER_UP_UNLOCK_LEVELS.catalyst,
@@ -38,7 +35,6 @@ const SHOP_POWER_UPS: Array<{
   },
   {
     id: "emission",
-    icon: "☢",
     name: "Emission",
     cost: 15000,
     unlockLevel: POWER_UP_UNLOCK_LEVELS.emission,
@@ -46,7 +42,6 @@ const SHOP_POWER_UPS: Array<{
   },
   {
     id: "gravity",
-    icon: "🌀",
     name: "Gravity",
     cost: 6000,
     unlockLevel: POWER_UP_UNLOCK_LEVELS.gravity,
@@ -54,7 +49,6 @@ const SHOP_POWER_UPS: Array<{
   },
   {
     id: "grab",
-    icon: "🤚",
     name: "Grab",
     cost: 20000,
     unlockLevel: POWER_UP_UNLOCK_LEVELS.grab,
@@ -62,7 +56,6 @@ const SHOP_POWER_UPS: Array<{
   },
   {
     id: "gamma",
-    icon: "☢",
     name: "Gamma Bomb",
     cost: 15000,
     unlockLevel: POWER_UP_UNLOCK_LEVELS.gamma,
@@ -70,7 +63,6 @@ const SHOP_POWER_UPS: Array<{
   },
   {
     id: "molecule",
-    icon: "ðŸ§¬",
     name: "Compound",
     cost: 18000,
     unlockLevel: POWER_UP_UNLOCK_LEVELS.molecule,
@@ -305,8 +297,11 @@ export function Shop({ onBack }: { onBack: () => void }) {
                     background: "var(--surface)",
                   }}
                 >
-                  <span style={{ fontSize: 24, textAlign: "center" }} aria-hidden="true">
-                    {powerUp.icon}
+                  <span
+                    style={{ display: "grid", placeItems: "center" }}
+                    aria-hidden="true"
+                  >
+                    <PowerUpBadge icon={powerUp.id} size={34} />
                   </span>
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 900 }}>{powerUp.name}</div>
