@@ -99,12 +99,12 @@ export function playWinSound() {
 function playAmbientStep(c: AudioContext, now: number) {
   if (!musicMaster) return;
   const master = musicMaster;
-  const chords = [
-    [196, 246.94, 293.66],
-    [174.61, 220, 261.63],
-    [207.65, 261.63, 329.63],
-    [164.81, 196, 246.94],
-  ];
+const chords = [
+  [261.63, 329.63, 392.00], // C major
+  [293.66, 369.99, 440.00], // D major
+  [246.94, 311.13, 370.00], // B minor → brighter resolution
+  [329.63, 392.00, 523.25], // E major sparkle
+];
   const chord = chords[musicStep % chords.length];
   musicStep += 1;
 
