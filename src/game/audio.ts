@@ -111,20 +111,23 @@ function playAmbientStep(c: AudioContext, now: number) {
   ];
 
   // En 64 takter lång struktur (ca 2 minuter och 8 sekunder)
-  const songStructure = [
-    // Intro
-    0, 1, 2, 3, 0, 1, 2, 5,
-    0, 1, 2, 3, 0, 1, 2, 5,
-    // Bas kommer in
-    4, 0, 1, 3, 4, 0, 1, 5,
-    1, 2, 3, 0, 1, 2, 3, 5,
-    // Arpeggio kommer in
-    0, 1, 2, 3, 0, 1, 2, 5,
-    4, 0, 1, 3, 4, 0, 1, 5,
-    // Melodi & Klimax
-    1, 2, 3, 0, 1, 2, 3, 5,
-    0, 1, 2, 3, 0, 1, 2, 3 // Fade ner mot loopen
-  ];
+const songStructure = [
+  // Gladare Intro (mer major, ljusare)
+  2, 3, 1, 5, 2, 3, 1, 2,   // C → G → F → E → C → G → F → C
+  2, 3, 1, 5, 2, 3, 1, 2,
+
+  // Bas kommer in (fortfarande relativt ljust)
+  1, 2, 3, 1, 4, 2, 3, 5,
+  2, 3, 1, 2, 1, 2, 3, 2,
+
+  // Arpeggio kommer in
+  2, 3, 1, 5, 2, 3, 1, 2,
+  1, 2, 3, 1, 4, 2, 3, 5,
+
+  // Melodi & Klimax
+  2, 3, 1, 2, 2, 3, 1, 5,
+  2, 3, 1, 2, 2, 3, 1, 2   // Avslutning mot loop
+];
 
   const measure = musicStep % 64;
   const chordIdx = songStructure[measure];
