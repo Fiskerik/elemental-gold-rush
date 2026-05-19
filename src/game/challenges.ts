@@ -49,11 +49,11 @@ export const GAME_MODES: GameModeConfig[] = [
     name: "Unstable Isotopes",
     emoji: "☢️",
     kind: "challenge",
-    description: "Some atoms become unstable isotopes with an 8-shot decay ring.",
+    description: "Some atoms become unstable isotopes with period-based decay shells.",
     unlockedAtLevel: 2,
     rules: [
       "Unstable atoms lose 1 ring segment after each shot",
-      "Merging stabilizes the isotope into the new atom",
+      "Merging stabilizes the isotope into the new atom for double points",
       "At 0 segments, it decays down by 1 element tier",
     ],
   },

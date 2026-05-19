@@ -14,6 +14,12 @@ interface Props {
   unstableShots?: number;
 }
 
+function isotopeChargeCapacity(period: number): number {
+  if (period <= 1) return 2;
+  if (period === 2) return 8;
+  return 16;
+}
+
 export function ElementBall({
   atomicNumber,
   size = 44,
@@ -36,12 +42,16 @@ export function ElementBall({
   size = size * periodScale;
   const symbolSize = Math.max(10, size * 0.42);
   const numberSize = Math.max(8, size * 0.22);
-  const unstableSegments = Math.max(0, Math.min(8, Math.floor(unstableShots ?? 0)));
+  const unstableMaxSegments = isotopeChargeCapacity(period);
+  const unstableSegments = Math.max(
+    0,
+    Math.min(unstableMaxSegments, Math.floor(unstableShots ?? 0)),
+  );
   const unstableCircumference = 100;
-  const unstableSegment = unstableCircumference / 8;
-  const unstableDash = unstableSegment * 0.72;
+  const unstableSegment = unstableCircumference / unstableMaxSegments;
+  const unstableDash = unstableSegment * (unstableMaxSegments > 8 ? 0.58 : 0.72);
   const unstableGap = unstableSegment - unstableDash;
-  const unstableDashArray = Array.from({ length: 8 }, (_, index) =>
+  const unstableDashArray = Array.from({ length: unstableMaxSegments }, (_, index) =>
     index < unstableSegments ? `${unstableDash} ${unstableGap}` : `0 ${unstableSegment}`,
   ).join(" ");
   return (

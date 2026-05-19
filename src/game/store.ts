@@ -20,6 +20,7 @@ export const INVENTORY_POWER_UPS = [
   "gravity",
   "grab",
   "gamma",
+  "molecule",
 ] as const;
 
 export type InventoryPowerUpId = (typeof INVENTORY_POWER_UPS)[number];
@@ -34,6 +35,7 @@ export const emptyPowerUpInventory = (): PowerUpInventory => ({
   gravity: 0,
   grab: 0,
   gamma: 0,
+  molecule: 0,
 });
 
 function normalizePowerUpInventory(

@@ -50,6 +50,8 @@ export interface MergeEvent {
   chainDepth: number;
   x: number;
   y: number;
+  stabilizedIsotope?: boolean;
+  scoreGained: number;
 }
 
 export interface MergeResult {
@@ -117,14 +119,26 @@ function resolveAdjacentMerges(
       const { s, a } = best;
       const mergeStep = jumpAvailable ? 2 : 1;
       const sourceAtomicNumber = list[s].atom;
+      const stabilizedIsotope =
+        (list[s].unstableShots ?? 0) > 0 || (list[a].unstableShots ?? 0) > 0;
       const next = Math.min(maxElement, sourceAtomicNumber + mergeStep);
       jumpAvailable = false;
       const survivor = { ...list[s], atom: next, unstableShots: undefined };
       list[s] = survivor;
       list.splice(a, 1);
       const newS = a < s ? s - 1 : s;
-      merges.push({ resultAtomicNumber: next, sourceAtomicNumber, chainDepth, x: list[newS].x, y: list[newS].y });
-      score += next * 10 * Math.pow(2, chainDepth);
+      const baseScore = next * 10 * Math.pow(2, chainDepth);
+      const mergeScore = stabilizedIsotope ? baseScore * 2 : baseScore;
+      merges.push({
+        resultAtomicNumber: next,
+        sourceAtomicNumber,
+        chainDepth,
+        x: list[newS].x,
+        y: list[newS].y,
+        stabilizedIsotope,
+        scoreGained: mergeScore,
+      });
+      score += mergeScore;
       highest = Math.max(highest, next);
       if (next >= targetElement) levelComplete = true;
       chainDepth++;

@@ -15,6 +15,7 @@ import {
   checkGameOver,
   formatScore,
   getHighestOnBoard,
+  type MergeEvent,
 } from "./logic";
 import { ElementBall } from "./ElementBall";
 import {
@@ -93,8 +94,10 @@ const DISCOVERY_DECAY_STEP = 5;
 const DISCOVERY_DECAY_BOOST = 0.04;
 const STAGE_CLEAR_ANIMATION_MS = 6200;
 const STONE_GRACE_SHOTS = 15;
-const UNSTABLE_SEGMENTS = 8;
-const UNSTABLE_SPAWN_CHANCE = 0.06;
+const UNSTABLE_SPAWN_CHANCE = 0.04;
+const MERGE_COMBO_START_MS = 240;
+const MERGE_COMBO_STEP_MS = 460;
+const MERGE_COMBO_END_PAD_MS = 560;
 
 const INVENTORY_PICK_LIMIT = 3;
 
@@ -118,6 +121,7 @@ interface SavedRunSnapshot {
   grabs: number;
   grabProgress: number;
   compoundCharges: number;
+  inventoryCompoundCharges: number;
   gravityCharges: number;
   emissionCharges: number;
   emissionUnlockIndex: number;
@@ -205,6 +209,11 @@ const POWER_UP_INVENTORY_META: Record<
     name: "Gamma Bomb",
     description: "Detonate a wide radius that clears surrounding atoms.",
   },
+  molecule: {
+    icon: "ðŸ§¬",
+    name: "Compound",
+    description: "Start with one Compound charge for forming a molecule.",
+  },
 };
 
 function countPowerUps(inventory: Partial<Record<InventoryPowerUpId, number>>): number {
@@ -240,6 +249,13 @@ function saveCompoundChargeState(charges: number, spentAt: number | null): void 
   );
 }
 
+function isotopeChargeCapacity(atom: number): number {
+  const period = Math.max(1, Math.min(8, ELEMENTS[atom - 1]?.period ?? 4));
+  if (period <= 1) return 2;
+  if (period === 2) return 8;
+  return 16;
+}
+
 function countsForBalls(balls: Ball[]): Record<string, number> {
   const counts: Record<string, number> = {};
   for (const ball of balls) {
@@ -264,8 +280,18 @@ function hasCompoundRecipe(counts: Record<string, number>, compound: CompoundDef
 // Shared rocky styling — used for both the launcher visual and live stones
 // on the board. Looks like a chunky rock with cracks and uneven shading
 // instead of a smooth grey ball.
-function compoundFormationScore(compound: CompoundDefinition, atoms: { atom: number }[]): number {
-  const atomWeight = atoms.reduce((sum, atom) => sum + Math.max(1, atom.atom), 0);
+function isActiveIsotope(atom: { unstableShots?: number | null }): boolean {
+  return (atom.unstableShots ?? 0) > 0;
+}
+
+function compoundFormationScore(
+  compound: CompoundDefinition,
+  atoms: { atom: number; unstableShots?: number | null }[],
+): number {
+  const atomWeight = atoms.reduce(
+    (sum, atom) => sum + Math.max(1, atom.atom) * (isActiveIsotope(atom) ? 2 : 1),
+    0,
+  );
   return compound.bonusScore + atomWeight * 125;
 }
 
@@ -625,6 +651,9 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     compound: CompoundDefinition;
     isNew: boolean;
   } | null>(null);
+  const [mergeComboFx, setMergeComboFx] = useState<
+    { id: number; x: number; y: number; depth: number; atom: number; isotope: boolean }[]
+  >([]);
   const [formingCompoundIds, setFormingCompoundIds] = useState<Set<number>>(new Set());
 
   // === Stone obstacle ===
@@ -692,6 +721,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
   const hasClaimedUnusedInventoryRef = useRef(false);
   const runPowerUpsUsedRef = useRef(0);
   const runRecordedRef = useRef(false);
+  const inventoryCompoundChargesRef = useRef(0);
   const [inventoryPickerOpen, setInventoryPickerOpen] = useState(false);
   const [selectedInventoryPowerUps, setSelectedInventoryPowerUps] = useState<PowerUpInventory>(() =>
     emptyPowerUpInventory(),
@@ -717,7 +747,13 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
       action: string;
       points: number;
       powerUp?: string;
-      merges: { sourceAtom: number; atom: number; depth: number }[];
+      merges: {
+        sourceAtom: number;
+        atom: number;
+        depth: number;
+        stabilizedIsotope?: boolean;
+        points: number;
+      }[];
     }[]
   >([]);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -727,7 +763,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     action: string;
     points: number;
     powerUp?: string;
-    merges?: { resultAtomicNumber: number; sourceAtomicNumber?: number; chainDepth: number }[];
+    merges?: MergeEvent[];
   }) {
     const now = Date.now();
     setShotHistory((prev) => {
@@ -744,6 +780,8 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
             sourceAtom: m.sourceAtomicNumber ?? Math.max(1, m.resultAtomicNumber - 1),
             atom: m.resultAtomicNumber,
             depth: m.chainDepth,
+            stabilizedIsotope: m.stabilizedIsotope,
+            points: m.scoreGained,
           })),
         },
       ];
@@ -925,6 +963,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
       grabs,
       grabProgress,
       compoundCharges,
+      inventoryCompoundCharges: inventoryCompoundChargesRef.current,
       gravityCharges,
       emissionCharges,
       emissionUnlockIndex,
@@ -963,7 +1002,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     if (paused) return;
     const refresh = () => {
       const state = loadCompoundChargeState();
-      setCompoundCharges(state.charges);
+      setCompoundCharges(Math.max(state.charges, inventoryCompoundChargesRef.current));
       if (state.charges > 0 && state.spentAt == null) saveCompoundChargeState(1, null);
     };
     refresh();
@@ -1000,6 +1039,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
         setGrabMode(false);
         setGrabbing(null);
         setCompoundCharges(saved.compoundCharges);
+        inventoryCompoundChargesRef.current = saved.inventoryCompoundCharges ?? 0;
         setCompoundMode(false);
         setSelectedCompoundIds(new Set());
         setCompoundFx(null);
@@ -1123,6 +1163,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     setGrabs(0);
     setGrabMode(false);
     setGrabbing(null);
+    inventoryCompoundChargesRef.current = 0;
     if (isMoleculeChallenge) {
       setCompoundCharges(1);
     } else {
@@ -1462,6 +1503,25 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     setUnstableQueue((u) => [...u.slice(1), nextSlot.unstable]);
   }
 
+  function showMergeComboFx(merges: MergeEvent[]) {
+    if (merges.length <= 1) return;
+    const fxId = Date.now();
+    setMergeComboFx(
+      merges.slice(1).map((merge, index) => ({
+        id: fxId + index,
+        x: merge.x,
+        y: merge.y,
+        depth: merge.chainDepth,
+        atom: merge.resultAtomicNumber,
+        isotope: Boolean(merge.stabilizedIsotope),
+      })),
+    );
+    window.setTimeout(
+      () => setMergeComboFx((current) => current.filter((fx) => fx.id < fxId || fx.id >= fxId + merges.length)),
+      MERGE_COMBO_START_MS + merges.length * MERGE_COMBO_STEP_MS + MERGE_COMBO_END_PAD_MS,
+    );
+  }
+
   function spawnPopup(text: string) {
     const id = ++popupId.current;
     setPopups((p) => [...p, { id, text, x: 50 + (Math.random() * 20 - 10), y: 30 }]);
@@ -1693,7 +1753,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
       "A radioactive atom has appeared. Its ring ticks down after shots; merge it before it decays.",
       "danger",
     );
-    return { ...ball, unstableShots: UNSTABLE_SEGMENTS };
+    return { ...ball, unstableShots: isotopeChargeCapacity(ball.atom) };
   }
 
   function createMoleculeChallengeBoard(compound: CompoundDefinition | null): Board {
@@ -2172,12 +2232,12 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     // Clear every non-stone atom within the gamma radius.
     const radius = gammaR * GAMMA_RADIUS_MULT;
     const hitIds = new Set<number>();
-    const clearedAtoms: number[] = [];
+    const clearedAtoms: { atom: number; isotope: boolean }[] = [];
     const remaining: Board = balls.filter((b) => {
       if (b.stoneHp != null) return true;
       if (Math.hypot(b.x - ix, b.y - iy) > radius + b.r) return true;
       hitIds.add(b.id);
-      clearedAtoms.push(b.atom);
+      clearedAtoms.push({ atom: b.atom, isotope: isActiveIsotope(b) });
       return false;
     });
     const nextShots = shots + 1;
@@ -2191,20 +2251,22 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     setNoMergeStreak(0);
 
     const gained = Math.floor(
-      clearedAtoms.reduce((sum, atom) => sum + atom * 12, 0) * level.scoreMultiplier,
+      clearedAtoms.reduce((sum, atom) => sum + atom.atom * 12 * (atom.isotope ? 2 : 1), 0) *
+        level.scoreMultiplier,
     );
     const nextScore = score + gained;
     setScore(nextScore);
     addScore(gained);
 
     spawnPopup(hitIds.size > 0 ? `☢ GAMMA -${hitIds.size}` : "☢ GAMMA");
+    if (clearedAtoms.some((atom) => atom.isotope)) spawnPopup("ISOTOPE x2");
     haptic([30, 50, 30, 50, 60]);
 
     pushShotHistory({
       shot: nextShots,
       action: hitIds.size > 0 ? `Gamma cleared ${hitIds.size} atom${hitIds.size === 1 ? "" : "s"}` : "Gamma fired",
       points: gained,
-      powerUp: "Gamma Bomb",
+      powerUp: clearedAtoms.some((atom) => atom.isotope) ? "Gamma Bomb, Isotope x2" : "Gamma Bomb",
     });
 
     if (checkGameOver(updated, geo)) {
@@ -2251,7 +2313,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
       updated = updated.map((b) => {
         if (remaining <= 0 || b.stoneHp != null || b.atom <= 1 || b.unstableShots != null || Math.random() > 0.45) return b;
         remaining -= 1;
-        return { ...b, unstableShots: UNSTABLE_SEGMENTS };
+        return { ...b, unstableShots: isotopeChargeCapacity(b.atom) };
       });
       spawnPopup("☢ UNSTABLE DECAY");
     }
@@ -2683,7 +2745,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
       y,
       atom: atomOverride,
       r: radiusFor(atomOverride),
-      unstableShots: currentIsUnstable ? UNSTABLE_SEGMENTS : undefined,
+      unstableShots: currentIsUnstable ? isotopeChargeCapacity(atomOverride) : undefined,
     };
     const newBall: Ball = baseNewBall;
     if (currentBalls !== balls) setBalls(currentBalls);
@@ -2748,21 +2810,25 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     if (result.merges.length > 0) {
       const comboLabel = getComboLabel(result.merges.length);
       if (comboLabel) spawnPopup(comboLabel);
+      showMergeComboFx(result.merges);
       grantGravityForCombo(result.merges.length);
       setRunBestCombo((best) => Math.max(best, result.merges.length));
       setBestCombo(result.merges.length);
       result.merges.forEach((m) => trackMerge(levelId, m.resultAtomicNumber, m.chainDepth, mode));
       const showSymbolPopups = result.merges.length >= 2;
+      if (result.merges.some((merge) => merge.stabilizedIsotope)) spawnPopup("☢ ISOTOPE ×2");
       result.merges.forEach((m, i) => {
         setTimeout(
           () => {
             sfx(() => playMergeSound(m.chainDepth));
             haptic([10, 20, 10]);
             if (showSymbolPopups) {
-              spawnPopup(`+${ELEMENTS[m.resultAtomicNumber - 1]?.symbol ?? "?"}`);
+              spawnPopup(
+                `${m.stabilizedIsotope ? "☢ " : ""}+${ELEMENTS[m.resultAtomicNumber - 1]?.symbol ?? "?"}`,
+              );
             }
           },
-          180 + i * 260,
+          MERGE_COMBO_START_MS + i * MERGE_COMBO_STEP_MS,
         );
       });
     }
@@ -2817,6 +2883,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
       pendingReversiblePowerUp === "transmute" ? "Transmute Shot" : null,
       pendingReversiblePowerUp === "emission" ? "Emission" : null,
       shimmerHit ? "Shimmer" : null,
+      result.merges.some((merge) => merge.stabilizedIsotope) ? "Isotope ×2" : null,
       fusionJumpArmed ? "Fusion Jump" : null,
       pendingReversiblePowerUp === "catalyst" || catalystShotsRemaining > 0 ? "Catalyst Aura" : null,
       currentIsBlank ? "Blank Atom" : null,
@@ -2877,7 +2944,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
         }
         setBusy(false);
       },
-      420 + result.merges.length * 260,
+      MERGE_COMBO_START_MS + result.merges.length * MERGE_COMBO_STEP_MS + MERGE_COMBO_END_PAD_MS,
     );
   }
 
@@ -2890,6 +2957,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
       gravity: gravityCharges,
       grab: grabs,
       gamma: gammaCharges + (pendingGamma ? 1 : 0),
+      molecule: Math.min(compoundCharges, inventoryCompoundChargesRef.current),
     };
   }
 
@@ -2928,6 +2996,13 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     setGravityCharges((count) => count + selectedInventoryPowerUps.gravity);
     setGrabs((count) => count + selectedInventoryPowerUps.grab);
     setGammaCharges((count) => count + selectedInventoryPowerUps.gamma);
+    if (selectedInventoryPowerUps.molecule > 0) {
+      inventoryCompoundChargesRef.current = Math.min(
+        1,
+        inventoryCompoundChargesRef.current + selectedInventoryPowerUps.molecule,
+      );
+      setCompoundCharges((count) => Math.min(1, count + selectedInventoryPowerUps.molecule));
+    }
     if (selectedCount > 0) {
       spawnPopup(`🎒 LOADED ×${selectedCount}`);
       if (canIntroducePowerUps) {
@@ -3151,8 +3226,9 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     if (!matchingCompound || busy) return;
     const selectedAtoms = balls
       .filter((b) => selectedCompoundIds.has(b.id) && b.stoneHp == null)
-      .map((b) => ({ id: b.id, x: b.x, y: b.y, atom: b.atom, r: b.r }));
+      .map((b) => ({ id: b.id, x: b.x, y: b.y, atom: b.atom, r: b.r, unstableShots: b.unstableShots }));
     if (selectedAtoms.length === 0) return;
+    const isotopeBonus = selectedAtoms.some(isActiveIsotope);
     const selectedKey = compoundKey(countsForBalls(selectedAtoms));
     if (selectedKey !== compoundKey(matchingCompound.elements)) return;
     if (isMoleculeChallenge && moleculeObjective && matchingCompound.id !== moleculeObjective.id) {
@@ -3165,6 +3241,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     if (!isMoleculeChallenge) {
       const spentAt = Date.now();
       saveCompoundChargeState(0, spentAt);
+      inventoryCompoundChargesRef.current = Math.max(0, inventoryCompoundChargesRef.current - 1);
       setCompoundCharges(0);
     }
     setCompoundMode(false);
@@ -3192,9 +3269,10 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
         shot: shots,
         action: `Formed ${matchingCompound.name}`,
         points: bonusScore,
-        powerUp: "Compound",
+        powerUp: isotopeBonus ? "Compound, Isotope x2" : "Compound",
       });
       spawnPopup(`+${formatScore(bonusScore)}`);
+      if (isotopeBonus) spawnPopup("ISOTOPE x2");
       const textFxId = Date.now();
       setCompoundTextFx({ id: textFxId, compound: matchingCompound, isNew: wasNew });
       window.setTimeout(
@@ -3351,10 +3429,13 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
           ? `Gravity caused ${result.merges.length} merge${result.merges.length === 1 ? "" : "s"}`
           : "Gravity shifted the board",
       points: gained,
-      powerUp: "Gravity",
+      powerUp: result.merges.some((merge) => merge.stabilizedIsotope)
+        ? "Gravity, Isotope ×2"
+        : "Gravity",
       merges: result.merges,
     });
     if (result.merges.length > 0) {
+      showMergeComboFx(result.merges);
       grantGravityForCombo(result.merges.length);
       setRunBestCombo((best) => Math.max(best, result.merges.length));
       setBestCombo(result.merges.length);
@@ -3373,9 +3454,11 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
           () => {
             sfx(() => playMergeSound(m.chainDepth));
             if (showSymbolPopups)
-              spawnPopup(`+${ELEMENTS[m.resultAtomicNumber - 1]?.symbol ?? "?"}`);
+              spawnPopup(
+                `${m.stabilizedIsotope ? "☢ " : ""}+${ELEMENTS[m.resultAtomicNumber - 1]?.symbol ?? "?"}`,
+              );
           },
-          80 + i * 120,
+          MERGE_COMBO_START_MS + i * MERGE_COMBO_STEP_MS,
         );
       });
     } else {
@@ -3418,7 +3501,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
         if (checkGameOver(result.balls, geo)) setGameOver(true);
         setBusy(false);
       },
-      200 + result.merges.length * 120,
+      MERGE_COMBO_START_MS + result.merges.length * MERGE_COMBO_STEP_MS + MERGE_COMBO_END_PAD_MS,
     );
   }
 
@@ -3514,6 +3597,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     if (grabEnabled && result.merges.length > 0) {
       const comboLabel = getComboLabel(result.merges.length);
       if (comboLabel) spawnPopup(comboLabel);
+      showMergeComboFx(result.merges);
       grantGravityForCombo(result.merges.length);
       setRunBestCombo((best) => Math.max(best, result.merges.length));
       setBestCombo(result.merges.length);
@@ -3524,9 +3608,11 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
             sfx(() => playMergeSound(m.chainDepth));
             haptic([10, 20, 10]);
             if (showSymbolPopups)
-              spawnPopup(`+${ELEMENTS[m.resultAtomicNumber - 1]?.symbol ?? "?"}`);
+              spawnPopup(
+                `${m.stabilizedIsotope ? "☢ " : ""}+${ELEMENTS[m.resultAtomicNumber - 1]?.symbol ?? "?"}`,
+              );
           },
-          80 + i * 120,
+          MERGE_COMBO_START_MS + i * MERGE_COMBO_STEP_MS,
         );
       });
     }
@@ -3544,7 +3630,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
           ? `Grab created ${result.merges.length} merge${result.merges.length === 1 ? "" : "s"}`
           : "Grab moved an atom",
       points: gained + mergeStoneBonus,
-      powerUp: "Grab",
+      powerUp: result.merges.some((merge) => merge.stabilizedIsotope) ? "Grab, Isotope ×2" : "Grab",
       merges: result.merges,
     });
     // Grab-and-drop that produces a merge counts as 1 step toward the next
@@ -3566,7 +3652,10 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
       reachedAtomicNumbers: Array.from(newAtoms),
       maxChainDepth: result.merges.length,
     });
-    setTimeout(() => setHighlightId(null), 200 + result.merges.length * 120);
+    setTimeout(
+      () => setHighlightId(null),
+      MERGE_COMBO_START_MS + result.merges.length * MERGE_COMBO_STEP_MS + MERGE_COMBO_END_PAD_MS,
+    );
     // Grabbed-and-merged into the target element? Trigger the same win flow
     // a regular shot does so the level actually clears.
     if (result.levelComplete && !isMoleculeChallenge && !continuingPastTarget) {
@@ -4226,6 +4315,31 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
             </div>
           )}
 
+          {mergeComboFx.map((fx, index) => (
+            <div
+              key={fx.id}
+              className={fx.isotope ? "merge-combo-fx isotope" : "merge-combo-fx"}
+              style={
+                {
+                  position: "absolute",
+                  left: fx.x,
+                  top: fx.y,
+                  zIndex: 8,
+                  pointerEvents: "none",
+                  animationDelay: `${MERGE_COMBO_START_MS + index * MERGE_COMBO_STEP_MS}ms`,
+                  "--combo-color": ELEMENTS[fx.atom - 1]?.glowColor ?? "var(--accent)",
+                } as React.CSSProperties & Record<"--combo-color", string>
+              }
+            >
+              <span className="merge-combo-ring merge-combo-ring-a" />
+              <span className="merge-combo-ring merge-combo-ring-b" />
+              <span className="merge-combo-core">
+                x{fx.depth + 1}
+                {fx.isotope ? " isotope" : ""}
+              </span>
+            </div>
+          ))}
+
           {gravityFxId && (
             <div
               className="gravity-fx"
@@ -4454,7 +4568,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
                   size={ballSize}
                   glow
                   shimmer={currentIsShimmer}
-                  unstableShots={currentIsUnstable ? UNSTABLE_SEGMENTS : undefined}
+                  unstableShots={currentIsUnstable ? isotopeChargeCapacity(current) : undefined}
                 />
               )}
             </div>
@@ -4490,7 +4604,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
                   size={ballSize}
                   glow
                   shimmer={currentIsShimmer}
-                  unstableShots={currentIsUnstable ? UNSTABLE_SEGMENTS : undefined}
+                  unstableShots={currentIsUnstable ? isotopeChargeCapacity(current) : undefined}
                 />
               ))}
           </div>
@@ -4548,7 +4662,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
                     atomicNumber={atom}
                     size={32 - distance * 3}
                     shimmer={shimmerQueue[queueIndex]}
-                    unstableShots={unstableQueue[queueIndex] ? UNSTABLE_SEGMENTS : undefined}
+                    unstableShots={unstableQueue[queueIndex] ? isotopeChargeCapacity(atom) : undefined}
                   />
                 ),
               )}
@@ -5711,7 +5825,13 @@ function ShotHistoryModal({
     action: string;
     points: number;
     powerUp?: string;
-    merges: { sourceAtom: number; atom: number; depth: number }[];
+    merges: {
+      sourceAtom: number;
+      atom: number;
+      depth: number;
+      stabilizedIsotope?: boolean;
+      points: number;
+    }[];
   }[];
   onClose: () => void;
 }) {
@@ -5778,11 +5898,26 @@ function ShotHistoryModal({
                       {e.powerUp ? `Power-up: ${e.powerUp}` : "No power-up"}
                     </div>
                     {e.merges.length > 0 && (
-                      <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginTop: 6 }}>
-                        {e.merges.map((merge, index) => (
-                          <MergeAtomFormula key={`${e.id}-${index}`} merge={merge} />
-                        ))}
-                      </div>
+                      <>
+                        <div
+                          style={{
+                            marginTop: 5,
+                            fontSize: 11,
+                            color: "var(--accent)",
+                            fontWeight: 900,
+                          }}
+                        >
+                          Chain combo x{Math.max(...e.merges.map((merge) => merge.depth + 1))}
+                          {e.merges.some((merge) => merge.stabilizedIsotope)
+                            ? " - isotope bonus"
+                            : ""}
+                        </div>
+                        <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginTop: 6 }}>
+                          {e.merges.map((merge, index) => (
+                            <MergeAtomFormula key={`${e.id}-${index}`} merge={merge} />
+                          ))}
+                        </div>
+                      </>
                     )}
                   </div>
                   <div
@@ -5805,7 +5940,17 @@ function ShotHistoryModal({
   );
 }
 
-function MergeAtomFormula({ merge }: { merge: { sourceAtom: number; atom: number } }) {
+function MergeAtomFormula({
+  merge,
+}: {
+  merge: {
+    sourceAtom: number;
+    atom: number;
+    depth: number;
+    stabilizedIsotope?: boolean;
+    points: number;
+  };
+}) {
   return (
     <span
       style={{
@@ -5815,14 +5960,28 @@ function MergeAtomFormula({ merge }: { merge: { sourceAtom: number; atom: number
         padding: "3px 5px",
         borderRadius: 999,
         background: "var(--surface)",
-        border: "1px solid var(--border)",
+        border: `1px solid ${merge.stabilizedIsotope ? "oklch(0.88 0.2 70)" : "var(--border)"}`,
+        boxShadow: merge.stabilizedIsotope
+          ? "0 0 10px oklch(0.82 0.18 70 / 0.35)"
+          : undefined,
       }}
     >
+      <span style={{ fontSize: 10, fontWeight: 900, color: "var(--accent)" }}>
+        x{merge.depth + 1}
+      </span>
       <ElementBall atomicNumber={merge.sourceAtom} size={22} />
       <span style={{ fontSize: 10, fontWeight: 900, color: "var(--muted-foreground)" }}>+</span>
       <ElementBall atomicNumber={merge.sourceAtom} size={22} />
-      <span style={{ fontSize: 10, fontWeight: 900, color: "var(--accent)" }}>→</span>
+      <span style={{ fontSize: 10, fontWeight: 900, color: "var(--accent)" }}>-&gt;</span>
       <ElementBall atomicNumber={merge.atom} size={24} glow />
+      <span style={{ fontSize: 10, fontWeight: 900, color: "var(--muted-foreground)" }}>
+        +{formatScore(merge.points)}
+      </span>
+      {merge.stabilizedIsotope && (
+        <span style={{ fontSize: 10, fontWeight: 900, color: "oklch(0.88 0.2 70)" }}>
+          isotope x2
+        </span>
+      )}
     </span>
   );
 }

@@ -68,6 +68,14 @@ const SHOP_POWER_UPS: Array<{
     unlockLevel: POWER_UP_UNLOCK_LEVELS.gamma,
     description: "Stock a wide-radius blast that clears surrounding non-stone atoms.",
   },
+  {
+    id: "molecule",
+    icon: "ðŸ§¬",
+    name: "Compound",
+    cost: 18000,
+    unlockLevel: POWER_UP_UNLOCK_LEVELS.molecule,
+    description: "Start a run with one Compound charge ready for molecule formation.",
+  },
 ];
 
 export function Shop({ onBack }: { onBack: () => void }) {

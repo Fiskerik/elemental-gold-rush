@@ -28,9 +28,9 @@ export const POWER_UPS = [
     icon: "unstable",
     name: "Unstable Isotope",
     unlock: `Level ${POWER_UP_UNLOCK_LEVELS.unstable}`,
-    effect: "Rare queue atoms have a 6% spawn chance with an 8-shot decay ring. Merge them to stabilize them.",
+    effect: "Rare queue atoms have a 4% spawn chance with period-based decay shells. Merge them for 2x points.",
     description:
-      "A rare radioactive queue atom with a 6% spawn chance. Its ring counts down after shots; merging stabilizes it into the new atom.",
+      "A rare radioactive queue atom with a 4% spawn chance. H/He get 2 shells, period 2 gets 8, and higher periods get 16; merging stabilizes it for double points.",
   },
   {
     icon: "grab",
