@@ -1760,7 +1760,8 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     if (!compound) return createSeededBoard();
     const recipeAtoms = atomsForCompound(compound);
     const highestRecipeAtom = Math.max(...recipeAtoms, 1);
-    const atoms = compound.id === "water" ? [7, 7, 1, 1] : [highestRecipeAtom];
+    const startingAtom = level.id >= 15 ? Math.max(1, highestRecipeAtom - 1) : highestRecipeAtom;
+    const atoms = compound.id === "water" ? [7, 7, 1, 1] : [startingAtom];
     const count = atoms.length;
     const maxR = Math.max(...atoms.map((atom) => radiusFor(atom)), radiusFor(1));
     const cols = Math.min(4, Math.max(2, Math.ceil(Math.sqrt(count))));
