@@ -1167,8 +1167,14 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     if (isMoleculeChallenge) {
       setCompoundCharges(1);
     } else {
-      setCompoundCharges(0);
-      if (compoundEnabled) saveCompoundChargeState(0, Date.now());
+      // Every new run starts with 1 Compound charge when unlocked,
+      // regardless of pre-selected inventory power-ups.
+      if (compoundEnabled) {
+        setCompoundCharges(1);
+        saveCompoundChargeState(1, null);
+      } else {
+        setCompoundCharges(0);
+      }
     }
     setCompoundMode(false);
     setSelectedCompoundIds(new Set());
