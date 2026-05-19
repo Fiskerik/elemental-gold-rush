@@ -1544,6 +1544,17 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     if (stageClearTimeoutRef.current !== null) {
       window.clearTimeout(stageClearTimeoutRef.current);
     }
+    // Record the cleared run immediately so campaign-map stats update
+    // even if the player exits before the result modal is dismissed.
+    if (!runRecordedRef.current) {
+      runRecordedRef.current = true;
+      recordLevelRun(levelId, {
+        score: stats.score,
+        shots: stats.shots,
+        powerUpsUsed: runPowerUpsUsedRef.current,
+        won: true,
+      });
+    }
     // Clear any in-flight score/merge popups so they don't bleed into the
     // win animation or appear behind the result modal.
     setPopups([]);
