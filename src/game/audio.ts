@@ -99,40 +99,82 @@ export function playWinSound() {
 function playAmbientStep(c: AudioContext, now: number) {
   if (!musicMaster) return;
   const master = musicMaster;
-const chords = [
-  [261.63, 329.63, 392.00], // C major
-  [293.66, 369.99, 440.00], // D major
-  [246.94, 311.13, 370.00], // B minor → brighter resolution
-  [329.63, 392.00, 523.25], // E major sparkle
-];
+  
+  // Am, F, C, G progression - klassisk och bra driv för spel
+  const chords = [
+    [220.00, 261.63, 329.63], // Am
+    [174.61, 220.00, 261.63], // F
+    [261.63, 329.63, 392.00], // C
+    [196.00, 246.94, 293.66], // G
+  ];
+  
   const chord = chords[musicStep % chords.length];
   musicStep += 1;
 
+  // 1. Spela upp ackordet (Pad)
   chord.forEach((freq, index) => {
     const osc = c.createOscillator();
     const gain = c.createGain();
     osc.type = index === 0 ? "triangle" : "sine";
     osc.frequency.setValueAtTime(freq, now);
-    osc.frequency.exponentialRampToValueAtTime(freq * 1.006, now + 3.8);
+    
     gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(index === 0 ? 0.08 : 0.045, now + 0.7);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 4.2);
+    gain.gain.linearRampToValueAtTime(index === 0 ? 0.05 : 0.03, now + 0.5);
+    gain.gain.linearRampToValueAtTime(0.02, now + 1.5);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 2.4);
+    
     osc.connect(gain).connect(master);
     osc.start(now);
-    osc.stop(now + 4.4);
+    osc.stop(now + 2.5);
   });
 
-  const sparkle = c.createOscillator();
-  const sparkleGain = c.createGain();
-  sparkle.type = "sine";
-  sparkle.frequency.setValueAtTime(chord[2] * 2, now + 0.12);
-  sparkle.frequency.exponentialRampToValueAtTime(chord[2] * 2.6, now + 1.1);
-  sparkleGain.gain.setValueAtTime(0.0001, now + 0.12);
-  sparkleGain.gain.exponentialRampToValueAtTime(0.035, now + 0.2);
-  sparkleGain.gain.exponentialRampToValueAtTime(0.0001, now + 1.3);
-  sparkle.connect(sparkleGain).connect(master);
-  sparkle.start(now + 0.12);
-  sparkle.stop(now + 1.4);
+  // 2. Rytmisk bas (pulserande sågtandsvåg)
+  const bassFreq = chord[0] / 2; // En oktav ner från grundtonen
+  for (let i = 0; i < 4; i++) {
+    const time = now + i * 0.5; // Spelar varje halvsekund
+    const bassOsc = c.createOscillator();
+    const bassGain = c.createGain();
+    const filter = c.createBiquadFilter();
+    
+    bassOsc.type = "sawtooth";
+    bassOsc.frequency.setValueAtTime(bassFreq, time);
+    
+    // Lågpassfilter för att basen inte ska bli för skrikig
+    filter.type = "lowpass";
+    filter.frequency.setValueAtTime(400, time);
+    filter.frequency.exponentialRampToValueAtTime(100, time + 0.3);
+    
+    bassGain.gain.setValueAtTime(0.0001, time);
+    bassGain.gain.exponentialRampToValueAtTime(0.05, time + 0.05);
+    bassGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.4);
+    
+    bassOsc.connect(filter).connect(bassGain).connect(master);
+    bassOsc.start(time);
+    bassOsc.stop(time + 0.45);
+  }
+
+  // 3. Arpeggio/melodi (spelar på offbeats för lite sväng)
+  const arpNotes = [chord[0] * 2, chord[1] * 2, chord[2] * 2, chord[1] * 2];
+  arpNotes.forEach((freq, i) => {
+    const time = now + i * 0.5 + 0.25; // Förskjuten 0.25s (offbeat)
+    const arpOsc = c.createOscillator();
+    const arpGain = c.createGain();
+    const filter = c.createBiquadFilter();
+    
+    arpOsc.type = "square"; // Fyrkantsvåg för retro spel-feeling
+    arpOsc.frequency.setValueAtTime(freq, time);
+    
+    filter.type = "bandpass";
+    filter.frequency.setValueAtTime(1200, time);
+    
+    arpGain.gain.setValueAtTime(0.0001, time);
+    arpGain.gain.exponentialRampToValueAtTime(0.015, time + 0.02);
+    arpGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.2);
+    
+    arpOsc.connect(filter).connect(arpGain).connect(master);
+    arpOsc.start(time);
+    arpOsc.stop(time + 0.25);
+  });
 }
 
 export function startAmbientMusic() {
@@ -149,11 +191,13 @@ export function startAmbientMusic() {
   musicMaster.gain.setValueAtTime(0.09, c.currentTime);
   musicMaster.connect(c.destination);
   playAmbientStep(c, c.currentTime + 0.02);
+  
+  // Ändrat intervallet till 2000 ms för att matcha tempot (4 slag á 0.5s)
   musicTimer = window.setInterval(() => {
     const active = getCtx();
     if (!active) return;
     playAmbientStep(active, active.currentTime + 0.02);
-  }, 3600);
+  }, 2000);
 }
 
 export function stopAmbientMusic() {
