@@ -81,10 +81,12 @@ interface ProgressState {
   unlockedLevel: number; // highest level unlocked (1-based)
   highestElement: number; // highest atomic number ever reached
   totalScore: number;
+  goldCoins: number;
   discoveredElements: number[]; // atomic numbers seen
   discoveredCompounds: string[];
   compoundCounts: Record<string, number>;
   soundEnabled: boolean;
+  musicEnabled: boolean;
   hapticsEnabled: boolean;
   dailyQuestDate: string;
   dailyQuests: DailyQuest[];
@@ -105,6 +107,7 @@ interface ProgressState {
   recordCompoundDiscovery: (compoundId: string) => void;
   addScore: (n: number) => void;
   spendScore: (cost: number) => boolean;
+  buyGoldCoins: (coins: number, pointCost: number) => boolean;
   setHighestElement: (n: number) => void;
   refreshDailyLab: () => void;
   reportQuestProgress: (event: QuestProgressEvent) => void;
@@ -120,8 +123,9 @@ interface ProgressState {
   grantProPack: () => void;
   addInventoryPowerUps: (powerUps: Partial<Record<InventoryPowerUpId, number>>) => void;
   consumeInventoryPowerUps: (powerUps: Partial<Record<InventoryPowerUpId, number>>) => boolean;
-  purchaseInventoryPowerUp: (powerUp: InventoryPowerUpId, cost: number) => boolean;
+  purchaseInventoryPowerUp: (powerUp: InventoryPowerUpId, coinCost: number) => boolean;
   toggleSound: () => void;
+  toggleMusic: () => void;
   toggleHaptics: () => void;
   reset: () => void;
 }
@@ -135,10 +139,12 @@ export const useProgress = create<ProgressState>()(
       unlockedLevel: 1,
       highestElement: 1,
       totalScore: 0,
+      goldCoins: 0,
       discoveredElements: [1],
       discoveredCompounds: [],
       compoundCounts: {},
       soundEnabled: true,
+      musicEnabled: true,
       hapticsEnabled: true,
       dailyQuestDate: initialQuestDate,
       dailyQuests: initialDailyQuests,
@@ -176,8 +182,7 @@ export const useProgress = create<ProgressState>()(
             [compoundId]: (s.compoundCounts[compoundId] ?? 0) + 1,
           },
         })),
-      addScore: (n) =>
-        set((s) => ({ totalScore: s.totalScore + Math.max(0, Math.floor(n / 10)) })),
+      addScore: (n) => set((s) => ({ totalScore: s.totalScore + Math.max(0, Math.floor(n)) })),
       spendScore: (cost) => {
         let spent = false;
         set((s) => {
@@ -187,6 +192,20 @@ export const useProgress = create<ProgressState>()(
           return { totalScore: s.totalScore - normalizedCost };
         });
         return spent;
+      },
+      buyGoldCoins: (coins, pointCost) => {
+        let purchased = false;
+        set((s) => {
+          const normalizedCoins = Math.max(0, Math.floor(coins));
+          const normalizedCost = Math.max(0, Math.floor(pointCost));
+          if (normalizedCoins <= 0 || s.totalScore < normalizedCost) return s;
+          purchased = true;
+          return {
+            totalScore: s.totalScore - normalizedCost,
+            goldCoins: s.goldCoins + normalizedCoins,
+          };
+        });
+        return purchased;
       },
       setHighestElement: (n) => set((s) => ({ highestElement: Math.max(s.highestElement, n) })),
       refreshDailyLab: () =>
@@ -212,12 +231,11 @@ export const useProgress = create<ProgressState>()(
           );
           if (refreshed.claimedDailyReward || !areDailyQuestsComplete(refreshed.dailyQuests))
             return refreshed;
-          const reward = 20000;
           return {
             ...refreshed,
             claimedDailyReward: true,
             dailyStreak: s.dailyStreak + 1,
-            totalScore: s.totalScore + reward,
+            goldCoins: s.goldCoins + 2,
           };
         }),
       setBestCombo: (combo) =>
@@ -299,10 +317,11 @@ export const useProgress = create<ProgressState>()(
         });
         return consumed;
       },
-      purchaseInventoryPowerUp: (powerUp, cost) => {
+      purchaseInventoryPowerUp: (powerUp, coinCost) => {
         let purchased = false;
         set((s) => {
-          if (s.totalScore < cost) return s;
+          const normalizedCost = Math.max(0, Math.floor(coinCost));
+          if (s.goldCoins < normalizedCost) return s;
           purchased = true;
           const refreshed = refreshDailyQuests(
             s.dailyQuestDate,
@@ -311,7 +330,7 @@ export const useProgress = create<ProgressState>()(
           );
           return {
             ...refreshed,
-            totalScore: s.totalScore - cost,
+            goldCoins: s.goldCoins - normalizedCost,
             powerUpInventory: mergePowerUpInventory(s.powerUpInventory, { [powerUp]: 1 }),
             dailyQuests: applyQuestProgress(refreshed.dailyQuests, { itemsPurchased: 1 }),
           };
@@ -319,15 +338,20 @@ export const useProgress = create<ProgressState>()(
         return purchased;
       },
       toggleSound: () => set((s) => ({ soundEnabled: !s.soundEnabled })),
+      toggleMusic: () => set((s) => ({ musicEnabled: !s.musicEnabled })),
       toggleHaptics: () => set((s) => ({ hapticsEnabled: !s.hapticsEnabled })),
       reset: () =>
         set({
           unlockedLevel: 1,
           highestElement: 1,
           totalScore: 0,
+          goldCoins: 0,
           discoveredElements: [1],
           discoveredCompounds: [],
           compoundCounts: {},
+          soundEnabled: true,
+          musicEnabled: true,
+          hapticsEnabled: true,
           dailyQuestDate: getTodayQuestDate(),
           dailyQuests: createDailyQuests(),
           dailyStreak: 0,
@@ -359,6 +383,10 @@ export const useProgress = create<ProgressState>()(
           dailyQuests: persistedState?.dailyQuests ?? current.dailyQuests,
           dailyStreak: persistedState?.dailyStreak ?? current.dailyStreak,
           claimedDailyReward: persistedState?.claimedDailyReward ?? current.claimedDailyReward,
+          goldCoins: persistedState?.goldCoins ?? current.goldCoins,
+          soundEnabled: persistedState?.soundEnabled ?? current.soundEnabled,
+          musicEnabled: persistedState?.musicEnabled ?? current.musicEnabled,
+          hapticsEnabled: persistedState?.hapticsEnabled ?? current.hapticsEnabled,
           bestCombo: persistedState?.bestCombo ?? current.bestCombo,
           bestComboDate: persistedState?.bestComboDate ?? current.bestComboDate,
           earnedBadges: getEarnedBadgeIds(discoveredElements),

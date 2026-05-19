@@ -47,6 +47,7 @@ export function MainMenu({
     unlockedLevel,
     highestElement,
     totalScore,
+    goldCoins,
     dailyQuests,
     dailyStreak,
     claimedDailyReward,
@@ -150,7 +151,7 @@ export function MainMenu({
           <div style={statGrid}>
             <Stat label="Highest" value={highestEl?.symbol ?? "H"} sub={`#${highestElement}`} />
             <Stat label="Score" value={formatScore(totalScore)} sub="total" />
-            <Stat label="Combo" value={`${bestCombo}`} sub="best" />
+            <Stat label="Coins" value={`${goldCoins}`} sub="gold" />
           </div>
         </section>
 
@@ -205,7 +206,7 @@ export function MainMenu({
                 Streak {dailyStreak} - {completedDailyQuests}/{dailyQuests.length} quests
               </div>
               <div style={{ fontSize: 11, color: "var(--muted-foreground)", marginTop: 2 }}>
-                Complete 4 of 6 quests to claim 20,000 points.
+                Complete 4 of 6 quests to claim 2 gold coins.
               </div>
             </div>
             <button

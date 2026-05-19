@@ -1,7 +1,8 @@
 import { useProgress } from "./store";
 
 export function Settings({ onBack }: { onBack: () => void }) {
-  const { soundEnabled, hapticsEnabled, toggleSound, toggleHaptics, reset } = useProgress();
+  const { soundEnabled, musicEnabled, hapticsEnabled, toggleSound, toggleMusic, toggleHaptics, reset } =
+    useProgress();
   return (
     <div className="app-shell" style={{ padding: 16 }}>
       <div style={{ position: "relative", zIndex: 1, maxWidth: 480, margin: "0 auto" }}>
@@ -10,6 +11,7 @@ export function Settings({ onBack }: { onBack: () => void }) {
           <h1 style={{ fontSize: 22, margin: 0, fontWeight: 800 }}>Settings</h1>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <Row label="Music" value={musicEnabled} onToggle={toggleMusic} />
           <Row label="Sound effects" value={soundEnabled} onToggle={toggleSound} />
           <Row label="Haptics" value={hapticsEnabled} onToggle={toggleHaptics} />
           <button

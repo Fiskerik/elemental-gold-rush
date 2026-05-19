@@ -23,6 +23,7 @@ export function Profile({ onBack }: Props) {
     unlockedLevel,
     highestElement,
     totalScore,
+    goldCoins,
     discoveredElements,
     dailyQuests,
     dailyStreak,
@@ -70,6 +71,7 @@ export function Profile({ onBack }: Props) {
 
         <section style={grid}>
           <ProfileStat label="Total Score" value={formatScore(totalScore)} sub="career" />
+          <ProfileStat label="Gold Coins" value={`${goldCoins}`} sub="shop currency" />
           <ProfileStat
             label="Daily Streak"
             value={`${dailyStreak}`}
@@ -106,7 +108,7 @@ export function Profile({ onBack }: Props) {
           <div style={{ color: "var(--muted-foreground)", fontSize: 13, marginBottom: 12 }}>
             {completedDailyQuests}/{dailyQuests.length} quests complete today.
             <div style={{ fontSize: 12, marginTop: 4 }}>
-              Complete 4 of 6 quests to claim the daily prize of 20,000 points.
+              Complete 4 of 6 quests to claim the daily prize of 2 gold coins.
             </div>
           </div>
           <div style={{ display: "grid", gap: 8 }}>

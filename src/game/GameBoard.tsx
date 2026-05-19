@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
+import { Settings as SettingsIcon } from "lucide-react";
 import { ELEMENTS } from "./elements";
 import { LEVELS, MOLECULE_CHALLENGE_BY_LEVEL, getLevelById, getNextLevel } from "./levels";
 import {
@@ -24,7 +25,14 @@ import {
   type PowerUpInventory,
   useProgress,
 } from "./store";
-import { playMergeSound, playShootSound, playWinSound, vibrate } from "./audio";
+import {
+  playMergeSound,
+  playShootSound,
+  playWinSound,
+  startAmbientMusic,
+  stopAmbientMusic,
+  vibrate,
+} from "./audio";
 import { GameModeId, getGameMode, getModeLevelLabel } from "./challenges";
 import { trackGameOver, trackGameStart, trackLevelWin, trackMerge, trackShot } from "./analytics";
 import {
@@ -559,6 +567,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     setHighestElement,
     unlockLevel,
     soundEnabled,
+    musicEnabled,
     hapticsEnabled,
     discoveredElements,
     discoveredCompounds,
@@ -577,6 +586,8 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     consumeInventoryPowerUps,
     seenTips,
     markTipSeen,
+    toggleSound,
+    toggleMusic,
   } = useProgress();
 
   const [balls, setBalls] = useState<Board>(() => createEmptyBoard());
@@ -610,6 +621,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
   const [aimDeg, setAimDeg] = useState(0); // 0 = straight up, negative = left
   const [popups, setPopups] = useState<{ id: number; text: string; x: number; y: number }[]>([]);
   const [busy, setBusy] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [gameOver, setGameOver] = useState(false);
   const [won, setWon] = useState(false);
   const [discoveryEl, setDiscoveryEl] = useState<number | null>(null);
@@ -718,6 +730,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     compound?: CompoundDefinition;
   } | null>(null);
   const stageClearTimeoutRef = useRef<number | null>(null);
+  const projectileFrameRef = useRef<number | null>(null);
   const hasClaimedUnusedInventoryRef = useRef(false);
   const runPowerUpsUsedRef = useRef(0);
   const runRecordedRef = useRef(false);
@@ -884,6 +897,12 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     if (hapticsEnabled) vibrate(ms);
   };
 
+  useEffect(() => {
+    if (musicEnabled && !gameOver && !won) startAmbientMusic();
+    else stopAmbientMusic();
+    return () => stopAmbientMusic();
+  }, [musicEnabled, gameOver, won]);
+
   // Tooltip queue — small dismissable boxes that explain new mechanics.
   const [activeTip, setActiveTip] = useState<null | {
     id: string;
@@ -999,7 +1018,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
 
   useEffect(() => {
     if (isMoleculeChallenge || !compoundEnabled) return;
-    if (paused) return;
+    if (paused || settingsOpen || inventoryPickerOpen) return;
     const refresh = () => {
       const state = loadCompoundChargeState();
       setCompoundCharges(Math.max(state.charges, inventoryCompoundChargesRef.current));
@@ -1008,7 +1027,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     refresh();
     const timer = window.setInterval(refresh, 15_000);
     return () => window.clearInterval(timer);
-  }, [compoundEnabled, isMoleculeChallenge, paused]);
+  }, [compoundEnabled, isMoleculeChallenge, paused, settingsOpen, inventoryPickerOpen]);
 
   useEffect(() => {
     if (resumeSavedRun) {
@@ -1028,6 +1047,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
         setEarnedStars(saved.earnedStars);
         setGameOver(false);
         setWon(false);
+        setSettingsOpen(false);
         setDiscoveryEl(null);
         setHighlightId(null);
         setWiggleIds(new Set());
@@ -1094,6 +1114,8 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     setNewlyDiscoveredThisRun([]);
     const initialBalls = isMoleculeChallenge
       ? createMoleculeChallengeBoard(moleculeObjective)
+      : mode === "pure-hydrogen"
+        ? createEmptyBoard()
       : level.id >= SHUFFLE_MIN_LEVEL
         ? buildShuffleStartBoard(generateShuffleAtoms())
         : createSeededBoard();
@@ -1153,6 +1175,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     setEarnedStars(0);
     setGameOver(false);
     setWon(false);
+    setSettingsOpen(false);
     setDiscoveryEl(null);
     setHighlightId(null);
     setWiggleIds(new Set());
@@ -1167,11 +1190,9 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     if (isMoleculeChallenge) {
       setCompoundCharges(1);
     } else {
-      // Every new run starts with 1 Compound charge when unlocked,
-      // regardless of pre-selected inventory power-ups.
       if (compoundEnabled) {
-        setCompoundCharges(1);
-        saveCompoundChargeState(1, null);
+        setCompoundCharges(0);
+        saveCompoundChargeState(0, Date.now());
       } else {
         setCompoundCharges(0);
       }
@@ -1285,13 +1306,13 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
 
   // Tick the run timer every second while the level is active.
   useEffect(() => {
-    if (gameOver || won || paused) return;
+    if (gameOver || won || paused || settingsOpen || inventoryPickerOpen) return;
     const id = setInterval(() => {
       // Use delta accumulation so paused time doesn't advance powerup timers.
       setElapsedMs((m) => m + 500);
     }, 500);
     return () => clearInterval(id);
-  }, [gameOver, won, levelId, paused]);
+  }, [gameOver, won, levelId, paused, settingsOpen, inventoryPickerOpen]);
 
   useEffect(() => {
     if (mode !== "gold-rush-timer" || gameOver || won) return;
@@ -1374,6 +1395,16 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
       floor = atom + 1;
     }
     return Math.min(118, floor);
+  }
+
+  function missingLowAtomFloorIndex(board: Board): number {
+    let missingThrough = 0;
+    for (let atom = 1; atom < target; atom++) {
+      const stillOnBoard = board.some((ball) => ball.stoneHp == null && ball.atom === atom);
+      if (stillOnBoard) break;
+      missingThrough = atom;
+    }
+    return missingThrough;
   }
 
   function generateQueueAtom(maxElement: number, board: Board, forceUniform = false): number {
@@ -1575,6 +1606,9 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     return () => {
       if (stageClearTimeoutRef.current !== null) {
         window.clearTimeout(stageClearTimeoutRef.current);
+      }
+      if (projectileFrameRef.current !== null) {
+        window.cancelAnimationFrame(projectileFrameRef.current);
       }
     };
   }, []);
@@ -2047,6 +2081,50 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     const cy = ay + vy * t;
     return Math.hypot(px - cx, py - cy);
   }
+
+  function cancelProjectileAnimation() {
+    if (projectileFrameRef.current === null) return;
+    window.cancelAnimationFrame(projectileFrameRef.current);
+    projectileFrameRef.current = null;
+  }
+
+  function animateProjectilePath(
+    path: { x: number; y: number }[],
+    totalMs: number,
+    onComplete: () => void,
+  ) {
+    if (path.length === 0) {
+      onComplete();
+      return;
+    }
+    cancelProjectileAnimation();
+    const startMs = performance.now();
+    const lastIndex = path.length - 1;
+    setProjectile(path[0]);
+
+    const tick = (now: number) => {
+      const progress = Math.min(1, Math.max(0, (now - startMs) / Math.max(1, totalMs)));
+      const exact = progress * lastIndex;
+      const index = Math.min(lastIndex, Math.floor(exact));
+      const nextIndex = Math.min(lastIndex, index + 1);
+      const local = exact - index;
+      const from = path[index];
+      const to = path[nextIndex];
+      setProjectile({
+        x: from.x + (to.x - from.x) * local,
+        y: from.y + (to.y - from.y) * local,
+      });
+      if (progress >= 1) {
+        projectileFrameRef.current = null;
+        onComplete();
+        return;
+      }
+      projectileFrameRef.current = window.requestAnimationFrame(tick);
+    };
+
+    projectileFrameRef.current = window.requestAnimationFrame(tick);
+  }
+
   function damageStones(
     source: Board,
     damageById: Map<number, number>,
@@ -2095,7 +2173,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
   }
 
   function shoot() {
-    if (busy || gameOver || won || inventoryPickerOpen || paused) return;
+    if (busy || gameOver || won || inventoryPickerOpen || paused || settingsOpen) return;
     trackShot(levelId, pendingStone ? -1 : currentIsEGun ? 0 : current, aimDeg, mode);
     queueUndoRef.current = null;
     setPendingReversiblePowerUp(null);
@@ -2108,20 +2186,11 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
       const path = hit.path;
       // Slow, heavy projectile — about 1.6× normal travel time.
       const totalMs = Math.min(560, 100 + path.length * 6);
-      const stepMs = totalMs / path.length;
-      let i = 0;
-      setProjectile(path[0]);
-      const interval = setInterval(() => {
-        i++;
-        if (i >= path.length) {
-          clearInterval(interval);
-          setProjectile(null);
-          setGravityFxId(null);
-          fireGamma(hit.x, hit.y);
-        } else {
-          setProjectile(path[i]);
-        }
-      }, stepMs);
+      animateProjectilePath(path, totalMs, () => {
+        setProjectile(null);
+        setGravityFxId(null);
+        fireGamma(hit.x, hit.y);
+      });
       return;
     }
     if (currentIsEGun && !pendingStone) {
@@ -2133,21 +2202,13 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
       setProjectile(beam.path[0]);
       setEGunBeamPath(beam.path);
       const totalMs = Math.min(220, 50 + beam.path.length * 3);
-      const stepMs = totalMs / beam.path.length;
-      let i = 0;
-      const interval = setInterval(() => {
-        i++;
-        if (i >= beam.path.length) {
-          clearInterval(interval);
-          advanceQueueAfterFiredShot();
-          setProjectile(null);
-          setEGunBeamPath(null);
-          setGravityFxId(null);
-          fireEGun(beam.path);
-        } else {
-          setProjectile(beam.path[i]);
-        }
-      }, stepMs);
+      animateProjectilePath(beam.path, totalMs, () => {
+        advanceQueueAfterFiredShot();
+        setProjectile(null);
+        setEGunBeamPath(null);
+        setGravityFxId(null);
+        fireEGun(beam.path);
+      });
       return;
     }
     const hit = castRay(aimDeg);
@@ -2161,21 +2222,12 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     const baseMs = Math.min(360, 60 + path.length * 4);
     // Stones fly twice as fast.
     const totalMs = pendingStone ? baseMs / 2 : baseMs;
-    const stepMs = totalMs / path.length;
-    let i = 0;
-    setProjectile(path[0]);
-    const interval = setInterval(() => {
-        i++;
-        if (i >= path.length) {
-          clearInterval(interval);
-          if (!pendingStone) advanceQueueAfterFiredShot();
-          setProjectile(null);
-          setGravityFxId(null);
-          triggerImpact(hit.x, hit.y, hit.hitId, hit.dx, hit.dy, hit.stoneHitIds);
-      } else {
-        setProjectile(path[i]);
-      }
-    }, stepMs);
+    animateProjectilePath(path, totalMs, () => {
+      if (!pendingStone) advanceQueueAfterFiredShot();
+      setProjectile(null);
+      setGravityFxId(null);
+      triggerImpact(hit.x, hit.y, hit.hitId, hit.dx, hit.dy, hit.stoneHitIds);
+    });
   }
 
   function fireEGun(path: { x: number; y: number }[]) {
@@ -3397,6 +3449,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     queueUndoRef.current = { queue, shimmerQueue, eGunQueue, blankQueue, unstableQueue, powerUp: "emission" };
     setPendingReversiblePowerUp("emission");
     setEmissionCharges((g) => Math.max(0, g - 1));
+    setEmissionUnlockIndex((index) => Math.max(index, missingLowAtomFloorIndex(balls)));
     runPowerUpsUsedRef.current += 1;
     setQueue(raisedQueue);
 
@@ -3887,8 +3940,14 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
           }}
         >
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-            <button onClick={exitToMenu} style={iconBtn}>
-              ← Menu
+            <button
+              type="button"
+              onClick={() => setSettingsOpen(true)}
+              title="Game settings"
+              aria-label="Open game settings"
+              style={{ ...iconBtn, minWidth: 0, padding: "6px 8px" }}
+            >
+              <SettingsIcon size={17} aria-hidden="true" />
             </button>
             <button
               type="button"
@@ -3961,8 +4020,8 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
           </div>
         </div>
 
-        {/* TARGET PROGRESS */}
-        <div
+        {!isMoleculeChallenge && (
+          <div
           style={{
             display: "flex",
             alignItems: "center",
@@ -4033,7 +4092,8 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
           >
             <ElementBall atomicNumber={target} size={36} glow />
           </button>
-        </div>
+          </div>
+        )}
 
         {isMoleculeChallenge && moleculeObjective && (
           <div
@@ -5065,6 +5125,16 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
           />
         )}
         {historyOpen && <ShotHistoryModal entries={shotHistory} onClose={() => setHistoryOpen(false)} />}
+        {settingsOpen && !gameOver && !won && (
+          <InGameSettingsModal
+            musicEnabled={musicEnabled}
+            soundEnabled={soundEnabled}
+            onToggleMusic={toggleMusic}
+            onToggleSound={toggleSound}
+            onClose={() => setSettingsOpen(false)}
+            onLeave={exitToMenu}
+          />
+        )}
         {paused && !gameOver && !won && (
           <div
             role="dialog"
@@ -6314,6 +6384,59 @@ function ResultStat({ label, value, color }: { label: string; value: string; col
   );
 }
 
+function InGameSettingsModal({
+  musicEnabled,
+  soundEnabled,
+  onToggleMusic,
+  onToggleSound,
+  onClose,
+  onLeave,
+}: {
+  musicEnabled: boolean;
+  soundEnabled: boolean;
+  onToggleMusic: () => void;
+  onToggleSound: () => void;
+  onClose: () => void;
+  onLeave: () => void;
+}) {
+  return (
+    <Modal zIndex={1000}>
+      <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--accent)", fontWeight: 900 }}>
+        SETTINGS
+      </div>
+      <h2 style={{ margin: "6px 0 12px", fontSize: 24, fontWeight: 900 }}>Game settings</h2>
+      <div style={{ display: "grid", gap: 10 }}>
+        <label style={settingsCheckRow}>
+          <input type="checkbox" checked={musicEnabled} onChange={onToggleMusic} />
+          <span>
+            <strong>Music</strong>
+            <small>Ambient background track</small>
+          </span>
+        </label>
+        <label style={settingsCheckRow}>
+          <input type="checkbox" checked={soundEnabled} onChange={onToggleSound} />
+          <span>
+            <strong>Sound</strong>
+            <small>Shot, merge, and win effects</small>
+          </span>
+        </label>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 16 }}>
+        <button
+          type="button"
+          onClick={onLeave}
+          style={{ ...modalBtn, marginTop: 0, background: "var(--surface-high)", color: "var(--foreground)" }}
+        >
+          Leave game
+        </button>
+        <button type="button" onClick={onClose} style={{ ...modalBtn, marginTop: 0 }}>
+          Resume
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
 function Modal({ children, zIndex = 100 }: { children: React.ReactNode; zIndex?: number }) {
   return (
     <div
@@ -6364,6 +6487,18 @@ const modalBtn: React.CSSProperties = {
   fontSize: 14,
   cursor: "pointer",
   boxShadow: "0 4px 16px var(--primary-glow)",
+};
+
+const settingsCheckRow: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "22px 1fr",
+  alignItems: "center",
+  gap: 10,
+  padding: 12,
+  borderRadius: 12,
+  border: "1px solid var(--border)",
+  background: "var(--surface)",
+  cursor: "pointer",
 };
 
 const miniPanelBtn: React.CSSProperties = {

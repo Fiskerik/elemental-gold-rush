@@ -8,71 +8,85 @@ import { PowerUpBadge } from "./PowerUpLibrary";
 const SHOP_POWER_UPS: Array<{
   id: InventoryPowerUpId;
   name: string;
-  cost: number;
+  coinCost: number;
   unlockLevel: number;
   description: string;
 }> = [
   {
     id: "transmute",
     name: "Transmute Shot",
-    cost: 10000,
+    coinCost: 2,
     unlockLevel: POWER_UP_UNLOCK_LEVELS.transmute,
     description: "Reroll the loaded atom into a higher tier at the start of a run.",
   },
   {
     id: "fusion-jump",
     name: "Fusion Jump",
-    cost: 6000,
+    coinCost: 2,
     unlockLevel: POWER_UP_UNLOCK_LEVELS["fusion-jump"],
     description: "Save a tier-skipping merge for a future level opening.",
   },
   {
     id: "catalyst",
     name: "Catalyst Aura",
-    cost: 10000,
+    coinCost: 4,
     unlockLevel: POWER_UP_UNLOCK_LEVELS.catalyst,
     description: "Start a level with 5 shots of wider fusion radius available.",
   },
   {
     id: "emission",
     name: "Emission",
-    cost: 15000,
+    coinCost: 5,
     unlockLevel: POWER_UP_UNLOCK_LEVELS.emission,
     description: "Raise your starting queue when a level needs a quick push.",
   },
   {
     id: "gravity",
     name: "Gravity",
-    cost: 6000,
+    coinCost: 4,
     unlockLevel: POWER_UP_UNLOCK_LEVELS.gravity,
     description: "Bank a board-lifting move for a difficult future board.",
   },
   {
     id: "grab",
     name: "Grab",
-    cost: 20000,
+    coinCost: 4,
     unlockLevel: POWER_UP_UNLOCK_LEVELS.grab,
     description: "Bring a saved reposition move into your next level.",
   },
   {
     id: "gamma",
     name: "Gamma Bomb",
-    cost: 15000,
+    coinCost: 4,
     unlockLevel: POWER_UP_UNLOCK_LEVELS.gamma,
     description: "Stock a wide-radius blast that clears surrounding non-stone atoms.",
   },
   {
     id: "molecule",
     name: "Compound",
-    cost: 18000,
+    coinCost: 5,
     unlockLevel: POWER_UP_UNLOCK_LEVELS.molecule,
     description: "Start a run with one Compound charge ready for molecule formation.",
   },
 ];
 
+const GOLD_COIN_PACKS = [
+  { coins: 1, pointCost: 10_000 },
+  { coins: 5, pointCost: 40_000 },
+  { coins: 10, pointCost: 75_000 },
+] as const;
+
 export function Shop({ onBack }: { onBack: () => void }) {
-  const { hasProPack, grantProPack, totalScore, unlockedLevel, powerUpInventory, purchaseInventoryPowerUp } =
-    useProgress();
+  const {
+    hasProPack,
+    grantProPack,
+    totalScore,
+    goldCoins,
+    unlockedLevel,
+    powerUpInventory,
+    buyGoldCoins,
+    purchaseInventoryPowerUp,
+  } = useProgress();
   const [message, setMessage] = useState("");
   const proPack = getProductById(PRODUCT_IDS.proLabPack);
 
@@ -88,7 +102,7 @@ export function Shop({ onBack }: { onBack: () => void }) {
 
   function handlePowerUpPurchase(
     powerUp: InventoryPowerUpId,
-    cost: number,
+    coinCost: number,
     name: string,
     unlockLevel: number,
   ) {
@@ -96,11 +110,20 @@ export function Shop({ onBack }: { onBack: () => void }) {
       setMessage(`${name} unlocks at level ${unlockLevel}.`);
       return;
     }
-    const purchased = purchaseInventoryPowerUp(powerUp, cost);
+    const purchased = purchaseInventoryPowerUp(powerUp, coinCost);
     setMessage(
       purchased
         ? `${name} added to your inventory.`
-        : `You need ${cost.toLocaleString()} points to buy ${name}.`,
+        : `You need ${coinCost} gold coin${coinCost === 1 ? "" : "s"} to buy ${name}.`,
+    );
+  }
+
+  function handleGoldCoinPurchase(coins: number, pointCost: number) {
+    const purchased = buyGoldCoins(coins, pointCost);
+    setMessage(
+      purchased
+        ? `${coins} gold coin${coins === 1 ? "" : "s"} added.`
+        : `You need ${pointCost.toLocaleString()} points for that coin pack.`,
     );
   }
 
@@ -134,10 +157,76 @@ export function Shop({ onBack }: { onBack: () => void }) {
           <div>
             <h1 style={{ fontSize: 22, margin: 0, fontWeight: 800 }}>Shop</h1>
             <div style={{ fontSize: 12, color: "var(--muted-foreground)" }}>
-              Premium upgrades and future StoreKit products
+              Convert points into gold coins and stock your next run
             </div>
           </div>
         </div>
+
+        <section
+          style={{
+            background: "var(--surface-elevated)",
+            border: "1px solid var(--border)",
+            borderRadius: 18,
+            padding: 18,
+            boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              gap: 12,
+              marginBottom: 12,
+            }}
+          >
+            <div>
+              <div
+                style={{
+                  fontSize: 11,
+                  letterSpacing: 2,
+                  color: "var(--accent)",
+                  fontWeight: 800,
+                  marginBottom: 6,
+                }}
+              >
+                GOLD COINS
+              </div>
+              <h2 style={{ margin: 0, fontSize: 22, fontWeight: 900 }}>Exchange points</h2>
+            </div>
+            <div style={walletWrap}>
+              <WalletPill label="Points" value={totalScore.toLocaleString()} />
+              <WalletPill
+                label="Coins"
+                value={`${goldCoins}`}
+                icon={<GoldCoinIcon size={18} />}
+                accent
+              />
+            </div>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8 }}>
+            {GOLD_COIN_PACKS.map((pack) => {
+              const canAfford = totalScore >= pack.pointCost;
+              return (
+                <button
+                  key={pack.coins}
+                  type="button"
+                  onClick={() => handleGoldCoinPurchase(pack.coins, pack.pointCost)}
+                  disabled={!canAfford}
+                  style={{
+                    ...coinPackButton,
+                    opacity: canAfford ? 1 : 0.55,
+                    cursor: canAfford ? "pointer" : "not-allowed",
+                  }}
+                >
+                  <GoldCoinIcon size={28} />
+                  <strong>{pack.coins}</strong>
+                  <span>{pack.pointCost.toLocaleString()} pts</span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
 
         <section
           style={{
@@ -260,28 +349,20 @@ export function Shop({ onBack }: { onBack: () => void }) {
               <h2 style={{ margin: 0, fontSize: 22, fontWeight: 900 }}>Stock your next run</h2>
             </div>
             <div
-              style={{
-                padding: "6px 10px",
-                borderRadius: 999,
-                background: "var(--surface)",
-                border: "1px solid var(--border)",
-                color: "var(--accent)",
-                fontSize: 12,
-                fontWeight: 900,
-                fontVariantNumeric: "tabular-nums",
-              }}
+              style={walletWrap}
             >
-              {totalScore.toLocaleString()} points
+              <WalletPill label="Points" value={totalScore.toLocaleString()} />
+              <WalletPill label="Coins" value={`${goldCoins}`} icon={<GoldCoinIcon size={18} />} accent />
             </div>
           </div>
           <p style={{ margin: "0 0 14px", color: "var(--muted-foreground)", fontSize: 13 }}>
-            Buy extra inventory copies with your saved points. Before each level, you can choose up
-            to 3 inventory power-ups to start with.
+            Buy extra inventory copies with gold coins. Before each level, you can choose up to 3
+            inventory power-ups to start with.
           </p>
           <div style={{ display: "grid", gap: 10 }}>
             {SHOP_POWER_UPS.map((powerUp) => {
               const isUnlocked = unlockedLevel >= powerUp.unlockLevel;
-              const canAfford = totalScore >= powerUp.cost;
+              const canAfford = goldCoins >= powerUp.coinCost;
               const canPurchase = isUnlocked && canAfford;
               return (
                 <div
@@ -321,7 +402,7 @@ export function Shop({ onBack }: { onBack: () => void }) {
                     onClick={() =>
                       handlePowerUpPurchase(
                         powerUp.id,
-                        powerUp.cost,
+                        powerUp.coinCost,
                         powerUp.name,
                         powerUp.unlockLevel,
                       )
@@ -335,7 +416,14 @@ export function Shop({ onBack }: { onBack: () => void }) {
                       cursor: canPurchase ? "pointer" : "not-allowed",
                     }}
                   >
-                    {isUnlocked ? powerUp.cost.toLocaleString() : `Level ${powerUp.unlockLevel}`}
+                    {isUnlocked ? (
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                        <GoldCoinIcon size={14} />
+                        {powerUp.coinCost}
+                      </span>
+                    ) : (
+                      `Level ${powerUp.unlockLevel}`
+                    )}
                   </button>
                 </div>
               );
@@ -346,6 +434,85 @@ export function Shop({ onBack }: { onBack: () => void }) {
     </div>
   );
 }
+
+function GoldCoinIcon({ size = 20 }: { size?: number }) {
+  return (
+    <span
+      aria-hidden="true"
+      style={{
+        width: size,
+        height: size,
+        borderRadius: "50%",
+        display: "inline-grid",
+        placeItems: "center",
+        background:
+          "radial-gradient(circle at 32% 24%, oklch(0.98 0.11 95), oklch(0.82 0.17 82) 48%, oklch(0.55 0.14 70))",
+        border: "1px solid oklch(0.94 0.13 90)",
+        boxShadow: "0 0 10px oklch(0.84 0.16 85 / 0.45), inset 0 -2px 4px rgba(0,0,0,0.25)",
+        color: "oklch(0.22 0.06 70)",
+        fontSize: Math.max(8, size * 0.42),
+        fontWeight: 1000,
+        lineHeight: 1,
+      }}
+    >
+      Au
+    </span>
+  );
+}
+
+function WalletPill({
+  label,
+  value,
+  icon,
+  accent = false,
+}: {
+  label: string;
+  value: string;
+  icon?: React.ReactNode;
+  accent?: boolean;
+}) {
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        padding: "6px 10px",
+        borderRadius: 999,
+        background: "var(--surface)",
+        border: "1px solid var(--border)",
+        color: accent ? "var(--accent)" : "var(--foreground)",
+        fontSize: 12,
+        fontWeight: 900,
+        fontVariantNumeric: "tabular-nums",
+      }}
+      title={label}
+    >
+      {icon}
+      {value}
+    </span>
+  );
+}
+
+const walletWrap: React.CSSProperties = {
+  display: "flex",
+  flexWrap: "wrap",
+  justifyContent: "flex-end",
+  gap: 6,
+};
+
+const coinPackButton: React.CSSProperties = {
+  display: "grid",
+  justifyItems: "center",
+  gap: 4,
+  border: "1px solid var(--border)",
+  borderRadius: 12,
+  padding: "10px 8px",
+  background: "var(--surface)",
+  color: "var(--foreground)",
+  fontSize: 11,
+  fontWeight: 800,
+};
 
 const smallButton: React.CSSProperties = {
   background: "var(--surface)",
