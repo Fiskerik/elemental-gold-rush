@@ -107,6 +107,10 @@ const MERGE_COMBO_START_MS = 240;
 const MERGE_COMBO_STEP_MS = 460;
 const MERGE_COMBO_END_PAD_MS = 560;
 
+function mergeComboCueDelay(index: number): number {
+  return index === 0 ? 0 : MERGE_COMBO_START_MS + (index - 1) * MERGE_COMBO_STEP_MS;
+}
+
 const INVENTORY_PICK_LIMIT = 3;
 
 interface SavedRunSnapshot {
@@ -2899,7 +2903,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
               );
             }
           },
-          MERGE_COMBO_START_MS + i * MERGE_COMBO_STEP_MS,
+          mergeComboCueDelay(i),
         );
       });
     }
@@ -3554,7 +3558,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
                 `${m.stabilizedIsotope ? "☢ " : ""}+${ELEMENTS[m.resultAtomicNumber - 1]?.symbol ?? "?"}`,
               );
           },
-          MERGE_COMBO_START_MS + i * MERGE_COMBO_STEP_MS,
+          mergeComboCueDelay(i),
         );
       });
     } else {
@@ -3708,7 +3712,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
                 `${m.stabilizedIsotope ? "☢ " : ""}+${ELEMENTS[m.resultAtomicNumber - 1]?.symbol ?? "?"}`,
               );
           },
-          MERGE_COMBO_START_MS + i * MERGE_COMBO_STEP_MS,
+          mergeComboCueDelay(i),
         );
       });
     }
@@ -6408,16 +6412,16 @@ function InGameSettingsModal({
       <div style={{ display: "grid", gap: 10 }}>
         <label style={settingsCheckRow}>
           <input type="checkbox" checked={musicEnabled} onChange={onToggleMusic} />
-          <span>
+          <span style={settingsLabelText}>
             <strong>Music</strong>
-            <small>Ambient background track</small>
+            <small style={settingsLabelSubtext}>Ambient background track</small>
           </span>
         </label>
         <label style={settingsCheckRow}>
           <input type="checkbox" checked={soundEnabled} onChange={onToggleSound} />
-          <span>
+          <span style={settingsLabelText}>
             <strong>Sound</strong>
-            <small>Shot, merge, and win effects</small>
+            <small style={settingsLabelSubtext}>Shot, merge, and win effects</small>
           </span>
         </label>
       </div>
@@ -6491,7 +6495,7 @@ const modalBtn: React.CSSProperties = {
 
 const settingsCheckRow: React.CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "22px 1fr",
+  gridTemplateColumns: "22px minmax(0, 1fr)",
   alignItems: "center",
   gap: 10,
   padding: 12,
@@ -6499,6 +6503,20 @@ const settingsCheckRow: React.CSSProperties = {
   border: "1px solid var(--border)",
   background: "var(--surface)",
   cursor: "pointer",
+};
+
+const settingsLabelText: React.CSSProperties = {
+  display: "grid",
+  gap: 3,
+  minWidth: 0,
+};
+
+const settingsLabelSubtext: React.CSSProperties = {
+  display: "block",
+  color: "var(--muted-foreground)",
+  fontSize: 12,
+  fontWeight: 700,
+  lineHeight: 1.35,
 };
 
 const miniPanelBtn: React.CSSProperties = {

@@ -11,6 +11,11 @@ import {
   getTodayQuestDate,
   refreshDailyQuests,
 } from "./quests";
+import {
+  WeeklyPlayBonusState,
+  claimWeeklyPlayBonus,
+  createWeeklyPlayBonus,
+} from "./weeklyBonus";
 
 export const INVENTORY_POWER_UPS = [
   "transmute",
@@ -92,6 +97,7 @@ interface ProgressState {
   dailyQuests: DailyQuest[];
   dailyStreak: number;
   claimedDailyReward: boolean;
+  weeklyPlayBonus: WeeklyPlayBonusState;
   bestCombo: number;
   bestComboDate: string | null;
   earnedBadges: string[];
@@ -132,6 +138,7 @@ interface ProgressState {
 
 const initialQuestDate = getTodayQuestDate();
 const initialDailyQuests = createDailyQuests(initialQuestDate);
+const initialWeeklyPlayBonus = createWeeklyPlayBonus();
 
 export const useProgress = create<ProgressState>()(
   persist(
@@ -150,6 +157,7 @@ export const useProgress = create<ProgressState>()(
       dailyQuests: initialDailyQuests,
       dailyStreak: 0,
       claimedDailyReward: false,
+      weeklyPlayBonus: initialWeeklyPlayBonus,
       bestCombo: 0,
       bestComboDate: null,
       earnedBadges: [],
@@ -209,7 +217,14 @@ export const useProgress = create<ProgressState>()(
       },
       setHighestElement: (n) => set((s) => ({ highestElement: Math.max(s.highestElement, n) })),
       refreshDailyLab: () =>
-        set((s) => refreshDailyQuests(s.dailyQuestDate, s.dailyQuests, s.claimedDailyReward)),
+        set((s) => {
+          const weekly = claimWeeklyPlayBonus(s.weeklyPlayBonus);
+          return {
+            ...refreshDailyQuests(s.dailyQuestDate, s.dailyQuests, s.claimedDailyReward),
+            weeklyPlayBonus: weekly.weeklyPlayBonus,
+            goldCoins: s.goldCoins + weekly.coinsAwarded,
+          };
+        }),
       reportQuestProgress: (event) =>
         set((s) => {
           const refreshed = refreshDailyQuests(
@@ -356,6 +371,7 @@ export const useProgress = create<ProgressState>()(
           dailyQuests: createDailyQuests(),
           dailyStreak: 0,
           claimedDailyReward: false,
+          weeklyPlayBonus: createWeeklyPlayBonus(),
           bestCombo: 0,
           bestComboDate: null,
           earnedBadges: [],
@@ -383,6 +399,7 @@ export const useProgress = create<ProgressState>()(
           dailyQuests: persistedState?.dailyQuests ?? current.dailyQuests,
           dailyStreak: persistedState?.dailyStreak ?? current.dailyStreak,
           claimedDailyReward: persistedState?.claimedDailyReward ?? current.claimedDailyReward,
+          weeklyPlayBonus: persistedState?.weeklyPlayBonus ?? current.weeklyPlayBonus,
           goldCoins: persistedState?.goldCoins ?? current.goldCoins,
           soundEnabled: persistedState?.soundEnabled ?? current.soundEnabled,
           musicEnabled: persistedState?.musicEnabled ?? current.musicEnabled,

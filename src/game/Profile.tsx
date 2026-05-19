@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   Atom,
   CheckCircle2,
@@ -12,6 +13,8 @@ import {
 import { ELEMENTS } from "./elements";
 import { MAX_LEVEL } from "./levels";
 import { formatScore } from "./logic";
+import { PRODUCT_IDS, getProductById } from "./products";
+import { purchaseProduct, restorePurchases } from "./purchases";
 import { useProgress } from "./store";
 
 interface Props {
@@ -34,8 +37,11 @@ export function Profile({ onBack }: Props) {
     levelStars,
     challengeBestScores,
     hasProPack,
+    grantProPack,
   } = useProgress();
+  const [proPackMessage, setProPackMessage] = useState("");
   const highestEl = ELEMENTS[highestElement - 1];
+  const proPack = getProductById(PRODUCT_IDS.proLabPack);
   const completedDailyQuests = dailyQuests.filter((quest) => quest.completed).length;
   const totalStars = Object.values(levelStars).reduce((sum, stars) => sum + stars, 0);
   const perfectLevels = Object.values(levelStars).filter((stars) => stars >= 3).length;
@@ -45,12 +51,95 @@ export function Profile({ onBack }: Props) {
   );
   const completionPercent = Math.round((discoveredElements.length / ELEMENTS.length) * 100);
 
+  async function handleProPackPurchase() {
+    const completed = await purchaseProduct(PRODUCT_IDS.proLabPack);
+    if (completed) {
+      grantProPack();
+      setProPackMessage("Pro Lab Pack unlocked.");
+      return;
+    }
+    setProPackMessage("Native App Store purchase support is not available in this web build yet.");
+  }
+
+  async function handleProPackRestore() {
+    const restored = await restorePurchases();
+    if (restored.includes(PRODUCT_IDS.proLabPack)) {
+      grantProPack();
+      setProPackMessage("Pro Lab Pack restored.");
+      return;
+    }
+    setProPackMessage("No Pro Lab Pack purchase was found for this web build.");
+  }
+
   return (
     <div className="app-shell" style={{ padding: 20, paddingTop: 32, minHeight: "100dvh" }}>
       <div style={{ position: "relative", zIndex: 1, maxWidth: 620, margin: "0 auto" }}>
         <button onClick={onBack} style={backBtn}>
           ← Menu
         </button>
+
+        {proPack && (
+          <section style={proPackCard}>
+            <div style={sectionHeading}>ONE-TIME UPGRADE</div>
+            <h2 style={{ margin: 0, fontSize: 28, fontWeight: 900 }}>{proPack.name}</h2>
+            <p style={{ color: "var(--muted-foreground)", fontSize: 14, lineHeight: 1.5 }}>
+              {proPack.description}
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, margin: "14px 0" }}>
+              {proPack.benefits.map((benefit) => (
+                <div
+                  key={benefit}
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "18px 1fr",
+                    gap: 8,
+                    fontSize: 13,
+                    lineHeight: 1.35,
+                  }}
+                >
+                  <CheckCircle2 size={15} color="var(--success)" aria-hidden="true" />
+                  <span>{benefit}</span>
+                </div>
+              ))}
+            </div>
+            <div style={proPackNote}>
+              Purchases are routed through a platform layer so an App Store build can connect this
+              product to StoreKit without adding native purchase SDK calls to UI components.
+            </div>
+            {hasProPack ? (
+              <div style={proPackActive}>Pro Lab Pack Active</div>
+            ) : (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: 10,
+                  marginTop: 14,
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={handleProPackRestore}
+                  style={{
+                    ...profileActionButton,
+                    background: "var(--surface-high)",
+                    color: "var(--foreground)",
+                  }}
+                >
+                  Restore
+                </button>
+                <button type="button" onClick={handleProPackPurchase} style={profileActionButton}>
+                  Unlock Pack
+                </button>
+              </div>
+            )}
+            {proPackMessage && (
+              <p style={{ margin: "12px 0 0", color: "var(--muted-foreground)", fontSize: 12 }}>
+                {proPackMessage}
+              </p>
+            )}
+          </section>
+        )}
 
         <header style={heroCard}>
           <div style={avatar}>{highestEl?.symbol ?? "H"}</div>
@@ -271,6 +360,45 @@ const card: React.CSSProperties = {
   background: "var(--surface-elevated)",
   border: "1px solid var(--border)",
   marginBottom: 12,
+};
+
+const proPackCard: React.CSSProperties = {
+  padding: 18,
+  borderRadius: 18,
+  background: "var(--surface-elevated)",
+  border: "1px solid var(--border)",
+  margin: "18px 0 12px",
+  boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
+};
+
+const proPackNote: React.CSSProperties = {
+  padding: 12,
+  borderRadius: 12,
+  background: "var(--surface)",
+  color: "var(--muted-foreground)",
+  fontSize: 12,
+  lineHeight: 1.45,
+};
+
+const proPackActive: React.CSSProperties = {
+  marginTop: 14,
+  padding: 12,
+  borderRadius: 12,
+  background: "color-mix(in oklch, var(--success) 18%, transparent)",
+  color: "var(--success)",
+  fontWeight: 800,
+  textAlign: "center",
+};
+
+const profileActionButton: React.CSSProperties = {
+  border: "none",
+  borderRadius: 12,
+  padding: "12px 16px",
+  background: "linear-gradient(135deg, var(--primary), oklch(0.55 0.15 230))",
+  color: "var(--primary-foreground)",
+  fontWeight: 900,
+  cursor: "pointer",
+  boxShadow: "0 4px 16px var(--primary-glow)",
 };
 
 const sectionHeading: React.CSSProperties = {

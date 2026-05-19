@@ -1,4 +1,4 @@
-import { useEffect, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import {
   Atom,
   BookOpen,
@@ -21,6 +21,7 @@ import { formatScore } from "./logic";
 import { ELEMENTS } from "./elements";
 import { ElementBall } from "./ElementBall";
 import { trackMenuAction } from "./analytics";
+import { getWeeklyPlayBonusView } from "./weeklyBonus";
 
 interface Props {
   onPlay: () => void;
@@ -51,6 +52,7 @@ export function MainMenu({
     dailyQuests,
     dailyStreak,
     claimedDailyReward,
+    weeklyPlayBonus,
     bestCombo,
     hasProPack,
     refreshDailyLab,
@@ -62,10 +64,42 @@ export function MainMenu({
   const completedDailyQuests = dailyQuests.filter((quest) => quest.completed).length;
   const dailyComplete = dailyQuests.length > 0 && completedDailyQuests >= 4;
   const campaignProgress = Math.round((Math.min(unlockedLevel, MAX_LEVEL) / MAX_LEVEL) * 100);
+  const weeklyBonus = getWeeklyPlayBonusView(weeklyPlayBonus);
+  const [dailyRewardToast, setDailyRewardToast] = useState<{ id: number; text: string } | null>(
+    null,
+  );
+  const dailyRewardToastTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     refreshDailyLab();
   }, [refreshDailyLab]);
+
+  useEffect(
+    () => () => {
+      if (dailyRewardToastTimeoutRef.current !== null) {
+        window.clearTimeout(dailyRewardToastTimeoutRef.current);
+      }
+    },
+    [],
+  );
+
+  function showDailyRewardToast(text: string) {
+    const id = Date.now();
+    if (dailyRewardToastTimeoutRef.current !== null) {
+      window.clearTimeout(dailyRewardToastTimeoutRef.current);
+    }
+    setDailyRewardToast({ id, text });
+    dailyRewardToastTimeoutRef.current = window.setTimeout(() => {
+      setDailyRewardToast((current) => (current?.id === id ? null : current));
+      dailyRewardToastTimeoutRef.current = null;
+    }, 1800);
+  }
+
+  function handleDailyRewardClaim() {
+    if (!dailyComplete || claimedDailyReward) return;
+    claimDailyReward();
+    showDailyRewardToast("+2 gold coins claimed");
+  }
 
   return (
     <div className="app-shell" style={{ padding: 18, paddingTop: 26 }}>
@@ -199,6 +233,12 @@ export function MainMenu({
         </nav>
 
         <section style={dailyPanel}>
+          {dailyRewardToast && (
+            <div style={dailyToast} role="status" aria-live="polite">
+              <Sparkles size={15} aria-hidden="true" />
+              <span>{dailyRewardToast.text}</span>
+            </div>
+          )}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
             <div>
               <div style={sectionLabel}>DAILY LAB</div>
@@ -210,7 +250,7 @@ export function MainMenu({
               </div>
             </div>
             <button
-              onClick={claimDailyReward}
+              onClick={handleDailyRewardClaim}
               disabled={!dailyComplete || claimedDailyReward}
               style={{
                 ...claimBtn,
@@ -227,6 +267,50 @@ export function MainMenu({
             >
               {claimedDailyReward ? "Claimed" : "Claim"}
             </button>
+          </div>
+          <div style={weeklyBonusCard}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
+              <div>
+                <div style={sectionLabel}>PLAY A GAME A DAY</div>
+                <div style={{ fontSize: 12, color: "var(--muted-foreground)", marginTop: 2 }}>
+                  {weeklyBonus.weekCoinsEarned}/4 coins formed this week
+                </div>
+              </div>
+              <div style={weeklyBonusPill}>
+                {weeklyBonus.todayClaimed ? "Today claimed" : "Claim today"}
+              </div>
+            </div>
+            <div style={weeklyBonusTrack} aria-label={`${weeklyBonus.claimedCount} of 7 days claimed`}>
+              <span
+                style={{
+                  ...weeklyBonusFill,
+                  width: `${Math.max(4, (weeklyBonus.claimedCount / 7) * 100)}%`,
+                }}
+              />
+            </div>
+            <div style={weeklyDayGrid}>
+              {weeklyBonus.days.map((day) => (
+                <div
+                  key={day.dateKey}
+                  style={{
+                    ...weeklyDayCell,
+                    borderColor: day.claimed
+                      ? "var(--accent)"
+                      : day.isToday
+                        ? "var(--primary)"
+                        : "var(--border)",
+                    color: day.claimed ? "var(--foreground)" : "var(--muted-foreground)",
+                  }}
+                >
+                  <span>{day.label}</span>
+                  <strong>{day.rewardLabel}</strong>
+                  <small>{day.claimed ? "Claimed" : day.isPast ? "Missed" : day.isToday ? "Today" : "Soon"}</small>
+                </div>
+              ))}
+            </div>
+            <div style={{ fontSize: 10, color: "var(--muted-foreground)", lineHeight: 1.35 }}>
+              Next reward: {weeklyBonus.nextRewardText}. Monday starts a fresh week.
+            </div>
           </div>
           <div style={questGrid}>
             {dailyQuests.map((quest) => (
@@ -441,10 +525,29 @@ const actionGrid: CSSProperties = {
 };
 
 const dailyPanel: CSSProperties = {
+  position: "relative",
   background: "var(--surface-elevated)",
   border: "1px solid var(--border)",
   borderRadius: 16,
   padding: 14,
+};
+
+const dailyToast: CSSProperties = {
+  position: "absolute",
+  top: 12,
+  right: 12,
+  zIndex: 2,
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 6,
+  padding: "8px 10px",
+  borderRadius: 999,
+  background: "linear-gradient(135deg, var(--accent), var(--primary))",
+  color: "var(--primary-foreground)",
+  fontSize: 11,
+  fontWeight: 900,
+  boxShadow: "0 10px 26px var(--accent-glow)",
+  animation: "coin-toast-rise 1800ms ease-out forwards",
 };
 
 const claimBtn: CSSProperties = {
@@ -453,6 +556,67 @@ const claimBtn: CSSProperties = {
   padding: "8px 10px",
   fontSize: 11,
   fontWeight: 900,
+};
+
+const weeklyBonusCard: CSSProperties = {
+  marginTop: 12,
+  padding: 12,
+  borderRadius: 14,
+  border: "1px solid color-mix(in oklch, var(--accent) 38%, var(--border))",
+  background:
+    "linear-gradient(135deg, color-mix(in oklch, var(--accent) 13%, transparent), var(--surface))",
+  boxShadow: "inset 0 0 18px oklch(0.86 0.18 95 / 0.08)",
+};
+
+const weeklyBonusPill: CSSProperties = {
+  alignSelf: "start",
+  padding: "5px 8px",
+  borderRadius: 999,
+  background: "var(--surface-high)",
+  border: "1px solid var(--border)",
+  color: "var(--accent)",
+  fontSize: 10,
+  fontWeight: 900,
+  whiteSpace: "nowrap",
+};
+
+const weeklyBonusTrack: CSSProperties = {
+  position: "relative",
+  height: 8,
+  borderRadius: 999,
+  overflow: "hidden",
+  background: "var(--surface-high)",
+  border: "1px solid var(--border)",
+  margin: "10px 0",
+};
+
+const weeklyBonusFill: CSSProperties = {
+  display: "block",
+  height: "100%",
+  borderRadius: 999,
+  background: "linear-gradient(90deg, var(--accent), var(--primary))",
+  boxShadow: "0 0 16px var(--accent-glow)",
+  transition: "width 260ms ease",
+};
+
+const weeklyDayGrid: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
+  gap: 5,
+  marginBottom: 9,
+};
+
+const weeklyDayCell: CSSProperties = {
+  display: "grid",
+  gap: 2,
+  justifyItems: "center",
+  minWidth: 0,
+  padding: "6px 3px",
+  borderRadius: 10,
+  border: "1px solid var(--border)",
+  background: "var(--surface)",
+  fontSize: 9,
+  lineHeight: 1.1,
 };
 
 const questGrid: CSSProperties = {

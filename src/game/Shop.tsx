@@ -1,6 +1,4 @@
 import { useState } from "react";
-import { PRODUCT_IDS, getProductById } from "./products";
-import { purchaseProduct, restorePurchases } from "./purchases";
 import { type InventoryPowerUpId, useProgress } from "./store";
 import { POWER_UP_UNLOCK_LEVELS } from "./powerUps";
 import { PowerUpBadge } from "./PowerUpLibrary";
@@ -70,6 +68,10 @@ const SHOP_POWER_UPS: Array<{
   },
 ];
 
+const SHOP_POWER_UPS_BY_PRICE = [...SHOP_POWER_UPS].sort(
+  (a, b) => a.coinCost - b.coinCost || a.unlockLevel - b.unlockLevel || a.name.localeCompare(b.name),
+);
+
 const GOLD_COIN_PACKS = [
   { coins: 1, pointCost: 10_000 },
   { coins: 5, pointCost: 40_000 },
@@ -78,8 +80,6 @@ const GOLD_COIN_PACKS = [
 
 export function Shop({ onBack }: { onBack: () => void }) {
   const {
-    hasProPack,
-    grantProPack,
     totalScore,
     goldCoins,
     unlockedLevel,
@@ -88,17 +88,6 @@ export function Shop({ onBack }: { onBack: () => void }) {
     purchaseInventoryPowerUp,
   } = useProgress();
   const [message, setMessage] = useState("");
-  const proPack = getProductById(PRODUCT_IDS.proLabPack);
-
-  async function handlePurchase() {
-    const completed = await purchaseProduct(PRODUCT_IDS.proLabPack);
-    if (completed) {
-      grantProPack();
-      setMessage("Pro Lab Pack unlocked.");
-      return;
-    }
-    setMessage("Native App Store purchase support is not available in this web build yet.");
-  }
 
   function handlePowerUpPurchase(
     powerUp: InventoryPowerUpId,
@@ -127,16 +116,6 @@ export function Shop({ onBack }: { onBack: () => void }) {
     );
   }
 
-  async function handleRestore() {
-    const restored = await restorePurchases();
-    if (restored.includes(PRODUCT_IDS.proLabPack)) {
-      grantProPack();
-      setMessage("Pro Lab Pack restored.");
-      return;
-    }
-    setMessage("No Pro Lab Pack purchase was found for this web build.");
-  }
-
   return (
     <div className="app-shell" style={{ padding: 20, paddingTop: 32 }}>
       <div
@@ -161,6 +140,11 @@ export function Shop({ onBack }: { onBack: () => void }) {
             </div>
           </div>
         </div>
+        {message && (
+          <p style={{ margin: "-4px 0 0", color: "var(--muted-foreground)", fontSize: 12 }}>
+            {message}
+          </p>
+        )}
 
         <section
           style={{
@@ -220,100 +204,12 @@ export function Shop({ onBack }: { onBack: () => void }) {
                   }}
                 >
                   <GoldCoinIcon size={28} />
-                  <strong>{pack.coins}</strong>
+                  <strong>{`${pack.coins} coin${pack.coins === 1 ? "" : "s"}`}</strong>
                   <span>{pack.pointCost.toLocaleString()} pts</span>
                 </button>
               );
             })}
           </div>
-        </section>
-
-        <section
-          style={{
-            background: "var(--surface-elevated)",
-            border: "1px solid var(--border)",
-            borderRadius: 18,
-            padding: 18,
-            boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
-          }}
-        >
-          <div
-            style={{
-              fontSize: 11,
-              letterSpacing: 2,
-              color: "var(--accent)",
-              fontWeight: 800,
-              marginBottom: 6,
-            }}
-          >
-            ONE-TIME UPGRADE
-          </div>
-          <h2 style={{ margin: 0, fontSize: 26, fontWeight: 900 }}>{proPack?.name}</h2>
-          <p style={{ color: "var(--muted-foreground)", fontSize: 13, lineHeight: 1.5 }}>
-            {proPack?.description}
-          </p>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8, margin: "14px 0" }}>
-            {proPack?.benefits.map((benefit) => (
-              <div
-                key={benefit}
-                style={{ display: "flex", gap: 8, fontSize: 13, lineHeight: 1.35 }}
-              >
-                <span style={{ color: "var(--success)" }}>✓</span>
-                <span>{benefit}</span>
-              </div>
-            ))}
-          </div>
-          <div
-            style={{
-              padding: 12,
-              borderRadius: 12,
-              background: "var(--surface)",
-              color: "var(--muted-foreground)",
-              fontSize: 12,
-              lineHeight: 1.45,
-            }}
-          >
-            Purchases are routed through a platform layer so an App Store build can connect this
-            product to StoreKit without adding native purchase SDK calls to UI components.
-          </div>
-          {hasProPack ? (
-            <div
-              style={{
-                marginTop: 14,
-                padding: 12,
-                borderRadius: 12,
-                background: "color-mix(in oklch, var(--success) 18%, transparent)",
-                color: "var(--success)",
-                fontWeight: 800,
-                textAlign: "center",
-              }}
-            >
-              Pro Lab Pack Active
-            </div>
-          ) : (
-            <div
-              style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 14 }}
-            >
-              <button
-                onClick={handleRestore}
-                style={{
-                  ...shopButton,
-                  background: "var(--surface-high)",
-                  color: "var(--foreground)",
-                }}
-              >
-                Restore
-              </button>
-              <button onClick={handlePurchase} style={shopButton}>
-                Unlock Pack
-              </button>
-            </div>
-          )}
-          {message && (
-            <p style={{ margin: "12px 0 0", color: "var(--muted-foreground)", fontSize: 12 }}>
-              {message}
-            </p>
-          )}
         </section>
 
         <section
@@ -360,7 +256,7 @@ export function Shop({ onBack }: { onBack: () => void }) {
             inventory power-ups to start with.
           </p>
           <div style={{ display: "grid", gap: 10 }}>
-            {SHOP_POWER_UPS.map((powerUp) => {
+            {SHOP_POWER_UPS_BY_PRICE.map((powerUp) => {
               const isUnlocked = unlockedLevel >= powerUp.unlockLevel;
               const canAfford = goldCoins >= powerUp.coinCost;
               const canPurchase = isUnlocked && canAfford;
@@ -449,14 +345,8 @@ function GoldCoinIcon({ size = 20 }: { size?: number }) {
           "radial-gradient(circle at 32% 24%, oklch(0.98 0.11 95), oklch(0.82 0.17 82) 48%, oklch(0.55 0.14 70))",
         border: "1px solid oklch(0.94 0.13 90)",
         boxShadow: "0 0 10px oklch(0.84 0.16 85 / 0.45), inset 0 -2px 4px rgba(0,0,0,0.25)",
-        color: "oklch(0.22 0.06 70)",
-        fontSize: Math.max(8, size * 0.42),
-        fontWeight: 1000,
-        lineHeight: 1,
       }}
-    >
-      Au
-    </span>
+    />
   );
 }
 
