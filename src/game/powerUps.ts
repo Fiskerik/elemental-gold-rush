@@ -50,7 +50,7 @@ export const POWER_UPS = [
   {
     icon: "gravity",
     name: "Gravity",
-    unlock: `Level ${POWER_UP_UNLOCK_LEVELS.gravity} / 4x combo`,
+    unlock: `Level ${POWER_UP_UNLOCK_LEVELS.gravity} / 30 successful merges`,
     effect: "Pulls atoms upward and immediately resolves any newly touching matches.",
     description: "Pulls atoms upward and lets any newly touching matches merge immediately.",
   },

@@ -275,7 +275,7 @@ const POWER_UP_STAGE_TIPS: Record<PowerUpStageId, { title: string; body: string;
   },
   gravity: {
     title: "Gravity practice",
-    body: "Atoms are scattered around the board. Tap Gravity to pull them upward and resolve any new fusions.",
+    body: "Gravity is earned every 30 successful merges. Tap Gravity to pull atoms upward and resolve any new fusions.",
   },
   stone: {
     title: "Stone practice",
@@ -616,23 +616,18 @@ function calculateStars(
   bestCombo: number,
   timeSec: number,
 ): number {
-  // Hard per-level overrides win when present.
-  if (level.starShotsThree != null && level.starShotsTwo != null) {
-    if (shots < level.starShotsThree) return 3;
-    if (shots < level.starShotsTwo) return 2;
-    return 1;
-  }
-  // New star formula: pure performance based on shots + time vs par.
-  // 3★ = at or under both par shots AND par time
-  // 2★ = within 1.3× of both
-  // 1★ = completed
-  const par = getStarParShots(level);
-  const parTime = level.parTimeSec ?? par * 5;
-  const shotsRatio = shots / par;
-  const timeRatio = timeSec / parTime;
-  if (shotsRatio <= 1 && timeRatio <= 1) return 3;
-  if (shotsRatio <= 1.3 && timeRatio <= 1.3) return 2;
-  return 1;
+  const scoreTarget =
+    level.id <= 2
+      ? 40
+      : level.id <= 8
+        ? 3_000
+        : level.id <= 15
+          ? 80_000
+          : level.id <= 30
+            ? 120_000
+            : 170_000;
+  return 1 + (timeSec <= 10 * 60 ? 1 : 0) + (score > scoreTarget ? 1 : 0);
+
 }
 
 export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSavedRun = false }: Props) {
@@ -678,6 +673,9 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     markTipSeen,
     toggleSound,
     toggleMusic,
+    shootingStyle,
+    hasChosenShootingStyle,
+    setShootingStyle,
   } = useProgress();
 
   const [balls, setBalls] = useState<Board>(() => createEmptyBoard());
@@ -709,7 +707,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
   const [runBestCombo, setRunBestCombo] = useState(0);
   const [earnedStars, setEarnedStars] = useState(0);
   const [aimDeg, setAimDeg] = useState(0); // 0 = straight up, negative = left
-  const [shootingStyle, setShootingStyle] = useState<"hold" | "press">("hold");
+  const [playStylePromptOpen, setPlayStylePromptOpen] = useState(!hasChosenShootingStyle);
   const [popups, setPopups] = useState<{ id: number; text: string; x: number; y: number }[]>([]);
   const [busy, setBusy] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -779,6 +777,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
   // Gravity is awarded by 4× combos. Emission is awarded every 5 minutes and
   // upgrades only the currently queued atom without creating the level target.
   const [gravityCharges, setGravityCharges] = useState(0);
+  const [gravityMergeProgress, setGravityMergeProgress] = useState(0);
   const [emissionCharges, setEmissionCharges] = useState(0);
   const [emissionUnlockIndex, setEmissionUnlockIndex] = useState(0);
   const [transmuteCharges, setTransmuteCharges] = useState(0);
@@ -831,6 +830,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
   const runRecordedRef = useRef(false);
   const inventoryCompoundChargesRef = useRef(0);
   const [inventoryPickerOpen, setInventoryPickerOpen] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<null | "restart" | "leave">(null);
   const [restartNonce, setRestartNonce] = useState(0);
   const [selectedInventoryPowerUps, setSelectedInventoryPowerUps] = useState<PowerUpInventory>(() =>
     emptyPowerUpInventory(),
@@ -1107,6 +1107,11 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     onExit();
   }
 
+  function leaveGameDiscardingRun() {
+    clearSavedRun();
+    onExit();
+  }
+
   function restartLevel() {
     clearSavedRun();
     setPaused(false);
@@ -1116,12 +1121,14 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     setWinChoice(null);
     setContinueClaimPromptOpen(false);
     setContinuingPastTarget(false);
+    setInventoryPickerOpen(false);
+    setConfirmAction(null);
     setRestartNonce((nonce) => nonce + 1);
   }
 
   useEffect(() => {
     if (isMoleculeChallenge || !compoundEnabled) return;
-    if (paused || settingsOpen || inventoryPickerOpen) return;
+    if (paused || settingsOpen || inventoryPickerOpen || playStylePromptOpen || confirmAction) return;
     const refresh = () => {
       const state = loadCompoundChargeState();
       setCompoundCharges(Math.max(state.charges, inventoryCompoundChargesRef.current));
@@ -1130,7 +1137,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     refresh();
     const timer = window.setInterval(refresh, 15_000);
     return () => window.clearInterval(timer);
-  }, [compoundEnabled, isMoleculeChallenge, paused, settingsOpen, inventoryPickerOpen]);
+  }, [compoundEnabled, isMoleculeChallenge, paused, settingsOpen, inventoryPickerOpen, playStylePromptOpen, confirmAction]);
 
   useEffect(() => {
     if (resumeSavedRun) {
@@ -1181,6 +1188,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
         setPendingStone(saved.pendingStone);
         setStoneSpawnCount(saved.stoneSpawnCount);
         setGravityCharges(saved.gravityCharges);
+        setGravityMergeProgress(0);
         setEmissionCharges(saved.emissionCharges);
         setEmissionUnlockIndex(saved.emissionUnlockIndex);
         setTransmuteCharges(saved.transmuteCharges);
@@ -1339,6 +1347,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     setPendingStone(false);
     setStoneSpawnCount(0);
     setGravityCharges(powerUpStage === "gravity" ? 1 : 0);
+    setGravityMergeProgress(0);
     setEmissionCharges(powerUpStage === "emission" ? 1 : 0);
     setEmissionUnlockIndex(0);
     setTransmuteCharges(powerUpStage === "transmute" ? 1 : 0);
@@ -1431,13 +1440,13 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
 
   // Tick the run timer every second while the level is active.
   useEffect(() => {
-    if (gameOver || won || paused || settingsOpen || inventoryPickerOpen) return;
+    if (gameOver || won || paused || settingsOpen || inventoryPickerOpen || playStylePromptOpen || confirmAction) return;
     const id = setInterval(() => {
       // Use delta accumulation so paused time doesn't advance powerup timers.
       setElapsedMs((m) => m + 500);
     }, 500);
     return () => clearInterval(id);
-  }, [gameOver, won, levelId, paused, settingsOpen, inventoryPickerOpen]);
+  }, [gameOver, won, levelId, paused, settingsOpen, inventoryPickerOpen, playStylePromptOpen, confirmAction]);
 
   useEffect(() => {
     if (mode !== "gold-rush-timer" || gameOver || won) return;
@@ -1545,19 +1554,26 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     return atoms.length > 0 ? atoms : [1];
   }
 
-  function grantGravityForCombo(mergeCount: number) {
-    if (mergeCount < 4) return;
-    if (gravityEnabled) {
-      setGravityCharges((g) => g + 1);
-      spawnPopup("GRAVITY READY");
-      if (canIntroducePowerUps) {
-        showTip(
-          "feature-gravity-powerup",
-          "Gravity power-up ready!",
-          "A 4x combo unlocks Gravity. Tap the Gravity button to make every atom fall upward; any combinations formed still count toward Grab progress and quest progress.",
-        );
-      }
+  function grantPowerUpsForMerges(mergeCount: number) {
+    if (gravityEnabled && mergeCount > 0) {
+      setGravityMergeProgress((progress) => {
+        const total = progress + mergeCount;
+        const earned = Math.floor(total / 30);
+        if (earned > 0) {
+          setGravityCharges((g) => g + earned);
+          spawnPopup(earned > 1 ? `GRAVITY READY x${earned}` : "GRAVITY READY");
+          if (canIntroducePowerUps) {
+            showTip(
+              "feature-gravity-powerup",
+              "Gravity power-up ready!",
+              "Every 30 successful merges earns Gravity. Tap the Gravity button to pull atoms upward; any combinations formed still count toward Grab progress and quest progress.",
+            );
+          }
+        }
+        return total % 30;
+      });
     }
+    if (mergeCount < 4) return;
     if (catalystEnabled) {
       setCatalystCharges((g) => g + 1);
       spawnPopup("CATALYST READY");
@@ -2466,7 +2482,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
   }
 
   function shoot() {
-    if (busy || gameOver || won || inventoryPickerOpen || paused || settingsOpen) return;
+    if (busy || gameOver || won || inventoryPickerOpen || paused || settingsOpen || playStylePromptOpen || confirmAction) return;
     primeAudio();
     if (musicEnabled) startAmbientMusic();
     trackShot(levelId, pendingStone ? -1 : currentIsEGun ? 0 : current, aimDeg, mode);
@@ -3197,7 +3213,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
       const comboLabel = getComboLabel(result.merges.length);
       if (comboLabel) spawnPopup(comboLabel);
       showMergeComboFx(result.merges);
-      grantGravityForCombo(result.merges.length);
+      grantPowerUpsForMerges(result.merges.length);
       setRunBestCombo((best) => Math.max(best, result.merges.length));
       setBestCombo(result.merges.length);
       result.merges.forEach((m) => trackMerge(levelId, m.resultAtomicNumber, m.chainDepth, mode));
@@ -3398,21 +3414,22 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
   }
 
   function startWithSelectedInventory() {
-    const selectedCount = countPowerUps(selectedInventoryPowerUps);
-    if (selectedCount > 0 && !consumeInventoryPowerUps(selectedInventoryPowerUps)) return;
-    setTransmuteCharges((count) => count + selectedInventoryPowerUps.transmute);
-    setFusionJumpCharges((count) => count + selectedInventoryPowerUps["fusion-jump"]);
-    setCatalystCharges((count) => count + selectedInventoryPowerUps.catalyst);
-    setEmissionCharges((count) => count + selectedInventoryPowerUps.emission);
-    setGravityCharges((count) => count + selectedInventoryPowerUps.gravity);
-    setGrabs((count) => count + selectedInventoryPowerUps.grab);
-    setGammaCharges((count) => count + selectedInventoryPowerUps.gamma);
-    if (selectedInventoryPowerUps.molecule > 0) {
+    const selected = { ...selectedInventoryPowerUps };
+    const selectedCount = countPowerUps(selected);
+    if (selectedCount > 0 && !consumeInventoryPowerUps(selected)) return;
+    setTransmuteCharges((count) => count + selected.transmute);
+    setFusionJumpCharges((count) => count + selected["fusion-jump"]);
+    setCatalystCharges((count) => count + selected.catalyst);
+    setEmissionCharges((count) => count + selected.emission);
+    setGravityCharges((count) => count + selected.gravity);
+    setGrabs((count) => count + selected.grab);
+    setGammaCharges((count) => count + selected.gamma);
+    if (selected.molecule > 0) {
       inventoryCompoundChargesRef.current = Math.min(
         1,
-        inventoryCompoundChargesRef.current + selectedInventoryPowerUps.molecule,
+        inventoryCompoundChargesRef.current + selected.molecule,
       );
-      setCompoundCharges((count) => Math.min(1, count + selectedInventoryPowerUps.molecule));
+      setCompoundCharges((count) => Math.min(1, count + selected.molecule));
     }
     if (selectedCount > 0) {
       spawnPopup(`🎒 LOADED ×${selectedCount}`);
@@ -3853,7 +3870,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     });
     if (result.merges.length > 0) {
       showMergeComboFx(result.merges);
-      grantGravityForCombo(result.merges.length);
+      grantPowerUpsForMerges(result.merges.length);
       setRunBestCombo((best) => Math.max(best, result.merges.length));
       setBestCombo(result.merges.length);
       if (grabEnabled) setGrabProgress((p) => {
@@ -4019,7 +4036,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
       const comboLabel = getComboLabel(result.merges.length);
       if (comboLabel) spawnPopup(comboLabel);
       showMergeComboFx(result.merges);
-      grantGravityForCombo(result.merges.length);
+      grantPowerUpsForMerges(result.merges.length);
       setRunBestCombo((best) => Math.max(best, result.merges.length));
       setBestCombo(result.merges.length);
       const showSymbolPopups = result.merges.length >= 2;
@@ -5484,6 +5501,25 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
             onBack={exitToMenu}
           />
         )}
+        {playStylePromptOpen && !won && !gameOver && (
+          <PlayStyleModal
+            selected={shootingStyle}
+            onSelect={(style) => {
+              setShootingStyle(style);
+              setPlayStylePromptOpen(false);
+            }}
+          />
+        )}
+        {confirmAction && !won && !gameOver && (
+          <ConfirmRunExitModal
+            action={confirmAction}
+            onCancel={() => setConfirmAction(null)}
+            onConfirm={() => {
+              if (confirmAction === "restart") restartLevel();
+              else leaveGameDiscardingRun();
+            }}
+          />
+        )}
         {historyOpen && <ShotHistoryModal entries={shotHistory} onClose={() => setHistoryOpen(false)} />}
         {settingsOpen && !gameOver && !won && (
           <InGameSettingsModal
@@ -5493,11 +5529,11 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
             onToggleMusic={toggleInGameMusic}
             onToggleSound={toggleSound}
             onToggleShootingStyle={() =>
-              setShootingStyle((style) => (style === "hold" ? "press" : "hold"))
+              setShootingStyle(shootingStyle === "hold" ? "press" : "hold")
             }
             onClose={() => setSettingsOpen(false)}
-            onRestart={restartLevel}
-            onLeave={exitToMenu}
+            onRestart={() => setConfirmAction("restart")}
+            onLeave={() => setConfirmAction("leave")}
           />
         )}
         {paused && !gameOver && !won && (
@@ -5568,7 +5604,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
                 </button>
                 <button
                   type="button"
-                  onClick={exitToMenu}
+                  onClick={() => setConfirmAction("leave")}
                   style={{
                     border: "1px solid var(--border)",
                     borderRadius: 12,
@@ -5803,6 +5839,92 @@ function selectedPowerUpSlots(selected: PowerUpInventory): InventoryPowerUpId[] 
     }
   }
   return slots;
+}
+
+function PlayStyleModal({
+  selected,
+  onSelect,
+}: {
+  selected: "hold" | "press";
+  onSelect: (style: "hold" | "press") => void;
+}) {
+  return (
+    <Modal zIndex={1200}>
+      <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--accent)", marginBottom: 8 }}>
+        PLAY STYLE
+      </div>
+      <h2 style={{ margin: "0 0 8px", fontSize: 24, fontWeight: 900 }}>Choose how you shoot</h2>
+      <p style={{ margin: "0 0 14px", color: "var(--muted-foreground)", fontSize: 13, lineHeight: 1.45 }}>
+        You can change this anytime in in-game settings or the main settings screen.
+      </p>
+      <div style={{ display: "grid", gap: 8 }}>
+        {([
+          ["hold", "Hold", "Aim by holding the board, then release to shoot."],
+          ["press", "Toggle", "Aim on the board first, then press the queued atom to shoot."],
+        ] as const).map(([style, title, body]) => (
+          <button
+            key={style}
+            type="button"
+            onClick={() => onSelect(style)}
+            style={{
+              padding: 12,
+              borderRadius: 12,
+              border: `1px solid ${selected === style ? "var(--accent)" : "var(--border)"}`,
+              background: selected === style
+                ? "color-mix(in oklch, var(--accent) 18%, var(--surface))"
+                : "var(--surface)",
+              color: "var(--foreground)",
+              textAlign: "left",
+              cursor: "pointer",
+            }}
+          >
+            <strong>{title}</strong>
+            <span style={{ display: "block", marginTop: 4, color: "var(--muted-foreground)", fontSize: 12 }}>
+              {body}
+            </span>
+          </button>
+        ))}
+      </div>
+    </Modal>
+  );
+}
+
+function ConfirmRunExitModal({
+  action,
+  onCancel,
+  onConfirm,
+}: {
+  action: "restart" | "leave";
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <Modal zIndex={1300}>
+      <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--destructive)", marginBottom: 8 }}>
+        {action === "restart" ? "RESTART LEVEL" : "LEAVE GAME"}
+      </div>
+      <h2 style={{ margin: "0 0 8px", fontSize: 24, fontWeight: 900 }}>
+        Progress and loaded power-ups will be lost.
+      </h2>
+      <p style={{ margin: "0 0 14px", color: "var(--muted-foreground)", fontSize: 13, lineHeight: 1.45 }}>
+        {action === "restart"
+          ? "Restarting returns you to the pre-game inventory screen for this level."
+          : "Leaving discards this run and returns you to the map."}
+      </p>
+      <div style={{ display: "flex", gap: 8 }}>
+        <button
+          type="button"
+          onClick={onCancel}
+          style={{ ...modalBtn, background: "var(--surface-high)", color: "var(--foreground)" }}
+        >
+          Cancel
+        </button>
+        <button type="button" onClick={onConfirm} style={modalBtn}>
+          {action === "restart" ? "Restart" : "Leave game"}
+        </button>
+      </div>
+    </Modal>
+  );
 }
 
 function InventoryStartModal({
@@ -6941,7 +7063,7 @@ function InGameSettingsModal({
             onChange={onToggleShootingStyle}
           />
           <span style={settingsLabelText}>
-            <strong>Shooting: {shootingStyle === "hold" ? "Hold" : "Press"}</strong>
+            <strong>Shooting: {shootingStyle === "hold" ? "Hold" : "Toggle"}</strong>
             <small style={settingsLabelSubtext}>
               {shootingStyle === "hold"
                 ? "Aim and release to shoot"

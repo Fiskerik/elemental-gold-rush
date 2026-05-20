@@ -93,6 +93,8 @@ interface ProgressState {
   soundEnabled: boolean;
   musicEnabled: boolean;
   hapticsEnabled: boolean;
+  shootingStyle: "hold" | "press";
+  hasChosenShootingStyle: boolean;
   dailyQuestDate: string;
   dailyQuests: DailyQuest[];
   dailyStreak: number;
@@ -134,6 +136,7 @@ interface ProgressState {
   toggleSound: () => void;
   toggleMusic: () => void;
   toggleHaptics: () => void;
+  setShootingStyle: (style: "hold" | "press") => void;
   reset: () => void;
 }
 
@@ -154,6 +157,8 @@ export const useProgress = create<ProgressState>()(
       soundEnabled: true,
       musicEnabled: true,
       hapticsEnabled: true,
+      shootingStyle: "hold",
+      hasChosenShootingStyle: false,
       dailyQuestDate: initialQuestDate,
       dailyQuests: initialDailyQuests,
       dailyStreak: 0,
@@ -357,6 +362,7 @@ export const useProgress = create<ProgressState>()(
       toggleSound: () => set((s) => ({ soundEnabled: !s.soundEnabled })),
       toggleMusic: () => set((s) => ({ musicEnabled: !s.musicEnabled })),
       toggleHaptics: () => set((s) => ({ hapticsEnabled: !s.hapticsEnabled })),
+      setShootingStyle: (style) => set({ shootingStyle: style, hasChosenShootingStyle: true }),
       reset: () =>
         set({
           unlockedLevel: 1,
@@ -369,6 +375,8 @@ export const useProgress = create<ProgressState>()(
           soundEnabled: true,
           musicEnabled: true,
           hapticsEnabled: true,
+          shootingStyle: "hold",
+          hasChosenShootingStyle: false,
           dailyQuestDate: getTodayQuestDate(),
           dailyQuests: createDailyQuests(),
           dailyStreak: 0,
@@ -406,6 +414,9 @@ export const useProgress = create<ProgressState>()(
           soundEnabled: persistedState?.soundEnabled ?? current.soundEnabled,
           musicEnabled: persistedState?.musicEnabled ?? current.musicEnabled,
           hapticsEnabled: persistedState?.hapticsEnabled ?? current.hapticsEnabled,
+          shootingStyle: persistedState?.shootingStyle ?? current.shootingStyle,
+          hasChosenShootingStyle:
+            persistedState?.hasChosenShootingStyle ?? current.hasChosenShootingStyle,
           bestCombo: persistedState?.bestCombo ?? current.bestCombo,
           bestComboDate: persistedState?.bestComboDate ?? current.bestComboDate,
           earnedBadges: getEarnedBadgeIds(discoveredElements),

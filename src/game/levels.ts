@@ -409,7 +409,7 @@ const EARLY_LEVELS: Level[] = [
   makeAtomLevel(LEVEL_SEEDS[4], 9, 5),
   makePowerUpLevel(11, "egun", "E-Gun Calibration", "Fire the E-Gun through a molecule to upgrade it.", 6, 6),
   makeAtomLevel({ ...LEVEL_SEEDS[5], targetElement: 7, name: "Nitrogen Climb", description: "Reach Nitrogen.", lore: "Nitrogen fills most of the air and anchors amino acids, proteins, and fertilizers." }, 12, 6),
-  makePowerUpLevel(13, "gravity", "Gravity Well", "Use Gravity to pull scattered atoms together.", 7, 7),
+  makePowerUpLevel(13, "gravity", "Gravity Well", "Gravity is earned every 30 successful merges. Use it to pull scattered atoms together.", 7, 7),
   makeAtomLevel(LEVEL_SEEDS[5], 14, 7),
   makeAtomLevel(LEVEL_SEEDS[6], 16, 8),
   makePowerUpLevel(17, "stone", "Stone Impact", "Miss three opening shots, then place the loaded Stone.", 10, 10),

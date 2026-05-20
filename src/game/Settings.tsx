@@ -2,7 +2,7 @@ import { useProgress } from "./store";
 import { startAmbientMusic, stopAmbientMusic } from "./audio";
 
 export function Settings({ onBack }: { onBack: () => void }) {
-  const { soundEnabled, musicEnabled, hapticsEnabled, toggleSound, toggleMusic, toggleHaptics, reset } =
+  const { soundEnabled, musicEnabled, hapticsEnabled, shootingStyle, toggleSound, toggleMusic, toggleHaptics, setShootingStyle, reset } =
     useProgress();
   const handleMusicToggle = () => {
     if (!musicEnabled) startAmbientMusic();
@@ -20,6 +20,11 @@ export function Settings({ onBack }: { onBack: () => void }) {
           <Row label="Music" value={musicEnabled} onToggle={handleMusicToggle} />
           <Row label="Sound effects" value={soundEnabled} onToggle={toggleSound} />
           <Row label="Haptics" value={hapticsEnabled} onToggle={toggleHaptics} />
+          <Row
+            label={`Play style: ${shootingStyle === "hold" ? "Hold" : "Toggle"}`}
+            value={shootingStyle === "press"}
+            onToggle={() => setShootingStyle(shootingStyle === "hold" ? "press" : "hold")}
+          />
           <button
             onClick={() => {
               if (confirm("Reset all progress? This cannot be undone.")) reset();
