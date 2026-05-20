@@ -119,6 +119,7 @@ interface ProgressState {
   buyGoldCoins: (coins: number, pointCost: number) => boolean;
   setHighestElement: (n: number) => void;
   refreshDailyLab: () => void;
+  claimWeeklyPlayBonus: () => { coinsAwarded: number; bonusAwarded: number } | null;
   reportQuestProgress: (event: QuestProgressEvent) => void;
   claimDailyReward: () => void;
   setBestCombo: (combo: number) => void;
