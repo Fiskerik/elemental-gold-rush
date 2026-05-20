@@ -416,7 +416,7 @@ const EARLY_LEVELS: Level[] = [
   makeAtomLevel({ ...LEVEL_SEEDS[7], targetElement: 13, name: "Aluminum Foil", description: "Reach Aluminum.", lore: "Aluminum is light, conductive, and protected by a thin oxide skin." }, 18, 9),
   makePowerUpLevel(19, "transmute", "Transmute Shot", "Transmute your queued atom, then merge it into the board.", 13, 13),
   makeAtomLevel(LEVEL_SEEDS[9], 21, 10),
-  makePowerUpLevel(22, "fusion-jump", "Fusion Jump", "Arm Fusion Jump and merge Chlorine into Argon.", 18, 17),
+  makePowerUpLevel(22, "fusion-jump", "Fusion Jump", "Arm Fusion Jump and merge Chlorine into Potassium.", 19, 17),
   makeAtomLevel(LEVEL_SEEDS[11], 23, 11),
   makePowerUpLevel(24, "catalyst", "Catalyst Chain", "Activate Catalyst and trigger a chain reaction.", 24, 6),
   makeAtomLevel(LEVEL_SEEDS[13], 26, 12),

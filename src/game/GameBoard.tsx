@@ -260,7 +260,7 @@ const POWER_UP_STAGE_TIPS: Record<PowerUpStageId, { title: string; body: string;
   },
   unstable: {
     title: "Unstable practice",
-    body: "The queued atom is unstable. Merge it before its shell counter runs out to clear the stage.",
+    body: "The isotope on the board has a shell shield based on electron shells: smaller atoms have smaller shields, larger atoms last longer. Merge a fresh queued atom into it before the shield depletes to clear the stage.",
     tone: "danger",
   },
   grab: {
@@ -269,7 +269,7 @@ const POWER_UP_STAGE_TIPS: Record<PowerUpStageId, { title: string; body: string;
   },
   egun: {
     title: "E-Gun practice",
-    body: "The E-Gun fires in a straight line and upgrades every atom in the beam. Hit a molecule with the beam to clear this stage.",
+    body: "The E-Gun fires in a straight line and upgrades every atom in the beam. It starts at a 1% spawn rate and increases slightly over time. Hit a molecule with the beam to clear this stage.",
   },
   gravity: {
     title: "Gravity practice",
@@ -277,7 +277,7 @@ const POWER_UP_STAGE_TIPS: Record<PowerUpStageId, { title: string; body: string;
   },
   stone: {
     title: "Stone practice",
-    body: "Fire the three queued atoms and miss the board. A Stone loads after the third miss; place it to clear the stage.",
+    body: "In normal runs, three consecutive misses after the initial 15-shot grace period load a Stone. Stones do not merge, but they shove atoms and can be destroyed for bonus points. Place this training Stone to clear the stage.",
     tone: "danger",
   },
   transmute: {
@@ -645,7 +645,9 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
   const fusionJumpEnabled = level.id >= FUSION_JUMP_MIN_LEVEL;
   const catalystEnabled = level.id >= CATALYST_MIN_LEVEL;
   const stoneEnabled = level.id >= STONE_MIN_LEVEL;
-  const compoundEnabled = mode === "campaign";
+  const powerUpStage = mode === "campaign" ? level.powerUpStage : undefined;
+  const isPowerUpStage = powerUpStage != null;
+  const compoundEnabled = mode === "campaign" && !isPowerUpStage;
   const blankEnabled = level.id >= BLANK_MIN_LEVEL;
   const {
     recordDiscovery,
@@ -934,8 +936,6 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     [level.id],
   );
   const isMoleculeChallenge = moleculeObjective != null && mode === "campaign";
-  const powerUpStage = mode === "campaign" ? level.powerUpStage : undefined;
-  const isPowerUpStage = powerUpStage != null;
   const canIntroducePowerUps = mode === "campaign" && !isMoleculeChallenge && !isPowerUpStage;
   const unstableEnabled = level.id >= UNSTABLE_UNLOCK_LEVEL;
   const current = queue[0];
@@ -1250,11 +1250,11 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     );
     const initialUnstable = initialEGun.map(
       (isEGun, i) =>
-        (powerUpStage === "unstable" && i === 0) ||
-        (!isEGun &&
+        !isPowerUpStage &&
+        !isEGun &&
         !initialBlank[i] &&
         level.id >= UNSTABLE_UNLOCK_LEVEL &&
-        Math.random() < UNSTABLE_SPAWN_CHANCE),
+        Math.random() < UNSTABLE_SPAWN_CHANCE,
     );
     setQueue(
       initialQueue.map((atom, i) =>
@@ -1709,6 +1709,12 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     // Clear any in-flight score/merge popups so they don't bleed into the
     // win animation or appear behind the result modal.
     setPopups([]);
+    if (level.powerUpStage) {
+      setWon(true);
+      setBusy(false);
+      stageClearTimeoutRef.current = null;
+      return;
+    }
     setStageClearFx(stats);
     spawnPopup(stats.compound ? "COMPOUND FORMED" : "TARGET FORMED");
     stageClearTimeoutRef.current = window.setTimeout(() => {
@@ -1724,8 +1730,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
   function completePowerUpStage(stage: PowerUpStageId | undefined = powerUpStage, scoreOverride = score) {
     if (!stage || powerUpStageCompletedRef.current || won || gameOver) return;
     powerUpStageCompletedRef.current = true;
-    const timeSec = (Date.now() - startTimeRef.current) / 1000;
-    const stars = calculateStars(level, scoreOverride, shots, runBestCombo, timeSec);
+    const stars = 1;
     setEarnedStars(stars);
     setLevelStars(levelId, stars);
     reportQuestProgress({ levelCleared: true, starsEarned: stars });
@@ -2018,7 +2023,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
           boardBall(atom, SIDE_PAD + radiusFor(atom) + (i % 4) * spacing, top + Math.floor(i / 4) * spacing),
         );
       case "unstable":
-        return [boardBall(2, cx, top + spacing)];
+        return [boardBall(2, cx, top + spacing, true)];
       case "grab":
         return [
           boardBall(1, cx - spacing * 1.5, top),
@@ -2529,7 +2534,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
       return;
     }
     const reachedTarget = Array.from(upgradedAtoms).some((atom) => atom >= target);
-    if (reachedTarget && !isMoleculeChallenge && !continuingPastTarget) {
+    if (reachedTarget && !isMoleculeChallenge && !isPowerUpStage && !continuingPastTarget) {
       const nextHighest = Math.max(highest, ...Array.from(upgradedAtoms));
       const timeSec = (Date.now() - startTimeRef.current) / 1000;
       const stars = calculateStars(level, score, nextShots, runBestCombo, timeSec);
@@ -3254,7 +3259,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
       (powerUpStage === "shimmer" && shimmerHit) ||
       (powerUpStage === "unstable" && result.merges.some((merge) => merge.stabilizedIsotope)) ||
       (powerUpStage === "transmute" && transmuteStagePending && result.merges.length > 0) ||
-      (powerUpStage === "fusion-jump" && fusionJumpResolved) ||
+      (powerUpStage === "fusion-jump" && fusionJumpResolved && result.levelComplete) ||
       (powerUpStage === "catalyst" && catalystResolved) ||
       (powerUpStage === "blank" && currentIsBlank && result.levelComplete) ||
       (powerUpStage === "queue-shuffle" && queueShuffleStagePending);
@@ -3268,7 +3273,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
           completePowerUpStage(powerUpStage, nextScore);
           return;
         }
-        if (result.levelComplete && !isMoleculeChallenge && !continuingPastTarget) {
+        if (result.levelComplete && !isMoleculeChallenge && !isPowerUpStage && !continuingPastTarget) {
           const timeSec = (Date.now() - startTimeRef.current) / 1000;
           const stars = calculateStars(level, nextScore, nextShots, nextBestCombo, timeSec);
           setEarnedStars(stars);
@@ -3839,7 +3844,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     setTimeout(
       () => {
         setHighlightId(null);
-        if (result.levelComplete && !isMoleculeChallenge && !continuingPastTarget) {
+        if (result.levelComplete && !isMoleculeChallenge && !isPowerUpStage && !continuingPastTarget) {
           const timeSec = (Date.now() - startTimeRef.current) / 1000;
           const stars = calculateStars(
             level,
@@ -4024,7 +4029,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     );
     // Grabbed-and-merged into the target element? Trigger the same win flow
     // a regular shot does so the level actually clears.
-    if (result.levelComplete && !isMoleculeChallenge && !continuingPastTarget) {
+    if (result.levelComplete && !isMoleculeChallenge && !isPowerUpStage && !continuingPastTarget) {
       const timeSec = (Date.now() - startTimeRef.current) / 1000;
       const nextBestCombo = Math.max(runBestCombo, result.merges.length);
       const stars = calculateStars(level, nextScore, shots, nextBestCombo, timeSec);
@@ -4048,6 +4053,14 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
   // outward to make room.
   function loadStoneIntoLauncher() {
     setPendingStone(true);
+    window.setTimeout(() => {
+      showTipForce(
+        "feature-stone-rule",
+        "Stone loaded",
+        "Three consecutive non-merging shots after the first 15 shots load a Stone. It will not merge, but it shoves nearby atoms and can be destroyed for bonus points.",
+        "danger",
+      );
+    }, 0);
     spawnPopup("⛰ STONE LOADED");
     haptic([20, 30, 20]);
     showTip(
@@ -5230,6 +5243,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
             {gravityEnabled && gravityCharges > 0 && (
               <button
                 type="button"
+                className={powerUpStage === "gravity" ? "target-claim-flash" : undefined}
                 title="Gravity: make all atoms fall upward. Combos count toward Grab progress."
                 aria-label={`Use Gravity power-up (${gravityCharges} available)`}
                 onClick={triggerGravityPowerUp}
@@ -5257,6 +5271,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
             {grabEnabled && grabs > 0 && (
               <button
                 type="button"
+                className={powerUpStage === "grab" ? "target-claim-flash" : undefined}
                 title="Grab: drag any atom on the board to a new position."
                 aria-label={`Toggle Grab power-up (${grabs} available)`}
                 onClick={() => setGrabMode((g) => !g)}
@@ -5266,12 +5281,12 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
                 )}
                 style={{
                   ...powerUpIconBtn,
-                  border: `1px solid ${grabMode ? "var(--accent)" : "var(--border)"}`,
+                  border: `1px solid ${grabMode || powerUpStage === "grab" ? "var(--accent)" : "var(--border)"}`,
                   background: grabMode
                     ? "linear-gradient(135deg, var(--accent), var(--primary))"
                     : "var(--surface-elevated)",
                   color: grabMode ? "var(--primary-foreground)" : "var(--foreground)",
-                  boxShadow: grabMode ? "0 0 14px var(--accent-glow)" : undefined,
+                  boxShadow: grabMode || powerUpStage === "grab" ? "0 0 14px var(--accent-glow)" : undefined,
                 }}
               >
                 <span aria-hidden="true" style={{ display: "grid", placeItems: "center" }}>
@@ -5546,14 +5561,16 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
             stars={earnedStars}
             newDiscoveries={newlyDiscoveredThisRun}
             formedCompounds={formedCompoundsThisRun}
+            isPowerUpPass={isPowerUpStage}
             claimablePowerUps={
-              hasClaimedUnusedInventoryRef.current ? {} : collectUnusedPowerUps()
+              isPowerUpStage || hasClaimedUnusedInventoryRef.current ? {} : collectUnusedPowerUps()
             }
             claimedPowerUp={claimedResultPowerUp}
             onClaimPowerUp={claimResultPowerUp}
             onDiscoveryClick={setDiscoveryEl}
             onMain={onExit}
-            onNext={() => onWin(getNextLevel(levelId)?.id ?? null)}
+            onNext={onExit}
+            nextLabel="Map"
           />
         )}
         {gameOver && !won && (
@@ -6480,6 +6497,7 @@ function ResultModal({
   formedCompounds = [],
   claimablePowerUps = {},
   claimedPowerUp = null,
+  isPowerUpPass = false,
   onClaimPowerUp,
   onDiscoveryClick,
   onMain,
@@ -6497,6 +6515,7 @@ function ResultModal({
   formedCompounds?: string[];
   claimablePowerUps?: Partial<Record<InventoryPowerUpId, number>>;
   claimedPowerUp?: InventoryPowerUpId | null;
+  isPowerUpPass?: boolean;
   onClaimPowerUp?: (powerUp: InventoryPowerUpId) => void;
   onDiscoveryClick?: (atomicNumber: number) => void;
   onMain: () => void;
@@ -6508,7 +6527,7 @@ function ResultModal({
     .map((id) => COMPOUNDS.find((compound) => compound.id === id))
     .filter((compound): compound is CompoundDefinition => Boolean(compound));
   const powerUpUnlockName = level.powerUpStage ? POWER_UP_STAGE_NAMES[level.powerUpStage] : null;
-  const shopPowerUps: string[] = ["grab", "egun", "gravity", "transmute", "fusion-jump", "catalyst", "emission", "gamma"];
+  const shopPowerUps: string[] = ["grab", "gravity", "transmute", "fusion-jump", "catalyst", "emission", "gamma"];
   const powerUpUnlockMessage =
     powerUpUnlockName && title === "LEVEL COMPLETE"
       ? shopPowerUps.includes(level.powerUpStage ?? "")
@@ -6526,6 +6545,38 @@ function ResultModal({
         {title}
       </div>
       <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 12 }}>{level.name}</div>
+      {isPowerUpPass && (
+        <div
+          style={{
+            display: "grid",
+            justifyItems: "center",
+            gap: 10,
+            margin: "4px 0 16px",
+          }}
+        >
+          <div
+            aria-hidden="true"
+            style={{
+              width: 72,
+              height: 72,
+              borderRadius: 999,
+              display: "grid",
+              placeItems: "center",
+              background: "color-mix(in oklch, var(--success, var(--accent)) 20%, var(--surface))",
+              border: "2px solid var(--success, var(--accent))",
+              color: "var(--success, var(--accent))",
+              fontSize: 42,
+              fontWeight: 900,
+              boxShadow: "0 0 24px var(--accent-glow)",
+            }}
+          >
+            ✓
+          </div>
+          <div style={{ fontSize: 24, fontWeight: 900, color: "var(--success, var(--accent))" }}>
+            Pass
+          </div>
+        </div>
+      )}
       {level.milestoneFact && (
         <p
           style={{
@@ -6551,7 +6602,7 @@ function ResultModal({
           {powerUpUnlockMessage}
         </p>
       )}
-      {stars > 0 && (
+      {stars > 0 && !isPowerUpPass && (
         <div
           style={{
             textAlign: "center",
@@ -6564,21 +6615,23 @@ function ResultModal({
           {Array.from({ length: 3 }, (_, i) => (i < stars ? "★" : "☆")).join("")}
         </div>
       )}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
-        <ResultStat label="Score" value={formatScore(score)} color="var(--accent)" />
-        <ResultStat
-          label="Target"
-          value={ELEMENTS[level.targetElement - 1]?.symbol ?? "?"}
-          color="var(--primary)"
-        />
-        <ResultStat
-          label="Shots"
-          value={`${shots}${level.parShots ? ` / ${getStarParShots(level)}` : ""}`}
-          color="var(--foreground)"
-        />
-        <ResultStat label="Best Combo" value={`${bestCombo}`} color="var(--foreground)" />
-      </div>
-      {newDiscoveries.length > 0 && (
+      {!isPowerUpPass && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+          <ResultStat label="Score" value={formatScore(score)} color="var(--accent)" />
+          <ResultStat
+            label="Target"
+            value={ELEMENTS[level.targetElement - 1]?.symbol ?? "?"}
+            color="var(--primary)"
+          />
+          <ResultStat
+            label="Shots"
+            value={`${shots}${level.parShots ? ` / ${getStarParShots(level)}` : ""}`}
+            color="var(--foreground)"
+          />
+          <ResultStat label="Best Combo" value={`${bestCombo}`} color="var(--foreground)" />
+        </div>
+      )}
+      {newDiscoveries.length > 0 && !isPowerUpPass && (
         <div
           style={{
             background: "var(--surface)",
@@ -6613,7 +6666,7 @@ function ResultModal({
           </div>
         </div>
       )}
-      {formedCompoundDefinitions.length > 0 && (
+      {formedCompoundDefinitions.length > 0 && !isPowerUpPass && (
         <div
           style={{
             background: "var(--surface)",
@@ -6645,7 +6698,7 @@ function ResultModal({
           </div>
         </div>
       )}
-      {onClaimPowerUp && (claimableOptions.length > 0 || claimedPowerUp) && (
+      {onClaimPowerUp && !isPowerUpPass && (claimableOptions.length > 0 || claimedPowerUp) && (
         <div
           style={{
             background: "var(--surface)",
@@ -6721,7 +6774,7 @@ function ResultModal({
           )}
         </div>
       )}
-      {level.scoreGoal && (
+      {level.scoreGoal && !isPowerUpPass && (
         <div
           style={{
             fontSize: 11,
