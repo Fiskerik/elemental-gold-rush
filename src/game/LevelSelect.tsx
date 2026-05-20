@@ -365,7 +365,7 @@ export function LevelSelect({
                 {selected.description}
               </p>
 
-              {selectedStats && selectedStats.attempts > 0 && (
+              {!selected.powerUpStage && selectedStats && selectedStats.attempts > 0 && (
                 <>
                   <button
                     type="button"

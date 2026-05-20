@@ -38,6 +38,7 @@ export function Profile({ onBack }: Props) {
     challengeBestScores,
     hasProPack,
     grantProPack,
+    setUnlockedLevel,
   } = useProgress();
   const [proPackMessage, setProPackMessage] = useState("");
   const highestEl = ELEMENTS[highestElement - 1];
@@ -244,6 +245,13 @@ export function Profile({ onBack }: Props) {
               label="Periodic table progress"
               value={`${discoveredElements.length}/${ELEMENTS.length}`}
             />
+            <button
+              type="button"
+              onClick={() => setUnlockedLevel(unlockedLevel >= MAX_LEVEL ? 1 : MAX_LEVEL)}
+              style={profileActionButton}
+            >
+              {unlockedLevel >= MAX_LEVEL ? "Lock stages" : "Unlock all stages"}
+            </button>
           </div>
         </section>
       </div>

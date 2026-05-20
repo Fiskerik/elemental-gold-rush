@@ -109,6 +109,7 @@ interface ProgressState {
   seenTips: string[];
   markTipSeen: (id: string) => void;
   unlockLevel: (id: number) => void;
+  setUnlockedLevel: (id: number) => void;
   recordDiscovery: (atomicNumbers: number[]) => void;
   recordCompoundDiscovery: (compoundId: string) => void;
   addScore: (n: number) => void;
@@ -170,6 +171,7 @@ export const useProgress = create<ProgressState>()(
       markTipSeen: (id) =>
         set((s) => (s.seenTips.includes(id) ? s : { seenTips: [...s.seenTips, id] })),
       unlockLevel: (id) => set((s) => ({ unlockedLevel: Math.max(s.unlockedLevel, id) })),
+      setUnlockedLevel: (id) => set(() => ({ unlockedLevel: Math.max(1, Math.floor(id)) })),
       recordDiscovery: (nums) =>
         set((s) => {
           const next = new Set(s.discoveredElements);

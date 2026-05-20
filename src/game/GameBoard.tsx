@@ -115,6 +115,8 @@ const MERGE_COMBO_START_MS = 240;
 const MERGE_COMBO_STEP_MS = 460;
 const MERGE_COMBO_END_PAD_MS = 560;
 const MERGE_COMBO_SOUND_STEP_MS = 130;
+const CHALLENGE_CLEAR_SCORE = 5000;
+const POWER_UP_CLEAR_DELAY_MS = 4000;
 
 function mergeComboCueDelay(index: number): number {
   return index * MERGE_COMBO_SOUND_STEP_MS;
@@ -1614,6 +1616,12 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     blank: boolean;
     unstable: boolean;
   } {
+    if (powerUpStage === "unstable") {
+      return { atom: Math.random() < 0.5 ? 2 : 10, shimmer: false, eGun: false, blank: false, unstable: false };
+    }
+    if (powerUpStage === "fusion-jump") {
+      return { atom: 17, shimmer: false, eGun: false, blank: false, unstable: false };
+    }
     const plannedChallengeAtom = isMoleculeChallenge ? challengeQueuePlanRef.current.shift() : undefined;
     if (plannedChallengeAtom != null) {
       return {
@@ -1731,14 +1739,35 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     if (!stage || powerUpStageCompletedRef.current || won || gameOver) return;
     powerUpStageCompletedRef.current = true;
     const stars = 1;
+    const clearScore = scoreOverride + CHALLENGE_CLEAR_SCORE;
+    setScore(clearScore);
+    addScore(CHALLENGE_CLEAR_SCORE);
     setEarnedStars(stars);
     setLevelStars(levelId, stars);
     reportQuestProgress({ levelCleared: true, starsEarned: stars });
     unlockLevel(getNextLevel(levelId)?.id ?? levelId + 1);
     sfx(playWinSound);
     haptic([30, 60, 30, 60, 80]);
-    trackLevelWin(levelId, scoreOverride, shots, highest, mode);
-    showStageClearAnimation({ stars, score: scoreOverride, shots, bestCombo: runBestCombo });
+    trackLevelWin(levelId, clearScore, shots, highest, mode);
+    showStageClearAnimation({ stars, score: clearScore, shots, bestCombo: runBestCombo });
+  }
+
+  function completePowerUpStageAfterDelay(stage: PowerUpStageId | undefined = powerUpStage, scoreOverride = score) {
+    if (!stage || powerUpStageCompletedRef.current || won || gameOver) return;
+    powerUpStageCompletedRef.current = true;
+    window.setTimeout(() => {
+      powerUpStageCompletedRef.current = false;
+      completePowerUpStage(stage, scoreOverride);
+    }, POWER_UP_CLEAR_DELAY_MS);
+  }
+
+  function failPowerUpStage(message: string) {
+    if (!isPowerUpStage || powerUpStageCompletedRef.current || won || gameOver) return;
+    powerUpStageCompletedRef.current = true;
+    spawnPopup(message);
+    trackGameOver(levelId, score, shots, highest, mode);
+    setGameOver(true);
+    haptic([50, 80, 50, 80, 200]);
   }
 
   useEffect(() => {
@@ -2023,7 +2052,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
           boardBall(atom, SIDE_PAD + radiusFor(atom) + (i % 4) * spacing, top + Math.floor(i / 4) * spacing),
         );
       case "unstable":
-        return [boardBall(2, cx, top + spacing, true)];
+        return [boardBall(2, cx - spacing, top + spacing, true), boardBall(10, cx + spacing, top + spacing, true)];
       case "grab":
         return [
           boardBall(1, cx - spacing * 1.5, top),
@@ -2091,7 +2120,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
       case "shimmer":
         return [1, 1, 2, 3];
       case "unstable":
-        return [2, 1, 1, 2];
+        return [2, 10, 2, 10];
       case "egun":
         return [1, 1, 1, 1];
       case "stone":
@@ -2530,7 +2559,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
       powerUp: "E-Gun",
     });
     if (powerUpStage === "egun" && hitIds.size > 0) {
-      completePowerUpStage("egun", score);
+      completePowerUpStageAfterDelay("egun", score);
       return;
     }
     const reachedTarget = Array.from(upgradedAtoms).some((atom) => atom >= target);
@@ -2587,9 +2616,11 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
       clearedAtoms.reduce((sum, atom) => sum + atom.atom * 12 * (atom.isotope ? 2 : 1), 0) *
         level.scoreMultiplier,
     );
-    const nextScore = score + gained;
-    setScore(nextScore);
-    addScore(gained);
+    const nextScore = isPowerUpStage ? score : score + gained;
+    if (!isPowerUpStage) {
+      setScore(nextScore);
+      addScore(gained);
+    }
 
     spawnPopup(hitIds.size > 0 ? `☢ GAMMA -${hitIds.size}` : "☢ GAMMA");
     if (clearedAtoms.some((atom) => atom.isotope)) spawnPopup("ISOTOPE x2");
@@ -2603,7 +2634,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     });
 
     if (powerUpStage === "gamma" && hitIds.size > 0) {
-      completePowerUpStage("gamma", nextScore);
+      completePowerUpStageAfterDelay("gamma", nextScore);
       return;
     }
 
@@ -2635,6 +2666,9 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
       if (decayed > 0) {
         spawnPopup(`☢ ${decayed} isotope${decayed === 1 ? "" : "s"} decayed`);
         haptic([18, 24, 18]);
+        if (powerUpStage === "unstable") {
+          window.setTimeout(() => failPowerUpStage("ISOTOPE DECAYED"), 300);
+        }
       }
     }
     if (mode === "isotope-decay" && nextShots > 0 && nextShots % 20 === 0) {
@@ -3026,8 +3060,10 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
             }
             if (totalBonus > 0) {
               grantFusionJump(destroyedCount);
-              setScore((s) => s + totalBonus);
-              addScore(totalBonus);
+              if (!isPowerUpStage) {
+                setScore((s) => s + totalBonus);
+                addScore(totalBonus);
+              }
               spawnPopup(`⛰ +${formatScore(totalBonus)}`);
               haptic([40, 60, 40, 60, 100]);
             } else {
@@ -3137,7 +3173,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
       if (mergeStoneDamage.bonus > 0) {
         grantFusionJump(mergeStoneDamage.destroyedCount);
         mergeStoneBonus = mergeStoneDamage.bonus;
-        addScore(mergeStoneDamage.bonus);
+        if (!isPowerUpStage) addScore(mergeStoneDamage.bonus);
       }
       haptic([20, 30, 30]);
     }
@@ -3219,7 +3255,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     setHighest(nextHighest);
     setHighestElement(nextHighest);
     const gained = Math.floor(result.scoreGained * level.scoreMultiplier * (shimmerHit ? 2 : 1));
-    const nextScore = score + gained + mergeStoneBonus + impactStoneBonus;
+    const nextScore = isPowerUpStage ? score : score + gained + mergeStoneBonus + impactStoneBonus;
     const nextBestCombo = Math.max(runBestCombo, result.merges.length);
     const shotPowerUps = [
       pendingReversiblePowerUp === "transmute" ? "Transmute Shot" : null,
@@ -3241,8 +3277,10 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
       powerUp: shotPowerUps.join(", ") || undefined,
       merges: result.merges,
     });
-    setScore(nextScore);
-    addScore(gained + impactStoneBonus);
+    if (!isPowerUpStage) {
+      setScore(nextScore);
+      addScore(gained + impactStoneBonus);
+    }
 
     reportQuestProgress({
       merges: result.merges.length,
@@ -3270,7 +3308,16 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
         if (powerUpStageResolved) {
           setTransmuteStagePending(false);
           setQueueShuffleStagePending(false);
-          completePowerUpStage(powerUpStage, nextScore);
+          const delayedStages: PowerUpStageId[] = ["blank", "queue-shuffle", "transmute"];
+          if (powerUpStage && delayedStages.includes(powerUpStage)) {
+            completePowerUpStageAfterDelay(powerUpStage, nextScore);
+          } else {
+            completePowerUpStage(powerUpStage, nextScore);
+          }
+          return;
+        }
+        if (powerUpStage === "fusion-jump" && nextShots >= 5) {
+          failPowerUpStage("FUSION JUMP MISSED");
           return;
         }
         if (result.levelComplete && !isMoleculeChallenge && !isPowerUpStage && !continuingPastTarget) {
@@ -3440,14 +3487,11 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     // Only reroll into atoms the player has already discovered, so Transmute
     // never hands out a fresh element for free.
     const candidates = discoveredElements.filter((n) => n > current && n <= maxTier);
-    if (candidates.length === 0) {
+    if (candidates.length === 0 && powerUpStage !== "transmute") {
       spawnPopup("🔀 NO HIGHER DISCOVERED");
       return;
     }
-    const atom =
-      powerUpStage === "transmute" && candidates.includes(4)
-        ? 4
-        : candidates[Math.floor(Math.random() * candidates.length)];
+    const atom = powerUpStage === "transmute" ? Math.min(maxTier, current + 1) : candidates[Math.floor(Math.random() * candidates.length)];
     setTransmuteCharges((g) => Math.max(0, g - 1));
     runPowerUpsUsedRef.current += 1;
     setQueue((q) => [atom, ...q.slice(1)]);
@@ -3597,7 +3641,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
       haptic(12);
       return;
     }
-    const bonusScore = compoundFormationScore(matchingCompound, selectedAtoms);
+    const bonusScore = isMoleculeChallenge ? CHALLENGE_CLEAR_SCORE : compoundFormationScore(matchingCompound, selectedAtoms);
 
     if (!isMoleculeChallenge) {
       const spentAt = Date.now();
@@ -3783,8 +3827,10 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     setBalls(result.balls.map((b) => (b.stoneHp != null ? b : { ...b, r: radiusFor(b.atom) })));
     setHighlightId(result.finalBallId);
     const gained = Math.floor(result.scoreGained * level.scoreMultiplier) + mergeStoneBonus;
-    setScore((s) => s + gained);
-    addScore(gained);
+    if (!isPowerUpStage) {
+      setScore((s) => s + gained);
+      addScore(gained);
+    }
     pushShotHistory({
       shot: shots,
       action:
@@ -3838,7 +3884,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     setHighest(nextHighest);
     setHighestElement(nextHighest);
     if (powerUpStage === "gravity") {
-      completePowerUpStage("gravity", score + gained);
+      completePowerUpStageAfterDelay("gravity", score);
       return;
     }
     setTimeout(
@@ -3954,7 +4000,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
       if (mergeStoneDamage.bonus > 0) {
         grantFusionJump(mergeStoneDamage.destroyedCount);
         mergeStoneBonus = mergeStoneDamage.bonus;
-        addScore(mergeStoneDamage.bonus);
+        if (!isPowerUpStage) addScore(mergeStoneDamage.bonus);
       }
       haptic([20, 30, 30]);
     }
@@ -3987,9 +4033,11 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     setHighest(nextHighest);
     setHighestElement(nextHighest);
     const gained = Math.floor(result.scoreGained * level.scoreMultiplier);
-    const nextScore = score + gained + mergeStoneBonus;
-    setScore(nextScore);
-    addScore(gained);
+    const nextScore = isPowerUpStage ? score : score + gained + mergeStoneBonus;
+    if (!isPowerUpStage) {
+      setScore(nextScore);
+      addScore(gained);
+    }
     pushShotHistory({
       shot: shots,
       action:
@@ -6528,9 +6576,12 @@ function ResultModal({
     .filter((compound): compound is CompoundDefinition => Boolean(compound));
   const powerUpUnlockName = level.powerUpStage ? POWER_UP_STAGE_NAMES[level.powerUpStage] : null;
   const shopPowerUps: string[] = ["grab", "gravity", "transmute", "fusion-jump", "catalyst", "emission", "gamma"];
+  const negativePowerUpStage = level.powerUpStage === "unstable" || level.powerUpStage === "stone";
   const powerUpUnlockMessage =
     powerUpUnlockName && title === "LEVEL COMPLETE"
-      ? shopPowerUps.includes(level.powerUpStage ?? "")
+      ? negativePowerUpStage
+        ? `${powerUpUnlockName} can now occur in upcoming levels.`
+        : shopPowerUps.includes(level.powerUpStage ?? "")
         ? `${powerUpUnlockName} is now unlocked for upcoming levels and available for purchase in the shop.`
         : `${powerUpUnlockName} is now unlocked for upcoming levels.`
       : null;
@@ -6593,7 +6644,7 @@ function ResultModal({
         <p
           style={{
             fontSize: 13,
-            color: "var(--success, var(--accent))",
+            color: negativePowerUpStage ? "var(--destructive)" : "var(--success, var(--accent))",
             lineHeight: 1.5,
             margin: "0 0 14px",
             fontWeight: 800,

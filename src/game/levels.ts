@@ -404,7 +404,7 @@ const EARLY_LEVELS: Level[] = [
   makePowerUpLevel(3, "shimmer", "Shimmer Practice", "Merge the shimmering queued atom to clear the stage.", 3, 3),
   makeAtomLevel(LEVEL_SEEDS[2], 4, 3),
   makeAtomLevel(LEVEL_SEEDS[3], 7, 4),
-  makePowerUpLevel(6, "unstable", "Unstable Isotope", "Merge the unstable atom before its shell depletes.", 4, 4),
+  makePowerUpLevel(6, "unstable", "Unstable Isotope", "Merge an unstable atom before its shell depletes.", 10, 10),
   makePowerUpLevel(8, "grab", "Grab Training", "Use Grab to reposition an atom and create a merge.", 5, 5),
   makeAtomLevel(LEVEL_SEEDS[4], 9, 5),
   makePowerUpLevel(11, "egun", "E-Gun Calibration", "Fire the E-Gun through a molecule to upgrade it.", 6, 6),
