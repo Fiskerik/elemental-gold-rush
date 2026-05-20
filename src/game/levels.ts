@@ -38,12 +38,29 @@ export interface Level {
   comboGoal?: number;
   /** Elements unlocked for the milestone reward screen */
   milestoneFact?: string;
+  /** Tutorial stage that clears by using a specific power-up correctly. */
+  powerUpStage?: PowerUpStageId;
 }
 
 type LevelSeed = Pick<
   Level,
   "name" | "description" | "lore" | "targetElement" | "milestoneFact"
 >;
+
+export type PowerUpStageId =
+  | "shimmer"
+  | "unstable"
+  | "grab"
+  | "egun"
+  | "gravity"
+  | "stone"
+  | "transmute"
+  | "fusion-jump"
+  | "catalyst"
+  | "emission"
+  | "gamma"
+  | "blank"
+  | "queue-shuffle";
 
 const LEVEL_SEEDS: LevelSeed[] = [
   {
@@ -319,11 +336,11 @@ export const MOLECULE_CHALLENGE_BY_LEVEL: Record<number, string> = {
   40: "sulfuric-acid",
   45: "calcium-carbonate",
   50: "sulfuric-acid",
+  55: "calcium-carbonate",
+  60: "sulfuric-acid",
 };
 
-const ATOM_LEVELS: Level[] = LEVEL_SEEDS.map((seed, index) => {
-  const atomStage = index + 1;
-  const id = atomStage + Math.floor((atomStage - 1) / 4);
+function makeAtomLevel(seed: LevelSeed, id: number, atomStage: number): Level {
   const target = seed.targetElement;
   const difficulty = atomStage - 1;
   const maxQueueElement =
@@ -350,7 +367,80 @@ const ATOM_LEVELS: Level[] = LEVEL_SEEDS.map((seed, index) => {
     scoreGoal: Math.round((520 + target * 290 + difficulty * 420) * scoreMultiplier),
     comboGoal: Math.min(6, 2 + Math.floor(atomStage / 10)),
   };
-});
+}
+
+function makePowerUpLevel(
+  id: number,
+  powerUpStage: PowerUpStageId,
+  name: string,
+  description: string,
+  targetElement: number,
+  maxQueueElement: number,
+): Level {
+  return {
+    id,
+    powerUpStage,
+    name,
+    description,
+    lore: "A focused training stage: use the highlighted mechanic to clear the board and unlock it for future runs.",
+    targetElement,
+    maxQueueElement,
+    queueDecay: 0.45,
+    gridCols: id >= 26 ? 10 : id >= 14 ? 9 : 8,
+    gridRows: id >= 32 ? 14 : id >= 20 ? 13 : id >= 7 ? 12 : 10,
+    scoreMultiplier: Number((1.2 + id * 0.08).toFixed(1)),
+    parShots: 8,
+    starShotsThree: 5,
+    starShotsTwo: 9,
+    parTimeSec: 45,
+    scoreGoal: Math.round(900 + id * 220),
+    comboGoal: 2,
+  };
+}
+
+const EARLY_LEVELS: Level[] = [
+  makeAtomLevel(LEVEL_SEEDS[0], 1, 1),
+  makeAtomLevel(LEVEL_SEEDS[1], 2, 2),
+  makePowerUpLevel(3, "shimmer", "Shimmer Practice", "Merge the shimmering queued atom to clear the stage.", 3, 3),
+  makeAtomLevel(LEVEL_SEEDS[2], 4, 3),
+  makeAtomLevel(LEVEL_SEEDS[3], 7, 4),
+  makePowerUpLevel(6, "unstable", "Unstable Isotope", "Merge the unstable atom before its shell depletes.", 4, 4),
+  makePowerUpLevel(8, "grab", "Grab Training", "Use Grab to reposition an atom and create a merge.", 5, 5),
+  makeAtomLevel(LEVEL_SEEDS[4], 9, 5),
+  makePowerUpLevel(11, "egun", "E-Gun Calibration", "Fire the E-Gun through a molecule to upgrade it.", 6, 6),
+  makeAtomLevel({ ...LEVEL_SEEDS[5], targetElement: 7, name: "Nitrogen Climb", description: "Reach Nitrogen.", lore: "Nitrogen fills most of the air and anchors amino acids, proteins, and fertilizers." }, 12, 6),
+  makePowerUpLevel(13, "gravity", "Gravity Well", "Use Gravity to pull scattered atoms together.", 7, 7),
+  makeAtomLevel(LEVEL_SEEDS[5], 14, 7),
+  makeAtomLevel(LEVEL_SEEDS[6], 16, 8),
+  makePowerUpLevel(17, "stone", "Stone Impact", "Miss three opening shots, then place the loaded Stone.", 10, 10),
+  makeAtomLevel({ ...LEVEL_SEEDS[7], targetElement: 13, name: "Aluminum Foil", description: "Reach Aluminum.", lore: "Aluminum is light, conductive, and protected by a thin oxide skin." }, 18, 9),
+  makePowerUpLevel(19, "transmute", "Transmute Shot", "Transmute your queued atom, then merge it into the board.", 13, 13),
+  makeAtomLevel(LEVEL_SEEDS[9], 21, 10),
+  makePowerUpLevel(22, "fusion-jump", "Fusion Jump", "Arm Fusion Jump and merge Chlorine into Argon.", 18, 17),
+  makeAtomLevel(LEVEL_SEEDS[11], 23, 11),
+  makePowerUpLevel(24, "catalyst", "Catalyst Chain", "Activate Catalyst and trigger a chain reaction.", 24, 6),
+  makeAtomLevel(LEVEL_SEEDS[13], 26, 12),
+  makePowerUpLevel(27, "emission", "Emission Burst", "Use Emission to raise the waiting queue.", 29, 29),
+  makeAtomLevel({ ...LEVEL_SEEDS[14], targetElement: 33, name: "Arsenic Trace", description: "Reach Arsenic.", lore: "Arsenic is infamous as a poison, yet its compounds also shaped semiconductors and pigments." }, 28, 13),
+  makePowerUpLevel(29, "gamma", "Gamma Bomb", "Use Gamma Bomb to clear a dense board.", 33, 6),
+  makeAtomLevel(LEVEL_SEEDS[15], 31, 14),
+  makePowerUpLevel(32, "blank", "Blank Breakthrough", "Use a Blank Atom to reach Krypton through the stone wall.", 36, 35),
+  makeAtomLevel(LEVEL_SEEDS[17], 33, 15),
+  makePowerUpLevel(34, "queue-shuffle", "Queue Shuffle", "Shuffle the queue, then fire one of the new atoms.", 42, 42),
+];
+
+const EARLY_LEVEL_IDS = new Set(EARLY_LEVELS.map((level) => level.id));
+let nextPostTutorialLevelId = 36;
+const ATOM_LEVELS: Level[] = [
+  ...EARLY_LEVELS,
+  ...LEVEL_SEEDS.slice(18).map((seed, index) => {
+    const atomStage = 16 + index;
+    while (nextPostTutorialLevelId % 5 === 0) nextPostTutorialLevelId += 1;
+    const id = nextPostTutorialLevelId;
+    nextPostTutorialLevelId += 1;
+    return makeAtomLevel(seed, id, atomStage);
+  }),
+].filter((level) => !MOLECULE_CHALLENGE_BY_LEVEL[level.id] || EARLY_LEVEL_IDS.has(level.id));
 
 const CHALLENGE_LEVELS: Level[] = Object.keys(MOLECULE_CHALLENGE_BY_LEVEL).map((key) => {
   const id = Number(key);

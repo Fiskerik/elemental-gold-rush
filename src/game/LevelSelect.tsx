@@ -6,6 +6,7 @@ import { ElementBall } from "./ElementBall";
 import { formatScore } from "./logic";
 import { COMPOUNDS, type CompoundDefinition } from "./compounds";
 import { MoleculeVisual } from "./MoleculeVisual";
+import { PowerUpBadge } from "./PowerUpLibrary";
 
 function getMoleculeChallenge(levelId: number): CompoundDefinition | null {
   const id = MOLECULE_CHALLENGE_BY_LEVEL[levelId];
@@ -159,6 +160,7 @@ export function LevelSelect({
               const isCurrent = lvl.id === unlockedLevel && !locked;
               const challenge = getMoleculeChallenge(lvl.id);
               const isChallenge = challenge != null;
+              const isPowerUpStage = lvl.powerUpStage != null;
               return (
                 <button
                   key={lvl.id}
@@ -183,7 +185,7 @@ export function LevelSelect({
                       position: "relative",
                       width: 50,
                       height: 50,
-                      borderRadius: isChallenge ? 13 : "50%",
+                      borderRadius: isChallenge || isPowerUpStage ? 13 : "50%",
                       background: "var(--surface)",
                       border: `2px solid ${
                         isCurrent
@@ -203,14 +205,16 @@ export function LevelSelect({
                       animation: isCurrent ? "decay-warn-flash 1.6s ease-in-out infinite" : undefined,
                     }}
                   >
-                    {isChallenge && challenge ? (
+                    {isPowerUpStage && lvl.powerUpStage ? (
+                      <PowerUpMapNode powerUp={lvl.powerUpStage} />
+                    ) : isChallenge && challenge ? (
                       <ChallengeMapNode compound={challenge} />
                     ) : locked ? (
                       <div style={{ fontSize: 22 }}>🔒</div>
                     ) : (
                       <ElementBall atomicNumber={lvl.targetElement} size={38} glow />
                     )}
-                    {locked && isChallenge && (
+                    {locked && (isChallenge || isPowerUpStage) && (
                       <div
                         aria-hidden="true"
                         style={{
@@ -301,7 +305,22 @@ export function LevelSelect({
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                {selectedChallenge ? (
+                {selected.powerUpStage ? (
+                  <div
+                    style={{
+                      width: 58,
+                      height: 58,
+                      borderRadius: 14,
+                      display: "grid",
+                      placeItems: "center",
+                      background: "var(--surface)",
+                      border: "2px solid var(--accent)",
+                      boxShadow: "0 0 18px var(--accent-glow)",
+                    }}
+                  >
+                    <PowerUpBadge icon={selected.powerUpStage} size={42} />
+                  </div>
+                ) : selectedChallenge ? (
                   <div
                     style={{
                       width: 58,
@@ -430,6 +449,26 @@ function ChallengeMapNode({ compound }: { compound: CompoundDefinition }) {
       }}
     >
       <MoleculeVisual compound={compound} size={34} />
+    </div>
+  );
+}
+
+function PowerUpMapNode({ powerUp }: { powerUp: NonNullable<(typeof LEVELS)[0]["powerUpStage"]> }) {
+  return (
+    <div
+      aria-hidden="true"
+      style={{
+        width: 40,
+        height: 40,
+        borderRadius: 11,
+        display: "grid",
+        placeItems: "center",
+        background:
+          "linear-gradient(135deg, color-mix(in oklch, var(--primary) 28%, var(--surface)), var(--surface-high))",
+        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.28), 0 0 12px var(--accent-glow)",
+      }}
+    >
+      <PowerUpBadge icon={powerUp} size={32} />
     </div>
   );
 }
