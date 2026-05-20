@@ -1,4 +1,22 @@
 import { ELEMENTS } from "./elements";
+import {
+  Atom,
+  Award,
+  Beaker,
+  Crown,
+  FlaskConical,
+  Flame,
+  Gem,
+  Hexagon,
+  Layers,
+  Medal,
+  Mountain,
+  Sparkles,
+  Sprout,
+  Trophy,
+  Zap,
+  type LucideIcon,
+} from "lucide-react";
 
 export type BadgeGroup = "milestones" | "families" | "periods" | "mastery";
 
@@ -7,6 +25,7 @@ export interface BadgeDefinition {
   name: string;
   description: string;
   icon: string;
+  iconLucide?: LucideIcon;
   group: BadgeGroup;
   requiredAtomicNumbers: number[];
 }
