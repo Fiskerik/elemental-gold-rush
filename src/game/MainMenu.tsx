@@ -312,8 +312,11 @@ export function MainMenu({
             </div>
             <div style={weeklyDayGrid}>
               {weeklyBonus.days.map((day) => (
-                <div
+                <button
                   key={day.index}
+                  type="button"
+                  onClick={day.isToday && !weeklyBonus.todayClaimed ? handleWeeklyDayClaim : undefined}
+                  disabled={!(day.isToday && !weeklyBonus.todayClaimed)}
                   style={{
                     ...weeklyDayCell,
                     borderColor: day.claimed
@@ -322,6 +325,16 @@ export function MainMenu({
                         ? "var(--primary)"
                         : "var(--border)",
                     color: day.claimed ? "var(--foreground)" : "var(--muted-foreground)",
+                    cursor: day.isToday && !weeklyBonus.todayClaimed ? "pointer" : "default",
+                    background:
+                      day.isToday && !weeklyBonus.todayClaimed
+                        ? "linear-gradient(135deg, color-mix(in oklch, var(--primary) 30%, var(--surface)), var(--surface))"
+                        : "var(--surface)",
+                    boxShadow:
+                      day.isToday && !weeklyBonus.todayClaimed
+                        ? "0 0 14px color-mix(in oklch, var(--primary) 50%, transparent)"
+                        : undefined,
+                    fontFamily: "inherit",
                   }}
                 >
                   <span>{day.label}</span>
@@ -329,8 +342,16 @@ export function MainMenu({
                     <GoldCoinIcon size={12} />
                     {day.index === 7 && <span>x5</span>}
                   </strong>
-                  <small>{day.claimed ? "Claimed" : day.isToday ? "Today" : "Next"}</small>
-                </div>
+                  <small>
+                    {day.claimed
+                      ? "Claimed"
+                      : day.isToday
+                        ? weeklyBonus.todayClaimed
+                          ? "Today"
+                          : "Claim"
+                        : "Next"}
+                  </small>
+                </button>
               ))}
             </div>
             <div style={{ fontSize: 10, color: "var(--muted-foreground)", lineHeight: 1.35 }}>
