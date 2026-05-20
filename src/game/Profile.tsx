@@ -72,75 +72,75 @@ export function Profile({ onBack }: Props) {
     setProPackMessage("No Pro Lab Pack purchase was found for this web build.");
   }
 
+  const proPackPanel = proPack ? (
+    <section style={proPackCard}>
+      <div style={sectionHeading}>ONE-TIME UPGRADE</div>
+      <h2 style={{ margin: 0, fontSize: 28, fontWeight: 900 }}>{proPack.name}</h2>
+      <p style={{ color: "var(--muted-foreground)", fontSize: 14, lineHeight: 1.5 }}>
+        {proPack.description}
+      </p>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, margin: "14px 0" }}>
+        {proPack.benefits.map((benefit) => (
+          <div
+            key={benefit}
+            style={{
+              display: "grid",
+              gridTemplateColumns: "18px 1fr",
+              gap: 8,
+              fontSize: 13,
+              lineHeight: 1.35,
+            }}
+          >
+            <CheckCircle2 size={15} color="var(--success)" aria-hidden="true" />
+            <span>{benefit}</span>
+          </div>
+        ))}
+      </div>
+      <div style={proPackNote}>
+        Purchases are routed through a platform layer so an App Store build can connect this
+        product to StoreKit without adding native purchase SDK calls to UI components.
+      </div>
+      {hasProPack ? (
+        <div style={proPackActive}>Pro Lab Pack Active</div>
+      ) : (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: 10,
+            marginTop: 14,
+          }}
+        >
+          <button
+            type="button"
+            onClick={handleProPackRestore}
+            style={{
+              ...profileActionButton,
+              background: "var(--surface-high)",
+              color: "var(--foreground)",
+            }}
+          >
+            Restore
+          </button>
+          <button type="button" onClick={handleProPackPurchase} style={profileActionButton}>
+            Unlock Pack
+          </button>
+        </div>
+      )}
+      {proPackMessage && (
+        <p style={{ margin: "12px 0 0", color: "var(--muted-foreground)", fontSize: 12 }}>
+          {proPackMessage}
+        </p>
+      )}
+    </section>
+  ) : null;
+
   return (
     <div className="app-shell" style={{ padding: 20, paddingTop: 32, minHeight: "100dvh" }}>
       <div style={{ position: "relative", zIndex: 1, maxWidth: 620, margin: "0 auto" }}>
         <button onClick={onBack} style={backBtn}>
           ← Menu
         </button>
-
-        {proPack && (
-          <section style={proPackCard}>
-            <div style={sectionHeading}>ONE-TIME UPGRADE</div>
-            <h2 style={{ margin: 0, fontSize: 28, fontWeight: 900 }}>{proPack.name}</h2>
-            <p style={{ color: "var(--muted-foreground)", fontSize: 14, lineHeight: 1.5 }}>
-              {proPack.description}
-            </p>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8, margin: "14px 0" }}>
-              {proPack.benefits.map((benefit) => (
-                <div
-                  key={benefit}
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "18px 1fr",
-                    gap: 8,
-                    fontSize: 13,
-                    lineHeight: 1.35,
-                  }}
-                >
-                  <CheckCircle2 size={15} color="var(--success)" aria-hidden="true" />
-                  <span>{benefit}</span>
-                </div>
-              ))}
-            </div>
-            <div style={proPackNote}>
-              Purchases are routed through a platform layer so an App Store build can connect this
-              product to StoreKit without adding native purchase SDK calls to UI components.
-            </div>
-            {hasProPack ? (
-              <div style={proPackActive}>Pro Lab Pack Active</div>
-            ) : (
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
-                  gap: 10,
-                  marginTop: 14,
-                }}
-              >
-                <button
-                  type="button"
-                  onClick={handleProPackRestore}
-                  style={{
-                    ...profileActionButton,
-                    background: "var(--surface-high)",
-                    color: "var(--foreground)",
-                  }}
-                >
-                  Restore
-                </button>
-                <button type="button" onClick={handleProPackPurchase} style={profileActionButton}>
-                  Unlock Pack
-                </button>
-              </div>
-            )}
-            {proPackMessage && (
-              <p style={{ margin: "12px 0 0", color: "var(--muted-foreground)", fontSize: 12 }}>
-                {proPackMessage}
-              </p>
-            )}
-          </section>
-        )}
 
         <header style={heroCard}>
           <div style={avatar}>{highestEl?.symbol ?? "H"}</div>
@@ -254,6 +254,8 @@ export function Profile({ onBack }: Props) {
             </button>
           </div>
         </section>
+
+        {proPackPanel}
       </div>
     </div>
   );

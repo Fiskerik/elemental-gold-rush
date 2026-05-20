@@ -44,8 +44,8 @@ export const POWER_UPS = [
     icon: "egun",
     name: "E-Gun",
     unlock: `Level ${POWER_UP_UNLOCK_LEVELS.egun}`,
-    effect: "Fires a straight beam that upgrades each atom it touches by 1 tier.",
-    description: "A straight beam that upgrades each atom it touches by 1 tier.",
+    effect: "Fires a wide straight beam that upgrades each atom it touches by 1 tier.",
+    description: "A wide straight beam that upgrades each atom it touches by 1 tier.",
   },
   {
     icon: "gravity",
@@ -58,8 +58,8 @@ export const POWER_UPS = [
     icon: "emission",
     name: "Emission",
     unlock: `Level ${POWER_UP_UNLOCK_LEVELS.emission} / every 5 minutes`,
-    effect: "Raises every atom currently waiting in your queue by 1 tier.",
-    description: "Raises every atom currently waiting in your queue by 1 tier.",
+    effect: "Raises every non-special atom currently waiting in your queue by 1 tier.",
+    description: "Raises every non-special atom currently waiting in your queue by 1 tier.",
   },
   {
     icon: "transmute",
@@ -119,7 +119,7 @@ export const POWER_UPS = [
     icon: "queue-shuffle",
     name: "Queue Shuffle",
     unlock: `Level ${POWER_UP_UNLOCK_LEVELS["queue-shuffle"]} / every 15th Stone hit`,
-    effect: "Rerolls the 3 atoms currently waiting in your queue.",
+    effect: "Rerolls the 4 atoms currently waiting in your queue.",
     description:
       "Recycle your queue: instantly rerolls every atom currently waiting in your queue.",
   },

@@ -305,7 +305,10 @@ export function MainMenu({
                   }}
                 >
                   <span>{day.label}</span>
-                  <strong>{day.rewardLabel}</strong>
+                  <strong style={weeklyReward}>
+                    <GoldCoinIcon size={12} />
+                    {day.index === 7 && <span>x5</span>}
+                  </strong>
                   <small>{day.claimed ? "Claimed" : day.isToday ? "Today" : "Next"}</small>
                 </div>
               ))}
@@ -620,6 +623,32 @@ const weeklyDayCell: CSSProperties = {
   fontSize: 9,
   lineHeight: 1.1,
 };
+
+const weeklyReward: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 3,
+  color: "oklch(0.86 0.17 84)",
+};
+
+function GoldCoinIcon({ size = 14 }: { size?: number }) {
+  return (
+    <span
+      aria-hidden="true"
+      style={{
+        width: size,
+        height: size,
+        borderRadius: "50%",
+        display: "inline-block",
+        background:
+          "radial-gradient(circle at 32% 24%, oklch(0.98 0.11 95), oklch(0.82 0.17 82) 48%, oklch(0.55 0.14 70))",
+        border: "1px solid oklch(0.94 0.13 90)",
+        boxShadow: "0 0 8px oklch(0.84 0.16 85 / 0.4), inset 0 -2px 4px rgba(0,0,0,0.25)",
+      }}
+    />
+  );
+}
 
 const questGrid: CSSProperties = {
   display: "grid",

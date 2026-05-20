@@ -116,7 +116,7 @@ const MERGE_COMBO_STEP_MS = 460;
 const MERGE_COMBO_END_PAD_MS = 560;
 const MERGE_COMBO_SOUND_STEP_MS = 130;
 const CHALLENGE_CLEAR_SCORE = 5000;
-const POWER_UP_CLEAR_DELAY_MS = 4000;
+const POWER_UP_CLEAR_DELAY_MS = 2000;
 
 function mergeComboCueDelay(index: number): number {
   return index * MERGE_COMBO_SOUND_STEP_MS;
@@ -709,6 +709,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
   const [runBestCombo, setRunBestCombo] = useState(0);
   const [earnedStars, setEarnedStars] = useState(0);
   const [aimDeg, setAimDeg] = useState(0); // 0 = straight up, negative = left
+  const [shootingStyle, setShootingStyle] = useState<"hold" | "press">("hold");
   const [popups, setPopups] = useState<{ id: number; text: string; x: number; y: number }[]>([]);
   const [busy, setBusy] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -830,6 +831,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
   const runRecordedRef = useRef(false);
   const inventoryCompoundChargesRef = useRef(0);
   const [inventoryPickerOpen, setInventoryPickerOpen] = useState(false);
+  const [restartNonce, setRestartNonce] = useState(0);
   const [selectedInventoryPowerUps, setSelectedInventoryPowerUps] = useState<PowerUpInventory>(() =>
     emptyPowerUpInventory(),
   );
@@ -917,17 +919,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
   function generateShuffleAtoms(): number[] {
     const hi = Math.max(2, level.targetElement - SHUFFLE_OFFSET_MIN);
     const lo = Math.max(1, level.targetElement - SHUFFLE_OFFSET_MAX);
-    const discovered = discoveredElements
-      .filter((atom, index, atoms) => atom >= lo && atom <= hi && atoms.indexOf(atom) === index)
-      .sort((a, b) => a - b);
-    const candidates =
-      discovered.length > 0
-        ? discovered
-        : discoveredElements
-            .filter((atom, index, atoms) => atom > 0 && atoms.indexOf(atom) === index)
-            .sort((a, b) => a - b);
-    const pool = candidates.length > 0 ? candidates : [1];
-    return Array.from({ length: SHUFFLE_COUNT }, () => pool[Math.floor(Math.random() * pool.length)]);
+    return Array.from({ length: SHUFFLE_COUNT }, () => randomAvailableElement(hi, lo));
   }
 
   const target = level.targetElement;
@@ -1115,6 +1107,18 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     onExit();
   }
 
+  function restartLevel() {
+    clearSavedRun();
+    setPaused(false);
+    setSettingsOpen(false);
+    setGameOver(false);
+    setWon(false);
+    setWinChoice(null);
+    setContinueClaimPromptOpen(false);
+    setContinuingPastTarget(false);
+    setRestartNonce((nonce) => nonce + 1);
+  }
+
   useEffect(() => {
     if (isMoleculeChallenge || !compoundEnabled) return;
     if (paused || settingsOpen || inventoryPickerOpen) return;
@@ -1243,7 +1247,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     ].slice(0, QUEUE_SIZE);
     const initialEGun = Array.from({ length: QUEUE_SIZE }, (_, i) => powerUpStage === "egun" && i === 0);
     const initialBlank = initialEGun.map(
-      (isEGun, i) => (powerUpStage === "blank" && i === 0) || (!isEGun && blankEnabled && Math.random() < BLANK_ATOM_CHANCE),
+      (isEGun) => powerUpStage === "blank" || (!isEGun && blankEnabled && Math.random() < BLANK_ATOM_CHANCE),
     );
     const initialShimmer = initialEGun.map(
       (isEGun, i) =>
@@ -1396,7 +1400,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
       );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [levelId, level.gridRows, level.gridCols, level.maxQueueElement, mode, resumeSavedRun, isMoleculeChallenge, isPowerUpStage, powerUpStage, moleculeObjective]);
+  }, [levelId, level.gridRows, level.gridCols, level.maxQueueElement, mode, resumeSavedRun, isMoleculeChallenge, isPowerUpStage, powerUpStage, moleculeObjective, restartNonce]);
 
   // Show a one-time tooltip the first time a shimmer atom appears in the queue.
   useEffect(() => {
@@ -1621,6 +1625,9 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     }
     if (powerUpStage === "fusion-jump") {
       return { atom: 17, shimmer: false, eGun: false, blank: false, unstable: false };
+    }
+    if (powerUpStage === "blank") {
+      return { atom: 1, shimmer: false, eGun: false, blank: true, unstable: false };
     }
     const plannedChallengeAtom = isMoleculeChallenge ? challengeQueuePlanRef.current.shift() : undefined;
     if (plannedChallengeAtom != null) {
@@ -2106,6 +2113,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
           boardStone(cx - gap, bromine.y),
           boardStone(cx + gap, bromine.y),
           boardStone(cx, bromine.y - gap),
+          boardStone(cx, bromine.y + gap),
         ];
       }
       case "queue-shuffle":
@@ -2524,7 +2532,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
     const upgradedAtoms = new Set<number>();
     const updated = balls.map((b) => {
       if (b.stoneHp != null || b.atom >= 118) return b;
-      if (distanceToSegment(b.x, b.y, start.x, start.y, end.x, end.y) > b.r + eGunR * 0.35)
+      if (distanceToSegment(b.x, b.y, start.x, start.y, end.x, end.y) > b.r + eGunR * 0.7)
         return b;
       hitIds.add(b.id);
       const atom = Math.min(118, b.atom + 1);
@@ -4102,7 +4110,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
   function loadStoneIntoLauncher() {
     setPendingStone(true);
     window.setTimeout(() => {
-      showTipForce(
+      showTip(
         "feature-stone-rule",
         "Stone loaded",
         "Three consecutive non-merging shots after the first 15 shots load a Stone. It will not merge, but it shoves nearby atoms and can be destroyed for bonus points.",
@@ -4227,7 +4235,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
           (b) =>
             b.stoneHp == null &&
             b.atom < 118 &&
-            distanceToSegment(b.x, b.y, start.x, start.y, end.x, end.y) <= b.r + eGunR * 0.35,
+            distanceToSegment(b.x, b.y, start.x, start.y, end.x, end.y) <= b.r + eGunR * 0.7,
         )
         .map((b) => b.id),
     );
@@ -4567,7 +4575,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
             if (compoundMode) return;
             if (grabMode) return;
             updateAimFromPointer(e.clientX, e.clientY);
-            shoot();
+            if (shootingStyle === "hold") shoot();
           }}
           style={{
             position: "relative",
@@ -4890,7 +4898,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
                     points={previewPath.map((p) => `${p.x},${p.y}`).join(" ")}
                     fill="none"
                     stroke="oklch(0.82 0.18 85)"
-                    strokeWidth={10}
+                    strokeWidth={20}
                     strokeLinecap="round"
                     opacity={0.18}
                   />
@@ -4898,7 +4906,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
                     points={previewPath.map((p) => `${p.x},${p.y}`).join(" ")}
                     fill="none"
                     stroke="oklch(0.92 0.2 90)"
-                    strokeWidth={4}
+                    strokeWidth={8}
                     strokeLinecap="round"
                     opacity={0.92}
                   />
@@ -4906,7 +4914,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
                     points={previewPath.map((p) => `${p.x},${p.y}`).join(" ")}
                     fill="none"
                     stroke="white"
-                    strokeWidth={1.5}
+                    strokeWidth={3}
                     strokeLinecap="round"
                     opacity={0.85}
                   />
@@ -4951,7 +4959,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
                 points={eGunBeamPath.map((p) => `${p.x},${p.y}`).join(" ")}
                 fill="none"
                 stroke="oklch(0.82 0.18 85)"
-                strokeWidth={14}
+                strokeWidth={28}
                 strokeLinecap="round"
                 opacity={0.24}
               />
@@ -4959,7 +4967,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
                 points={eGunBeamPath.map((p) => `${p.x},${p.y}`).join(" ")}
                 fill="none"
                 stroke="oklch(0.95 0.2 95)"
-                strokeWidth={5}
+                strokeWidth={10}
                 strokeLinecap="round"
                 opacity={0.95}
               />
@@ -4967,7 +4975,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
                 points={eGunBeamPath.map((p) => `${p.x},${p.y}`).join(" ")}
                 fill="none"
                 stroke="white"
-                strokeWidth={2}
+                strokeWidth={4}
                 strokeLinecap="round"
                 opacity={0.92}
               />
@@ -5010,12 +5018,31 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
 
           {/* LAUNCHER */}
           <div
+            role={shootingStyle === "press" ? "button" : undefined}
+            tabIndex={shootingStyle === "press" ? 0 : undefined}
+            aria-label={shootingStyle === "press" ? "Shoot queued atom" : undefined}
+            onPointerDown={(event) => {
+              if (shootingStyle !== "press") return;
+              event.stopPropagation();
+            }}
+            onPointerUp={(event) => {
+              if (shootingStyle !== "press") return;
+              event.stopPropagation();
+              shoot();
+            }}
+            onKeyDown={(event) => {
+              if (shootingStyle !== "press") return;
+              if (event.key !== "Enter" && event.key !== " ") return;
+              event.preventDefault();
+              shoot();
+            }}
             style={{
               position: "absolute",
               left: launcherX - projShotSize / 2,
               top: launcherY - projShotSize / 2,
               zIndex: 2,
-              pointerEvents: "none",
+              pointerEvents: shootingStyle === "press" ? "auto" : "none",
+              cursor: shootingStyle === "press" ? "pointer" : undefined,
               transform: `rotate(${aimDeg}deg)`,
               transformOrigin: "center center",
             }}
@@ -5462,9 +5489,14 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
           <InGameSettingsModal
             musicEnabled={musicEnabled}
             soundEnabled={soundEnabled}
+            shootingStyle={shootingStyle}
             onToggleMusic={toggleInGameMusic}
             onToggleSound={toggleSound}
+            onToggleShootingStyle={() =>
+              setShootingStyle((style) => (style === "hold" ? "press" : "hold"))
+            }
             onClose={() => setSettingsOpen(false)}
+            onRestart={restartLevel}
             onLeave={exitToMenu}
           />
         )}
@@ -5588,12 +5620,8 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
               setContinueClaimPromptOpen(false);
             }}
             onContinue={() => {
-              setContinuingPastTarget(true);
-              setContinueStartedElapsedMs((startedAt) => startedAt ?? elapsedMs);
-              hasClaimedUnusedInventoryRef.current = false;
-              setClaimedResultPowerUp(null);
-              setWinChoice(null);
-              setContinueClaimPromptOpen(false);
+              restartLevel();
+              return;
               spawnPopup("Keep going! Score mode 🚀");
             }}
           />
@@ -5851,7 +5879,7 @@ function InventoryStartModal({
           );
         })}
       </div>
-      <div style={{ display: "grid", gap: 8 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 8 }}>
         {availablePowerUps.map((id) => {
           const meta = POWER_UP_INVENTORY_META[id];
           const selectedAmount = selected[id];
@@ -5865,10 +5893,11 @@ function InventoryStartModal({
               disabled={disabled}
               style={{
                 display: "grid",
-                gridTemplateColumns: "36px 1fr auto",
+                gridTemplateRows: "auto auto",
                 alignItems: "center",
-                gap: 10,
-                padding: 10,
+                justifyItems: "center",
+                gap: 5,
+                padding: "9px 6px",
                 borderRadius: 12,
                 border: `1px solid ${isSelected ? "var(--accent)" : "var(--border)"}`,
                 background: isSelected
@@ -5877,25 +5906,19 @@ function InventoryStartModal({
                 color: "var(--foreground)",
                 opacity: disabled ? 0.55 : 1,
                 cursor: disabled ? "not-allowed" : "pointer",
-                textAlign: "left",
+                textAlign: "center",
               }}
             >
               <span style={{ display: "grid", placeItems: "center" }} aria-hidden="true">
                 <PowerUpBadge icon={id} size={34} />
               </span>
-              <span>
-                <span style={{ display: "block", fontWeight: 900, fontSize: 13 }}>{meta.name}</span>
-                <span style={{ display: "block", color: "var(--muted-foreground)", fontSize: 11 }}>
-                  {meta.description}
-                </span>
-              </span>
               <span
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  justifyContent: "flex-end",
+                  justifyContent: "center",
                   gap: 6,
-                  minWidth: 76,
+                  minWidth: 0,
                   color: isSelected ? "var(--accent)" : "var(--muted-foreground)",
                   fontWeight: 900,
                   fontVariantNumeric: "tabular-nums",
@@ -6497,9 +6520,7 @@ function ContinueChoiceModal({
           margin: "0 0 14px",
         }}
       >
-        {isContinuing
-          ? "You can finish the level now, or close this popup and keep chasing a higher score. The danger zone will keep rising every 30 seconds."
-          : "Claim your stars now, or keep playing to chase a higher score. The level is already complete either way."}
+        The level is clear. Finish the stage, or restart this level and try a cleaner run.
       </p>
       {stars > 0 && (
         <div
@@ -6523,7 +6544,7 @@ function ContinueChoiceModal({
           onClick={onContinue}
           style={{ ...modalBtn, background: "var(--surface-high)", color: "var(--foreground)" }}
         >
-          {isContinuing ? "Continue" : "Keep Playing"}
+          Restart
         </button>
         <button onClick={onClaim} style={modalBtn}>
           Finish Level
@@ -6874,16 +6895,22 @@ function ResultStat({ label, value, color }: { label: string; value: string; col
 function InGameSettingsModal({
   musicEnabled,
   soundEnabled,
+  shootingStyle,
   onToggleMusic,
   onToggleSound,
+  onToggleShootingStyle,
   onClose,
+  onRestart,
   onLeave,
 }: {
   musicEnabled: boolean;
   soundEnabled: boolean;
+  shootingStyle: "hold" | "press";
   onToggleMusic: () => void;
   onToggleSound: () => void;
+  onToggleShootingStyle: () => void;
   onClose: () => void;
+  onRestart: () => void;
   onLeave: () => void;
 }) {
   return (
@@ -6907,17 +6934,39 @@ function InGameSettingsModal({
             <small style={settingsLabelSubtext}>Shot, merge, and win effects</small>
           </span>
         </label>
+        <label style={settingsCheckRow}>
+          <input
+            type="checkbox"
+            checked={shootingStyle === "press"}
+            onChange={onToggleShootingStyle}
+          />
+          <span style={settingsLabelText}>
+            <strong>Shooting: {shootingStyle === "hold" ? "Hold" : "Press"}</strong>
+            <small style={settingsLabelSubtext}>
+              {shootingStyle === "hold"
+                ? "Aim and release to shoot"
+                : "Aim on the board, then press the queued atom"}
+            </small>
+          </span>
+        </label>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10, marginTop: 16 }}>
+        <button type="button" onClick={onClose} style={{ ...modalBtn, marginTop: 0 }}>
+          Resume
+        </button>
+        <button
+          type="button"
+          onClick={onRestart}
+          style={{ ...modalBtn, marginTop: 0, background: "var(--surface)", color: "var(--foreground)" }}
+        >
+          Restart
+        </button>
         <button
           type="button"
           onClick={onLeave}
           style={{ ...modalBtn, marginTop: 0, background: "var(--surface-high)", color: "var(--foreground)" }}
         >
           Leave game
-        </button>
-        <button type="button" onClick={onClose} style={{ ...modalBtn, marginTop: 0 }}>
-          Resume
         </button>
       </div>
     </Modal>

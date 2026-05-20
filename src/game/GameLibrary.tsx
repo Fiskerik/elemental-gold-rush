@@ -11,7 +11,10 @@ interface Props {
 
 export function GameLibrary({ onBack }: Props) {
   const unlockedLevel = useProgress((s) => s.unlockedLevel);
-  const [tab, setTab] = useState<"challenges" | "powerups">("challenges");
+  const [tab, setTab] = useState<"challenges" | "powerups">("powerups");
+  const powerUpsByOccurrence = [...POWER_UPS].sort(
+    (a, b) => POWER_UP_OCCURRENCE[a.icon] - POWER_UP_OCCURRENCE[b.icon],
+  );
 
   return (
     <div className="app-shell" style={{ padding: 20, paddingTop: 32, minHeight: "100dvh" }}>
@@ -33,16 +36,16 @@ export function GameLibrary({ onBack }: Props) {
 
         <div style={tabBar}>
           <button
-            onClick={() => setTab("challenges")}
-            style={{ ...tabBtn, ...(tab === "challenges" ? tabBtnActive : {}) }}
-          >
-            Challenges
-          </button>
-          <button
             onClick={() => setTab("powerups")}
             style={{ ...tabBtn, ...(tab === "powerups" ? tabBtnActive : {}) }}
           >
             Power-Ups
+          </button>
+          <button
+            onClick={() => setTab("challenges")}
+            style={{ ...tabBtn, ...(tab === "challenges" ? tabBtnActive : {}) }}
+          >
+            Challenges
           </button>
         </div>
 
@@ -80,7 +83,7 @@ export function GameLibrary({ onBack }: Props) {
         {tab === "powerups" && (
           <section style={sectionCard}>
             <div style={{ display: "grid", gap: 12 }}>
-            {POWER_UPS.map((powerUp) => (
+            {powerUpsByOccurrence.map((powerUp) => (
               <article key={powerUp.name} style={rowCard}>
                 <div style={iconWrap}>
                   <PowerUpBadge icon={powerUp.icon} size={46} />
@@ -113,6 +116,23 @@ const CHALLENGE_ICONS: Record<string, LucideIcon> = {
   "noble-gas-lock": LockKeyhole,
   "gold-rush-timer": Clock,
   "isotope-decay": Atom,
+};
+
+const POWER_UP_OCCURRENCE: Record<string, number> = {
+  molecule: 1,
+  shimmer: 3,
+  unstable: 6,
+  grab: 8,
+  egun: 11,
+  gravity: 13,
+  stone: 17,
+  transmute: 19,
+  "fusion-jump": 22,
+  catalyst: 24,
+  emission: 27,
+  gamma: 29,
+  blank: 32,
+  "queue-shuffle": 34,
 };
 
 const CHALLENGE_ICON_STYLES: Record<string, { color: string; background: string; glow: string }> = {

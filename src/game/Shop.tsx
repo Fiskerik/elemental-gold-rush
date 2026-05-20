@@ -206,7 +206,7 @@ export function Shop({ onBack }: { onBack: () => void }) {
                   }}
                 >
                   <GoldCoinIcon size={28} />
-                  <strong>{`${pack.coins} coin${pack.coins === 1 ? "" : "s"}`}</strong>
+                  <strong style={coinPackAmount}>{pack.coins}x</strong>
                   <span>{pack.pointCost.toLocaleString()} pts</span>
                 </button>
               );
@@ -404,6 +404,11 @@ const coinPackButton: React.CSSProperties = {
   color: "var(--foreground)",
   fontSize: 11,
   fontWeight: 800,
+};
+
+const coinPackAmount: React.CSSProperties = {
+  color: "oklch(0.86 0.17 84)",
+  fontSize: 13,
 };
 
 const smallButton: React.CSSProperties = {
