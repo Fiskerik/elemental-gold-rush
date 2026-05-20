@@ -385,11 +385,14 @@ function compoundFormationScore(
   compound: CompoundDefinition,
   atoms: { atom: number; unstableShots?: number | null }[],
 ): number {
-  const atomWeight = atoms.reduce(
-    (sum, atom) => sum + Math.max(1, atom.atom) * (isActiveIsotope(atom) ? 2 : 1),
+  // Base bonus is precomputed in compounds.ts (clamped to 1,000–20,000).
+  // Active unstable atoms still earn a small multiplier bonus.
+  const isotopeCount = atoms.reduce(
+    (count, atom) => count + (isActiveIsotope(atom) ? 1 : 0),
     0,
   );
-  return compound.bonusScore + atomWeight * 125;
+  const multiplier = 1 + isotopeCount * 0.2;
+  return Math.min(20000, Math.round(compound.bonusScore * multiplier));
 }
 
 const stoneBackground =
