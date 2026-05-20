@@ -673,6 +673,18 @@ const weeklyReward: CSSProperties = {
   color: "oklch(0.86 0.17 84)",
 };
 
+function formatResetCountdown(now: Date = new Date()): string {
+  const next = new Date(now);
+  next.setHours(24, 0, 0, 0);
+  const diff = Math.max(0, next.getTime() - now.getTime());
+  const totalSec = Math.floor(diff / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(h)}:${pad(m)}:${pad(s)}`;
+}
+
 function GoldCoinIcon({ size = 14 }: { size?: number }) {
   return (
     <span
