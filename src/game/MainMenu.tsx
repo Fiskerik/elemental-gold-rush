@@ -57,6 +57,7 @@ export function MainMenu({
     hasProPack,
     refreshDailyLab,
     claimDailyReward,
+    claimWeeklyPlayBonus,
   } = useProgress();
   const highestEl = ELEMENTS[highestElement - 1];
   const nextLevel = getLevelById(unlockedLevel) ?? LEVELS[LEVELS.length - 1];
@@ -69,6 +70,14 @@ export function MainMenu({
     null,
   );
   const dailyRewardToastTimeoutRef = useRef<number | null>(null);
+  const [resetCountdown, setResetCountdown] = useState<string>(() => formatResetCountdown());
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setResetCountdown(formatResetCountdown());
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, []);
 
   useEffect(() => {
     refreshDailyLab();
@@ -99,6 +108,14 @@ export function MainMenu({
     if (!dailyComplete || claimedDailyReward) return;
     claimDailyReward();
     showDailyRewardToast("+2 gold coins claimed");
+  }
+
+  function handleWeeklyDayClaim() {
+    if (weeklyBonus.todayClaimed) return;
+    const result = claimWeeklyPlayBonus();
+    if (!result) return;
+    const bonusText = result.bonusAwarded > 0 ? ` (+${result.bonusAwarded} streak bonus)` : "";
+    showDailyRewardToast(`+${result.coinsAwarded} gold coin${result.coinsAwarded === 1 ? "" : "s"}${bonusText}`);
   }
 
   return (
@@ -247,6 +264,9 @@ export function MainMenu({
               </div>
               <div style={{ fontSize: 11, color: "var(--muted-foreground)", marginTop: 2 }}>
                 Complete 4 of 6 quests to claim 2 gold coins.
+              </div>
+              <div style={{ fontSize: 10, color: "var(--accent)", marginTop: 4, fontWeight: 800, letterSpacing: 0.6 }}>
+                Resets in {resetCountdown}
               </div>
             </div>
             <button
