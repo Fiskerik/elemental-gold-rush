@@ -262,7 +262,16 @@ export function Collection({ onBack }: { onBack: () => void }) {
                           <div
                             style={{ fontSize: 22, filter: unlocked ? undefined : "grayscale(1)" }}
                           >
-                            {badge.icon}
+                            {badge.iconLucide ? (
+                              <badge.iconLucide
+                                size={22}
+                                strokeWidth={2}
+                                aria-hidden="true"
+                                color={unlocked ? "var(--accent)" : "var(--muted-foreground)"}
+                              />
+                            ) : (
+                              badge.icon
+                            )}
                           </div>
                           <div>
                             <div style={{ fontSize: 12, fontWeight: 800 }}>{badge.name}</div>

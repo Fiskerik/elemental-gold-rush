@@ -1,5 +1,7 @@
 export type CompoundRarity = "common" | "uncommon" | "rare";
 
+import { ELEMENTS } from "./elements";
+
 export interface CompoundDefinition {
   id: string;
   name: string;
@@ -33,20 +35,55 @@ function compound(
   name: string,
   formula: string,
   elements: Record<string, number>,
-  bonusScore: number,
+  _legacyBonusScore: number,
   rarity: CompoundRarity,
   fact: string,
 ): CompoundDefinition {
+  void _legacyBonusScore;
   return {
     id,
     name,
     formula,
     elements,
     totalAtoms: Object.values(elements).reduce((sum, count) => sum + count, 0),
-    bonusScore,
+    bonusScore: computeCompoundBaseScore(elements),
     rarity,
     fact,
   };
+}
+
+const SYMBOL_TO_ATOMIC = new Map<string, number>(
+  ELEMENTS.map((e) => [e.symbol, e.atomicNumber] as const),
+);
+
+/**
+ * Compute the base bonus score awarded for forming a compound, clamped to
+ * the 1,000–20,000 range. Considers four factors:
+ *   - sum of atomic numbers of all atoms in the molecule
+ *   - total number of atoms
+ *   - highest atomic number present
+ *   - number of distinct element types
+ */
+export function computeCompoundBaseScore(elements: Record<string, number>): number {
+  let sumAtomic = 0;
+  let totalAtoms = 0;
+  let maxAtomic = 0;
+  let unique = 0;
+  for (const [symbol, count] of Object.entries(elements)) {
+    if (!count) continue;
+    const z = SYMBOL_TO_ATOMIC.get(symbol) ?? 0;
+    sumAtomic += z * count;
+    totalAtoms += count;
+    if (z > maxAtomic) maxAtomic = z;
+    unique += 1;
+  }
+  const raw =
+    sumAtomic * 30 +
+    totalAtoms * 150 +
+    maxAtomic * 80 +
+    Math.max(0, unique - 1) * 1200;
+  const rounded = Math.round(raw / 50) * 50;
+  return Math.max(1000, Math.min(20000, rounded));
 }
 
 export const COMPOUNDS: CompoundDefinition[] = [

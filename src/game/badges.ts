@@ -1,4 +1,18 @@
 import { ELEMENTS } from "./elements";
+import {
+  Atom,
+  Award,
+  Beaker,
+  Crown,
+  FlaskConical,
+  Hexagon,
+  Layers,
+  Mountain,
+  Sprout,
+  Trophy,
+  Zap,
+  type LucideIcon,
+} from "lucide-react";
 
 export type BadgeGroup = "milestones" | "families" | "periods" | "mastery";
 
@@ -7,6 +21,7 @@ export interface BadgeDefinition {
   name: string;
   description: string;
   icon: string;
+  iconLucide?: LucideIcon;
   group: BadgeGroup;
   requiredAtomicNumbers: number[];
 }
@@ -47,6 +62,7 @@ export const BADGES: BadgeDefinition[] = [
     name: "First Row",
     description: "Discover Hydrogen and Helium.",
     icon: "H",
+    iconLucide: Atom,
     requiredAtomicNumbers: byPeriod(1),
   },
   {
@@ -79,6 +95,7 @@ export const BADGES: BadgeDefinition[] = [
     name: "Reactive Core",
     description: "Discover every reactive nonmetal.",
     icon: "Rx",
+    iconLucide: Zap,
     requiredAtomicNumbers: byCategory("reactive-nonmetal"),
   },
   {
@@ -87,6 +104,7 @@ export const BADGES: BadgeDefinition[] = [
     name: "Soft Metals",
     description: "Discover every post-transition metal.",
     icon: "Sn",
+    iconLucide: Layers,
     requiredAtomicNumbers: byCategory("post-transition"),
   },
   {
@@ -95,6 +113,7 @@ export const BADGES: BadgeDefinition[] = [
     name: "Coinage Metals",
     description: "Discover Copper, Silver, and Gold.",
     icon: "Au",
+    iconLucide: Crown,
     requiredAtomicNumbers: [29, 47, 79],
   },
   {
@@ -103,6 +122,7 @@ export const BADGES: BadgeDefinition[] = [
     name: "Carbon Family",
     description: "Discover every Group 14 element.",
     icon: "C",
+    iconLucide: Hexagon,
     requiredAtomicNumbers: byGroup(14),
   },
   {
@@ -111,6 +131,7 @@ export const BADGES: BadgeDefinition[] = [
     name: "Nitrogen Family",
     description: "Discover every Group 15 element.",
     icon: "N",
+    iconLucide: Sprout,
     requiredAtomicNumbers: byGroup(15),
   },
   {
@@ -119,6 +140,7 @@ export const BADGES: BadgeDefinition[] = [
     name: "Oxygen Family",
     description: "Discover every Group 16 element.",
     icon: "O",
+    iconLucide: Beaker,
     requiredAtomicNumbers: byGroup(16),
   },
   {
@@ -215,6 +237,7 @@ export const BADGES: BadgeDefinition[] = [
     name: "Full Period 5",
     description: "Discover every Period 5 element.",
     icon: "5",
+    iconLucide: FlaskConical,
     requiredAtomicNumbers: byPeriod(5),
   },
   {
@@ -223,6 +246,7 @@ export const BADGES: BadgeDefinition[] = [
     name: "Full Period 6",
     description: "Discover every Period 6 element, including lanthanides.",
     icon: "6",
+    iconLucide: FlaskConical,
     requiredAtomicNumbers: byPeriod(6),
   },
   {
@@ -231,6 +255,7 @@ export const BADGES: BadgeDefinition[] = [
     name: "Full Period 7",
     description: "Discover every Period 7 element, including actinides.",
     icon: "7",
+    iconLucide: FlaskConical,
     requiredAtomicNumbers: byPeriod(7),
   },
   {
@@ -271,6 +296,7 @@ export const BADGES: BadgeDefinition[] = [
     name: "Superheavy Scout",
     description: "Discover Hassium.",
     icon: "Hs",
+    iconLucide: Mountain,
     requiredAtomicNumbers: [108],
   },
   {
@@ -279,6 +305,7 @@ export const BADGES: BadgeDefinition[] = [
     name: "Table Finisher",
     description: "Discover Oganesson.",
     icon: "Og",
+    iconLucide: Trophy,
     requiredAtomicNumbers: [118],
   },
   {
@@ -295,6 +322,7 @@ export const BADGES: BadgeDefinition[] = [
     name: "Periodic Master",
     description: "Discover all 118 elements.",
     icon: "118",
+    iconLucide: Award,
     requiredAtomicNumbers: allElements(),
   },
 ];
