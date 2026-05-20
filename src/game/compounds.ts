@@ -98,6 +98,18 @@ export const COMPOUNDS: CompoundDefinition[] = [
   compound("nitric-acid", "Nitric Acid", "HNO₃", { H: 1, N: 1, O: 3 }, 3400, "rare", "Nitric acid is a strong oxidizing acid used to make fertilizers and explosives."),
   compound("sodium-carbonate", "Sodium Carbonate", "Na₂CO₃", { Na: 2, C: 1, O: 3 }, 3500, "rare", "Sodium carbonate, or soda ash, is used in glassmaking and cleaning products."),
   compound("ethanol", "Ethanol", "C₂H₆O", { C: 2, H: 6, O: 1 }, 3600, "rare", "Ethanol is the alcohol in beverages and is also used as a fuel and solvent."),
+  compound("titanium-dioxide", "Titanium Dioxide", "TiO₂", { Ti: 1, O: 2 }, 2400, "uncommon", "Titanium dioxide is the bright white pigment in paint, toothpaste, and sunscreen."),
+compound("zinc-oxide", "Zinc Oxide", "ZnO", { Zn: 1, O: 1 }, 2300, "uncommon", "Zinc oxide is used in diaper rash cream, calamine lotion, and sunscreen."),
+compound("aluminum-oxide", "Aluminum Oxide", "Al₂O₃", { Al: 2, O: 3 }, 2800, "uncommon", "Aluminum oxide (alumina) is extremely hard and used in sandpaper and many gemstones like sapphire."),
+compound("ethylene", "Ethylene", "C₂H₄", { C: 2, H: 4 }, 2200, "uncommon", "Ethylene is the gas that makes fruit ripen faster (bananas in a bag trick)."),
+compound("acetylene", "Acetylene", "C₂H₂", { C: 2, H: 2 }, 2400, "uncommon", "Acetylene is the gas used in oxy-acetylene welding torches."),
+compound("formaldehyde", "Formaldehyde", "CH₂O", { C: 1, H: 2, O: 1 }, 2500, "uncommon", "Formaldehyde is used to preserve biological specimens and as a disinfectant."),
+compound("urea", "Urea", "CH₄N₂O", { C: 1, H: 4, N: 2, O: 1 }, 3100, "rare", "Urea is found in urine and is a major nitrogen fertilizer."),
+compound("ammonium-nitrate", "Ammonium Nitrate", "N₂H₄O₃", { N: 2, H: 4, O: 3 }, 3400, "rare", "Ammonium nitrate is a common fertilizer and was used in the Beirut explosion."),
+compound("potassium-chloride", "Potassium Chloride", "KCl", { K: 1, Cl: 1 }, 2100, "common", "Potassium chloride is a salt substitute used by people on low-sodium diets."),
+compound("magnesium-sulfate", "Magnesium Sulfate", "MgSO₄", { Mg: 1, S: 1, O: 4 }, 3200, "rare", "Magnesium sulfate is Epsom salt, used in baths to soothe sore muscles."),
+compound("calcium-sulfate", "Calcium Sulfate", "CaSO₄", { Ca: 1, S: 1, O: 4 }, 3100, "rare", "Calcium sulfate is the main ingredient in plaster and gypsum drywall."),
+
 ];
 
 export function compoundKey(elements: Record<string, number>): string {
@@ -165,6 +177,17 @@ export const COMPOUND_HINTS: Record<string, string> = {
   "nitric-acid": "A strong acid with hydrogen, nitrogen, and three oxygens.",
   "sodium-carbonate": "A soda-ash compound used in glass and cleaning.",
   "ethanol": "A two-carbon alcohol with six hydrogens and one oxygen.",
+  "titanium-dioxide": "The bright white powder used in sunscreen, toothpaste, and most white paint.",
+  "zinc-oxide": "A white compound famous for diaper rash creams, calamine lotion, and sunscreen.",
+  "aluminum-oxide": "An extremely hard mineral found in sandpaper and beautiful gemstones like sapphire.",
+  "ethylene": "The natural gas that makes bananas and other fruits ripen faster.",
+  "acetylene": "The fuel gas used in bright, high-temperature welding torches.",
+  "formaldehyde": "A strong-smelling gas used to preserve specimens in biology labs.",
+  "urea": "The main nitrogen waste product found in urine and used as fertilizer.",
+  "ammonium-nitrate": "A powerful fertilizer that can also cause massive explosions when mishandled.",
+  "potassium-chloride": "A salt used as a sodium-free substitute for people with high blood pressure.",
+  "magnesium-sulfate": "Better known as Epsom salt, used in relaxing baths for sore muscles.",
+  "calcium-sulfate": "The main ingredient in plaster, gypsum boards, and blackboard chalk.",
 };
 
 export const COMPOUND_STRUCTURES: Record<string, CompoundStructure> = {
@@ -292,6 +315,169 @@ export const COMPOUND_STRUCTURES: Record<string, CompoundStructure> = {
     atoms: [{ symbol: "H", x: -0.28, y: 0 }, { symbol: "H", x: 0.28, y: 0 }],
     bonds: [{ from: 0, to: 1 }],
   },
+  Here are the CompoundStructure definitions for all the new compounds I suggested, designed to match the style and coordinate system of your existing ones.
+Ready-to-paste Code:
+TypeScriptexport const COMPOUND_STRUCTURES: Record<string, CompoundStructure> = {
+  ... // your existing structures
+
+  "titanium-dioxide": {
+    atoms: [
+      { symbol: "O", x: -0.55, y: 0 },
+      { symbol: "Ti", x: 0, y: 0 },
+      { symbol: "O", x: 0.55, y: 0 }
+    ],
+    bonds: [
+      { from: 0, to: 1, order: 2 },
+      { from: 1, to: 2, order: 2 }
+    ]
+  },
+  "zinc-oxide": {
+    atoms: [
+      { symbol: "Zn", x: -0.32, y: 0 },
+      { symbol: "O", x: 0.32, y: 0 }
+    ],
+    bonds: [{ from: 0, to: 1 }]
+  },
+  "aluminum-oxide": {
+    atoms: [
+      { symbol: "Al", x: -0.45, y: -0.25 },
+      { symbol: "O", x: 0, y: 0.4 },
+      { symbol: "Al", x: 0.45, y: -0.25 },
+      { symbol: "O", x: -0.25, y: -0.45 },
+      { symbol: "O", x: 0.25, y: -0.45 }
+    ],
+    bonds: [
+      { from: 0, to: 1 },
+      { from: 0, to: 3 },
+      { from: 2, to: 1 },
+      { from: 2, to: 4 }
+    ]
+  },
+  "ethylene": {
+    atoms: [
+      { symbol: "C", x: -0.35, y: 0 },
+      { symbol: "C", x: 0.35, y: 0 },
+      { symbol: "H", x: -0.65, y: 0.35 },
+      { symbol: "H", x: -0.65, y: -0.35 },
+      { symbol: "H", x: 0.65, y: 0.35 },
+      { symbol: "H", x: 0.65, y: -0.35 }
+    ],
+    bonds: [
+      { from: 0, to: 1, order: 2 },
+      { from: 0, to: 2 },
+      { from: 0, to: 3 },
+      { from: 1, to: 4 },
+      { from: 1, to: 5 }
+    ]
+  },
+  "acetylene": {
+    atoms: [
+      { symbol: "H", x: -0.65, y: 0 },
+      { symbol: "C", x: -0.25, y: 0 },
+      { symbol: "C", x: 0.25, y: 0 },
+      { symbol: "H", x: 0.65, y: 0 }
+    ],
+    bonds: [
+      { from: 0, to: 1 },
+      { from: 1, to: 2, order: 3 },
+      { from: 2, to: 3 }
+    ]
+  },
+  "formaldehyde": {
+    atoms: [
+      { symbol: "C", x: 0, y: 0 },
+      { symbol: "O", x: 0.55, y: 0 },
+      { symbol: "H", x: -0.45, y: 0.35 },
+      { symbol: "H", x: -0.45, y: -0.35 }
+    ],
+    bonds: [
+      { from: 0, to: 1, order: 2 },
+      { from: 0, to: 2 },
+      { from: 0, to: 3 }
+    ]
+  },
+  "urea": {
+    atoms: [
+      { symbol: "C", x: 0, y: 0 },
+      { symbol: "O", x: 0, y: -0.55 },
+      { symbol: "N", x: -0.55, y: 0.3 },
+      { symbol: "N", x: 0.55, y: 0.3 },
+      { symbol: "H", x: -0.85, y: 0.55 },
+      { symbol: "H", x: -0.45, y: 0.7 },
+      { symbol: "H", x: 0.45, y: 0.7 },
+      { symbol: "H", x: 0.85, y: 0.55 }
+    ],
+    bonds: [
+      { from: 0, to: 1, order: 2 },
+      { from: 0, to: 2 },
+      { from: 0, to: 3 },
+      { from: 2, to: 4 },
+      { from: 2, to: 5 },
+      { from: 3, to: 6 },
+      { from: 3, to: 7 }
+    ]
+  },
+  "ammonium-nitrate": {
+    atoms: [
+      { symbol: "N", x: -0.4, y: 0 },      // Ammonium nitrogen
+      { symbol: "H", x: -0.75, y: -0.25 },
+      { symbol: "H", x: -0.75, y: 0.25 },
+      { symbol: "H", x: -0.25, y: -0.45 },
+      { symbol: "H", x: -0.25, y: 0.45 },
+      { symbol: "N", x: 0.45, y: 0 },      // Nitrate nitrogen
+      { symbol: "O", x: 0.8, y: 0.35 },
+      { symbol: "O", x: 0.8, y: -0.35 },
+      { symbol: "O", x: 0.2, y: 0 }
+    ],
+    bonds: [
+      { from: 0, to: 1 }, { from: 0, to: 2 },
+      { from: 0, to: 3 }, { from: 0, to: 4 },
+      { from: 5, to: 6, order: 2 },
+      { from: 5, to: 7, order: 2 },
+      { from: 5, to: 8 }
+    ]
+  },
+  "potassium-chloride": {
+    atoms: [
+      { symbol: "K", x: -0.32, y: 0 },
+      { symbol: "Cl", x: 0.32, y: 0 }
+    ],
+    bonds: [{ from: 0, to: 1 }]
+  },
+  "magnesium-sulfate": {
+    atoms: [
+      { symbol: "Mg", x: -0.65, y: 0 },
+      { symbol: "S", x: 0, y: 0 },
+      { symbol: "O", x: 0.35, y: 0.45 },
+      { symbol: "O", x: 0.35, y: -0.45 },
+      { symbol: "O", x: -0.35, y: 0.45 },
+      { symbol: "O", x: -0.35, y: -0.45 }
+    ],
+    bonds: [
+      { from: 0, to: 1 },
+      { from: 1, to: 2, order: 2 },
+      { from: 1, to: 3, order: 2 },
+      { from: 1, to: 4 },
+      { from: 1, to: 5 }
+    ]
+  },
+  "calcium-sulfate": {
+    atoms: [
+      { symbol: "Ca", x: -0.65, y: 0 },
+      { symbol: "S", x: 0, y: 0 },
+      { symbol: "O", x: 0.4, y: 0.4 },
+      { symbol: "O", x: 0.4, y: -0.4 },
+      { symbol: "O", x: -0.3, y: 0.5 },
+      { symbol: "O", x: -0.3, y: -0.5 }
+    ],
+    bonds: [
+      { from: 0, to: 1 },
+      { from: 1, to: 2, order: 2 },
+      { from: 1, to: 3, order: 2 },
+      { from: 1, to: 4 },
+      { from: 1, to: 5 }
+    ]
+  }
 };
 
 export function getCompoundHint(compound: CompoundDefinition): string {
