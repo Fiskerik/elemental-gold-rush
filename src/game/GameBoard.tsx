@@ -2846,7 +2846,7 @@ export function GameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "camp
           return prev;
         });
         if (powerUpStage === "stone") {
-          completePowerUpStage("stone", score);
+          completePowerUpStageAfterDelay("stone", score);
           return;
         }
         setBusy(false);
@@ -3333,12 +3333,7 @@ export function GameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "camp
         if (powerUpStageResolved) {
           setTransmuteStagePending(false);
           setQueueShuffleStagePending(false);
-          const delayedStages: PowerUpStageId[] = ["blank", "queue-shuffle", "transmute"];
-          if (powerUpStage && delayedStages.includes(powerUpStage)) {
-            completePowerUpStageAfterDelay(powerUpStage, nextScore);
-          } else {
-            completePowerUpStage(powerUpStage, nextScore);
-          }
+          completePowerUpStageAfterDelay(powerUpStage, nextScore);
           return;
         }
         if (powerUpStage === "fusion-jump" && nextShots >= 5) {
@@ -3796,7 +3791,7 @@ export function GameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "camp
     spawnPopup("☢ QUEUE +1");
     reportQuestProgress({ discoveries, reachedAtomicNumbers });
     haptic([25, 45, 25]);
-    if (powerUpStage === "emission") completePowerUpStage("emission", score);
+    if (powerUpStage === "emission") completePowerUpStageAfterDelay("emission", score);
   }
 
   function triggerGravityPowerUp() {
@@ -4088,7 +4083,7 @@ export function GameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "camp
       });
     }
     if (powerUpStage === "grab" && result.merges.length > 0) {
-      completePowerUpStage("grab", nextScore);
+      completePowerUpStageAfterDelay("grab", nextScore);
       return;
     }
     reportQuestProgress({
