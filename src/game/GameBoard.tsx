@@ -56,6 +56,7 @@ interface Props {
   levelId: number;
   onExit: () => void;
   onWin: (nextId: number | null) => void;
+  onMap?: () => void;
   mode?: GameModeId;
   resumeSavedRun?: boolean;
 }
@@ -630,7 +631,7 @@ function calculateStars(
 
 }
 
-export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSavedRun = false }: Props) {
+export function GameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "campaign", resumeSavedRun = false }: Props) {
   const level = getLevelById(levelId) ?? LEVELS[0];
   const gameMode = getGameMode(mode);
   const shimmerEnabled = level.id >= SHIMMER_MIN_LEVEL;
@@ -1761,7 +1762,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
   function completePowerUpStage(stage: PowerUpStageId | undefined = powerUpStage, scoreOverride = score) {
     if (!stage || powerUpStageCompletedRef.current || won || gameOver) return;
     powerUpStageCompletedRef.current = true;
-    const stars = 1;
+    const stars = 3;
     const clearScore = scoreOverride + CHALLENGE_CLEAR_SCORE;
     setScore(clearScore);
     addScore(CHALLENGE_CLEAR_SCORE);
@@ -3712,7 +3713,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
       setDiscoveryCompound({ compound: matchingCompound, isNew: wasNew, count: nextCount, bonusScore });
       if (isMoleculeChallenge && moleculeObjective && matchingCompound.id === moleculeObjective.id) {
         const timeSec = (Date.now() - startTimeRef.current) / 1000;
-        const stars = calculateStars(level, score + bonusScore, shots, runBestCombo, timeSec);
+        const stars = 3;
         setEarnedStars(stars);
         setLevelStars(levelId, stars);
         reportQuestProgress({ levelCleared: true, starsEarned: stars });
@@ -5681,7 +5682,7 @@ export function GameBoard({ levelId, onExit, onWin, mode = "campaign", resumeSav
             onClaimPowerUp={claimResultPowerUp}
             onDiscoveryClick={setDiscoveryEl}
             onMain={onExit}
-            onNext={onExit}
+            onNext={onMap}
             nextLabel="Map"
           />
         )}

@@ -110,6 +110,7 @@ function Index() {
           mode={screen.mode}
           resumeSavedRun={screen.resumeSavedRun}
           onExit={() => setScreen({ name: "menu" })}
+          onMap={() => setScreen({ name: "levels" })}
           onWin={(nextId) => {
             if (nextId) setScreen({ name: "game", levelId: nextId, mode: screen.mode ?? "campaign" });
             else setScreen({ name: "menu" });
