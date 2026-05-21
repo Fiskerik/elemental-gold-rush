@@ -122,6 +122,7 @@ interface ProgressState {
   grantGoldCoins: (coins: number) => void;
   setHighestElement: (n: number) => void;
   refreshDailyLab: () => void;
+  claimWeeklyPlayBonus: () => { coinsAwarded: number; bonusAwarded: number } | null;
   reportQuestProgress: (event: QuestProgressEvent) => void;
   claimDailyReward: () => void;
   setBestCombo: (combo: number) => void;
@@ -235,13 +236,32 @@ export const useProgress = create<ProgressState>()(
       setHighestElement: (n) => set((s) => ({ highestElement: Math.max(s.highestElement, n) })),
       refreshDailyLab: () =>
         set((s) => {
-          const weekly = claimWeeklyPlayBonus(s.weeklyPlayBonus);
+          // Refresh the daily quests for today, but do NOT auto-claim the
+          // weekly play-bonus coin. The user must explicitly click today's
+          // day on the streak grid to claim it.
           return {
             ...refreshDailyQuests(s.dailyQuestDate, s.dailyQuests, s.claimedDailyReward),
+          };
+        }),
+      claimWeeklyPlayBonus: () => {
+        let result: { coinsAwarded: number; bonusAwarded: number } | null = null;
+        set((s) => {
+          const weekly = claimWeeklyPlayBonus(s.weeklyPlayBonus);
+          if (weekly.coinsAwarded <= 0) {
+            result = null;
+            return s;
+          }
+          result = {
+            coinsAwarded: weekly.coinsAwarded,
+            bonusAwarded: weekly.bonusAwarded,
+          };
+          return {
             weeklyPlayBonus: weekly.weeklyPlayBonus,
             goldCoins: s.goldCoins + weekly.coinsAwarded,
           };
-        }),
+        });
+        return result;
+      },
       reportQuestProgress: (event) =>
         set((s) => {
           const refreshed = refreshDailyQuests(

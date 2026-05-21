@@ -335,9 +335,9 @@ export const MOLECULE_CHALLENGE_BY_LEVEL: Record<number, string> = {
   35: "magnesium-chloride",
   40: "sulfuric-acid",
   45: "calcium-carbonate",
-  50: "sulfuric-acid",
-  55: "calcium-carbonate",
-  60: "sulfuric-acid",
+  50: "aluminum-oxide",
+  55: "calcium-sulfate",
+  60: "urea",
 };
 
 function makeAtomLevel(seed: LevelSeed, id: number, atomStage: number): Level {

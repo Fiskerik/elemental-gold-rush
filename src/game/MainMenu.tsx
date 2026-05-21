@@ -57,6 +57,7 @@ export function MainMenu({
     hasProPack,
     refreshDailyLab,
     claimDailyReward,
+    claimWeeklyPlayBonus,
   } = useProgress();
   const highestEl = ELEMENTS[highestElement - 1];
   const nextLevel = getLevelById(unlockedLevel) ?? LEVELS[LEVELS.length - 1];
@@ -69,6 +70,14 @@ export function MainMenu({
     null,
   );
   const dailyRewardToastTimeoutRef = useRef<number | null>(null);
+  const [resetCountdown, setResetCountdown] = useState<string>(() => formatResetCountdown());
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setResetCountdown(formatResetCountdown());
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, []);
 
   useEffect(() => {
     refreshDailyLab();
@@ -99,6 +108,14 @@ export function MainMenu({
     if (!dailyComplete || claimedDailyReward) return;
     claimDailyReward();
     showDailyRewardToast("+2 gold coins claimed");
+  }
+
+  function handleWeeklyDayClaim() {
+    if (weeklyBonus.todayClaimed) return;
+    const result = claimWeeklyPlayBonus();
+    if (!result) return;
+    const bonusText = result.bonusAwarded > 0 ? ` (+${result.bonusAwarded} streak bonus)` : "";
+    showDailyRewardToast(`+${result.coinsAwarded} gold coin${result.coinsAwarded === 1 ? "" : "s"}${bonusText}`);
   }
 
   return (
@@ -276,6 +293,9 @@ export function MainMenu({
               <div style={{ fontSize: 11, color: "var(--muted-foreground)", marginTop: 2 }}>
                 Complete 4 of 6 quests to claim 2 gold coins.
               </div>
+              <div style={{ fontSize: 10, color: "var(--accent)", marginTop: 4, fontWeight: 800, letterSpacing: 0.6 }}>
+                Resets in {resetCountdown}
+              </div>
             </div>
             <div style={weeklyBonusPill}>
               {weeklyBonus.todayClaimed ? `Today +${weeklyBonus.coinsEarnedToday}` : "Play today +1"}
@@ -305,8 +325,11 @@ export function MainMenu({
             </div>
             <div style={weeklyDayGrid}>
               {weeklyBonus.days.map((day) => (
-                <div
+                <button
                   key={day.index}
+                  type="button"
+                  onClick={day.isToday && !weeklyBonus.todayClaimed ? handleWeeklyDayClaim : undefined}
+                  disabled={!(day.isToday && !weeklyBonus.todayClaimed)}
                   style={{
                     ...weeklyDayCell,
                     borderColor: day.claimed
@@ -315,6 +338,16 @@ export function MainMenu({
                         ? "var(--primary)"
                         : "var(--border)",
                     color: day.claimed ? "var(--foreground)" : "var(--muted-foreground)",
+                    cursor: day.isToday && !weeklyBonus.todayClaimed ? "pointer" : "default",
+                    background:
+                      day.isToday && !weeklyBonus.todayClaimed
+                        ? "linear-gradient(135deg, color-mix(in oklch, var(--primary) 30%, var(--surface)), var(--surface))"
+                        : "var(--surface)",
+                    boxShadow:
+                      day.isToday && !weeklyBonus.todayClaimed
+                        ? "0 0 14px color-mix(in oklch, var(--primary) 50%, transparent)"
+                        : undefined,
+                    fontFamily: "inherit",
                   }}
                 >
                   <span>{day.label}</span>
@@ -322,8 +355,16 @@ export function MainMenu({
                     <GoldCoinIcon size={12} />
                     {day.index === 7 && <span>x5</span>}
                   </strong>
-                  <small>{day.claimed ? "Claimed" : day.isToday ? "Today" : "Next"}</small>
-                </div>
+                  <small>
+                    {day.claimed
+                      ? "Claimed"
+                      : day.isToday
+                        ? weeklyBonus.todayClaimed
+                          ? "Today"
+                          : "Claim"
+                        : "Next"}
+                  </small>
+                </button>
               ))}
             </div>
             <div style={{ fontSize: 10, color: "var(--muted-foreground)", lineHeight: 1.35 }}>
@@ -634,6 +675,18 @@ const weeklyReward: CSSProperties = {
   gap: 3,
   color: "oklch(0.86 0.17 84)",
 };
+
+function formatResetCountdown(now: Date = new Date()): string {
+  const next = new Date(now);
+  next.setHours(24, 0, 0, 0);
+  const diff = Math.max(0, next.getTime() - now.getTime());
+  const totalSec = Math.floor(diff / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(h)}:${pad(m)}:${pad(s)}`;
+}
 
 function GoldCoinIcon({ size = 14 }: { size?: number }) {
   return (
