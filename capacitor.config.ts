@@ -1,6 +1,6 @@
 const config = {
-  appId: "com.elementalgoldrush.game",
-  appName: "Elemental Gold Rush",
+  appId: "com.eaconsulting.atomicfusion",
+  appName: "Atomic Fusion",
   webDir: "dist/client",
   bundledWebRuntime: false,
   server: {
