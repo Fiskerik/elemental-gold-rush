@@ -1,5 +1,8 @@
 export const PRODUCT_IDS = {
-  proLabPack: "pro_lab_pack",
+  proLabPack: "pro_lab_pack_lifetime",
+  coins1: "coins_1",
+  coins5: "coins_5",
+  coins20: "coins_20",
   themeGoldLab: "theme_gold_lab",
   themeNeonPeriodic: "theme_neon_periodic",
 } as const;
@@ -10,24 +13,48 @@ export interface ProductDefinition {
   id: ProductId;
   name: string;
   description: string;
-  type: "non_consumable";
+  type: "non_consumable" | "consumable";
+  coins?: number;
   benefits: string[];
 }
 
 export const PRODUCTS: ProductDefinition[] = [
   {
     id: PRODUCT_IDS.proLabPack,
-    name: "Pro Lab Pack",
+    name: "Pro Lab Pack - Lifetime",
     description:
-      "A one-time premium upgrade for players who want extra style, stats, and future lab content.",
+      "A one-time premium upgrade that removes forced ads and adds extra launch bonuses.",
     type: "non_consumable",
     benefits: [
-      "Remove forced ads if they are added later.",
-      "Unlock exclusive board themes.",
-      "Unlock advanced stats and mastery summaries.",
-      "Unlock extra challenge modes in future updates.",
+      "Remove forced interstitial ads.",
+      "Unlock the Pro Lab profile badge.",
+      "Includes a small starter coin bonus in the App Store build.",
       "Support future Elemental Gold Rush updates.",
     ],
+  },
+  {
+    id: PRODUCT_IDS.coins1,
+    name: "1x Gold Coin",
+    description: "Adds 1 gold coin to your shop wallet.",
+    type: "consumable",
+    coins: 1,
+    benefits: ["Buy one inventory power-up sooner."],
+  },
+  {
+    id: PRODUCT_IDS.coins5,
+    name: "5x Gold Coins",
+    description: "Adds 5 gold coins to your shop wallet.",
+    type: "consumable",
+    coins: 5,
+    benefits: ["Stock several early power-ups."],
+  },
+  {
+    id: PRODUCT_IDS.coins20,
+    name: "20x Gold Coins",
+    description: "Adds 20 gold coins to your shop wallet.",
+    type: "consumable",
+    coins: 20,
+    benefits: ["Build a stronger inventory reserve."],
   },
   {
     id: PRODUCT_IDS.themeGoldLab,

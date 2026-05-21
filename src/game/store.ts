@@ -107,6 +107,8 @@ interface ProgressState {
   levelStats: Record<number, LevelStats>;
   challengeBestScores: Partial<Record<GameModeId, number>>;
   hasProPack: boolean;
+  clearedStageCount: number;
+  clearedStagesSinceAd: number;
   powerUpInventory: PowerUpInventory;
   seenTips: string[];
   markTipSeen: (id: string) => void;
@@ -117,6 +119,7 @@ interface ProgressState {
   addScore: (n: number) => void;
   spendScore: (cost: number) => boolean;
   buyGoldCoins: (coins: number, pointCost: number) => boolean;
+  grantGoldCoins: (coins: number) => void;
   setHighestElement: (n: number) => void;
   refreshDailyLab: () => void;
   reportQuestProgress: (event: QuestProgressEvent) => void;
@@ -130,6 +133,7 @@ interface ProgressState {
   ) => void;
   setChallengeBestScore: (mode: GameModeId, score: number) => void;
   grantProPack: () => void;
+  markInterstitialShown: () => void;
   addInventoryPowerUps: (powerUps: Partial<Record<InventoryPowerUpId, number>>) => void;
   consumeInventoryPowerUps: (powerUps: Partial<Record<InventoryPowerUpId, number>>) => boolean;
   purchaseInventoryPowerUp: (powerUp: InventoryPowerUpId, coinCost: number) => boolean;
@@ -171,6 +175,8 @@ export const useProgress = create<ProgressState>()(
       levelStats: {},
       challengeBestScores: {},
       hasProPack: false,
+      clearedStageCount: 0,
+      clearedStagesSinceAd: 0,
       powerUpInventory: emptyPowerUpInventory(),
       seenTips: [],
       markTipSeen: (id) =>
@@ -222,6 +228,10 @@ export const useProgress = create<ProgressState>()(
         });
         return purchased;
       },
+      grantGoldCoins: (coins) =>
+        set((s) => ({
+          goldCoins: s.goldCoins + Math.max(0, Math.floor(coins)),
+        })),
       setHighestElement: (n) => set((s) => ({ highestElement: Math.max(s.highestElement, n) })),
       refreshDailyLab: () =>
         set((s) => {
@@ -292,7 +302,10 @@ export const useProgress = create<ProgressState>()(
       recordLevelRun: (levelId, run) =>
         set((s) => {
           const current = s.levelStats[levelId] ?? emptyLevelStats();
+          const clearedIncrement = run.won ? 1 : 0;
           return {
+            clearedStageCount: s.clearedStageCount + clearedIncrement,
+            clearedStagesSinceAd: s.clearedStagesSinceAd + clearedIncrement,
             levelStats: {
               ...s.levelStats,
               [levelId]: {
@@ -317,6 +330,7 @@ export const useProgress = create<ProgressState>()(
           },
         })),
       grantProPack: () => set({ hasProPack: true }),
+      markInterstitialShown: () => set({ clearedStagesSinceAd: 0 }),
       addInventoryPowerUps: (powerUps) =>
         set((s) => ({
           powerUpInventory: mergePowerUpInventory(s.powerUpInventory, powerUps),
@@ -389,6 +403,8 @@ export const useProgress = create<ProgressState>()(
           levelStats: {},
           challengeBestScores: {},
           hasProPack: false,
+          clearedStageCount: 0,
+          clearedStagesSinceAd: 0,
           powerUpInventory: emptyPowerUpInventory(),
           seenTips: [],
         }),
@@ -426,6 +442,9 @@ export const useProgress = create<ProgressState>()(
           levelStats: persistedState?.levelStats ?? current.levelStats,
           challengeBestScores: persistedState?.challengeBestScores ?? current.challengeBestScores,
           hasProPack: persistedState?.hasProPack ?? current.hasProPack,
+          clearedStageCount: persistedState?.clearedStageCount ?? current.clearedStageCount,
+          clearedStagesSinceAd:
+            persistedState?.clearedStagesSinceAd ?? current.clearedStagesSinceAd,
           powerUpInventory: normalizePowerUpInventory(persistedState?.powerUpInventory),
           seenTips: persistedState?.seenTips ?? current.seenTips,
         } as ProgressState;

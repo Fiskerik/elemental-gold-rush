@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import type { CSSProperties } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { MainMenu } from "@/game/MainMenu";
 import { clearSavedRun, GameBoard, getSavedRunSummary } from "@/game/GameBoard";
 import { LevelSelect } from "@/game/LevelSelect";
@@ -13,6 +13,8 @@ import { Profile } from "@/game/Profile";
 import { GameModeId } from "@/game/challenges";
 import { getLevelById } from "@/game/levels";
 import { useProgress } from "@/game/store";
+import { initAds } from "@/game/ads";
+import { initPurchases } from "@/game/purchases";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -47,8 +49,24 @@ type Screen =
 
 function Index() {
   const unlockedLevel = useProgress((s) => s.unlockedLevel);
+  const hasProPack = useProgress((s) => s.hasProPack);
+  const grantProPack = useProgress((s) => s.grantProPack);
   const [screen, setScreen] = useState<Screen>({ name: "menu" });
   const [resumePrompt, setResumePrompt] = useState<ReturnType<typeof getSavedRunSummary>>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    initPurchases().then((hasProEntitlement) => {
+      if (!cancelled && hasProEntitlement) grantProPack();
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [grantProPack]);
+
+  useEffect(() => {
+    void initAds(hasProPack);
+  }, [hasProPack]);
 
   function startCampaign() {
     const saved = getSavedRunSummary();

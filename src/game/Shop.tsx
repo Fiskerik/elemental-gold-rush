@@ -2,6 +2,8 @@ import { useState } from "react";
 import { type InventoryPowerUpId, useProgress } from "./store";
 import { POWER_UP_UNLOCK_LEVELS } from "./powerUps";
 import { PowerUpBadge } from "./PowerUpLibrary";
+import { PRODUCT_IDS, getProductById, type ProductId } from "./products";
+import { purchaseGoldCoinPack } from "./purchases";
 
 const SHOP_POWER_UPS: Array<{
   id: InventoryPowerUpId;
@@ -80,6 +82,12 @@ const GOLD_COIN_PACKS = [
   { coins: 50, pointCost: 500_000 },
 ] as const;
 
+const APP_STORE_COIN_PACKS = [
+  PRODUCT_IDS.coins1,
+  PRODUCT_IDS.coins5,
+  PRODUCT_IDS.coins20,
+] as const;
+
 export function Shop({ onBack }: { onBack: () => void }) {
   const {
     totalScore,
@@ -87,6 +95,7 @@ export function Shop({ onBack }: { onBack: () => void }) {
     unlockedLevel,
     powerUpInventory,
     buyGoldCoins,
+    grantGoldCoins,
     purchaseInventoryPowerUp,
   } = useProgress();
   const [message, setMessage] = useState("");
@@ -118,6 +127,16 @@ export function Shop({ onBack }: { onBack: () => void }) {
     );
   }
 
+  async function handleNativeCoinPurchase(productId: ProductId) {
+    const coins = await purchaseGoldCoinPack(productId);
+    if (coins > 0) {
+      grantGoldCoins(coins);
+      setMessage(`${coins} gold coin${coins === 1 ? "" : "s"} added from App Store purchase.`);
+      return;
+    }
+    setMessage("App Store coin purchases are only available in the iPhone build.");
+  }
+
   return (
     <div className="app-shell" style={{ padding: 20, paddingTop: 32 }}>
       <div
@@ -147,6 +166,64 @@ export function Shop({ onBack }: { onBack: () => void }) {
             {message}
           </p>
         )}
+
+        <section
+          style={{
+            background: "var(--surface-elevated)",
+            border: "1px solid var(--border)",
+            borderRadius: 18,
+            padding: 18,
+            boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              gap: 12,
+              marginBottom: 12,
+            }}
+          >
+            <div>
+              <div
+                style={{
+                  fontSize: 11,
+                  letterSpacing: 2,
+                  color: "var(--accent)",
+                  fontWeight: 800,
+                  marginBottom: 6,
+                }}
+              >
+                APP STORE COINS
+              </div>
+              <h2 style={{ margin: 0, fontSize: 22, fontWeight: 900 }}>Buy gold coins</h2>
+            </div>
+            <WalletPill label="Coins" value={`${goldCoins}`} icon={<GoldCoinIcon size={18} />} accent />
+          </div>
+          <p style={{ margin: "0 0 14px", color: "var(--muted-foreground)", fontSize: 13 }}>
+            These packs connect to RevenueCat in the iPhone build. The browser build keeps them as
+            safe purchase-layer checks.
+          </p>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8 }}>
+            {APP_STORE_COIN_PACKS.map((productId) => {
+              const product = getProductById(productId);
+              if (!product?.coins) return null;
+              return (
+                <button
+                  key={productId}
+                  type="button"
+                  onClick={() => handleNativeCoinPurchase(productId)}
+                  style={coinPackButton}
+                >
+                  <GoldCoinIcon size={28} />
+                  <strong style={coinPackAmount}>{product.coins}x</strong>
+                  <span>App Store</span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
 
         <section
           style={{

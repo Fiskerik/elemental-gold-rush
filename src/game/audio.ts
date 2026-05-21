@@ -325,5 +325,12 @@ export function primeAudio() {
 }
 
 export function vibrate(ms: number | number[]) {
-  if ("vibrate" in navigator) navigator.vibrate(ms);
+  void import("./nativeHaptics")
+    .then(({ triggerNativeHaptic }) => triggerNativeHaptic(ms))
+    .then((handled) => {
+      if (!handled && "vibrate" in navigator) navigator.vibrate(ms);
+    })
+    .catch(() => {
+      if ("vibrate" in navigator) navigator.vibrate(ms);
+    });
 }

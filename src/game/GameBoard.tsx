@@ -51,6 +51,7 @@ import {
 import { MoleculeVisual } from "./MoleculeVisual";
 import { PowerUpBadge } from "./PowerUpLibrary";
 import { POWER_UP_UNLOCK_LEVELS } from "./powerUps";
+import { showInterstitialIfReady } from "./ads";
 
 interface Props {
   levelId: number;
@@ -677,6 +678,9 @@ export function GameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "camp
     shootingStyle,
     hasChosenShootingStyle,
     setShootingStyle,
+    hasProPack,
+    clearedStagesSinceAd,
+    markInterstitialShown,
   } = useProgress();
 
   const [balls, setBalls] = useState<Board>(() => createEmptyBoard());
@@ -4265,6 +4269,22 @@ export function GameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "camp
       }
     : winChoice;
 
+  async function runPostClearAdIfDue() {
+    if (clearedStagesSinceAd < 5 || hasProPack) return;
+    const shown = await showInterstitialIfReady(hasProPack);
+    if (shown) markInterstitialShown();
+  }
+
+  async function handleWonMain() {
+    await runPostClearAdIfDue();
+    onExit();
+  }
+
+  async function handleWonMap() {
+    await runPostClearAdIfDue();
+    onMap();
+  }
+
   return (
     <div
       className="app-shell"
@@ -5676,8 +5696,8 @@ export function GameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "camp
             claimedPowerUp={claimedResultPowerUp}
             onClaimPowerUp={claimResultPowerUp}
             onDiscoveryClick={setDiscoveryEl}
-            onMain={onExit}
-            onNext={onMap}
+            onMain={handleWonMain}
+            onNext={handleWonMap}
             nextLabel="Map"
           />
         )}

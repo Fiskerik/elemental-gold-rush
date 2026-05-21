@@ -21,7 +21,7 @@ export function Settings({ onBack }: { onBack: () => void }) {
           <Row label="Sound effects" value={soundEnabled} onToggle={toggleSound} />
           <Row label="Haptics" value={hapticsEnabled} onToggle={toggleHaptics} />
           <Row
-            label={`Play style: ${shootingStyle === "hold" ? "Hold" : "Toggle"}`}
+            label={`Play style: ${shootingStyle === "hold" ? "Hold" : "Press"}`}
             value={shootingStyle === "press"}
             onToggle={() => setShootingStyle(shootingStyle === "hold" ? "press" : "hold")}
           />

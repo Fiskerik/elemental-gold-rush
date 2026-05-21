@@ -116,77 +116,105 @@ export function MainMenu({
           paddingBottom: 24,
         }}
       >
-        <header style={heroPanel}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={eyebrow}>LEVEL {unlockedLevel} OF {MAX_LEVEL}</div>
-            <h1 className="gold-text" style={titleStyle}>
-              Elemental Gold Rush
-            </h1>
-            <p style={subtitleStyle}>
-              Fuse atoms, discover the periodic table, and push toward {targetEl?.name ?? "Gold"}.
-            </p>
-            <div style={heroActions}>
-              <button
-                onClick={() => {
-                  trackMenuAction("continue");
-                  onPlay();
-                }}
-                style={heroPlayBtn}
-              >
-                <Play size={18} fill="currentColor" aria-hidden="true" />
-                Continue
-              </button>
-              <button
-                onClick={() => {
-                  trackMenuAction("levels");
-                  onLevels();
-                }}
-                style={secondaryBtn}
-              >
-                <Layers size={17} aria-hidden="true" />
-                Map
-              </button>
-            </div>
+        <header style={topBar}>
+          <button
+            onClick={() => {
+              trackMenuAction("settings");
+              onSettings();
+            }}
+            style={iconButton}
+            aria-label="Open settings"
+          >
+            <SettingsIcon size={18} aria-hidden="true" />
+          </button>
+          <div style={{ textAlign: "center", minWidth: 0 }}>
+            <div className="gold-text" style={brandTitle}>Elemental Gold Rush</div>
+            <div style={brandSubline}>Level {unlockedLevel} of {MAX_LEVEL}</div>
           </div>
-          <div style={targetOrb}>
-            <ElementBall atomicNumber={nextLevel?.targetElement ?? 1} size={94} glow />
-            <div style={targetLabel}>
-              <span>{targetEl?.symbol ?? "H"}</span>
-              <small>Target</small>
-            </div>
-          </div>
+          <button
+            onClick={() => {
+              trackMenuAction("profile");
+              onProfile();
+            }}
+            style={profileCoinButton}
+            aria-label="Open profile"
+          >
+            <GoldCoinIcon size={13} />
+            <span>{goldCoins}</span>
+            <User size={17} aria-hidden="true" />
+          </button>
         </header>
 
-        <section style={progressPanel}>
+        <section style={playPanel}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
             <div>
-              <div style={sectionLabel}>NEXT RUN</div>
-              <div style={{ fontSize: 17, fontWeight: 900 }}>
-                Level {unlockedLevel}: {nextLevel?.name}
+              <div style={eyebrow}>NEXT RUN</div>
+              <div style={{ fontSize: 22, fontWeight: 900, lineHeight: 1.1 }}>
+                Level {unlockedLevel}
               </div>
-              <div style={{ fontSize: 12, color: "var(--muted-foreground)", marginTop: 2 }}>
-                {nextLevel?.description}
+              <div style={{ fontSize: 13, color: "var(--muted-foreground)", marginTop: 4 }}>
+                {nextLevel?.name} - target {targetEl?.symbol ?? "H"}
               </div>
             </div>
             <button
               onClick={() => {
-                trackMenuAction("profile");
-                onProfile();
+                trackMenuAction("levels");
+                onLevels();
               }}
-              style={profileBtn}
-              aria-label="Open profile"
+              style={chooseLevelBtn}
             >
-              <User size={19} aria-hidden="true" />
+              <Layers size={16} aria-hidden="true" />
+              Choose level
             </button>
           </div>
+          <button
+            onClick={() => {
+              trackMenuAction("continue");
+              onPlay();
+            }}
+            style={heroPlayBtn}
+          >
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+              <Play size={20} fill="currentColor" aria-hidden="true" />
+              Continue
+            </span>
+            <ElementBall atomicNumber={nextLevel?.targetElement ?? 1} size={54} glow />
+          </button>
           <div style={progressTrack}>
             <div style={{ ...progressFill, width: `${campaignProgress}%` }} />
           </div>
-          <div style={statGrid}>
-            <Stat label="Highest" value={highestEl?.symbol ?? "H"} sub={`#${highestElement}`} />
-            <Stat label="Score" value={formatScore(totalScore)} sub="total" />
-            <Stat label="Coins" value={`${goldCoins}`} sub="gold" />
+          <div style={compactStatRow}>
+            <span>Highest {highestEl?.symbol ?? "H"} #{highestElement}</span>
+            <span>{formatScore(totalScore)} score</span>
+            <span>{campaignProgress}% campaign</span>
           </div>
+        </section>
+
+        <section style={streakPanel}>
+          <div>
+            <div style={sectionLabel}>DAILY STREAK</div>
+            <div style={{ fontSize: 13, color: "var(--muted-foreground)" }}>
+              {weeklyBonus.currentStreak} day streak - {weeklyBonus.cycleProgress}/7 toward x5
+            </div>
+          </div>
+          <button
+            onClick={handleDailyRewardClaim}
+            disabled={!dailyComplete || claimedDailyReward}
+            style={{
+              ...claimBtn,
+              background:
+                dailyComplete && !claimedDailyReward
+                  ? "linear-gradient(135deg, var(--accent), var(--primary))"
+                  : "var(--surface-high)",
+              color:
+                dailyComplete && !claimedDailyReward
+                  ? "var(--primary-foreground)"
+                  : "var(--muted-foreground)",
+              cursor: dailyComplete && !claimedDailyReward ? "pointer" : "not-allowed",
+            }}
+          >
+            {claimedDailyReward ? "Claimed" : "Claim"}
+          </button>
         </section>
 
         <nav style={actionGrid} aria-label="Main game sections">
@@ -249,24 +277,9 @@ export function MainMenu({
                 Complete 4 of 6 quests to claim 2 gold coins.
               </div>
             </div>
-            <button
-              onClick={handleDailyRewardClaim}
-              disabled={!dailyComplete || claimedDailyReward}
-              style={{
-                ...claimBtn,
-                background:
-                  dailyComplete && !claimedDailyReward
-                    ? "linear-gradient(135deg, var(--accent), var(--primary))"
-                    : "var(--surface-high)",
-                color:
-                  dailyComplete && !claimedDailyReward
-                    ? "var(--primary-foreground)"
-                    : "var(--muted-foreground)",
-                cursor: dailyComplete && !claimedDailyReward ? "pointer" : "not-allowed",
-              }}
-            >
-              {claimedDailyReward ? "Claimed" : "Claim"}
-            </button>
+            <div style={weeklyBonusPill}>
+              {weeklyBonus.todayClaimed ? `Today +${weeklyBonus.coinsEarnedToday}` : "Play today +1"}
+            </div>
           </div>
           <div style={weeklyBonusCard}>
             <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
@@ -350,28 +363,6 @@ export function MainMenu({
           </div>
         </section>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-          <BigButton
-            icon={User}
-            iconColor="oklch(0.8 0.16 85)"
-            onClick={() => {
-              trackMenuAction("profile");
-              onProfile();
-            }}
-          >
-            Profile
-          </BigButton>
-          <BigButton
-            icon={SettingsIcon}
-            iconColor="oklch(0.78 0.04 250)"
-            onClick={() => {
-              trackMenuAction("settings");
-              onSettings();
-            }}
-          >
-            Settings
-          </BigButton>
-        </div>
       </div>
     </div>
   );
@@ -390,15 +381,62 @@ function QuestIcon({ type, completed }: { type: string; completed: boolean }) {
   return <Icon size={15} strokeWidth={2.4} aria-hidden="true" />;
 }
 
-const heroPanel: CSSProperties = {
+const topBar: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "minmax(0, 1fr) auto",
+  gridTemplateColumns: "44px minmax(0, 1fr) auto",
   alignItems: "center",
-  gap: 18,
-  padding: "24px 18px",
-  borderRadius: 20,
+  gap: 10,
+  padding: "8px 0 2px",
+};
+
+const brandTitle: CSSProperties = {
+  fontSize: 22,
+  fontWeight: 1000,
+  lineHeight: 1,
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+};
+
+const brandSubline: CSSProperties = {
+  marginTop: 3,
+  fontSize: 11,
+  color: "var(--muted-foreground)",
+  fontWeight: 800,
+};
+
+const iconButton: CSSProperties = {
+  width: 42,
+  height: 42,
+  display: "grid",
+  placeItems: "center",
+  border: "1px solid var(--border)",
+  borderRadius: 12,
+  background: "var(--surface)",
+  color: "var(--foreground)",
+  cursor: "pointer",
+};
+
+const profileCoinButton: CSSProperties = {
+  minWidth: 74,
+  height: 42,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 6,
+  border: "1px solid var(--border)",
+  borderRadius: 12,
+  background: "var(--surface)",
+  color: "var(--foreground)",
+  fontWeight: 900,
+  cursor: "pointer",
+};
+
+const playPanel: CSSProperties = {
+  padding: 16,
+  borderRadius: 18,
   background:
-    "radial-gradient(circle at 82% 18%, oklch(0.75 0.16 85 / 0.24), transparent 32%), linear-gradient(145deg, var(--surface-elevated), var(--surface))",
+    "radial-gradient(circle at 86% 18%, oklch(0.75 0.16 85 / 0.2), transparent 32%), linear-gradient(145deg, var(--surface-elevated), var(--surface))",
   border: "1px solid var(--border)",
   boxShadow: "0 16px 42px rgba(0,0,0,0.32)",
 };
@@ -410,76 +448,38 @@ const eyebrow: CSSProperties = {
   fontWeight: 900,
 };
 
-const titleStyle: CSSProperties = {
-  fontSize: 34,
-  fontWeight: 900,
-  lineHeight: 1,
-  margin: "7px 0 0",
-};
-
-const subtitleStyle: CSSProperties = {
-  color: "var(--muted-foreground)",
-  margin: "10px 0 0",
-  fontSize: 13,
-  lineHeight: 1.45,
-};
-
-const heroActions: CSSProperties = {
-  display: "flex",
-  gap: 10,
-  marginTop: 18,
-  flexWrap: "wrap",
-};
-
 const heroPlayBtn: CSSProperties = {
-  display: "inline-flex",
+  width: "100%",
+  display: "flex",
   alignItems: "center",
-  justifyContent: "center",
-  gap: 8,
+  justifyContent: "space-between",
+  gap: 12,
   border: "none",
   borderRadius: 14,
-  padding: "13px 18px",
+  padding: "14px 14px 14px 18px",
   background: "linear-gradient(135deg, var(--primary), oklch(0.55 0.15 230))",
   color: "var(--primary-foreground)",
   boxShadow: "0 10px 26px var(--primary-glow)",
   fontWeight: 900,
+  fontSize: 20,
   cursor: "pointer",
+  marginTop: 16,
 };
 
-const secondaryBtn: CSSProperties = {
+const chooseLevelBtn: CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
-  gap: 7,
+  gap: 6,
   border: "1px solid var(--border)",
-  borderRadius: 14,
-  padding: "12px 14px",
+  borderRadius: 12,
+  padding: "9px 10px",
   background: "var(--surface)",
   color: "var(--foreground)",
+  fontSize: 12,
   fontWeight: 800,
   cursor: "pointer",
-};
-
-const targetOrb: CSSProperties = {
-  display: "grid",
-  justifyItems: "center",
-  gap: 6,
-  minWidth: 110,
-};
-
-const targetLabel: CSSProperties = {
-  display: "grid",
-  justifyItems: "center",
-  gap: 1,
-  fontWeight: 900,
-  color: "var(--foreground)",
-};
-
-const progressPanel: CSSProperties = {
-  padding: 14,
-  borderRadius: 16,
-  background: "color-mix(in oklch, var(--surface-elevated) 88%, transparent)",
-  border: "1px solid var(--border)",
+  whiteSpace: "nowrap",
 };
 
 const sectionLabel: CSSProperties = {
@@ -488,18 +488,6 @@ const sectionLabel: CSSProperties = {
   color: "var(--accent)",
   fontWeight: 900,
   marginBottom: 4,
-};
-
-const profileBtn: CSSProperties = {
-  width: 42,
-  height: 42,
-  display: "grid",
-  placeItems: "center",
-  border: "1px solid var(--border)",
-  borderRadius: 12,
-  background: "var(--surface)",
-  color: "var(--foreground)",
-  cursor: "pointer",
 };
 
 const progressTrack: CSSProperties = {
@@ -516,11 +504,15 @@ const progressFill: CSSProperties = {
   background: "linear-gradient(90deg, var(--primary), var(--accent))",
 };
 
-const statGrid: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+const compactStatRow: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  flexWrap: "wrap",
   gap: 8,
   marginTop: 12,
+  color: "var(--muted-foreground)",
+  fontSize: 11,
+  fontWeight: 800,
 };
 
 const actionGrid: CSSProperties = {
@@ -531,6 +523,17 @@ const actionGrid: CSSProperties = {
 
 const dailyPanel: CSSProperties = {
   position: "relative",
+  background: "var(--surface-elevated)",
+  border: "1px solid var(--border)",
+  borderRadius: 16,
+  padding: 14,
+};
+
+const streakPanel: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 12,
   background: "var(--surface-elevated)",
   border: "1px solid var(--border)",
   borderRadius: 16,
