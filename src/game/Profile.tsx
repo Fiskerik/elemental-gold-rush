@@ -14,7 +14,12 @@ import { ELEMENTS } from "./elements";
 import { MAX_LEVEL } from "./levels";
 import { formatScore } from "./logic";
 import { PRODUCT_IDS, getProductById } from "./products";
-import { purchaseProduct, restorePurchases } from "./purchases";
+import {
+  presentCustomerCenter,
+  presentPaywallIfNeeded,
+  purchaseProduct,
+  restorePurchases,
+} from "./purchases";
 import { useProgress } from "./store";
 
 interface Props {
@@ -53,23 +58,36 @@ export function Profile({ onBack }: Props) {
   const completionPercent = Math.round((discoveredElements.length / ELEMENTS.length) * 100);
 
   async function handleProPackPurchase() {
-    const completed = await purchaseProduct(PRODUCT_IDS.proLabPack);
+    const completed = await presentPaywallIfNeeded();
     if (completed) {
       grantProPack();
-      setProPackMessage("Pro Lab Pack unlocked.");
+      setProPackMessage("Atomic Fusion Lifetime unlocked.");
       return;
     }
-    setProPackMessage("Native App Store purchase support is not available in this web build yet.");
+    const fallbackCompleted = await purchaseProduct(PRODUCT_IDS.proLabPack);
+    if (fallbackCompleted) {
+      grantProPack();
+      setProPackMessage("Atomic Fusion Lifetime unlocked.");
+      return;
+    }
+    setProPackMessage("Paywall is not available in this build. Use iPhone build for purchases.");
+  }
+
+  async function handleCustomerCenter() {
+    const opened = await presentCustomerCenter();
+    if (!opened) {
+      setProPackMessage("Customer Center is only available in the native iPhone build.");
+    }
   }
 
   async function handleProPackRestore() {
     const restored = await restorePurchases();
     if (restored.includes(PRODUCT_IDS.proLabPack)) {
       grantProPack();
-      setProPackMessage("Pro Lab Pack restored.");
+      setProPackMessage("Atomic Fusion Lifetime restored.");
       return;
     }
-    setProPackMessage("No Pro Lab Pack purchase was found for this web build.");
+    setProPackMessage("No Atomic Fusion Lifetime purchase was found.");
   }
 
   const proPackPanel = proPack ? (
@@ -97,11 +115,11 @@ export function Profile({ onBack }: Props) {
         ))}
       </div>
       <div style={proPackNote}>
-        Purchases are routed through a platform layer so an App Store build can connect this
-        product to StoreKit without adding native purchase SDK calls to UI components.
+        RevenueCat powers purchases in native builds. This web build keeps the same UI with safe
+        fallbacks.
       </div>
       {hasProPack ? (
-        <div style={proPackActive}>Pro Lab Pack Active</div>
+        <div style={proPackActive}>Atomic Fusion Lifetime Active</div>
       ) : (
         <div
           style={{
@@ -127,6 +145,21 @@ export function Profile({ onBack }: Props) {
           </button>
         </div>
       )}
+      <button
+        type="button"
+        onClick={handleCustomerCenter}
+        style={{
+          ...profileActionButton,
+          width: "100%",
+          marginTop: 10,
+          background: "var(--surface-high)",
+          color: "var(--foreground)",
+          boxShadow: "none",
+          border: "1px solid var(--border)",
+        }}
+      >
+        Manage Purchases
+      </button>
       {proPackMessage && (
         <p style={{ margin: "12px 0 0", color: "var(--muted-foreground)", fontSize: 12 }}>
           {proPackMessage}

@@ -83,9 +83,9 @@ const GOLD_COIN_PACKS = [
 ] as const;
 
 const APP_STORE_COIN_PACKS = [
-  PRODUCT_IDS.coins1,
-  PRODUCT_IDS.coins5,
   PRODUCT_IDS.coins20,
+  PRODUCT_IDS.coins50,
+  PRODUCT_IDS.coins100,
 ] as const;
 
 export function Shop({ onBack }: { onBack: () => void }) {

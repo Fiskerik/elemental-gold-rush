@@ -14,7 +14,12 @@ import { GameModeId } from "@/game/challenges";
 import { getLevelById } from "@/game/levels";
 import { useProgress } from "@/game/store";
 import { initAds } from "@/game/ads";
-import { initPurchases } from "@/game/purchases";
+import {
+  clearCustomerInfoListener,
+  initPurchases,
+  setCustomerInfoListener,
+  syncCustomerInfoEntitlement,
+} from "@/game/purchases";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -59,8 +64,15 @@ function Index() {
     initPurchases().then((hasProEntitlement) => {
       if (!cancelled && hasProEntitlement) grantProPack();
     });
+    void setCustomerInfoListener((hasProEntitlement) => {
+      if (hasProEntitlement) grantProPack();
+    });
+    void syncCustomerInfoEntitlement().then((hasProEntitlement) => {
+      if (!cancelled && hasProEntitlement) grantProPack();
+    });
     return () => {
       cancelled = true;
+      void clearCustomerInfoListener();
     };
   }, [grantProPack]);
 
