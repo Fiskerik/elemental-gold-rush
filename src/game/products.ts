@@ -1,5 +1,6 @@
 export const PRODUCT_IDS = {
   proLabPack: "lifetime",
+  coins5: "coins_5",
   coins20: "coins_20",
   coins50: "coins_50",
   coins100: "coins_100",
@@ -31,6 +32,14 @@ export const PRODUCTS: ProductDefinition[] = [
       "Includes a small starter coin bonus in the App Store build.",
       "Support future Elemental Gold Rush updates.",
     ],
+  },
+  {
+    id: PRODUCT_IDS.coins5,
+    name: "5x Gold Coins",
+    description: "Adds 5 gold coins to your shop wallet.",
+    type: "consumable",
+    coins: 5,
+    benefits: ["Quick boost for early inventory purchases."],
   },
   {
     id: PRODUCT_IDS.coins20,

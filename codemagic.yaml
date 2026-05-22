@@ -1,0 +1,50 @@
+workflows:
+  ios-capacitor-release:
+    name: Atomic Fusion iOS (Capacitor)
+    max_build_duration: 120
+    instance_type: mac_mini_m2
+    integrations:
+      app_store_connect: codemagic-app-store-connect
+    environment:
+      vars:
+        BUNDLE_ID: "com.eaconsulting.atomicfusion"
+        XCODE_WORKSPACE: "ios/App/App.xcworkspace"
+        XCODE_SCHEME: "App"
+      xcode: latest
+      cocoapods: default
+      node: 22.16.0
+    scripts:
+      - name: Install dependencies
+        script: |
+          npm ci
+      - name: Build web + sync Capacitor iOS
+        script: |
+          npm run cap:sync
+      - name: Install CocoaPods
+        script: |
+          cd ios/App
+          pod install
+      - name: Set up iOS signing
+        script: |
+          xcode-project use-profiles
+      - name: Build IPA
+        script: |
+          xcode-project build-ipa \
+            --workspace "$XCODE_WORKSPACE" \
+            --scheme "$XCODE_SCHEME" \
+            --archive-xcargs "CODE_SIGN_STYLE=Automatic DEVELOPMENT_TEAM=$CM_DEVELOPER_TEAM"
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.dSYM
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        submit_to_app_store: false
+      email:
+        recipients:
+          - erik.abrahamsson@live.com
+        notify:
+          success: true
+          failure: true

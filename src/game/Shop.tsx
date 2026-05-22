@@ -83,6 +83,7 @@ const GOLD_COIN_PACKS = [
 ] as const;
 
 const APP_STORE_COIN_PACKS = [
+  PRODUCT_IDS.coins5,
   PRODUCT_IDS.coins20,
   PRODUCT_IDS.coins50,
   PRODUCT_IDS.coins100,
@@ -205,7 +206,7 @@ export function Shop({ onBack }: { onBack: () => void }) {
             These packs connect to RevenueCat in the iPhone build. The browser build keeps them as
             safe purchase-layer checks.
           </p>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
             {APP_STORE_COIN_PACKS.map((productId) => {
               const product = getProductById(productId);
               if (!product?.coins) return null;
