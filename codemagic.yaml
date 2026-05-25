@@ -4,7 +4,7 @@ workflows:
     max_build_duration: 120
     instance_type: mac_mini_m2
     integrations:
-      app_store_connect: codemagic-app-store-connect
+      app_store_connect: Atomic fusion rush API key
     environment:
       vars:
         BUNDLE_ID: "com.eaconsulting.atomicfusion"
