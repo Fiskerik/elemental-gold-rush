@@ -20,6 +20,10 @@ workflows:
       - name: Build web + sync Capacitor iOS
         script: |
           npm run cap:sync
+      - name: Enforce iOS deployment target
+        script: |
+          sed -i '' 's/platform :ios, '\''[0-9.]*'\''/platform :ios, '\''15.0'\''/g' ios/App/Podfile
+          sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = [0-9.]\\+;/IPHONEOS_DEPLOYMENT_TARGET = 15.0;/g' ios/App/App.xcodeproj/project.pbxproj
       - name: Install CocoaPods
         script: |
           cd ios/App
