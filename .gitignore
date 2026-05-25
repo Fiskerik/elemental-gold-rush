@@ -30,3 +30,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+.playwright/chromium-1223/chrome-win64/ABOUT
+/.playwright
+/appstore-screenshots-v2
+/appstore-screenshots
