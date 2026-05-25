@@ -4272,20 +4272,30 @@ export function GameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "camp
       }
     : winChoice;
 
-  async function runPostClearAdIfDue() {
+  async function runAttemptAdIfDue() {
     if (clearedStagesSinceAd < 5 || hasProPack) return;
     const shown = await showInterstitialIfReady(hasProPack);
     if (shown) markInterstitialShown();
   }
 
   async function handleWonMain() {
-    await runPostClearAdIfDue();
+    await runAttemptAdIfDue();
     onExit();
   }
 
   async function handleWonMap() {
-    await runPostClearAdIfDue();
+    await runAttemptAdIfDue();
     onMap();
+  }
+
+  async function handleGameOverMain() {
+    await runAttemptAdIfDue();
+    onExit();
+  }
+
+  async function handleGameOverRetry() {
+    await runAttemptAdIfDue();
+    onWin(levelId);
   }
 
   return (
@@ -5716,8 +5726,8 @@ export function GameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "camp
             newDiscoveries={newlyDiscoveredThisRun}
             formedCompounds={formedCompoundsThisRun}
             onDiscoveryClick={setDiscoveryEl}
-            onMain={onExit}
-            onNext={() => onWin(levelId)}
+            onMain={handleGameOverMain}
+            onNext={handleGameOverRetry}
             nextLabel="Retry"
           />
         )}

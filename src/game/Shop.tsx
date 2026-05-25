@@ -4,6 +4,7 @@ import { POWER_UP_UNLOCK_LEVELS } from "./powerUps";
 import { PowerUpBadge } from "./PowerUpLibrary";
 import { PRODUCT_IDS, getProductById, type ProductId } from "./products";
 import { purchaseGoldCoinPack } from "./purchases";
+import { showRewardedForCoin } from "./ads";
 
 const SHOP_POWER_UPS: Array<{
   id: InventoryPowerUpId;
@@ -98,6 +99,7 @@ export function Shop({ onBack }: { onBack: () => void }) {
     buyGoldCoins,
     grantGoldCoins,
     purchaseInventoryPowerUp,
+    hasProPack,
   } = useProgress();
   const [message, setMessage] = useState("");
 
@@ -136,6 +138,16 @@ export function Shop({ onBack }: { onBack: () => void }) {
       return;
     }
     setMessage("App Store coin purchases are only available in the iPhone build.");
+  }
+
+  async function handleRewardedCoin() {
+    const rewarded = await showRewardedForCoin(hasProPack);
+    if (rewarded) {
+      grantGoldCoins(1);
+      setMessage("Reward complete: +1 gold coin.");
+      return;
+    }
+    setMessage("Rewarded ad not completed or not available yet. Try again shortly.");
   }
 
   return (
@@ -206,6 +218,20 @@ export function Shop({ onBack }: { onBack: () => void }) {
             These packs connect to RevenueCat in the iPhone build. The browser build keeps them as
             safe purchase-layer checks.
           </p>
+          <button
+            type="button"
+            onClick={handleRewardedCoin}
+            disabled={hasProPack}
+            style={{
+              ...shopButton,
+              width: "100%",
+              marginBottom: 10,
+              opacity: hasProPack ? 0.6 : 1,
+              cursor: hasProPack ? "not-allowed" : "pointer",
+            }}
+          >
+            Watch rewarded ad for +1 coin
+          </button>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
             {APP_STORE_COIN_PACKS.map((productId) => {
               const product = getProductById(productId);

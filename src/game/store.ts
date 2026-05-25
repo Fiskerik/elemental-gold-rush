@@ -322,10 +322,11 @@ export const useProgress = create<ProgressState>()(
       recordLevelRun: (levelId, run) =>
         set((s) => {
           const current = s.levelStats[levelId] ?? emptyLevelStats();
-          const clearedIncrement = run.won ? 1 : 0;
+          // Ad cadence is based on attempts (completed runs), not only clears.
+          const attemptIncrement = 1;
           return {
-            clearedStageCount: s.clearedStageCount + clearedIncrement,
-            clearedStagesSinceAd: s.clearedStagesSinceAd + clearedIncrement,
+            clearedStageCount: s.clearedStageCount + (run.won ? 1 : 0),
+            clearedStagesSinceAd: s.clearedStagesSinceAd + attemptIncrement,
             levelStats: {
               ...s.levelStats,
               [levelId]: {
