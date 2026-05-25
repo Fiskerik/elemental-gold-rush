@@ -6,6 +6,9 @@ workflows:
     integrations:
       app_store_connect: Atomic fusion rush API key
     environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: "com.eaconsulting.atomicfusion"
       vars:
         BUNDLE_ID: "com.eaconsulting.atomicfusion"
         XCODE_WORKSPACE: "ios/App/App.xcworkspace"
@@ -35,8 +38,7 @@ workflows:
         script: |
           xcode-project build-ipa \
             --workspace "$XCODE_WORKSPACE" \
-            --scheme "$XCODE_SCHEME" \
-            --archive-xcargs "CODE_SIGN_STYLE=Automatic DEVELOPMENT_TEAM=$CM_DEVELOPER_TEAM"
+            --scheme "$XCODE_SCHEME"
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
