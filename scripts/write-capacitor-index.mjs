@@ -85,30 +85,81 @@ const indexHtml = `<!doctype html>
         color: #ff9b9b;
       }
     </style>
-    <script type="module" src="/assets/${entry}"></script>
     <script>
+      function setBootError(message) {
+        var el = document.getElementById("boot-fallback");
+        if (!el) return;
+        el.classList.add("error");
+        var text = (message && String(message).trim()) ? String(message) : "Unknown startup error";
+        el.querySelector("p").textContent = "Startup error: " + text;
+      }
+
+      window.__bootReady = function () {
+        var el = document.getElementById("boot-fallback");
+        if (!el) return;
+        el.style.display = "none";
+      };
+
       window.addEventListener("error", function (event) {
-        var el = document.getElementById("boot-fallback");
-        if (!el) return;
-        el.classList.add("error");
-        var msg = (event && event.message) ? event.message : "Unknown runtime error";
-        el.querySelector("p").textContent = "Startup error: " + msg;
+        setBootError(event && event.message ? event.message : "Unhandled runtime error");
       });
+
       window.addEventListener("unhandledrejection", function (event) {
-        var el = document.getElementById("boot-fallback");
-        if (!el) return;
-        el.classList.add("error");
-        var reason = event && event.reason ? String(event.reason) : "Unknown promise rejection";
-        el.querySelector("p").textContent = "Startup error: " + reason;
+        var reason = event && event.reason ? String(event.reason) : "Unhandled promise rejection";
+        setBootError(reason);
       });
-      setTimeout(function () {
-        var root = document.querySelector(".app-shell, #root, [data-router-root]");
-        var el = document.getElementById("boot-fallback");
-        if (root && el) el.style.display = "none";
-      }, 2500);
+    </script>
+    <script type="module">
+      const bootTimeoutMs = 7000;
+      const timeoutId = window.setTimeout(() => {
+        const el = document.getElementById("boot-fallback");
+        if (!el) return;
+        if (el.style.display !== "none") {
+          el.classList.add("error");
+          el.querySelector("p").textContent =
+            "Startup timeout: app did not render within " + (bootTimeoutMs / 1000) + "s";
+        }
+      }, bootTimeoutMs);
+
+      import("/assets/${entry}")
+        .then(() => {
+          const hideWhenReady = () => {
+            const hasApp = !!document.querySelector(".app-shell, #root, [data-router-root]");
+            if (hasApp && typeof window.__bootReady === "function") {
+              window.__bootReady();
+              window.clearTimeout(timeoutId);
+              return;
+            }
+            window.setTimeout(hideWhenReady, 150);
+          };
+          hideWhenReady();
+        })
+        .catch((error) => {
+          window.clearTimeout(timeoutId);
+          const msg = error && (error.stack || error.message) ? (error.stack || error.message) : String(error);
+          const el = document.getElementById("boot-fallback");
+          if (!el) return;
+          el.classList.add("error");
+          el.querySelector("p").textContent = "Import failed: " + msg;
+        });
     </script>
   </head>
   <body>
+    <script>
+      window.__CAPACITOR_DEBUG__ = true;
+      window.addEventListener("error", function (event) {
+        var message = event && event.message ? event.message : "Unknown runtime error";
+        var filename = event && event.filename ? event.filename : "";
+        var line = event && event.lineno ? event.lineno : "";
+        var col = event && event.colno ? event.colno : "";
+        var stack = event && event.error && event.error.stack ? String(event.error.stack) : "";
+        var details = message + "\\n" + filename + ":" + line + ":" + col + (stack ? "\\n\\n" + stack : "");
+        document.body.innerHTML =
+          '<pre style="white-space:pre-wrap;word-break:break-word;color:#ffb4b4;background:#12070a;padding:16px;margin:0;min-height:100dvh;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;">' +
+          details.replace(/</g, "&lt;").replace(/>/g, "&gt;") +
+          "</pre>";
+      });
+    </script>
     <div id="boot-fallback">
       <div>
         <h1>Elemental Gold Rush</h1>
