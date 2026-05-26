@@ -26,6 +26,8 @@
 	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>UIApplicationSupportsIndirectInputEvents</key>
+	<false/>
 	<key>NSUserTrackingUsageDescription</key>
 	<string>This identifier will be used to deliver more relevant ads and support rewarded video.</string>
 	<key>UILaunchStoryboardName</key>
