@@ -147,6 +147,12 @@ const indexHtml = `<!doctype html>
   <body>
     <script>
       window.__CAPACITOR_DEBUG__ = true;
+      // Force client-only mode for TanStack Start in native WebView.
+      // This avoids SSR hydration paths that can fail in Capacitor static bundles.
+      window.__TSS_START_OPTIONS__ = {
+        defaultSsr: false,
+        serializationAdapters: [],
+      };
       window.addEventListener("error", function (event) {
         var message = event && event.message ? event.message : "Unknown runtime error";
         var filename = event && event.filename ? event.filename : "";
