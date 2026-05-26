@@ -43,18 +43,7 @@ type PurchasesModule = {
   };
 };
 
-type RevenueCatUiModule = {
-  RevenueCatUI?: {
-    presentPaywallIfNeeded?: (options: {
-      requiredEntitlementIdentifier: string;
-      offeringIdentifier?: string;
-    }) => Promise<unknown>;
-    presentCustomerCenter?: () => Promise<unknown>;
-  };
-};
-
 const PURCHASES_MODULE = "@revenuecat/purchases-capacitor";
-const PURCHASES_UI_MODULE = "@revenuecat/purchases-capacitor-ui";
 const DEFAULT_PRO_ENTITLEMENT = "atomic_fusion_lifetime";
 const DEFAULT_OFFERING_ID = "default";
 
@@ -88,15 +77,6 @@ function hasProEntitlement(customerInfo: CustomerInfo): boolean {
 async function loadPurchases(): Promise<PurchasesModule | null> {
   try {
     return (await import(/* @vite-ignore */ PURCHASES_MODULE)) as PurchasesModule;
-  } catch {
-    return null;
-  }
-}
-
-async function loadPurchasesUi(): Promise<RevenueCatUiModule["RevenueCatUI"] | null> {
-  try {
-    const module = (await import(/* @vite-ignore */ PURCHASES_UI_MODULE)) as RevenueCatUiModule;
-    return module.RevenueCatUI ?? null;
   } catch {
     return null;
   }
@@ -172,26 +152,13 @@ export async function clearCustomerInfoListener(): Promise<void> {
 }
 
 export async function presentPaywallIfNeeded(): Promise<boolean> {
-  if (!isNativePlatform()) return false;
-  const purchases = await ensureConfigured();
-  const ui = await loadPurchasesUi();
-  if (!purchases || !ui?.presentPaywallIfNeeded) return false;
-
-  await ui.presentPaywallIfNeeded({
-    requiredEntitlementIdentifier: getEntitlementId(),
-    offeringIdentifier: getOfferingId(),
-  });
-
-  const { customerInfo } = await purchases.Purchases.getCustomerInfo();
-  return hasProEntitlement(customerInfo);
+  // Temporarily disabled while isolating iOS startup crash related to native UI SDK loading.
+  return false;
 }
 
 export async function presentCustomerCenter(): Promise<boolean> {
-  if (!isNativePlatform()) return false;
-  const ui = await loadPurchasesUi();
-  if (!ui?.presentCustomerCenter) return false;
-  await ui.presentCustomerCenter();
-  return true;
+  // Temporarily disabled while isolating iOS startup crash related to native UI SDK loading.
+  return false;
 }
 
 export async function purchaseProduct(productId: ProductId): Promise<boolean> {
