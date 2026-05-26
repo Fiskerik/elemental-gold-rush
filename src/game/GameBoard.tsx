@@ -1970,9 +1970,7 @@ export function GameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "camp
   );
 
   function createSeededBoard(): Board {
-    if (target < SEEDED_BOARD_MIN_TARGET) {
-      // SCREENSHOT_SEED: temporary seeding for marketing screenshots
-    }
+    if (target < SEEDED_BOARD_MIN_TARGET) return createEmptyBoard();
     const maxSeedAtom = Math.max(1, target - SEEDED_BOARD_TARGET_OFFSET);
     const availableAtoms = discoveredSeedAtoms(maxSeedAtom);
     const count =
