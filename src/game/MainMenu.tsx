@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import {
   Atom,
   BookOpen,
@@ -44,6 +44,7 @@ export function MainMenu({
   onLibrary,
   onProfile,
 }: Props) {
+  const [showMissionDetails, setShowMissionDetails] = useState(false);
   const {
     unlockedLevel,
     highestElement,
@@ -119,7 +120,7 @@ export function MainMenu({
   }
 
   return (
-    <div className="app-shell" style={{ padding: 18, paddingTop: 26 }}>
+    <div className="app-shell" style={{ padding: 20, paddingTop: 26 }}>
       <div
         style={{
           position: "relative",
@@ -128,9 +129,9 @@ export function MainMenu({
           margin: "0 auto",
           display: "flex",
           flexDirection: "column",
-          gap: 14,
+          gap: 18,
           minHeight: "100dvh",
-          paddingBottom: 24,
+          paddingBottom: 28,
         }}
       >
         <header style={topBar}>
@@ -234,47 +235,39 @@ export function MainMenu({
           </button>
         </section>
 
-        <nav style={actionGrid} aria-label="Main game sections">
-          <BigButton
+        <nav style={subpageRow} aria-label="Main game sections">
+          <NavPill
             icon={Atom}
-            iconColor="oklch(0.78 0.18 145)"
+            label="Collection"
             onClick={() => {
               trackMenuAction("collection");
               onCollection();
             }}
-          >
-            Collection
-          </BigButton>
-          <BigButton
+          />
+          <NavPill
             icon={FlaskConical}
-            iconColor="oklch(0.78 0.2 320)"
+            label="Lab"
             onClick={() => {
               trackMenuAction("lab");
               onLab();
             }}
-          >
-            Lab Modes
-          </BigButton>
-          <BigButton
+          />
+          <NavPill
             icon={Library}
-            iconColor="oklch(0.78 0.16 50)"
+            label="Library"
             onClick={() => {
               trackMenuAction("library");
               onLibrary();
             }}
-          >
-            Library
-          </BigButton>
-          <BigButton
+          />
+          <NavPill
             icon={hasProPack ? BookOpen : ShoppingBag}
-            iconColor="oklch(0.78 0.18 25)"
+            label={hasProPack ? "Pro" : "Shop"}
             onClick={() => {
               trackMenuAction("shop");
               onShop();
             }}
-          >
-            {hasProPack ? "Pro Pack" : "Shop"}
-          </BigButton>
+          />
         </nav>
 
         <section style={dailyPanel}>
@@ -301,7 +294,14 @@ export function MainMenu({
               {weeklyBonus.todayClaimed ? `Today +${weeklyBonus.coinsEarnedToday}` : "Play today +1"}
             </div>
           </div>
-          <div style={weeklyBonusCard}>
+          <button
+            type="button"
+            onClick={() => setShowMissionDetails((current) => !current)}
+            style={dailyExpandButton}
+          >
+            {showMissionDetails ? "Hide details" : "Show details"}
+          </button>
+          {showMissionDetails && <div style={weeklyBonusCard}>
             <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
               <div>
                 <div style={sectionLabel}>PLAY A GAME A DAY</div>
@@ -370,8 +370,8 @@ export function MainMenu({
             <div style={{ fontSize: 10, color: "var(--muted-foreground)", lineHeight: 1.35 }}>
               1 coin each day you play. {weeklyBonus.nextRewardText}.
             </div>
-          </div>
-          <div style={questGrid}>
+          </div>}
+          {showMissionDetails && <div style={questGrid}>
             {dailyQuests.map((quest) => (
               <div key={quest.id} style={questRow}>
                 <span
@@ -401,7 +401,7 @@ export function MainMenu({
                 </span>
               </div>
             ))}
-          </div>
+          </div>}
         </section>
 
       </div>
@@ -556,9 +556,9 @@ const compactStatRow: CSSProperties = {
   fontWeight: 800,
 };
 
-const actionGrid: CSSProperties = {
+const subpageRow: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+  gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
   gap: 10,
 };
 
@@ -568,6 +568,19 @@ const dailyPanel: CSSProperties = {
   border: "1px solid var(--border)",
   borderRadius: 16,
   padding: 14,
+};
+
+const dailyExpandButton: CSSProperties = {
+  width: "100%",
+  marginTop: 12,
+  borderRadius: 10,
+  border: "1px solid var(--border)",
+  background: "var(--surface)",
+  color: "var(--muted-foreground)",
+  fontSize: 12,
+  fontWeight: 800,
+  padding: "8px 10px",
+  cursor: "pointer",
 };
 
 const streakPanel: CSSProperties = {
@@ -777,45 +790,34 @@ function Stat({ label, value, sub }: { label: string; value: string; sub?: strin
   );
 }
 
-function BigButton({
-  children,
-  onClick,
+function NavPill({
   icon: Icon,
-  iconColor,
+  label,
+  onClick,
 }: {
-  children: ReactNode;
+  icon: LucideIcon;
+  label: string;
   onClick: () => void;
-  icon?: LucideIcon;
-  iconColor?: string;
 }) {
   return (
     <button
+      type="button"
       onClick={onClick}
       style={{
-        textAlign: "left",
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-        padding: "14px 15px",
+        display: "grid",
+        justifyItems: "center",
+        gap: 6,
         borderRadius: 13,
         border: "1px solid var(--border)",
         background: "var(--surface)",
         color: "var(--foreground)",
-        boxShadow: "0 2px 8px rgba(0,0,0,0.22)",
+        padding: "10px 8px",
+        boxShadow: "0 2px 12px rgba(0,0,0,0.2)",
         cursor: "pointer",
-        fontSize: 15,
-        fontWeight: 800,
-        transition: "transform 0.1s ease",
-        minWidth: 0,
       }}
-      onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.98)")}
-      onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
-      onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
     >
-      {Icon && <Icon size={19} color={iconColor} aria-hidden="true" />}
-      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-        {children}
-      </span>
+      <Icon size={18} aria-hidden="true" />
+      <span style={{ fontSize: 11, color: "var(--muted-foreground)", fontWeight: 700 }}>{label}</span>
     </button>
   );
 }

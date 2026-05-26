@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import type { CSSProperties } from "react";
 import { useEffect, useState } from "react";
+import { Capacitor } from "@capacitor/core";
 import { MainMenu } from "@/game/MainMenu";
 import { clearSavedRun, GameBoard, getSavedRunSummary } from "@/game/GameBoard";
 import { LevelSelect } from "@/game/LevelSelect";
@@ -57,7 +58,14 @@ function Index() {
   const hasProPack = useProgress((s) => s.hasProPack);
   const grantProPack = useProgress((s) => s.grantProPack);
   const [screen, setScreen] = useState<Screen>({ name: "menu" });
+  const [showLaunchScreen, setShowLaunchScreen] = useState(() => Capacitor.isNativePlatform());
   const [resumePrompt, setResumePrompt] = useState<ReturnType<typeof getSavedRunSummary>>(null);
+
+  useEffect(() => {
+    if (!showLaunchScreen) return;
+    const timeoutId = window.setTimeout(() => setShowLaunchScreen(false), 1100);
+    return () => window.clearTimeout(timeoutId);
+  }, [showLaunchScreen]);
 
   useEffect(() => {
     let cancelled = false;
@@ -79,6 +87,8 @@ function Index() {
   useEffect(() => {
     void initAds(hasProPack);
   }, [hasProPack]);
+
+  if (showLaunchScreen) return <NativeLaunchScreen />;
 
   function startCampaign() {
     const saved = getSavedRunSummary();
@@ -165,6 +175,39 @@ function Index() {
     case "settings":
       return <Settings onBack={() => setScreen({ name: "menu" })} />;
   }
+}
+
+function NativeLaunchScreen() {
+  return (
+    <div
+      style={{
+        minHeight: "100dvh",
+        display: "grid",
+        placeItems: "center",
+        background:
+          "radial-gradient(circle at 25% 18%, oklch(0.36 0.07 250 / 0.28), transparent 45%), radial-gradient(circle at 75% 82%, oklch(0.48 0.08 55 / 0.2), transparent 50%), oklch(0.16 0.02 255)",
+      }}
+    >
+      <div style={{ display: "grid", justifyItems: "center", gap: 14 }}>
+        <img
+          src="/game-icon.png"
+          alt="Elemental Gold Rush"
+          style={{
+            width: 98,
+            height: 98,
+            borderRadius: 24,
+            boxShadow: "0 18px 46px rgba(0,0,0,0.46)",
+          }}
+        />
+        <div className="gold-text" style={{ fontSize: 22, fontWeight: 900 }}>
+          Elemental Gold Rush
+        </div>
+        <div style={{ fontSize: 12, color: "var(--muted-foreground)", letterSpacing: 0.4 }}>
+          Loading compounds...
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function ResumeRunPrompt({
