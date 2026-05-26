@@ -37,6 +37,14 @@ workflows:
         script: |
           cd ios/App
           pod install
+      - name: Auto-increment iOS build number
+        script: |
+          cd ios/App
+          BUILD_NO="${PROJECT_BUILD_NUMBER:-$BUILD_NUMBER}"
+          if [ -z "$BUILD_NO" ]; then
+            BUILD_NO="$(date +%s)"
+          fi
+          xcrun agvtool new-version -all "$BUILD_NO"
       - name: Set up iOS signing
         script: |
           xcode-project use-profiles
