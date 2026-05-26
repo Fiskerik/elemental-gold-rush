@@ -27,6 +27,12 @@ workflows:
         script: |
           sed -i '' 's/platform :ios, '\''[0-9.]*'\''/platform :ios, '\''15.0'\''/g' ios/App/Podfile
           sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = [0-9.]\\+;/IPHONEOS_DEPLOYMENT_TARGET = 15.0;/g' ios/App/App.xcodeproj/project.pbxproj
+      - name: Inject iOS runtime keys
+        script: |
+          if [ -n "$VITE_ADMOB_IOS_APP_ID" ]; then
+            /usr/libexec/PlistBuddy -c "Set :GADApplicationIdentifier $VITE_ADMOB_IOS_APP_ID" ios/App/App/Info.plist \
+              || /usr/libexec/PlistBuddy -c "Add :GADApplicationIdentifier string $VITE_ADMOB_IOS_APP_ID" ios/App/App/Info.plist
+          fi
       - name: Install CocoaPods
         script: |
           cd ios/App

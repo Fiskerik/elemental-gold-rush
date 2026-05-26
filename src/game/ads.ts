@@ -33,6 +33,12 @@ let rewardedReady = false;
 let rewardedLoading = false;
 let rewardedEarned = false;
 
+function hasAdMobRuntimeConfig(): boolean {
+  // Native iOS builds require a valid GADApplicationIdentifier in Info.plist.
+  // We gate initialization on this env var so a missing config cannot crash launch builds.
+  return Boolean(import.meta.env.VITE_ADMOB_IOS_APP_ID);
+}
+
 async function loadAdMob(): Promise<AdMobModule | null> {
   try {
     return (await import(/* @vite-ignore */ ADMOB_MODULE)) as AdMobModule;
@@ -50,6 +56,7 @@ function getRewardedId(): string {
 }
 
 export async function initAds(hasProPack: boolean): Promise<void> {
+  if (!hasAdMobRuntimeConfig()) return;
   if (hasProPack || initialized) return;
   const admob = await loadAdMob();
   if (!admob) return;
