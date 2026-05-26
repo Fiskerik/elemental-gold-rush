@@ -14,11 +14,7 @@ import { Profile } from "@/game/Profile";
 import { GameModeId } from "@/game/challenges";
 import { getLevelById } from "@/game/levels";
 import { useProgress } from "@/game/store";
-import { initAds } from "@/game/ads";
 import {
-  clearCustomerInfoListener,
-  initPurchases,
-  setCustomerInfoListener,
   syncCustomerInfoEntitlement,
 } from "@/game/purchases";
 
@@ -69,24 +65,22 @@ function Index() {
 
   useEffect(() => {
     let cancelled = false;
-    initPurchases().then((hasProEntitlement) => {
-      if (!cancelled && hasProEntitlement) grantProPack();
-    });
-    void setCustomerInfoListener((hasProEntitlement) => {
-      if (hasProEntitlement) grantProPack();
-    });
-    void syncCustomerInfoEntitlement().then((hasProEntitlement) => {
-      if (!cancelled && hasProEntitlement) grantProPack();
-    });
+    // Delay native purchase SDK access to avoid launch-time native SDK crashes on some iOS builds.
+    const timeoutId = window.setTimeout(() => {
+      void syncCustomerInfoEntitlement()
+        .then((hasProEntitlement) => {
+          if (!cancelled && hasProEntitlement) grantProPack();
+        })
+        .catch(() => {
+          // Keep launch resilient even if native billing SDK has runtime issues.
+        });
+    }, 4000);
+
     return () => {
       cancelled = true;
-      void clearCustomerInfoListener();
+      window.clearTimeout(timeoutId);
     };
   }, [grantProPack]);
-
-  useEffect(() => {
-    void initAds(hasProPack);
-  }, [hasProPack]);
 
   if (showLaunchScreen) return <NativeLaunchScreen />;
 
