@@ -49,6 +49,12 @@ const DEFAULT_OFFERING_ID = "default";
 
 let configured = false;
 let customerInfoListenerId: string | null = null;
+let missingConfigLogged = false;
+
+export type PurchaseGoldCoinResult = {
+  coins: number;
+  reason?: string;
+};
 
 function isNativePlatform(): boolean {
   return Capacitor.isNativePlatform();
@@ -58,6 +64,7 @@ function getRevenueCatApiKey(): string {
   return (
     import.meta.env.VITE_REVENUECAT_API_KEY ??
     import.meta.env.VITE_REVENUECAT_IOS_API_KEY ??
+    import.meta.env.VITE_RC_IOS_API_KEY ??
     ""
   );
 }
@@ -89,7 +96,15 @@ async function ensureConfigured(): Promise<PurchasesModule | null> {
   if (configured) return purchases;
 
   const apiKey = getRevenueCatApiKey();
-  if (!apiKey) return null;
+  if (!apiKey) {
+    if (!missingConfigLogged) {
+      console.warn(
+        "RevenueCat API key is missing. Set VITE_REVENUECAT_IOS_API_KEY (or VITE_REVENUECAT_API_KEY) in iOS release builds.",
+      );
+      missingConfigLogged = true;
+    }
+    return null;
+  }
   if (!import.meta.env.PROD) {
     await purchases.Purchases.setLogLevel?.({ level: purchases.LOG_LEVEL?.DEBUG ?? "DEBUG" });
   }
@@ -109,10 +124,32 @@ async function findPackage(productId: ProductId): Promise<RevenueCatPackage | nu
       ? offerings.current
       : offerings.all?.[offeringId] ?? offerings.current;
 
+  const packages = preferred?.availablePackages ?? [];
+  const directMatch =
+    packages.find((pkg) => pkg.product.identifier === productId) ??
+    packages.find((pkg) => pkg.identifier === productId) ??
+    null;
+  if (directMatch) return directMatch;
+
+  const product = getProductById(productId);
+  if (!product?.coins) return null;
+
+  const normalizedNeedles = [
+    `coins${product.coins}`,
+    `coin${product.coins}`,
+    `${product.coins}coins`,
+    `${product.coins}coin`,
+  ];
+  const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, "");
+
   return (
-    preferred?.availablePackages?.find((pkg) => pkg.product.identifier === productId) ??
-    preferred?.availablePackages?.find((pkg) => pkg.identifier === productId) ??
-    null
+    packages.find((pkg) => {
+      const productToken = normalize(pkg.product.identifier);
+      const packageToken = normalize(pkg.identifier);
+      return normalizedNeedles.some(
+        (needle) => productToken.includes(needle) || packageToken.includes(needle),
+      );
+    }) ?? null
   );
 }
 
@@ -176,17 +213,39 @@ export async function purchaseProduct(productId: ProductId): Promise<boolean> {
   return productId === PRODUCT_IDS.proLabPack ? hasProEntitlement(customerInfo) : true;
 }
 
-export async function purchaseGoldCoinPack(productId: ProductId): Promise<number> {
+export async function purchaseGoldCoinPack(productId: ProductId): Promise<PurchaseGoldCoinResult> {
   const product = getProductById(productId);
-  if (!product || product.type !== "consumable" || !product.coins) return 0;
-  const purchases = await ensureConfigured();
-  const packageToPurchase = await findPackage(productId);
-  if (!purchases || !packageToPurchase) {
-    console.log("Native App Store coin purchases are not available in this build.", { productId });
-    return 0;
+  if (!product || product.type !== "consumable" || !product.coins) {
+    return { coins: 0, reason: "Invalid product configuration." };
   }
-  await purchases.Purchases.purchasePackage({ aPackage: packageToPurchase });
-  return product.coins;
+  if (!isNativePlatform()) {
+    return { coins: 0, reason: "App Store purchases are only available in the iPhone app." };
+  }
+  const purchases = await ensureConfigured();
+  if (!purchases) {
+    return {
+      coins: 0,
+      reason: "RevenueCat is not configured in this build. Add VITE_REVENUECAT_IOS_API_KEY in Codemagic.",
+    };
+  }
+  const packageToPurchase = await findPackage(productId);
+  if (!packageToPurchase) {
+    const offeringId = getOfferingId();
+    return {
+      coins: 0,
+      reason: `Product not found in RevenueCat offering '${offeringId}'. Check product IDs and offering setup.`,
+    };
+  }
+  try {
+    await purchases.Purchases.purchasePackage({ aPackage: packageToPurchase });
+    return { coins: product.coins };
+  } catch (error) {
+    const message =
+      error instanceof Error && error.message
+        ? error.message
+        : "App Store purchase could not be completed right now.";
+    return { coins: 0, reason: message };
+  }
 }
 
 export async function restorePurchases(): Promise<ProductId[]> {

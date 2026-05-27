@@ -8,7 +8,7 @@ const config = {
   },
   ios: {
     contentInset: "automatic",
-    scrollEnabled: false,
+    scrollEnabled: true,
   },
   plugins: {
     SplashScreen: {
@@ -17,6 +17,7 @@ const config = {
       showSpinner: false,
     },
     StatusBar: {
+      overlaysWebView: false,
       style: "DARK",
       backgroundColor: "#0A0A1A",
     },

@@ -4301,7 +4301,14 @@ export function GameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "camp
   return (
     <div
       className="app-shell"
-      style={{ display: "flex", flexDirection: "column", minHeight: "100dvh", padding: 12 }}
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        minHeight: "100dvh",
+        padding: 12,
+        paddingTop: "calc(env(safe-area-inset-top, 0px) + 12px)",
+        paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 12px)",
+      }}
     >
       <div
         style={{

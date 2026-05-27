@@ -20,6 +20,26 @@ workflows:
       - name: Install dependencies
         script: |
           npm ci
+      - name: Prepare Vite iOS env
+        script: |
+          RC_KEY="${VITE_REVENUECAT_IOS_API_KEY:-$REVENUECAT_IOS_API_KEY}"
+          RC_ENTITLEMENT="${VITE_REVENUECAT_ENTITLEMENT_ID:-$REVENUECAT_ENTITLEMENT_ID}"
+          RC_OFFERING="${VITE_REVENUECAT_OFFERING_ID:-$REVENUECAT_OFFERING_ID}"
+          ADMOB_INTERSTITIAL="${VITE_ADMOB_IOS_INTERSTITIAL_ID:-$ADMOB_IOS_INTERSTITIAL_ID}"
+          ADMOB_REWARDED="${VITE_ADMOB_IOS_REWARDED_ID:-$ADMOB_IOS_REWARDED_ID}"
+
+          cat > .env.production.local <<EOF
+          VITE_REVENUECAT_IOS_API_KEY=${RC_KEY}
+          VITE_REVENUECAT_API_KEY=${RC_KEY}
+          VITE_REVENUECAT_ENTITLEMENT_ID=${RC_ENTITLEMENT}
+          VITE_REVENUECAT_OFFERING_ID=${RC_OFFERING}
+          VITE_ADMOB_IOS_INTERSTITIAL_ID=${ADMOB_INTERSTITIAL}
+          VITE_ADMOB_IOS_REWARDED_ID=${ADMOB_REWARDED}
+          EOF
+
+          if [ -z "$RC_KEY" ]; then
+            echo "WARNING: RevenueCat API key is missing. Native coin purchases will not work in this build."
+          fi
       - name: Build web + sync Capacitor iOS
         script: |
           npm run cap:sync

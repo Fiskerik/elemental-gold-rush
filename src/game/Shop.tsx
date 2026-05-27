@@ -131,13 +131,15 @@ export function Shop({ onBack }: { onBack: () => void }) {
   }
 
   async function handleNativeCoinPurchase(productId: ProductId) {
-    const coins = await purchaseGoldCoinPack(productId);
-    if (coins > 0) {
-      grantGoldCoins(coins);
-      setMessage(`${coins} gold coin${coins === 1 ? "" : "s"} added from App Store purchase.`);
+    const result = await purchaseGoldCoinPack(productId);
+    if (result.coins > 0) {
+      grantGoldCoins(result.coins);
+      setMessage(
+        `${result.coins} gold coin${result.coins === 1 ? "" : "s"} added from App Store purchase.`,
+      );
       return;
     }
-    setMessage("App Store coin purchases are only available in the iPhone build.");
+    setMessage(result.reason ?? "App Store coin purchase is not available right now.");
   }
 
   async function handleRewardedCoin() {

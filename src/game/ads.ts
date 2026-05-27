@@ -27,17 +27,12 @@ const TEST_INTERSTITIAL_ID = "ca-app-pub-3940256099942544/4411468910";
 const TEST_REWARDED_ID = "ca-app-pub-3940256099942544/1712485313";
 
 let initialized = false;
+let initFailed = false;
 let ready = false;
 let loading = false;
 let rewardedReady = false;
 let rewardedLoading = false;
 let rewardedEarned = false;
-
-function hasAdMobRuntimeConfig(): boolean {
-  // Native iOS builds require a valid GADApplicationIdentifier in Info.plist.
-  // We gate initialization on this env var so a missing config cannot crash launch builds.
-  return Boolean(import.meta.env.VITE_ADMOB_IOS_APP_ID);
-}
 
 async function loadAdMob(): Promise<AdMobModule | null> {
   try {
@@ -56,51 +51,55 @@ function getRewardedId(): string {
 }
 
 export async function initAds(hasProPack: boolean): Promise<void> {
-  if (!hasAdMobRuntimeConfig()) return;
-  if (hasProPack || initialized) return;
+  if (hasProPack || initialized || initFailed) return;
   const admob = await loadAdMob();
   if (!admob) return;
-  initialized = true;
-
-  await admob.AdMob.initialize({
-    requestTrackingAuthorization: true,
-    initializeForTesting: !import.meta.env.PROD,
-  });
   try {
-    await admob.AdMob.requestConsentInfo?.();
-    await admob.AdMob.showConsentForm?.();
-  } catch {
-    // Consent forms depend on the AdMob dashboard region/message setup.
-  }
+    await admob.AdMob.initialize({
+      requestTrackingAuthorization: true,
+      initializeForTesting: !import.meta.env.PROD,
+    });
+    initialized = true;
 
-  admob.AdMob.addListener?.(admob.InterstitialAdPluginEvents?.Loaded ?? "interstitialAdLoaded", () => {
-    ready = true;
-    loading = false;
-  });
-  admob.AdMob.addListener?.(
-    admob.InterstitialAdPluginEvents?.FailedToLoad ?? "interstitialAdFailedToLoad",
-    () => {
-      ready = false;
+    try {
+      await admob.AdMob.requestConsentInfo?.();
+      await admob.AdMob.showConsentForm?.();
+    } catch {
+      // Consent forms depend on the AdMob dashboard region/message setup.
+    }
+
+    admob.AdMob.addListener?.(admob.InterstitialAdPluginEvents?.Loaded ?? "interstitialAdLoaded", () => {
+      ready = true;
       loading = false;
-    },
-  );
-  admob.AdMob.addListener?.(admob.RewardAdPluginEvents?.Loaded ?? "rewardedVideoAdLoaded", () => {
-    rewardedReady = true;
-    rewardedLoading = false;
-  });
-  admob.AdMob.addListener?.(
-    admob.RewardAdPluginEvents?.FailedToLoad ?? "rewardedVideoAdFailedToLoad",
-    () => {
-      rewardedReady = false;
+    });
+    admob.AdMob.addListener?.(
+      admob.InterstitialAdPluginEvents?.FailedToLoad ?? "interstitialAdFailedToLoad",
+      () => {
+        ready = false;
+        loading = false;
+      },
+    );
+    admob.AdMob.addListener?.(admob.RewardAdPluginEvents?.Loaded ?? "rewardedVideoAdLoaded", () => {
+      rewardedReady = true;
       rewardedLoading = false;
-    },
-  );
-  admob.AdMob.addListener?.(admob.RewardAdPluginEvents?.Rewarded ?? "onRewardedVideoAdReward", () => {
-    rewardedEarned = true;
-  });
+    });
+    admob.AdMob.addListener?.(
+      admob.RewardAdPluginEvents?.FailedToLoad ?? "rewardedVideoAdFailedToLoad",
+      () => {
+        rewardedReady = false;
+        rewardedLoading = false;
+      },
+    );
+    admob.AdMob.addListener?.(admob.RewardAdPluginEvents?.Rewarded ?? "onRewardedVideoAdReward", () => {
+      rewardedEarned = true;
+    });
 
-  await preloadInterstitial();
-  await preloadRewarded();
+    await preloadInterstitial();
+    await preloadRewarded();
+  } catch {
+    initFailed = true;
+    initialized = false;
+  }
 }
 
 export async function preloadInterstitial(): Promise<void> {
@@ -110,8 +109,10 @@ export async function preloadInterstitial(): Promise<void> {
   loading = true;
   try {
     await admob.AdMob.prepareInterstitial({ adId: getInterstitialId() });
+    ready = true;
   } catch {
     ready = false;
+  } finally {
     loading = false;
   }
 }
@@ -123,8 +124,10 @@ export async function preloadRewarded(): Promise<void> {
   rewardedLoading = true;
   try {
     await admob.AdMob.prepareRewardVideoAd({ adId: getRewardedId() });
+    rewardedReady = true;
   } catch {
     rewardedReady = false;
+  } finally {
     rewardedLoading = false;
   }
 }
@@ -136,7 +139,7 @@ export async function showInterstitialIfReady(hasProPack: boolean): Promise<bool
   if (!initialized) await initAds(false);
   if (!ready) {
     await preloadInterstitial();
-    return false;
+    if (!ready) return false;
   }
   ready = false;
   try {
@@ -156,7 +159,7 @@ export async function showRewardedForCoin(hasProPack: boolean): Promise<boolean>
   if (!initialized) await initAds(false);
   if (!rewardedReady) {
     await preloadRewarded();
-    return false;
+    if (!rewardedReady) return false;
   }
   rewardedEarned = false;
   rewardedReady = false;
