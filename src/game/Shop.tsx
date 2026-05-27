@@ -102,6 +102,7 @@ export function Shop({ onBack }: { onBack: () => void }) {
     hasProPack,
   } = useProgress();
   const [message, setMessage] = useState("");
+  const [pendingProductId, setPendingProductId] = useState<ProductId | "rewarded" | null>(null);
 
   function handlePowerUpPurchase(
     powerUp: InventoryPowerUpId,
@@ -131,25 +132,41 @@ export function Shop({ onBack }: { onBack: () => void }) {
   }
 
   async function handleNativeCoinPurchase(productId: ProductId) {
-    const result = await purchaseGoldCoinPack(productId);
-    if (result.coins > 0) {
-      grantGoldCoins(result.coins);
-      setMessage(
-        `${result.coins} gold coin${result.coins === 1 ? "" : "s"} added from App Store purchase.`,
-      );
-      return;
+    setPendingProductId(productId);
+    setMessage("Opening App Store purchase...");
+    try {
+      const result = await purchaseGoldCoinPack(productId);
+      if (result.coins > 0) {
+        grantGoldCoins(result.coins);
+        setMessage(
+          `${result.coins} gold coin${result.coins === 1 ? "" : "s"} added from App Store purchase.`,
+        );
+        return;
+      }
+      setMessage(result.reason ?? "App Store coin purchase is not available right now.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "App Store coin purchase could not be started.");
+    } finally {
+      setPendingProductId(null);
     }
-    setMessage(result.reason ?? "App Store coin purchase is not available right now.");
   }
 
   async function handleRewardedCoin() {
-    const result = await showRewardedForCoin(hasProPack);
-    if (result.rewarded) {
-      grantGoldCoins(1);
-      setMessage("Reward complete: +1 gold coin.");
-      return;
+    setPendingProductId("rewarded");
+    setMessage("Loading rewarded ad...");
+    try {
+      const result = await showRewardedForCoin(hasProPack);
+      if (result.rewarded) {
+        grantGoldCoins(1);
+        setMessage("Reward complete: +1 gold coin.");
+        return;
+      }
+      setMessage(result.reason ?? "Rewarded ad not completed or not available yet. Try again shortly.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Rewarded ad could not be started.");
+    } finally {
+      setPendingProductId(null);
     }
-    setMessage(result.reason ?? "Rewarded ad not completed or not available yet. Try again shortly.");
   }
 
   return (
@@ -223,16 +240,16 @@ export function Shop({ onBack }: { onBack: () => void }) {
           <button
             type="button"
             onClick={handleRewardedCoin}
-            disabled={hasProPack}
+            disabled={hasProPack || Boolean(pendingProductId)}
             style={{
               ...shopButton,
               width: "100%",
               marginBottom: 10,
-              opacity: hasProPack ? 0.6 : 1,
-              cursor: hasProPack ? "not-allowed" : "pointer",
+              opacity: hasProPack || (pendingProductId && pendingProductId !== "rewarded") ? 0.6 : 1,
+              cursor: hasProPack || pendingProductId ? "not-allowed" : "pointer",
             }}
           >
-            Watch rewarded ad for +1 coin
+            {pendingProductId === "rewarded" ? "Loading ad..." : "Watch rewarded ad for +1 coin"}
           </button>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
             {APP_STORE_COIN_PACKS.map((productId) => {
@@ -243,11 +260,16 @@ export function Shop({ onBack }: { onBack: () => void }) {
                   key={productId}
                   type="button"
                   onClick={() => handleNativeCoinPurchase(productId)}
-                  style={coinPackButton}
+                  disabled={Boolean(pendingProductId)}
+                  style={{
+                    ...coinPackButton,
+                    opacity: pendingProductId && pendingProductId !== productId ? 0.55 : 1,
+                    cursor: pendingProductId ? "not-allowed" : "pointer",
+                  }}
                 >
                   <GoldCoinIcon size={28} />
                   <strong style={coinPackAmount}>{product.coins}x</strong>
-                  <span>App Store</span>
+                  <span>{pendingProductId === productId ? "Opening..." : "App Store"}</span>
                 </button>
               );
             })}

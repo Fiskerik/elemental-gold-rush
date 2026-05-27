@@ -16,8 +16,7 @@ import { formatScore } from "./logic";
 import { PRODUCT_IDS, getProductById } from "./products";
 import {
   presentCustomerCenter,
-  presentPaywallIfNeeded,
-  purchaseProduct,
+  purchaseProductWithResult,
   restorePurchases,
 } from "./purchases";
 import { useProgress } from "./store";
@@ -46,6 +45,7 @@ export function Profile({ onBack }: Props) {
     setUnlockedLevel,
   } = useProgress();
   const [proPackMessage, setProPackMessage] = useState("");
+  const [proPackBusy, setProPackBusy] = useState<"purchase" | "restore" | "manage" | "">("");
   const highestEl = ELEMENTS[highestElement - 1];
   const proPack = getProductById(PRODUCT_IDS.proLabPack);
   const completedDailyQuests = dailyQuests.filter((quest) => quest.completed).length;
@@ -58,36 +58,56 @@ export function Profile({ onBack }: Props) {
   const completionPercent = Math.round((discoveredElements.length / ELEMENTS.length) * 100);
 
   async function handleProPackPurchase() {
-    const completed = await presentPaywallIfNeeded();
-    if (completed) {
-      grantProPack();
-      setProPackMessage("Atomic Fusion Lifetime unlocked.");
-      return;
+    setProPackBusy("purchase");
+    setProPackMessage("Opening App Store purchase...");
+    try {
+      const result = await purchaseProductWithResult(PRODUCT_IDS.proLabPack);
+      if (result.purchased) {
+        grantProPack();
+        setProPackMessage("Atomic Fusion Lifetime unlocked.");
+        return;
+      }
+      setProPackMessage(result.reason ?? "Atomic Fusion Lifetime purchase is not available right now.");
+    } catch (error) {
+      setProPackMessage(error instanceof Error ? error.message : "App Store purchase could not be started.");
+    } finally {
+      setProPackBusy("");
     }
-    const fallbackCompleted = await purchaseProduct(PRODUCT_IDS.proLabPack);
-    if (fallbackCompleted) {
-      grantProPack();
-      setProPackMessage("Atomic Fusion Lifetime unlocked.");
-      return;
-    }
-    setProPackMessage("Paywall is not available in this build. Use iPhone build for purchases.");
   }
 
   async function handleCustomerCenter() {
-    const opened = await presentCustomerCenter();
-    if (!opened) {
-      setProPackMessage("Customer Center is only available in the native iPhone build.");
+    setProPackBusy("manage");
+    setProPackMessage("Opening App Store purchase management...");
+    try {
+      const opened = await presentCustomerCenter();
+      setProPackMessage(
+        opened
+          ? "Purchase management opened."
+          : "No App Store management page is available yet. Use Restore to refresh purchases.",
+      );
+    } catch (error) {
+      setProPackMessage(error instanceof Error ? error.message : "Purchase management could not be opened.");
+    } finally {
+      setProPackBusy("");
     }
   }
 
   async function handleProPackRestore() {
-    const restored = await restorePurchases();
-    if (restored.includes(PRODUCT_IDS.proLabPack)) {
-      grantProPack();
-      setProPackMessage("Atomic Fusion Lifetime restored.");
-      return;
+    setProPackBusy("restore");
+    setProPackMessage("Checking App Store purchases...");
+    try {
+      const restored = await restorePurchases();
+      if (restored.includes(PRODUCT_IDS.proLabPack)) {
+        grantProPack();
+        setProPackMessage("Atomic Fusion Lifetime restored.");
+        return;
+      }
+      setProPackMessage("No Atomic Fusion Lifetime purchase was found.");
+    } catch (error) {
+      setProPackMessage(error instanceof Error ? error.message : "Purchases could not be restored.");
+    } finally {
+      setProPackBusy("");
     }
-    setProPackMessage("No Atomic Fusion Lifetime purchase was found.");
   }
 
   const proPackPanel = proPack ? (
@@ -132,22 +152,33 @@ export function Profile({ onBack }: Props) {
           <button
             type="button"
             onClick={handleProPackRestore}
+            disabled={Boolean(proPackBusy)}
             style={{
               ...profileActionButton,
               background: "var(--surface-high)",
               color: "var(--foreground)",
+              opacity: proPackBusy && proPackBusy !== "restore" ? 0.55 : 1,
             }}
           >
-            Restore
+            {proPackBusy === "restore" ? "Checking..." : "Restore"}
           </button>
-          <button type="button" onClick={handleProPackPurchase} style={profileActionButton}>
-            Unlock Pack
+          <button
+            type="button"
+            onClick={handleProPackPurchase}
+            disabled={Boolean(proPackBusy)}
+            style={{
+              ...profileActionButton,
+              opacity: proPackBusy && proPackBusy !== "purchase" ? 0.55 : 1,
+            }}
+          >
+            {proPackBusy === "purchase" ? "Opening..." : "Unlock Pack"}
           </button>
         </div>
       )}
       <button
         type="button"
         onClick={handleCustomerCenter}
+        disabled={Boolean(proPackBusy)}
         style={{
           ...profileActionButton,
           width: "100%",
@@ -156,9 +187,10 @@ export function Profile({ onBack }: Props) {
           color: "var(--foreground)",
           boxShadow: "none",
           border: "1px solid var(--border)",
+          opacity: proPackBusy && proPackBusy !== "manage" ? 0.55 : 1,
         }}
       >
-        Manage Purchases
+        {proPackBusy === "manage" ? "Opening..." : "Manage Purchases"}
       </button>
       {proPackMessage && (
         <p style={{ margin: "12px 0 0", color: "var(--muted-foreground)", fontSize: 12 }}>
