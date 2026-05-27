@@ -10,14 +10,11 @@ export const getRouter = () => {
     context: { queryClient },
     scrollRestoration: true,
     defaultPreloadStaleTime: 0,
-<<<<<<< Updated upstream
-=======
     defaultSsr: false,
     defaultErrorComponent: ({ error }) => {
       console.error(error);
       return null;
     },
->>>>>>> Stashed changes
   });
 
   return router;
