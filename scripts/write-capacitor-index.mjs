@@ -1,55 +1,12 @@
-import { readdir, readFile, stat, writeFile } from "node:fs/promises";
+import { readdir, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 const clientDir = join(process.cwd(), "dist", "client");
 const assetsDir = join(clientDir, "assets");
 const assets = await readdir(assetsDir);
 const css = assets.find((name) => /^styles-.*\.css$/.test(name));
-let entry = null;
-
-// Prefer Vite manifest entries when available.
-try {
-  const manifestRaw = await readFile(join(clientDir, ".vite", "manifest.json"), "utf8");
-  const manifest = JSON.parse(manifestRaw);
-  for (const chunk of Object.values(manifest)) {
-    if (
-      chunk &&
-      typeof chunk === "object" &&
-      chunk.isEntry === true &&
-      typeof chunk.file === "string" &&
-      /^assets\/index-.*\.js$/.test(chunk.file)
-    ) {
-      entry = chunk.file.replace(/^assets\//, "");
-      break;
-    }
-  }
-} catch {
-  // Fall back to source scanning below.
-}
-
-if (!entry) {
-  const indexAssets = assets.filter((name) => /^index-.*\.js$/.test(name));
-  const candidates = [];
-  for (const asset of indexAssets) {
-    const source = await readFile(join(assetsDir, asset), "utf8");
-    if (!source.includes("hydrateRoot(document")) continue;
-    const hasIndexImport = /from"\.\/index-.*\.js"/.test(source);
-    const fileStat = await stat(join(assetsDir, asset));
-    candidates.push({ asset, hasIndexImport, size: fileStat.size });
-  }
-
-  // Prefer the bootstrap chunk that imports the large vendor `index-*` chunk.
-  // If that is missing, prefer the smallest hydrate chunk.
-  candidates.sort((a, b) => {
-    if (a.hasIndexImport !== b.hasIndexImport) return a.hasIndexImport ? -1 : 1;
-    return a.size - b.size;
-  });
-  entry = candidates[0]?.asset ?? null;
-}
-
-if (!entry) {
-  throw new Error("Could not find the TanStack Start browser entry for Capacitor.");
-}
+const entry = "capacitor-entry.js";
+await stat(join(assetsDir, entry));
 
 const indexHtml = `<!doctype html>
 <html lang="en">
@@ -122,18 +79,7 @@ const indexHtml = `<!doctype html>
       }, bootTimeoutMs);
 
       import("/assets/${entry}")
-        .then(() => {
-          const hideWhenReady = () => {
-            const hasApp = !!document.querySelector(".app-shell, #root, [data-router-root]");
-            if (hasApp && typeof window.__bootReady === "function") {
-              window.__bootReady();
-              window.clearTimeout(timeoutId);
-              return;
-            }
-            window.setTimeout(hideWhenReady, 150);
-          };
-          hideWhenReady();
-        })
+        .then(() => {})
         .catch((error) => {
           window.clearTimeout(timeoutId);
           const msg = error && (error.stack || error.message) ? (error.stack || error.message) : String(error);
@@ -147,12 +93,6 @@ const indexHtml = `<!doctype html>
   <body>
     <script>
       window.__CAPACITOR_DEBUG__ = true;
-      // Force client-only mode for TanStack Start in native WebView.
-      // This avoids SSR hydration paths that can fail in Capacitor static bundles.
-      window.__TSS_START_OPTIONS__ = {
-        defaultSsr: false,
-        serializationAdapters: [],
-      };
       window.addEventListener("error", function (event) {
         var message = event && event.message ? event.message : "Unknown runtime error";
         var filename = event && event.filename ? event.filename : "";
@@ -166,6 +106,7 @@ const indexHtml = `<!doctype html>
           "</pre>";
       });
     </script>
+    <div id="root"></div>
     <div id="boot-fallback">
       <div>
         <h1>Elemental Gold Rush</h1>
