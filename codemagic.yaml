@@ -22,20 +22,22 @@ workflows:
           npm ci
       - name: Prepare Vite iOS env
         script: |
-          RC_KEY="${VITE_REVENUECAT_IOS_API_KEY:-$REVENUECAT_IOS_API_KEY}"
-          RC_ENTITLEMENT="${VITE_REVENUECAT_ENTITLEMENT_ID:-$REVENUECAT_ENTITLEMENT_ID}"
-          RC_OFFERING="${VITE_REVENUECAT_OFFERING_ID:-$REVENUECAT_OFFERING_ID}"
+          RC_KEY="${VITE_REVENUECAT_IOS_API_KEY:-${REVENUECAT_IOS_API_KEY:-appl_wleIrbzZnDKaUaQgnbmYbTYVxfX}}"
+          RC_ENTITLEMENT="${VITE_REVENUECAT_ENTITLEMENT_ID:-${REVENUECAT_ENTITLEMENT_ID:-atomic_fusion_lifetime}}"
+          RC_OFFERING="${VITE_REVENUECAT_OFFERING_ID:-${REVENUECAT_OFFERING_ID:-default}}"
+          ADMOB_APP_ID="${VITE_ADMOB_IOS_APP_ID:-ca-app-pub-8854735603167656~9228353443}"
           ADMOB_INTERSTITIAL="${VITE_ADMOB_IOS_INTERSTITIAL_ID:-$ADMOB_IOS_INTERSTITIAL_ID}"
           ADMOB_REWARDED="${VITE_ADMOB_IOS_REWARDED_ID:-$ADMOB_IOS_REWARDED_ID}"
 
-          cat > .env.production.local <<EOF
-          VITE_REVENUECAT_IOS_API_KEY=${RC_KEY}
-          VITE_REVENUECAT_API_KEY=${RC_KEY}
-          VITE_REVENUECAT_ENTITLEMENT_ID=${RC_ENTITLEMENT}
-          VITE_REVENUECAT_OFFERING_ID=${RC_OFFERING}
-          VITE_ADMOB_IOS_INTERSTITIAL_ID=${ADMOB_INTERSTITIAL}
-          VITE_ADMOB_IOS_REWARDED_ID=${ADMOB_REWARDED}
-          EOF
+          {
+            printf 'VITE_REVENUECAT_IOS_API_KEY=%s\n' "$RC_KEY"
+            printf 'VITE_REVENUECAT_API_KEY=%s\n' "$RC_KEY"
+            printf 'VITE_REVENUECAT_ENTITLEMENT_ID=%s\n' "$RC_ENTITLEMENT"
+            printf 'VITE_REVENUECAT_OFFERING_ID=%s\n' "$RC_OFFERING"
+            printf 'VITE_ADMOB_IOS_APP_ID=%s\n' "$ADMOB_APP_ID"
+            printf 'VITE_ADMOB_IOS_INTERSTITIAL_ID=%s\n' "$ADMOB_INTERSTITIAL"
+            printf 'VITE_ADMOB_IOS_REWARDED_ID=%s\n' "$ADMOB_REWARDED"
+          } > .env.production.local
 
           if [ -z "$RC_KEY" ]; then
             echo "WARNING: RevenueCat API key is missing. Native coin purchases will not work in this build."

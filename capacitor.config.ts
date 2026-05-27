@@ -7,7 +7,7 @@ const config = {
     iosScheme: "https",
   },
   ios: {
-    contentInset: "automatic",
+    contentInset: "never",
     scrollEnabled: true,
   },
   plugins: {
@@ -17,8 +17,8 @@ const config = {
       showSpinner: false,
     },
     StatusBar: {
-      overlaysWebView: false,
-      style: "DARK",
+      overlaysWebView: true,
+      style: "LIGHT",
       backgroundColor: "#0A0A1A",
     },
   },

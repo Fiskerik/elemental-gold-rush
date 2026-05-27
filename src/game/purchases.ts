@@ -44,6 +44,7 @@ type PurchasesModule = {
 };
 
 const PURCHASES_MODULE = "@revenuecat/purchases-capacitor";
+const FALLBACK_REVENUECAT_IOS_API_KEY = "appl_wleIrbzZnDKaUaQgnbmYbTYVxfX";
 const DEFAULT_PRO_ENTITLEMENT = "atomic_fusion_lifetime";
 const DEFAULT_OFFERING_ID = "default";
 
@@ -60,12 +61,18 @@ function isNativePlatform(): boolean {
   return Capacitor.isNativePlatform();
 }
 
+function configuredEnvValue(value: unknown): string {
+  if (typeof value !== "string") return "";
+  const trimmed = value.trim();
+  return trimmed && trimmed !== "undefined" && trimmed !== "null" ? trimmed : "";
+}
+
 function getRevenueCatApiKey(): string {
   return (
-    import.meta.env.VITE_REVENUECAT_API_KEY ??
-    import.meta.env.VITE_REVENUECAT_IOS_API_KEY ??
-    import.meta.env.VITE_RC_IOS_API_KEY ??
-    ""
+    configuredEnvValue(import.meta.env.VITE_REVENUECAT_IOS_API_KEY) ||
+    configuredEnvValue(import.meta.env.VITE_REVENUECAT_API_KEY) ||
+    configuredEnvValue(import.meta.env.VITE_RC_IOS_API_KEY) ||
+    FALLBACK_REVENUECAT_IOS_API_KEY
   );
 }
 

@@ -143,13 +143,13 @@ export function Shop({ onBack }: { onBack: () => void }) {
   }
 
   async function handleRewardedCoin() {
-    const rewarded = await showRewardedForCoin(hasProPack);
-    if (rewarded) {
+    const result = await showRewardedForCoin(hasProPack);
+    if (result.rewarded) {
       grantGoldCoins(1);
       setMessage("Reward complete: +1 gold coin.");
       return;
     }
-    setMessage("Rewarded ad not completed or not available yet. Try again shortly.");
+    setMessage(result.reason ?? "Rewarded ad not completed or not available yet. Try again shortly.");
   }
 
   return (

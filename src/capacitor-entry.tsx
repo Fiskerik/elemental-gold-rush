@@ -21,8 +21,9 @@ const router = getRouter();
 createRoot(rootElement).render(<RouterProvider router={router} />);
 
 if (Capacitor.getPlatform() === "ios") {
-  void StatusBar.setOverlaysWebView({ overlay: false }).catch(() => {});
-  void StatusBar.setStyle({ style: Style.Dark }).catch(() => {});
+  void StatusBar.setOverlaysWebView({ overlay: true }).catch(() => {});
+  void StatusBar.setStyle({ style: Style.Light }).catch(() => {});
+  void StatusBar.setBackgroundColor({ color: "#0A0A1A" }).catch(() => {});
 }
 
 window.requestAnimationFrame(() => {
