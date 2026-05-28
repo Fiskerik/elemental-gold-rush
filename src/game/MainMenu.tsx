@@ -209,6 +209,45 @@ export function MainMenu({
           </div>
         </section>
 
+        <nav style={subpageRow} aria-label="Main game sections">
+          <NavPill
+            icon={Atom}
+            label="Collection"
+            tone="collection"
+            onClick={() => {
+              trackMenuAction("collection");
+              onCollection();
+            }}
+          />
+          <NavPill
+            icon={FlaskConical}
+            label="Lab"
+            tone="lab"
+            onClick={() => {
+              trackMenuAction("lab");
+              onLab();
+            }}
+          />
+          <NavPill
+            icon={Library}
+            label="Library"
+            tone="library"
+            onClick={() => {
+              trackMenuAction("library");
+              onLibrary();
+            }}
+          />
+          <NavPill
+            icon={hasProPack ? BookOpen : ShoppingBag}
+            label={hasProPack ? "Pro" : "Shop"}
+            tone="shop"
+            onClick={() => {
+              trackMenuAction("shop");
+              onShop();
+            }}
+          />
+        </nav>
+
         <section style={dailyPanel}>
           {dailyRewardToast && (
             <div style={dailyToast} role="status" aria-live="polite">
@@ -357,45 +396,6 @@ export function MainMenu({
           </div>
         </section>
 
-        <nav style={subpageRow} aria-label="Main game sections">
-          <NavPill
-            icon={Atom}
-            label="Collection"
-            tone="collection"
-            onClick={() => {
-              trackMenuAction("collection");
-              onCollection();
-            }}
-          />
-          <NavPill
-            icon={FlaskConical}
-            label="Lab"
-            tone="lab"
-            onClick={() => {
-              trackMenuAction("lab");
-              onLab();
-            }}
-          />
-          <NavPill
-            icon={Library}
-            label="Library"
-            tone="library"
-            onClick={() => {
-              trackMenuAction("library");
-              onLibrary();
-            }}
-          />
-          <NavPill
-            icon={hasProPack ? BookOpen : ShoppingBag}
-            label={hasProPack ? "Pro" : "Shop"}
-            tone="shop"
-            onClick={() => {
-              trackMenuAction("shop");
-              onShop();
-            }}
-          />
-        </nav>
-
       </div>
     </div>
   );
@@ -522,13 +522,11 @@ const chooseLevelBtn: CSSProperties = {
   borderRadius: 12,
   padding: "9px 10px",
   background: "linear-gradient(135deg, color-mix(in oklch, var(--primary) 35%, var(--surface)), color-mix(in oklch, var(--accent) 25%, var(--surface)))",
-  backgroundSize: "220% 100%",
   color: "var(--foreground)",
   fontSize: 12,
   fontWeight: 900,
   cursor: "pointer",
   whiteSpace: "nowrap",
-  animation: "shimmer 4.2s linear infinite",
   boxShadow: "0 0 16px color-mix(in oklch, var(--primary) 35%, transparent)",
 };
 
@@ -771,6 +769,12 @@ function NavPill({
       "linear-gradient(135deg, color-mix(in oklch, var(--secondary) 30%, var(--surface)), color-mix(in oklch, var(--primary) 15%, var(--surface)))",
     shop: "linear-gradient(135deg, color-mix(in oklch, var(--accent) 32%, var(--surface)), color-mix(in oklch, var(--primary) 22%, var(--surface)))",
   };
+  const shimmerDelay: Record<"collection" | "lab" | "library" | "shop", string> = {
+    collection: "0s",
+    lab: "0.35s",
+    library: "0.7s",
+    shop: "1.05s",
+  };
   return (
     <button
       type="button"
@@ -782,15 +786,23 @@ function NavPill({
         borderRadius: 13,
         border: "1px solid var(--border)",
         background: tones[tone],
-        backgroundSize: "220% 100%",
         color: "var(--foreground)",
         padding: "10px 8px",
         boxShadow: "0 2px 12px rgba(0,0,0,0.2), 0 0 12px color-mix(in oklch, var(--primary) 30%, transparent)",
         cursor: "pointer",
-        animation: "shimmer 4.8s linear infinite",
       }}
     >
-      <Icon size={18} aria-hidden="true" />
+      <span
+        style={{
+          display: "grid",
+          placeItems: "center",
+          color: "var(--accent)",
+          animation: `icon-shimmer 3.4s ease-in-out infinite`,
+          animationDelay: shimmerDelay[tone],
+        }}
+      >
+        <Icon size={18} aria-hidden="true" />
+      </span>
       <span style={{ fontSize: 11, color: "var(--foreground)", fontWeight: 800 }}>{label}</span>
     </button>
   );

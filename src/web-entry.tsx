@@ -14,6 +14,7 @@ function getStoredTheme(): "dark" | "light" {
 
 const storedTheme = getStoredTheme();
 document.documentElement.classList.add(storedTheme === "light" ? "theme-light" : "theme-dark");
+document.documentElement.classList.add("platform-web");
 document.documentElement.style.colorScheme = storedTheme;
 
 const rootElement = document.getElementById("root");

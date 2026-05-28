@@ -12,6 +12,7 @@
     "build:capacitor-client": "vite build --config vite.capacitor.config.ts",
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
+    "screenshots:store": "node scripts/generate-store-screenshots.mjs",
     "cap:prepare": "npm run build:web && npm run build:capacitor-client && node scripts/write-capacitor-index.mjs",
     "cap:add:ios": "cap add ios",
     "cap:sync": "npm run cap:prepare && cap sync ios",
