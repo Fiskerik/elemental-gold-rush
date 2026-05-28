@@ -4,7 +4,9 @@ import { join } from "node:path";
 const clientDir = join(process.cwd(), "dist", "client");
 const assetsDir = join(clientDir, "assets");
 const assets = await readdir(assetsDir);
-const css = assets.find((name) => /^styles-.*\.css$/.test(name));
+const css =
+  assets.find((name) => /^capacitor-.*\.css$/.test(name)) ??
+  assets.find((name) => /^styles-.*\.css$/.test(name));
 const entry = "capacitor-entry.js";
 await stat(join(assetsDir, entry));
 

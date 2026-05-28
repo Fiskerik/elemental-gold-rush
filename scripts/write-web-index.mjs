@@ -1,7 +1,7 @@
 import { readdir, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-const webDir = join(process.cwd(), "dist", "web");
+const webDir = join(process.cwd(), "dist");
 const assetsDir = join(webDir, "assets");
 const assets = await readdir(assetsDir);
 const css = assets.find((name) => /^web-.*\.css$/.test(name));
@@ -14,6 +14,7 @@ const indexHtml = `<!doctype html>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Elemental Gold Rush</title>
+    <link rel="icon" href="/favicon.ico" />
     <link rel="icon" type="image/png" href="/favicon.png" />
     ${css ? `<link rel="stylesheet" href="/assets/${css}" />` : ""}
     <style>
