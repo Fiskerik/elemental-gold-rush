@@ -21,7 +21,7 @@ type PurchasesPlugin = {
   getProducts: (options: { productIdentifiers: string[]; type: string }) => Promise<{ products: PurchasesStoreProduct[] }>;
   getCustomerInfo: () => Promise<{ customerInfo: CustomerInfo }>;
   addCustomerInfoUpdateListener: (listener: (customerInfo: CustomerInfo) => void) => Promise<string>;
-  removeCustomerInfoUpdateListener: (options: { listenerToRemove: string }) => Promise<void>;
+  removeCustomerInfoUpdateListener: (options: { listenerToRemove: string }) => Promise<unknown>;
   purchaseStoreProduct: (options: { product: PurchasesStoreProduct }) => Promise<{ customerInfo: CustomerInfo }>;
   purchasePackage: (options: { aPackage: PurchasesPackage }) => Promise<{ customerInfo: CustomerInfo }>;
   restorePurchases: () => Promise<{ customerInfo: CustomerInfo }>;
@@ -163,7 +163,7 @@ async function ensureConfigured(reportStep?: PurchaseStepReporter): Promise<type
   if (!purchasesPluginPromise) {
     purchasesPluginPromise = import("@revenuecat/purchases-capacitor")
       .then((module) => {
-        const plugin = module.Purchases as PurchasesPlugin;
+        const plugin = module.Purchases as unknown as PurchasesPlugin;
         return plugin;
       })
       .catch((error) => {
@@ -320,7 +320,7 @@ async function findStoreProduct(
     const { products } = await withNativeTimeout(
       purchases.getProducts({
         productIdentifiers: [productId],
-        type: PRODUCT_CATEGORY.NON_SUBSCRIPTION,
+        type: "NON_SUBSCRIPTION",
       }),
       NATIVE_SETUP_TIMEOUT_MS,
       "App Store product lookup",
