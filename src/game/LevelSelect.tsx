@@ -20,12 +20,11 @@ export function LevelSelect({
   onPick: (id: number) => void;
   onBack: () => void;
 }) {
-  const { unlockedLevel, levelStars, levelStats } = useProgress();
+  const { unlockedLevel, levelStars, levelStats, goldCoins, skipLevelForCoins } = useProgress();
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [statsOpen, setStatsOpen] = useState(false);
+  const [modalMessage, setModalMessage] = useState("");
 
-  // Compact winding route: four stops per row keeps 40 levels readable without
-  // stretching the campaign map into a long corridor.
   const MAP_W = 360;
   const ROW_H = 86;
   const COLS = [0.16, 0.39, 0.61, 0.84];
@@ -46,7 +45,6 @@ export function LevelSelect({
   const mapRows = Math.ceil(LEVELS.length / COLS.length);
   const mapH = 112 + (mapRows - 1) * ROW_H;
 
-  // Smooth path between nodes
   const pathD = useMemo(() => {
     if (nodes.length === 0) return "";
     let d = `M ${nodes[0].x} ${nodes[0].y}`;
@@ -63,6 +61,31 @@ export function LevelSelect({
   const selectedChallenge = selected ? getMoleculeChallenge(selected.id) : null;
   const selectedStats = selectedId != null ? levelStats[selectedId] : undefined;
   const selectedStars = selectedId != null ? (levelStars[selectedId] ?? 0) : 0;
+  const canSkipLevel =
+    Boolean(selected) &&
+    selected.id === unlockedLevel &&
+    selectedStars === 0 &&
+    (selectedStats?.fails ?? 0) > 0;
+
+  function closeModal() {
+    setSelectedId(null);
+    setStatsOpen(false);
+    setModalMessage("");
+  }
+
+  function handleSkipLevel() {
+    if (!selected) return;
+    if (!canSkipLevel) {
+      setModalMessage("Skip unlocks after at least one failed attempt on this current stage.");
+      return;
+    }
+    const skipped = skipLevelForCoins(selected.id, 5);
+    if (!skipped) {
+      setModalMessage("You need 5 gold coins to skip this stage.");
+      return;
+    }
+    closeModal();
+  }
 
   return (
     <div className="app-shell" style={{ padding: 16 }}>
@@ -286,10 +309,7 @@ export function LevelSelect({
               zIndex: 50,
               padding: 16,
             }}
-            onClick={() => {
-              setSelectedId(null);
-              setStatsOpen(false);
-            }}
+            onClick={closeModal}
           >
             <div
               onClick={(e) => e.stopPropagation()}
@@ -340,7 +360,7 @@ export function LevelSelect({
                 )}
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 11, color: "var(--muted-foreground)", letterSpacing: 1 }}>
-                    LEVEL {selected.id} → {ELEMENTS[selected.targetElement - 1]?.symbol}
+                    LEVEL {selected.id} {"→"} {ELEMENTS[selected.targetElement - 1]?.symbol}
                   </div>
                   <div style={{ fontSize: 18, fontWeight: 800 }}>{selected.name}</div>
                   <div
@@ -382,19 +402,22 @@ export function LevelSelect({
                       marginBottom: 10,
                     }}
                   >
-                    {statsOpen ? "Hide stats ▴" : "Show stats ▾"}
+                    {statsOpen ? "Hide stats ▲" : "Show stats ▼"}
                   </button>
                   {statsOpen && <StatsGrid stats={selectedStats} />}
                 </>
               )}
 
+              {modalMessage && (
+                <p style={{ margin: "0 0 10px", fontSize: 12, color: "var(--muted-foreground)" }}>
+                  {modalMessage}
+                </p>
+              )}
+
               <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
                 <button
                   type="button"
-                  onClick={() => {
-                    setSelectedId(null);
-                    setStatsOpen(false);
-                  }}
+                  onClick={closeModal}
                   style={{
                     flex: 1,
                     background: "var(--surface)",
@@ -410,9 +433,12 @@ export function LevelSelect({
                 </button>
                 <button
                   type="button"
-                  onClick={() => onPick(selected.id)}
+                  onClick={() => {
+                    setModalMessage("");
+                    onPick(selected.id);
+                  }}
                   style={{
-                    flex: 1.4,
+                    flex: 1.2,
                     background: "linear-gradient(135deg, var(--primary), oklch(0.55 0.15 230))",
                     color: "var(--primary-foreground)",
                     border: "none",
@@ -423,6 +449,30 @@ export function LevelSelect({
                   }}
                 >
                   Play ▶
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSkipLevel}
+                  disabled={!canSkipLevel || goldCoins < 5}
+                  style={{
+                    flex: 1,
+                    background:
+                      canSkipLevel && goldCoins >= 5
+                        ? "linear-gradient(135deg, var(--accent), var(--primary))"
+                        : "var(--surface-high)",
+                    color:
+                      canSkipLevel && goldCoins >= 5
+                        ? "var(--primary-foreground)"
+                        : "var(--muted-foreground)",
+                    border: "1px solid var(--border)",
+                    borderRadius: 12,
+                    padding: "12px 10px",
+                    fontWeight: 900,
+                    cursor: canSkipLevel && goldCoins >= 5 ? "pointer" : "not-allowed",
+                  }}
+                  title="Skip this stage with 0 stars"
+                >
+                  Skip 5 coins
                 </button>
               </div>
             </div>
@@ -487,10 +537,8 @@ function StatsGrid({ stats }: { stats: LevelStats }) {
     >
       <StatCell label="Attempts" value={`${stats.attempts}`} />
       <StatCell label="Max Score" value={formatScore(stats.maxScore)} />
-      <StatCell
-        label="Best Run"
-        value={stats.bestShots != null ? `${stats.bestShots} shots` : "—"}
-      />
+      <StatCell label="Best Run" value={stats.bestShots != null ? `${stats.bestShots} shots` : "—"} />
+      <StatCell label="Fails" value={`${stats.fails}`} />
       <StatCell label="Power-ups" value={`${stats.powerUpsUsed}`} />
       <StatCell label="Total Score" value={formatScore(stats.totalScore)} />
       <StatCell label="Stars" value={`${stats.stars}/3`} />

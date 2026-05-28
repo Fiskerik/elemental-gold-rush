@@ -3,11 +3,11 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 export const Route = createFileRoute("/terms")({
   head: () => ({
     meta: [
-      { title: "Terms of Service | Atomic Fuse" },
+      { title: "Terms of Service | Atomic Fusion Rush" },
       {
         name: "description",
         content:
-          "Terms of service for Atomic Fuse, covering acceptable use, purchases, liability, and account responsibilities.",
+          "Terms of service for Atomic Fusion Rush, covering acceptable use, purchases, liability, and account responsibilities.",
       },
     ],
   }),
@@ -43,7 +43,7 @@ function TermsPage() {
         <section style={sectionStyle}>
           <h2 style={headingStyle}>Acceptance of Terms</h2>
           <p style={textStyle}>
-            By using Atomic Fuse, you agree to these Terms of Service and our Privacy Policy.
+            By using Atomic Fusion Rush, you agree to these Terms of Service and our Privacy Policy.
           </p>
         </section>
 
@@ -93,7 +93,7 @@ function TermsPage() {
         <section style={sectionStyle}>
           <h2 style={headingStyle}>Contact</h2>
           <p style={textStyle}>
-            Terms inquiries: <strong>legal@atomicfusegame.com</strong>
+            Terms inquiries: <strong>eaconsulting.supp@gmail.com</strong>
           </p>
         </section>
       </div>

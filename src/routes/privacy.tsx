@@ -3,11 +3,11 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 export const Route = createFileRoute("/privacy")({
   head: () => ({
     meta: [
-      { title: "Privacy Policy | Atomic Fuse" },
+      { title: "Privacy Policy | Atomic Fusion Rush" },
       {
         name: "description",
         content:
-          "Privacy policy for Atomic Fuse, including purchases, analytics, advertising, and data handling practices.",
+          "Privacy policy for Atomic Fusion Rush, including purchases, analytics, advertising, and data handling practices.",
       },
     ],
   }),
@@ -43,7 +43,7 @@ function PrivacyPolicyPage() {
         <section style={sectionStyle}>
           <h2 style={headingStyle}>Overview</h2>
           <p style={textStyle}>
-            Atomic Fuse is a puzzle game published by EA Consulting. This policy explains what data
+            Atomic Fusion Rush is a puzzle game published by EA Consulting. This policy explains what data
             is processed when you use the game on web and native mobile builds.
           </p>
         </section>
@@ -96,7 +96,7 @@ function PrivacyPolicyPage() {
         <section style={sectionStyle}>
           <h2 style={headingStyle}>Contact</h2>
           <p style={textStyle}>
-            For privacy requests, contact: <strong>privacy@atomicfusegame.com</strong>
+            For privacy requests, contact: <strong>eaconsulting.supp@gmail.com</strong>
           </p>
         </section>
       </div>

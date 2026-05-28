@@ -29,7 +29,8 @@ export const PRODUCTS: ProductDefinition[] = [
     benefits: [
       "Remove forced interstitial ads.",
       "Unlock the Pro Lab profile badge.",
-      "Includes a small starter coin bonus in the App Store build.",
+      "Includes 50 starting gold coins in the App Store build.",
+      "Adds +2 extra gold coins on daily gold claims.",
       "Support future Elemental Gold Rush updates.",
     ],
   },

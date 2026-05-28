@@ -44,7 +44,6 @@ export function MainMenu({
   onLibrary,
   onProfile,
 }: Props) {
-  const [showMissionDetails, setShowMissionDetails] = useState(false);
   const {
     unlockedLevel,
     highestElement,
@@ -65,6 +64,7 @@ export function MainMenu({
   const targetEl = ELEMENTS[(nextLevel?.targetElement ?? 1) - 1];
   const completedDailyQuests = dailyQuests.filter((quest) => quest.completed).length;
   const dailyComplete = dailyQuests.length > 0 && completedDailyQuests >= 4;
+  const dailyRewardAmount = hasProPack ? 4 : 2;
   const campaignProgress = Math.round((Math.min(unlockedLevel, MAX_LEVEL) / MAX_LEVEL) * 100);
   const weeklyBonus = getWeeklyPlayBonusView(weeklyPlayBonus);
   const [dailyRewardToast, setDailyRewardToast] = useState<{ id: number; text: string } | null>(
@@ -108,7 +108,7 @@ export function MainMenu({
   function handleDailyRewardClaim() {
     if (!dailyComplete || claimedDailyReward) return;
     claimDailyReward();
-    showDailyRewardToast("+2 gold coins claimed");
+    showDailyRewardToast(`+${dailyRewardAmount} gold coin${dailyRewardAmount === 1 ? "" : "s"} claimed`);
   }
 
   function handleWeeklyDayClaim() {
@@ -148,6 +148,7 @@ export function MainMenu({
           <div style={{ textAlign: "center", minWidth: 0 }}>
             <div className="gold-text" style={brandTitle}>Elemental Gold Rush</div>
             <div style={brandSubline}>Level {unlockedLevel} of {MAX_LEVEL}</div>
+            {hasProPack && <div style={proActiveChip}>PRO LAB ACTIVE</div>}
           </div>
           <button
             onClick={() => {
@@ -182,7 +183,7 @@ export function MainMenu({
               style={chooseLevelBtn}
             >
               <Layers size={16} aria-hidden="true" />
-              Choose level
+              Map
             </button>
           </div>
           <button
@@ -208,68 +209,6 @@ export function MainMenu({
           </div>
         </section>
 
-        <section style={streakPanel}>
-          <div>
-            <div style={sectionLabel}>DAILY STREAK</div>
-            <div style={{ fontSize: 13, color: "var(--muted-foreground)" }}>
-              {weeklyBonus.currentStreak} day streak - {weeklyBonus.cycleProgress}/7 toward x5
-            </div>
-          </div>
-          <button
-            onClick={handleDailyRewardClaim}
-            disabled={!dailyComplete || claimedDailyReward}
-            style={{
-              ...claimBtn,
-              background:
-                dailyComplete && !claimedDailyReward
-                  ? "linear-gradient(135deg, var(--accent), var(--primary))"
-                  : "var(--surface-high)",
-              color:
-                dailyComplete && !claimedDailyReward
-                  ? "var(--primary-foreground)"
-                  : "var(--muted-foreground)",
-              cursor: dailyComplete && !claimedDailyReward ? "pointer" : "not-allowed",
-            }}
-          >
-            {claimedDailyReward ? "Claimed" : "Claim"}
-          </button>
-        </section>
-
-        <nav style={subpageRow} aria-label="Main game sections">
-          <NavPill
-            icon={Atom}
-            label="Collection"
-            onClick={() => {
-              trackMenuAction("collection");
-              onCollection();
-            }}
-          />
-          <NavPill
-            icon={FlaskConical}
-            label="Lab"
-            onClick={() => {
-              trackMenuAction("lab");
-              onLab();
-            }}
-          />
-          <NavPill
-            icon={Library}
-            label="Library"
-            onClick={() => {
-              trackMenuAction("library");
-              onLibrary();
-            }}
-          />
-          <NavPill
-            icon={hasProPack ? BookOpen : ShoppingBag}
-            label={hasProPack ? "Pro" : "Shop"}
-            onClick={() => {
-              trackMenuAction("shop");
-              onShop();
-            }}
-          />
-        </nav>
-
         <section style={dailyPanel}>
           {dailyRewardToast && (
             <div style={dailyToast} role="status" aria-live="polite">
@@ -284,24 +223,38 @@ export function MainMenu({
                 Streak {dailyStreak} - {completedDailyQuests}/{dailyQuests.length} quests
               </div>
               <div style={{ fontSize: 11, color: "var(--muted-foreground)", marginTop: 2 }}>
-                Complete 4 of 6 quests to claim 2 gold coins.
+                Complete 4 of 6 quests to claim {dailyRewardAmount} gold coins.
+                {hasProPack ? " (includes +2 Pro bonus)" : ""}
               </div>
               <div style={{ fontSize: 10, color: "var(--accent)", marginTop: 4, fontWeight: 800, letterSpacing: 0.6 }}>
                 Resets in {resetCountdown}
               </div>
             </div>
-            <div style={weeklyBonusPill}>
-              {weeklyBonus.todayClaimed ? `Today +${weeklyBonus.coinsEarnedToday}` : "Play today +1"}
+            <div style={{ display: "grid", justifyItems: "end", gap: 8 }}>
+              <button
+                onClick={handleDailyRewardClaim}
+                disabled={!dailyComplete || claimedDailyReward}
+                style={{
+                  ...claimBtn,
+                  background:
+                    dailyComplete && !claimedDailyReward
+                      ? "linear-gradient(135deg, var(--accent), var(--primary))"
+                      : "var(--surface-high)",
+                  color:
+                    dailyComplete && !claimedDailyReward
+                      ? "var(--primary-foreground)"
+                      : "var(--muted-foreground)",
+                  cursor: dailyComplete && !claimedDailyReward ? "pointer" : "not-allowed",
+                }}
+              >
+                {claimedDailyReward ? "Claimed" : "Claim"}
+              </button>
+              <div style={weeklyBonusPill}>
+                {weeklyBonus.todayClaimed ? `Today +${weeklyBonus.coinsEarnedToday}` : "Play today +1"}
+              </div>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => setShowMissionDetails((current) => !current)}
-            style={dailyExpandButton}
-          >
-            {showMissionDetails ? "Hide details" : "Show details"}
-          </button>
-          {showMissionDetails && <div style={weeklyBonusCard}>
+          <div style={weeklyBonusCard}>
             <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
               <div>
                 <div style={sectionLabel}>PLAY A GAME A DAY</div>
@@ -370,8 +323,8 @@ export function MainMenu({
             <div style={{ fontSize: 10, color: "var(--muted-foreground)", lineHeight: 1.35 }}>
               1 coin each day you play. {weeklyBonus.nextRewardText}.
             </div>
-          </div>}
-          {showMissionDetails && <div style={questGrid}>
+          </div>
+          <div style={questGrid}>
             {dailyQuests.map((quest) => (
               <div key={quest.id} style={questRow}>
                 <span
@@ -401,8 +354,47 @@ export function MainMenu({
                 </span>
               </div>
             ))}
-          </div>}
+          </div>
         </section>
+
+        <nav style={subpageRow} aria-label="Main game sections">
+          <NavPill
+            icon={Atom}
+            label="Collection"
+            tone="collection"
+            onClick={() => {
+              trackMenuAction("collection");
+              onCollection();
+            }}
+          />
+          <NavPill
+            icon={FlaskConical}
+            label="Lab"
+            tone="lab"
+            onClick={() => {
+              trackMenuAction("lab");
+              onLab();
+            }}
+          />
+          <NavPill
+            icon={Library}
+            label="Library"
+            tone="library"
+            onClick={() => {
+              trackMenuAction("library");
+              onLibrary();
+            }}
+          />
+          <NavPill
+            icon={hasProPack ? BookOpen : ShoppingBag}
+            label={hasProPack ? "Pro" : "Shop"}
+            tone="shop"
+            onClick={() => {
+              trackMenuAction("shop");
+              onShop();
+            }}
+          />
+        </nav>
 
       </div>
     </div>
@@ -444,6 +436,20 @@ const brandSubline: CSSProperties = {
   fontSize: 11,
   color: "var(--muted-foreground)",
   fontWeight: 800,
+};
+
+const proActiveChip: CSSProperties = {
+  marginTop: 6,
+  display: "inline-block",
+  padding: "3px 8px",
+  borderRadius: 999,
+  border: "1px solid color-mix(in oklch, var(--accent) 70%, var(--border))",
+  background:
+    "linear-gradient(135deg, color-mix(in oklch, var(--accent) 45%, transparent), color-mix(in oklch, var(--primary) 30%, transparent))",
+  color: "var(--foreground)",
+  fontSize: 9,
+  letterSpacing: 1.3,
+  fontWeight: 900,
 };
 
 const iconButton: CSSProperties = {
@@ -512,15 +518,18 @@ const chooseLevelBtn: CSSProperties = {
   alignItems: "center",
   justifyContent: "center",
   gap: 6,
-  border: "1px solid var(--border)",
+  border: "1px solid color-mix(in oklch, var(--primary) 45%, var(--border))",
   borderRadius: 12,
   padding: "9px 10px",
-  background: "var(--surface)",
+  background: "linear-gradient(135deg, color-mix(in oklch, var(--primary) 35%, var(--surface)), color-mix(in oklch, var(--accent) 25%, var(--surface)))",
+  backgroundSize: "220% 100%",
   color: "var(--foreground)",
   fontSize: 12,
-  fontWeight: 800,
+  fontWeight: 900,
   cursor: "pointer",
   whiteSpace: "nowrap",
+  animation: "shimmer 4.2s linear infinite",
+  boxShadow: "0 0 16px color-mix(in oklch, var(--primary) 35%, transparent)",
 };
 
 const sectionLabel: CSSProperties = {
@@ -564,30 +573,6 @@ const subpageRow: CSSProperties = {
 
 const dailyPanel: CSSProperties = {
   position: "relative",
-  background: "var(--surface-elevated)",
-  border: "1px solid var(--border)",
-  borderRadius: 16,
-  padding: 14,
-};
-
-const dailyExpandButton: CSSProperties = {
-  width: "100%",
-  marginTop: 12,
-  borderRadius: 10,
-  border: "1px solid var(--border)",
-  background: "var(--surface)",
-  color: "var(--muted-foreground)",
-  fontSize: 12,
-  fontWeight: 800,
-  padding: "8px 10px",
-  cursor: "pointer",
-};
-
-const streakPanel: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  gap: 12,
   background: "var(--surface-elevated)",
   border: "1px solid var(--border)",
   borderRadius: 16,
@@ -767,38 +752,25 @@ const questProgressFill: CSSProperties = {
   background: "linear-gradient(90deg, var(--primary), var(--accent))",
 };
 
-function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
-  return (
-    <div
-      style={{
-        background: "var(--surface)",
-        border: "1px solid var(--border)",
-        borderRadius: 10,
-        padding: "10px 8px",
-        textAlign: "center",
-        minWidth: 0,
-      }}
-    >
-      <div style={{ fontSize: 9, letterSpacing: 1.3, color: "var(--muted-foreground)" }}>
-        {label.toUpperCase()}
-      </div>
-      <div style={{ fontSize: 20, fontWeight: 900, color: "var(--primary)", marginTop: 2 }}>
-        {value}
-      </div>
-      {sub && <div style={{ fontSize: 10, color: "var(--muted-foreground)" }}>{sub}</div>}
-    </div>
-  );
-}
-
 function NavPill({
   icon: Icon,
   label,
+  tone,
   onClick,
 }: {
   icon: LucideIcon;
   label: string;
+  tone: "collection" | "lab" | "library" | "shop";
   onClick: () => void;
 }) {
+  const tones: Record<"collection" | "lab" | "library" | "shop", string> = {
+    collection:
+      "linear-gradient(135deg, color-mix(in oklch, var(--primary) 32%, var(--surface)), color-mix(in oklch, var(--accent) 18%, var(--surface)))",
+    lab: "linear-gradient(135deg, color-mix(in oklch, var(--success) 30%, var(--surface)), color-mix(in oklch, var(--primary) 18%, var(--surface)))",
+    library:
+      "linear-gradient(135deg, color-mix(in oklch, var(--secondary) 30%, var(--surface)), color-mix(in oklch, var(--primary) 15%, var(--surface)))",
+    shop: "linear-gradient(135deg, color-mix(in oklch, var(--accent) 32%, var(--surface)), color-mix(in oklch, var(--primary) 22%, var(--surface)))",
+  };
   return (
     <button
       type="button"
@@ -809,15 +781,17 @@ function NavPill({
         gap: 6,
         borderRadius: 13,
         border: "1px solid var(--border)",
-        background: "var(--surface)",
+        background: tones[tone],
+        backgroundSize: "220% 100%",
         color: "var(--foreground)",
         padding: "10px 8px",
-        boxShadow: "0 2px 12px rgba(0,0,0,0.2)",
+        boxShadow: "0 2px 12px rgba(0,0,0,0.2), 0 0 12px color-mix(in oklch, var(--primary) 30%, transparent)",
         cursor: "pointer",
+        animation: "shimmer 4.8s linear infinite",
       }}
     >
       <Icon size={18} aria-hidden="true" />
-      <span style={{ fontSize: 11, color: "var(--muted-foreground)", fontWeight: 700 }}>{label}</span>
+      <span style={{ fontSize: 11, color: "var(--foreground)", fontWeight: 800 }}>{label}</span>
     </button>
   );
 }

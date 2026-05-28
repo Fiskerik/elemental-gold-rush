@@ -3,7 +3,12 @@ import { type InventoryPowerUpId, useProgress } from "./store";
 import { POWER_UP_UNLOCK_LEVELS } from "./powerUps";
 import { PowerUpBadge } from "./PowerUpLibrary";
 import { PRODUCT_IDS, getProductById, type ProductId } from "./products";
-import { purchaseGoldCoinPack } from "./purchases";
+import {
+  presentCustomerCenter,
+  purchaseGoldCoinPack,
+  purchaseProductWithResult,
+  restorePurchases,
+} from "./purchases";
 import { showRewardedForCoin } from "./ads";
 
 const SHOP_POWER_UPS: Array<{
@@ -75,14 +80,6 @@ const SHOP_POWER_UPS_BY_PRICE = [...SHOP_POWER_UPS].sort(
   (a, b) => a.coinCost - b.coinCost || a.unlockLevel - b.unlockLevel || a.name.localeCompare(b.name),
 );
 
-const GOLD_COIN_PACKS = [
-  { coins: 1, pointCost: 20_000 },
-  { coins: 5, pointCost: 80_000 },
-  { coins: 10, pointCost: 150_000 },
-  { coins: 20, pointCost: 250_000 },
-  { coins: 50, pointCost: 500_000 },
-] as const;
-
 const APP_STORE_COIN_PACKS = [
   PRODUCT_IDS.coins5,
   PRODUCT_IDS.coins20,
@@ -105,17 +102,19 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string)
 
 export function Shop({ onBack }: { onBack: () => void }) {
   const {
-    totalScore,
     goldCoins,
     unlockedLevel,
     powerUpInventory,
-    buyGoldCoins,
     grantGoldCoins,
+    grantProPack,
     purchaseInventoryPowerUp,
     hasProPack,
   } = useProgress();
   const [message, setMessage] = useState("");
   const [pendingProductId, setPendingProductId] = useState<ProductId | "rewarded" | null>(null);
+  const [proPackMessage, setProPackMessage] = useState("");
+  const [proPackBusy, setProPackBusy] = useState<"purchase" | "restore" | "manage" | "">("");
+  const proPack = getProductById(PRODUCT_IDS.proLabPack);
 
   function handlePowerUpPurchase(
     powerUp: InventoryPowerUpId,
@@ -135,13 +134,63 @@ export function Shop({ onBack }: { onBack: () => void }) {
     );
   }
 
-  function handleGoldCoinPurchase(coins: number, pointCost: number) {
-    const purchased = buyGoldCoins(coins, pointCost);
-    setMessage(
-      purchased
-        ? `${coins} gold coin${coins === 1 ? "" : "s"} added.`
-        : `You need ${pointCost.toLocaleString()} points for that coin pack.`,
-    );
+  async function handleProPackPurchase() {
+    setProPackBusy("purchase");
+    setProPackMessage("Opening App Store purchase...");
+    try {
+      const result = await withTimeout(
+        purchaseProductWithResult(PRODUCT_IDS.proLabPack, (statusMessage) =>
+          setProPackMessage(statusMessage),
+        ),
+        SHOP_PURCHASE_GUARD_TIMEOUT_MS,
+        "App Store did not respond in time. Try again.",
+      );
+      if (result.purchased) {
+        grantProPack();
+        setProPackMessage("Pro Lab Pack unlocked.");
+        return;
+      }
+      setProPackMessage(result.reason ?? "Pro Lab Pack is not available right now.");
+    } catch (error) {
+      setProPackMessage(error instanceof Error ? error.message : "App Store purchase could not be started.");
+    } finally {
+      setProPackBusy("");
+    }
+  }
+
+  async function handleProPackRestore() {
+    setProPackBusy("restore");
+    setProPackMessage("Checking App Store purchases...");
+    try {
+      const restored = await restorePurchases();
+      if (restored.includes(PRODUCT_IDS.proLabPack)) {
+        grantProPack();
+        setProPackMessage("Pro Lab Pack restored.");
+        return;
+      }
+      setProPackMessage("No Pro Lab Pack purchase was found.");
+    } catch (error) {
+      setProPackMessage(error instanceof Error ? error.message : "Purchases could not be restored.");
+    } finally {
+      setProPackBusy("");
+    }
+  }
+
+  async function handleManagePurchases() {
+    setProPackBusy("manage");
+    setProPackMessage("Opening App Store purchase management...");
+    try {
+      const opened = await presentCustomerCenter();
+      setProPackMessage(
+        opened
+          ? "Purchase management opened."
+          : "No App Store management page is available yet. Use Restore to refresh purchases.",
+      );
+    } catch (error) {
+      setProPackMessage(error instanceof Error ? error.message : "Purchase management could not be opened.");
+    } finally {
+      setProPackBusy("");
+    }
   }
 
   async function handleNativeCoinPurchase(productId: ProductId) {
@@ -214,6 +263,95 @@ export function Shop({ onBack }: { onBack: () => void }) {
           <p style={{ margin: "-4px 0 0", color: "var(--muted-foreground)", fontSize: 12 }}>
             {message}
           </p>
+        )}
+
+        {proPack && (
+          <section
+            style={{
+              background: "var(--surface-elevated)",
+              border: "1px solid var(--border)",
+              borderRadius: 18,
+              padding: 18,
+              boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", gap: 12 }}>
+              <div>
+                <div
+                  style={{
+                    fontSize: 11,
+                    letterSpacing: 2,
+                    color: "var(--accent)",
+                    fontWeight: 800,
+                    marginBottom: 6,
+                  }}
+                >
+                  ONE-TIME UPGRADE
+                </div>
+                <h2 style={{ margin: 0, fontSize: 28, fontWeight: 900 }}>{proPack.name}</h2>
+              </div>
+              <WalletPill
+                label="Status"
+                value={hasProPack ? "Active" : "Available"}
+                accent={hasProPack}
+              />
+            </div>
+            <p style={{ margin: "12px 0 10px", color: "var(--muted-foreground)", fontSize: 14, lineHeight: 1.45 }}>
+              A one-time premium upgrade for long-term progression.
+            </p>
+            <div style={{ display: "grid", gap: 7, marginBottom: 14 }}>
+              <Benefit text="Remove forced interstitial ads." />
+              <Benefit text="Unlock the Pro Lab profile badge." />
+              <Benefit text="Get 50 starting gold coins." />
+              <Benefit text="Get +2 extra gold coins on each daily gold claim." />
+            </div>
+            {hasProPack ? (
+              <div style={proPackActive}>Pro Lab Pack Active</div>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <button
+                  type="button"
+                  onClick={handleProPackRestore}
+                  disabled={Boolean(proPackBusy)}
+                  style={{
+                    ...secondaryShopButton,
+                    opacity: proPackBusy && proPackBusy !== "restore" ? 0.55 : 1,
+                  }}
+                >
+                  {proPackBusy === "restore" ? "Checking..." : "Restore"}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleProPackPurchase}
+                  disabled={Boolean(proPackBusy)}
+                  style={{
+                    ...shopButton,
+                    opacity: proPackBusy && proPackBusy !== "purchase" ? 0.55 : 1,
+                  }}
+                >
+                  {proPackBusy === "purchase" ? "Opening..." : "Unlock Pack"}
+                </button>
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={handleManagePurchases}
+              disabled={Boolean(proPackBusy)}
+              style={{
+                ...secondaryShopButton,
+                width: "100%",
+                marginTop: 10,
+                opacity: proPackBusy && proPackBusy !== "manage" ? 0.55 : 1,
+              }}
+            >
+              {proPackBusy === "manage" ? "Opening..." : "Manage Purchases"}
+            </button>
+            {proPackMessage && (
+              <p style={{ margin: "12px 0 0", color: "var(--muted-foreground)", fontSize: 12 }}>
+                {proPackMessage}
+              </p>
+            )}
+          </section>
         )}
 
         <section
@@ -306,72 +444,6 @@ export function Shop({ onBack }: { onBack: () => void }) {
             style={{
               display: "flex",
               justifyContent: "space-between",
-              alignItems: "center",
-              gap: 12,
-              marginBottom: 12,
-            }}
-          >
-            <div>
-              <div
-                style={{
-                  fontSize: 11,
-                  letterSpacing: 2,
-                  color: "var(--accent)",
-                  fontWeight: 800,
-                  marginBottom: 6,
-                }}
-              >
-                GOLD COINS
-              </div>
-              <h2 style={{ margin: 0, fontSize: 22, fontWeight: 900 }}>Exchange points</h2>
-            </div>
-            <div style={walletWrap}>
-              <WalletPill label="Points" value={totalScore.toLocaleString()} />
-              <WalletPill
-                label="Coins"
-                value={`${goldCoins}`}
-                icon={<GoldCoinIcon size={18} />}
-                accent
-              />
-            </div>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(92px, 1fr))", gap: 8 }}>
-            {GOLD_COIN_PACKS.map((pack) => {
-              const canAfford = totalScore >= pack.pointCost;
-              return (
-                <button
-                  key={pack.coins}
-                  type="button"
-                  onClick={() => handleGoldCoinPurchase(pack.coins, pack.pointCost)}
-                  disabled={!canAfford}
-                  style={{
-                    ...coinPackButton,
-                    opacity: canAfford ? 1 : 0.55,
-                    cursor: canAfford ? "pointer" : "not-allowed",
-                  }}
-                >
-                  <GoldCoinIcon size={28} />
-                  <strong style={coinPackAmount}>{pack.coins}x</strong>
-                  <span>{pack.pointCost.toLocaleString()} pts</span>
-                </button>
-              );
-            })}
-          </div>
-        </section>
-
-        <section
-          style={{
-            background: "var(--surface-elevated)",
-            border: "1px solid var(--border)",
-            borderRadius: 18,
-            padding: 18,
-            boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
               alignItems: "baseline",
               gap: 12,
               marginBottom: 10,
@@ -394,7 +466,6 @@ export function Shop({ onBack }: { onBack: () => void }) {
             <div
               style={walletWrap}
             >
-              <WalletPill label="Points" value={totalScore.toLocaleString()} />
               <WalletPill label="Coins" value={`${goldCoins}`} icon={<GoldCoinIcon size={18} />} accent />
             </div>
           </div>
@@ -531,11 +602,38 @@ function WalletPill({
   );
 }
 
+function Benefit({ text }: { text: string }) {
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "18px 1fr",
+        gap: 8,
+        fontSize: 13,
+        lineHeight: 1.35,
+      }}
+    >
+      <span style={{ color: "var(--success)", fontWeight: 900 }}>✓</span>
+      <span>{text}</span>
+    </div>
+  );
+}
+
 const walletWrap: React.CSSProperties = {
   display: "flex",
   flexWrap: "wrap",
   justifyContent: "flex-end",
   gap: 6,
+};
+
+const proPackActive: React.CSSProperties = {
+  marginTop: 4,
+  padding: 12,
+  borderRadius: 12,
+  background: "color-mix(in oklch, var(--success) 18%, transparent)",
+  color: "var(--success)",
+  fontWeight: 800,
+  textAlign: "center",
 };
 
 const coinPackButton: React.CSSProperties = {
@@ -572,6 +670,16 @@ const shopButton: React.CSSProperties = {
   padding: "12px 14px",
   background: "linear-gradient(135deg, var(--primary), oklch(0.55 0.15 230))",
   color: "var(--primary-foreground)",
+  fontWeight: 800,
+  cursor: "pointer",
+};
+
+const secondaryShopButton: React.CSSProperties = {
+  borderRadius: 12,
+  padding: "12px 14px",
+  background: "var(--surface-high)",
+  color: "var(--foreground)",
+  border: "1px solid var(--border)",
   fontWeight: 800,
   cursor: "pointer",
 };

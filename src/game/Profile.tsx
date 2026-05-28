@@ -1,4 +1,3 @@
-import { useState } from "react";
 import {
   Atom,
   CheckCircle2,
@@ -13,29 +12,10 @@ import {
 import { ELEMENTS } from "./elements";
 import { MAX_LEVEL } from "./levels";
 import { formatScore } from "./logic";
-import { PRODUCT_IDS, getProductById } from "./products";
-import {
-  presentCustomerCenter,
-  purchaseProductWithResult,
-  restorePurchases,
-} from "./purchases";
 import { useProgress } from "./store";
 
 interface Props {
   onBack: () => void;
-}
-const PURCHASE_GUARD_TIMEOUT_MS = 12_000;
-
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
-  let timeoutId: ReturnType<typeof window.setTimeout> | undefined;
-  return Promise.race([
-    promise.finally(() => {
-      if (timeoutId) window.clearTimeout(timeoutId);
-    }),
-    new Promise<T>((_, reject) => {
-      timeoutId = window.setTimeout(() => reject(new Error(message)), timeoutMs);
-    }),
-  ]);
 }
 
 export function Profile({ onBack }: Props) {
@@ -55,15 +35,12 @@ export function Profile({ onBack }: Props) {
     challengeBestScores,
     hasProPack,
     appTheme,
-    grantProPack,
     setUnlockedLevel,
     setAppTheme,
   } = useProgress();
-  const [proPackMessage, setProPackMessage] = useState("");
-  const [proPackBusy, setProPackBusy] = useState<"purchase" | "restore" | "manage" | "">("");
   const highestEl = ELEMENTS[highestElement - 1];
-  const proPack = getProductById(PRODUCT_IDS.proLabPack);
   const completedDailyQuests = dailyQuests.filter((quest) => quest.completed).length;
+  const dailyRewardAmount = hasProPack ? 4 : 2;
   const totalStars = Object.values(levelStars).reduce((sum, stars) => sum + stars, 0);
   const perfectLevels = Object.values(levelStars).filter((stars) => stars >= 3).length;
   const bestChallengeScore = Math.max(
@@ -71,155 +48,6 @@ export function Profile({ onBack }: Props) {
     ...Object.values(challengeBestScores).map((score) => score ?? 0),
   );
   const completionPercent = Math.round((discoveredElements.length / ELEMENTS.length) * 100);
-
-  async function handleProPackPurchase() {
-    setProPackBusy("purchase");
-    setProPackMessage("Opening App Store purchase...");
-    try {
-      const result = await withTimeout(
-        purchaseProductWithResult(PRODUCT_IDS.proLabPack, (statusMessage) =>
-          setProPackMessage(statusMessage),
-        ),
-        PURCHASE_GUARD_TIMEOUT_MS,
-        "App Store did not respond in time. Try again.",
-      );
-      if (result.purchased) {
-        grantProPack();
-        setProPackMessage("Atomic Fusion Lifetime unlocked.");
-        return;
-      }
-      setProPackMessage(result.reason ?? "Atomic Fusion Lifetime purchase is not available right now.");
-    } catch (error) {
-      setProPackMessage(error instanceof Error ? error.message : "App Store purchase could not be started.");
-    } finally {
-      setProPackBusy("");
-    }
-  }
-
-  async function handleCustomerCenter() {
-    setProPackBusy("manage");
-    setProPackMessage("Opening App Store purchase management...");
-    try {
-      const opened = await presentCustomerCenter();
-      setProPackMessage(
-        opened
-          ? "Purchase management opened."
-          : "No App Store management page is available yet. Use Restore to refresh purchases.",
-      );
-    } catch (error) {
-      setProPackMessage(error instanceof Error ? error.message : "Purchase management could not be opened.");
-    } finally {
-      setProPackBusy("");
-    }
-  }
-
-  async function handleProPackRestore() {
-    setProPackBusy("restore");
-    setProPackMessage("Checking App Store purchases...");
-    try {
-      const restored = await restorePurchases();
-      if (restored.includes(PRODUCT_IDS.proLabPack)) {
-        grantProPack();
-        setProPackMessage("Atomic Fusion Lifetime restored.");
-        return;
-      }
-      setProPackMessage("No Atomic Fusion Lifetime purchase was found.");
-    } catch (error) {
-      setProPackMessage(error instanceof Error ? error.message : "Purchases could not be restored.");
-    } finally {
-      setProPackBusy("");
-    }
-  }
-
-  const proPackPanel = proPack ? (
-    <section style={proPackCard}>
-      <div style={sectionHeading}>ONE-TIME UPGRADE</div>
-      <h2 style={{ margin: 0, fontSize: 28, fontWeight: 900 }}>{proPack.name}</h2>
-      <p style={{ color: "var(--muted-foreground)", fontSize: 14, lineHeight: 1.5 }}>
-        {proPack.description}
-      </p>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8, margin: "14px 0" }}>
-        {proPack.benefits.map((benefit) => (
-          <div
-            key={benefit}
-            style={{
-              display: "grid",
-              gridTemplateColumns: "18px 1fr",
-              gap: 8,
-              fontSize: 13,
-              lineHeight: 1.35,
-            }}
-          >
-            <CheckCircle2 size={15} color="var(--success)" aria-hidden="true" />
-            <span>{benefit}</span>
-          </div>
-        ))}
-      </div>
-      <div style={proPackNote}>
-        RevenueCat powers purchases in native builds. This web build keeps the same UI with safe
-        fallbacks.
-      </div>
-      {hasProPack ? (
-        <div style={proPackActive}>Atomic Fusion Lifetime Active</div>
-      ) : (
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: 10,
-            marginTop: 14,
-          }}
-        >
-          <button
-            type="button"
-            onClick={handleProPackRestore}
-            disabled={Boolean(proPackBusy)}
-            style={{
-              ...profileActionButton,
-              background: "var(--surface-high)",
-              color: "var(--foreground)",
-              opacity: proPackBusy && proPackBusy !== "restore" ? 0.55 : 1,
-            }}
-          >
-            {proPackBusy === "restore" ? "Checking..." : "Restore"}
-          </button>
-          <button
-            type="button"
-            onClick={handleProPackPurchase}
-            disabled={Boolean(proPackBusy)}
-            style={{
-              ...profileActionButton,
-              opacity: proPackBusy && proPackBusy !== "purchase" ? 0.55 : 1,
-            }}
-          >
-            {proPackBusy === "purchase" ? "Opening..." : "Unlock Pack"}
-          </button>
-        </div>
-      )}
-      <button
-        type="button"
-        onClick={handleCustomerCenter}
-        disabled={Boolean(proPackBusy)}
-        style={{
-          ...profileActionButton,
-          width: "100%",
-          marginTop: 10,
-          background: "var(--surface-high)",
-          color: "var(--foreground)",
-          boxShadow: "none",
-          border: "1px solid var(--border)",
-          opacity: proPackBusy && proPackBusy !== "manage" ? 0.55 : 1,
-        }}
-      >
-        {proPackBusy === "manage" ? "Opening..." : "Manage Purchases"}
-      </button>
-      {proPackMessage && (
-        <p style={{ margin: "12px 0 0", color: "var(--muted-foreground)", fontSize: 12 }}>
-          {proPackMessage}
-        </p>
-      )}
-    </section>
-  ) : null;
 
   return (
     <div className="app-shell" style={{ padding: 20, paddingTop: 32, minHeight: "100dvh" }}>
@@ -242,6 +70,7 @@ export function Profile({ onBack }: Props) {
             <p style={{ margin: 0, color: "var(--muted-foreground)", fontSize: 13 }}>
               {hasProPack ? "Pro Lab active" : "Free Lab"} • Level {unlockedLevel} / {MAX_LEVEL}
             </p>
+            {hasProPack && <div style={proBadge}>PRO LAB PACK ACTIVE</div>}
           </div>
         </header>
 
@@ -309,7 +138,8 @@ export function Profile({ onBack }: Props) {
           <div style={{ color: "var(--muted-foreground)", fontSize: 13, marginBottom: 12 }}>
             {completedDailyQuests}/{dailyQuests.length} quests complete today.
             <div style={{ fontSize: 12, marginTop: 4 }}>
-              Complete 4 of 6 quests to claim the daily prize of 2 gold coins.
+              Complete 4 of 6 quests to claim the daily prize of {dailyRewardAmount} gold coins.
+              {hasProPack ? " (includes +2 Pro bonus)" : ""}
             </div>
           </div>
           <div style={{ display: "grid", gap: 8 }}>
@@ -365,8 +195,6 @@ export function Profile({ onBack }: Props) {
             </button>
           </div>
         </section>
-
-        {proPackPanel}
       </div>
     </div>
   );
@@ -460,6 +288,20 @@ const avatar: React.CSSProperties = {
   boxShadow: "0 0 24px var(--primary-glow)",
 };
 
+const proBadge: React.CSSProperties = {
+  marginTop: 8,
+  display: "inline-block",
+  padding: "4px 10px",
+  borderRadius: 999,
+  background:
+    "linear-gradient(135deg, color-mix(in oklch, var(--accent) 45%, transparent), color-mix(in oklch, var(--primary) 30%, transparent))",
+  border: "1px solid color-mix(in oklch, var(--accent) 70%, var(--border))",
+  color: "var(--foreground)",
+  fontSize: 10,
+  letterSpacing: 1.4,
+  fontWeight: 900,
+};
+
 const grid: React.CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
@@ -497,34 +339,6 @@ const themeChoiceButton: React.CSSProperties = {
   fontSize: 12,
   fontWeight: 900,
   cursor: "pointer",
-};
-
-const proPackCard: React.CSSProperties = {
-  padding: 18,
-  borderRadius: 18,
-  background: "var(--surface-elevated)",
-  border: "1px solid var(--border)",
-  margin: "18px 0 12px",
-  boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
-};
-
-const proPackNote: React.CSSProperties = {
-  padding: 12,
-  borderRadius: 12,
-  background: "var(--surface)",
-  color: "var(--muted-foreground)",
-  fontSize: 12,
-  lineHeight: 1.45,
-};
-
-const proPackActive: React.CSSProperties = {
-  marginTop: 14,
-  padding: 12,
-  borderRadius: 12,
-  background: "color-mix(in oklch, var(--success) 18%, transparent)",
-  color: "var(--success)",
-  fontWeight: 800,
-  textAlign: "center",
 };
 
 const profileActionButton: React.CSSProperties = {

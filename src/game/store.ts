@@ -68,6 +68,7 @@ function mergePowerUpInventory(
 
 export interface LevelStats {
   attempts: number;
+  fails: number;
   maxScore: number;
   bestShots: number | null;
   powerUpsUsed: number;
@@ -77,12 +78,36 @@ export interface LevelStats {
 
 export const emptyLevelStats = (): LevelStats => ({
   attempts: 0,
+  fails: 0,
   maxScore: 0,
   bestShots: null,
   powerUpsUsed: 0,
   totalScore: 0,
   stars: 0,
 });
+
+function normalizeLevelStatsRecord(
+  stats: Record<number, Partial<LevelStats>> | undefined,
+): Record<number, LevelStats> {
+  const next: Record<number, LevelStats> = {};
+  if (!stats) return next;
+  for (const [levelId, value] of Object.entries(stats)) {
+    const base = emptyLevelStats();
+    next[Number(levelId)] = {
+      ...base,
+      ...value,
+      attempts: Math.max(0, Math.floor(value?.attempts ?? base.attempts)),
+      fails: Math.max(0, Math.floor(value?.fails ?? base.fails)),
+      maxScore: Math.max(0, Math.floor(value?.maxScore ?? base.maxScore)),
+      bestShots:
+        value?.bestShots == null ? null : Math.max(0, Math.floor(value.bestShots)),
+      powerUpsUsed: Math.max(0, Math.floor(value?.powerUpsUsed ?? base.powerUpsUsed)),
+      totalScore: Math.max(0, Math.floor(value?.totalScore ?? base.totalScore)),
+      stars: Math.max(0, Math.min(3, Math.floor(value?.stars ?? base.stars))),
+    };
+  }
+  return next;
+}
 
 interface ProgressState {
   unlockedLevel: number; // highest level unlocked (1-based)
@@ -110,6 +135,7 @@ interface ProgressState {
   levelStats: Record<number, LevelStats>;
   challengeBestScores: Partial<Record<GameModeId, number>>;
   hasProPack: boolean;
+  proStarterCoinsGranted: boolean;
   clearedStageCount: number;
   clearedStagesSinceAd: number;
   powerUpInventory: PowerUpInventory;
@@ -121,6 +147,8 @@ interface ProgressState {
   recordCompoundDiscovery: (compoundId: string) => void;
   addScore: (n: number) => void;
   spendScore: (cost: number) => boolean;
+  spendGoldCoins: (cost: number) => boolean;
+  skipLevelForCoins: (levelId: number, coinCost: number) => boolean;
   buyGoldCoins: (coins: number, pointCost: number) => boolean;
   grantGoldCoins: (coins: number) => void;
   setHighestElement: (n: number) => void;
@@ -182,6 +210,7 @@ export const useProgress = create<ProgressState>()(
       levelStats: {},
       challengeBestScores: {},
       hasProPack: false,
+      proStarterCoinsGranted: false,
       clearedStageCount: 0,
       clearedStagesSinceAd: 0,
       powerUpInventory: emptyPowerUpInventory(),
@@ -220,6 +249,33 @@ export const useProgress = create<ProgressState>()(
           return { totalScore: s.totalScore - normalizedCost };
         });
         return spent;
+      },
+      spendGoldCoins: (cost) => {
+        let spent = false;
+        set((s) => {
+          const normalizedCost = Math.max(0, Math.floor(cost));
+          if (normalizedCost <= 0 || s.goldCoins < normalizedCost) return s;
+          spent = true;
+          return { goldCoins: s.goldCoins - normalizedCost };
+        });
+        return spent;
+      },
+      skipLevelForCoins: (levelId, coinCost) => {
+        let skipped = false;
+        set((s) => {
+          const normalizedLevel = Math.max(1, Math.floor(levelId));
+          const normalizedCost = Math.max(0, Math.floor(coinCost));
+          const stats = s.levelStats[normalizedLevel] ?? emptyLevelStats();
+          const canSkipCurrentLevel =
+            normalizedLevel === s.unlockedLevel && (stats.fails ?? 0) > 0;
+          if (!canSkipCurrentLevel || s.goldCoins < normalizedCost) return s;
+          skipped = true;
+          return {
+            goldCoins: s.goldCoins - normalizedCost,
+            unlockedLevel: Math.max(s.unlockedLevel, normalizedLevel + 1),
+          };
+        });
+        return skipped;
       },
       buyGoldCoins: (coins, pointCost) => {
         let purchased = false;
@@ -289,11 +345,12 @@ export const useProgress = create<ProgressState>()(
           );
           if (refreshed.claimedDailyReward || !areDailyQuestsComplete(refreshed.dailyQuests))
             return refreshed;
+          const bonusCoins = s.hasProPack ? 4 : 2;
           return {
             ...refreshed,
             claimedDailyReward: true,
             dailyStreak: s.dailyStreak + 1,
-            goldCoins: s.goldCoins + 2,
+            goldCoins: s.goldCoins + bonusCoins,
           };
         }),
       setBestCombo: (combo) =>
@@ -337,6 +394,7 @@ export const useProgress = create<ProgressState>()(
               ...s.levelStats,
               [levelId]: {
                 ...current,
+                fails: current.fails + (run.won ? 0 : 1),
                 maxScore: Math.max(current.maxScore, run.score),
                 totalScore: current.totalScore + Math.max(0, run.score),
                 powerUpsUsed: current.powerUpsUsed + Math.max(0, run.powerUpsUsed),
@@ -356,7 +414,16 @@ export const useProgress = create<ProgressState>()(
             [mode]: Math.max(s.challengeBestScores[mode] ?? 0, score),
           },
         })),
-      grantProPack: () => set({ hasProPack: true }),
+      grantProPack: () =>
+        set((s) => {
+          if (s.hasProPack && s.proStarterCoinsGranted) return s;
+          const shouldGrantStarter = !s.proStarterCoinsGranted;
+          return {
+            hasProPack: true,
+            proStarterCoinsGranted: true,
+            goldCoins: s.goldCoins + (shouldGrantStarter ? 50 : 0),
+          };
+        }),
       markInterstitialShown: () => set({ clearedStagesSinceAd: 0 }),
       addInventoryPowerUps: (powerUps) =>
         set((s) => ({
@@ -434,6 +501,7 @@ export const useProgress = create<ProgressState>()(
           levelStats: {},
           challengeBestScores: {},
           hasProPack: false,
+          proStarterCoinsGranted: false,
           clearedStageCount: 0,
           clearedStagesSinceAd: 0,
           powerUpInventory: emptyPowerUpInventory(),
@@ -471,13 +539,15 @@ export const useProgress = create<ProgressState>()(
           discoveredCompounds: persistedState?.discoveredCompounds ?? current.discoveredCompounds,
           compoundCounts,
           levelStars: persistedState?.levelStars ?? current.levelStars,
-          levelStats: persistedState?.levelStats ?? current.levelStats,
           challengeBestScores: persistedState?.challengeBestScores ?? current.challengeBestScores,
           hasProPack: persistedState?.hasProPack ?? current.hasProPack,
+          proStarterCoinsGranted:
+            persistedState?.proStarterCoinsGranted ?? current.proStarterCoinsGranted,
           clearedStageCount: persistedState?.clearedStageCount ?? current.clearedStageCount,
           clearedStagesSinceAd:
             persistedState?.clearedStagesSinceAd ?? current.clearedStagesSinceAd,
           powerUpInventory: normalizePowerUpInventory(persistedState?.powerUpInventory),
+          levelStats: normalizeLevelStatsRecord(persistedState?.levelStats),
           seenTips: persistedState?.seenTips ?? current.seenTips,
         } as ProgressState;
       },
