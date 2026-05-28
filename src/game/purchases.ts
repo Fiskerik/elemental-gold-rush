@@ -1,13 +1,32 @@
 import { Capacitor } from "@capacitor/core";
-import {
-  LOG_LEVEL,
-  PRODUCT_CATEGORY,
-  Purchases,
-  type CustomerInfo,
-  type PurchasesPackage,
-  type PurchasesStoreProduct,
-} from "@revenuecat/purchases-capacitor";
 import { PRODUCT_IDS, ProductId, getProductById } from "./products";
+
+type CustomerInfo = {
+  entitlements?: { active?: Record<string, unknown> };
+  managementURL?: string | null;
+  managementUrl?: string | null;
+};
+
+type PurchasesStoreProduct = { identifier: string };
+type PurchasesPackage = { identifier: string; product: PurchasesStoreProduct };
+type PurchasesOffering = {
+  identifier: string;
+  availablePackages?: PurchasesPackage[];
+  lifetime?: PurchasesPackage | null;
+};
+type PurchasesPlugin = {
+  setLogLevel: (options: { level: string }) => Promise<void>;
+  configure: (options: { apiKey: string }) => Promise<void>;
+  getOfferings: () => Promise<{ current?: PurchasesOffering | null; all?: Record<string, PurchasesOffering> }>;
+  getProducts: (options: { productIdentifiers: string[]; type: string }) => Promise<{ products: PurchasesStoreProduct[] }>;
+  getCustomerInfo: () => Promise<{ customerInfo: CustomerInfo }>;
+  addCustomerInfoUpdateListener: (listener: (customerInfo: CustomerInfo) => void) => Promise<string>;
+  removeCustomerInfoUpdateListener: (options: { listenerToRemove: string }) => Promise<void>;
+  purchaseStoreProduct: (options: { product: PurchasesStoreProduct }) => Promise<{ customerInfo: CustomerInfo }>;
+  purchasePackage: (options: { aPackage: PurchasesPackage }) => Promise<{ customerInfo: CustomerInfo }>;
+  restorePurchases: () => Promise<{ customerInfo: CustomerInfo }>;
+};
+
 const FALLBACK_REVENUECAT_IOS_API_KEY = "appl_wleIrbzZnDKaUaQgnbmYbTYVxfX";
 const DEFAULT_PRO_ENTITLEMENT = "atomic_fusion_lifetime";
 const DEFAULT_OFFERING_ID = "default";
@@ -15,6 +34,8 @@ const NATIVE_SETUP_TIMEOUT_MS = 15_000;
 const NATIVE_PURCHASE_TIMEOUT_MS = 20_000;
 
 let configured = false;
+let purchasesPlugin: PurchasesPlugin | null = null;
+let purchasesPluginPromise: Promise<PurchasesPlugin | null> | null = null;
 let customerInfoListenerId: string | null = null;
 let missingConfigLogged = false;
 let lastConfigurationReason = "";
