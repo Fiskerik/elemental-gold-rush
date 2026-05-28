@@ -24,6 +24,19 @@ import { useProgress } from "./store";
 interface Props {
   onBack: () => void;
 }
+const PURCHASE_GUARD_TIMEOUT_MS = 12_000;
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  let timeoutId: ReturnType<typeof window.setTimeout> | undefined;
+  return Promise.race([
+    promise.finally(() => {
+      if (timeoutId) window.clearTimeout(timeoutId);
+    }),
+    new Promise<T>((_, reject) => {
+      timeoutId = window.setTimeout(() => reject(new Error(message)), timeoutMs);
+    }),
+  ]);
+}
 
 export function Profile({ onBack }: Props) {
   const {
@@ -63,7 +76,13 @@ export function Profile({ onBack }: Props) {
     setProPackBusy("purchase");
     setProPackMessage("Opening App Store purchase...");
     try {
-      const result = await purchaseProductWithResult(PRODUCT_IDS.proLabPack);
+      const result = await withTimeout(
+        purchaseProductWithResult(PRODUCT_IDS.proLabPack, (statusMessage) =>
+          setProPackMessage(statusMessage),
+        ),
+        PURCHASE_GUARD_TIMEOUT_MS,
+        "App Store did not respond in time. Try again.",
+      );
       if (result.purchased) {
         grantProPack();
         setProPackMessage("Atomic Fusion Lifetime unlocked.");

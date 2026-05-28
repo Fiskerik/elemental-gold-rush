@@ -1,21 +1,24 @@
 import { Capacitor } from "@capacitor/core";
 import {
   LOG_LEVEL,
+  PRODUCT_CATEGORY,
   Purchases,
   type CustomerInfo,
   type PurchasesPackage,
+  type PurchasesStoreProduct,
 } from "@revenuecat/purchases-capacitor";
 import { PRODUCT_IDS, ProductId, getProductById } from "./products";
 const FALLBACK_REVENUECAT_IOS_API_KEY = "appl_wleIrbzZnDKaUaQgnbmYbTYVxfX";
 const DEFAULT_PRO_ENTITLEMENT = "atomic_fusion_lifetime";
 const DEFAULT_OFFERING_ID = "default";
 const NATIVE_SETUP_TIMEOUT_MS = 15_000;
-const NATIVE_PURCHASE_TIMEOUT_MS = 45_000;
+const NATIVE_PURCHASE_TIMEOUT_MS = 20_000;
 
 let configured = false;
 let customerInfoListenerId: string | null = null;
 let missingConfigLogged = false;
 let lastConfigurationReason = "";
+let lastStoreProductLookupReason = "";
 
 export type PurchaseGoldCoinResult = {
   coins: number;
@@ -26,6 +29,8 @@ export type PurchaseProductResult = {
   purchased: boolean;
   reason?: string;
 };
+
+type PurchaseStepReporter = (message: string) => void;
 
 let lastPackageLookupReason = "";
 
@@ -123,7 +128,15 @@ function summarizePackages(packages: PurchasesPackage[]): string {
     .join(", ");
 }
 
-async function ensureConfigured(): Promise<typeof Purchases | null> {
+function summarizeStoreProducts(products: PurchasesStoreProduct[]): string {
+  if (!products.length) return "none";
+  return products
+    .map((product) => product.identifier)
+    .slice(0, 8)
+    .join(", ");
+}
+
+async function ensureConfigured(reportStep?: PurchaseStepReporter): Promise<typeof Purchases | null> {
   if (!isNativePlatform()) return null;
   if (configured) return Purchases;
 
@@ -142,12 +155,14 @@ async function ensureConfigured(): Promise<typeof Purchases | null> {
   lastConfigurationReason = "";
   try {
     if (!import.meta.env.PROD) {
+      reportStep?.("Preparing purchase logs...");
       await withNativeTimeout(
         Purchases.setLogLevel({ level: LOG_LEVEL.DEBUG }),
         NATIVE_SETUP_TIMEOUT_MS,
         "RevenueCat log setup",
       );
     }
+    reportStep?.("Connecting to App Store purchases...");
     await withNativeTimeout(
       Purchases.configure({ apiKey }),
       NATIVE_SETUP_TIMEOUT_MS,
@@ -163,9 +178,9 @@ async function ensureConfigured(): Promise<typeof Purchases | null> {
   }
 }
 
-async function findPackage(productId: ProductId): Promise<PurchasesPackage | null> {
+async function findPackage(productId: ProductId, reportStep?: PurchaseStepReporter): Promise<PurchasesPackage | null> {
   lastPackageLookupReason = "";
-  const purchases = await ensureConfigured();
+  const purchases = await ensureConfigured(reportStep);
   if (!purchases) {
     lastPackageLookupReason =
       lastConfigurationReason || "RevenueCat is not configured in this build.";
@@ -174,6 +189,7 @@ async function findPackage(productId: ProductId): Promise<PurchasesPackage | nul
 
   let offerings;
   try {
+    reportStep?.("Loading available products...");
     offerings = await withNativeTimeout(
       purchases.getOfferings(),
       NATIVE_SETUP_TIMEOUT_MS,
@@ -252,6 +268,43 @@ async function findPackage(productId: ProductId): Promise<PurchasesPackage | nul
   return matchedPackage;
 }
 
+async function findStoreProduct(
+  productId: ProductId,
+  reportStep?: PurchaseStepReporter,
+): Promise<PurchasesStoreProduct | null> {
+  lastStoreProductLookupReason = "";
+  const purchases = await ensureConfigured(reportStep);
+  if (!purchases) {
+    lastStoreProductLookupReason =
+      lastConfigurationReason || "RevenueCat could not be initialized for App Store products.";
+    return null;
+  }
+
+  try {
+    reportStep?.("Loading App Store product...");
+    const { products } = await withNativeTimeout(
+      purchases.getProducts({
+        productIdentifiers: [productId],
+        type: PRODUCT_CATEGORY.NON_SUBSCRIPTION,
+      }),
+      NATIVE_SETUP_TIMEOUT_MS,
+      "App Store product lookup",
+    );
+
+    const product = products.find((entry) => entry.identifier === productId) ?? products[0] ?? null;
+    if (!product) {
+      lastStoreProductLookupReason = `Product '${productId}' was not returned by App Store. Returned products: ${summarizeStoreProducts(products)}.`;
+      return null;
+    }
+    return product;
+  } catch (error) {
+    lastStoreProductLookupReason =
+      describePurchaseError(error) ||
+      "App Store product lookup failed. Check product IDs and App Store Connect status.";
+    return null;
+  }
+}
+
 export async function initPurchases(): Promise<boolean> {
   const purchases = await ensureConfigured();
   if (!purchases) return false;
@@ -325,7 +378,10 @@ export async function presentCustomerCenter(): Promise<boolean> {
   }
 }
 
-export async function purchaseProductWithResult(productId: ProductId): Promise<PurchaseProductResult> {
+export async function purchaseProductWithResult(
+  productId: ProductId,
+  reportStep?: PurchaseStepReporter,
+): Promise<PurchaseProductResult> {
   const product = getProductById(productId);
   if (!product || product.type !== "non_consumable") {
     return { purchased: false, reason: "Invalid App Store product configuration." };
@@ -334,11 +390,27 @@ export async function purchaseProductWithResult(productId: ProductId): Promise<P
     return { purchased: false, reason: "App Store purchases are only available in the iPhone app." };
   }
 
-  const purchases = await ensureConfigured();
-  const packageToPurchase = await findPackage(productId);
-  if (!purchases || !packageToPurchase) {
+  const purchases = await ensureConfigured(reportStep);
+  if (!purchases) {
     const reason =
-      lastPackageLookupReason || "Native App Store purchase support is not available in this build.";
+      lastConfigurationReason || "Native App Store purchase support is not available in this build.";
+    console.log("Native App Store purchase support is not available in this build.", {
+      productId,
+      reason,
+    });
+    return { purchased: false, reason };
+  }
+
+  const [storeProduct, packageToPurchase] = await Promise.all([
+    findStoreProduct(productId, reportStep),
+    findPackage(productId, reportStep),
+  ]);
+
+  if (!storeProduct && !packageToPurchase) {
+    const reason =
+      lastStoreProductLookupReason ||
+      lastPackageLookupReason ||
+      "Native App Store purchase support is not available in this build.";
     console.log("Native App Store purchase support is not available in this build.", {
       productId,
       reason,
@@ -347,13 +419,23 @@ export async function purchaseProductWithResult(productId: ProductId): Promise<P
   }
 
   try {
-    const { customerInfo } = await withNativeTimeout(
-      purchases.purchasePackage({
-        aPackage: packageToPurchase,
-      }),
-      NATIVE_PURCHASE_TIMEOUT_MS,
-      "App Store purchase",
-    );
+    reportStep?.("Waiting for App Store confirmation...");
+    const purchaseResult = storeProduct
+      ? await withNativeTimeout(
+          purchases.purchaseStoreProduct({
+            product: storeProduct,
+          }),
+          NATIVE_PURCHASE_TIMEOUT_MS,
+          "App Store purchase",
+        )
+      : await withNativeTimeout(
+          purchases.purchasePackage({
+            aPackage: packageToPurchase!,
+          }),
+          NATIVE_PURCHASE_TIMEOUT_MS,
+          "App Store purchase",
+        );
+    const { customerInfo } = purchaseResult;
     if (productId !== PRODUCT_IDS.proLabPack) return { purchased: true };
     if (hasProEntitlement(customerInfo)) return { purchased: true };
     return {
@@ -361,11 +443,43 @@ export async function purchaseProductWithResult(productId: ProductId): Promise<P
       reason: `Purchase completed, but entitlement '${getEntitlementId()}' is not active yet. Try Restore after a moment.`,
     };
   } catch (error) {
-    const reason = purchaseSetupHint(
-      describePurchaseError(error) || "App Store purchase could not be completed right now.",
-    );
-    console.log("Native App Store purchase could not be completed.", { productId, error, reason });
-    return { purchased: false, reason };
+    if (!storeProduct || !packageToPurchase) {
+      const reason = purchaseSetupHint(
+        describePurchaseError(error) || "App Store purchase could not be completed right now.",
+      );
+      console.log("Native App Store purchase could not be completed.", { productId, error, reason });
+      return { purchased: false, reason };
+    }
+
+    try {
+      reportStep?.("Retrying purchase route...");
+      const { customerInfo } = await withNativeTimeout(
+        purchases.purchasePackage({
+          aPackage: packageToPurchase,
+        }),
+        NATIVE_PURCHASE_TIMEOUT_MS,
+        "App Store purchase retry",
+      );
+      if (productId !== PRODUCT_IDS.proLabPack) return { purchased: true };
+      if (hasProEntitlement(customerInfo)) return { purchased: true };
+      return {
+        purchased: false,
+        reason: `Purchase completed, but entitlement '${getEntitlementId()}' is not active yet. Try Restore after a moment.`,
+      };
+    } catch (fallbackError) {
+      const reason = purchaseSetupHint(
+        describePurchaseError(fallbackError) ||
+          describePurchaseError(error) ||
+          "App Store purchase could not be completed right now.",
+      );
+      console.log("Native App Store purchase could not be completed.", {
+        productId,
+        error,
+        fallbackError,
+        reason,
+      });
+      return { purchased: false, reason };
+    }
   }
 }
 
@@ -374,7 +488,10 @@ export async function purchaseProduct(productId: ProductId): Promise<boolean> {
   return result.purchased;
 }
 
-export async function purchaseGoldCoinPack(productId: ProductId): Promise<PurchaseGoldCoinResult> {
+export async function purchaseGoldCoinPack(
+  productId: ProductId,
+  reportStep?: PurchaseStepReporter,
+): Promise<PurchaseGoldCoinResult> {
   const product = getProductById(productId);
   if (!product || product.type !== "consumable" || !product.coins) {
     return { coins: 0, reason: "Invalid product configuration." };
@@ -382,7 +499,7 @@ export async function purchaseGoldCoinPack(productId: ProductId): Promise<Purcha
   if (!isNativePlatform()) {
     return { coins: 0, reason: "App Store purchases are only available in the iPhone app." };
   }
-  const purchases = await ensureConfigured();
+  const purchases = await ensureConfigured(reportStep);
   if (!purchases) {
     return {
       coins: 0,
@@ -391,23 +508,54 @@ export async function purchaseGoldCoinPack(productId: ProductId): Promise<Purcha
         "RevenueCat is not configured in this build. Add VITE_REVENUECAT_IOS_API_KEY in Codemagic.",
     };
   }
-  const packageToPurchase = await findPackage(productId);
-  if (!packageToPurchase) {
+  const [storeProduct, packageToPurchase] = await Promise.all([
+    findStoreProduct(productId, reportStep),
+    findPackage(productId, reportStep),
+  ]);
+  if (!storeProduct && !packageToPurchase) {
     return {
       coins: 0,
       reason:
+        lastStoreProductLookupReason ||
         lastPackageLookupReason ||
         `Product not found in RevenueCat offering '${getOfferingId()}'. Check product IDs and offering setup.`,
     };
   }
   try {
-    await withNativeTimeout(
-      purchases.purchasePackage({ aPackage: packageToPurchase }),
-      NATIVE_PURCHASE_TIMEOUT_MS,
-      "App Store coin purchase",
-    );
+    reportStep?.("Waiting for App Store confirmation...");
+    if (storeProduct) {
+      await withNativeTimeout(
+        purchases.purchaseStoreProduct({ product: storeProduct }),
+        NATIVE_PURCHASE_TIMEOUT_MS,
+        "App Store coin purchase",
+      );
+    } else {
+      await withNativeTimeout(
+        purchases.purchasePackage({ aPackage: packageToPurchase! }),
+        NATIVE_PURCHASE_TIMEOUT_MS,
+        "App Store coin purchase",
+      );
+    }
     return { coins: product.coins };
   } catch (error) {
+    if (storeProduct && packageToPurchase) {
+      try {
+        reportStep?.("Retrying purchase route...");
+        await withNativeTimeout(
+          purchases.purchasePackage({ aPackage: packageToPurchase }),
+          NATIVE_PURCHASE_TIMEOUT_MS,
+          "App Store coin purchase retry",
+        );
+        return { coins: product.coins };
+      } catch (fallbackError) {
+        const message = purchaseSetupHint(
+          describePurchaseError(fallbackError) ||
+            describePurchaseError(error) ||
+            "App Store purchase could not be completed right now.",
+        );
+        return { coins: 0, reason: message };
+      }
+    }
     const message = purchaseSetupHint(
       describePurchaseError(error) || "App Store purchase could not be completed right now.",
     );

@@ -10,6 +10,7 @@ export const getRouter = () => {
     context: { queryClient },
     scrollRestoration: true,
     defaultPreloadStaleTime: 0,
+    defaultSsr: false,
     defaultErrorComponent: ({ error }) => {
       console.error(error);
       return null;

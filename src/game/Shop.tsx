@@ -89,6 +89,19 @@ const APP_STORE_COIN_PACKS = [
   PRODUCT_IDS.coins50,
   PRODUCT_IDS.coins100,
 ] as const;
+const SHOP_PURCHASE_GUARD_TIMEOUT_MS = 12_000;
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  let timeoutId: ReturnType<typeof window.setTimeout> | undefined;
+  return Promise.race([
+    promise.finally(() => {
+      if (timeoutId) window.clearTimeout(timeoutId);
+    }),
+    new Promise<T>((_, reject) => {
+      timeoutId = window.setTimeout(() => reject(new Error(message)), timeoutMs);
+    }),
+  ]);
+}
 
 export function Shop({ onBack }: { onBack: () => void }) {
   const {
@@ -135,7 +148,11 @@ export function Shop({ onBack }: { onBack: () => void }) {
     setPendingProductId(productId);
     setMessage("Opening App Store purchase...");
     try {
-      const result = await purchaseGoldCoinPack(productId);
+      const result = await withTimeout(
+        purchaseGoldCoinPack(productId, (statusMessage) => setMessage(statusMessage)),
+        SHOP_PURCHASE_GUARD_TIMEOUT_MS,
+        "App Store did not respond in time. Try again.",
+      );
       if (result.coins > 0) {
         grantGoldCoins(result.coins);
         setMessage(

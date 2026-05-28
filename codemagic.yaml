@@ -20,6 +20,9 @@ workflows:
       - name: Install dependencies
         script: |
           npm ci
+      - name: Sync iOS App Icon from project logo
+        script: |
+          sips -z 1024 1024 src/logo.png --out ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png
       - name: Prepare Vite iOS env
         script: |
           RC_KEY="${VITE_REVENUECAT_IOS_API_KEY:-${REVENUECAT_IOS_API_KEY:-appl_wleIrbzZnDKaUaQgnbmYbTYVxfX}}"

@@ -17,7 +17,7 @@ const config = {
       showSpinner: false,
     },
     StatusBar: {
-      overlaysWebView: true,
+      overlaysWebView: false,
       style: "LIGHT",
       backgroundColor: "#0A0A1A",
     },
