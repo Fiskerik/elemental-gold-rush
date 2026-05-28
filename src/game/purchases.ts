@@ -159,7 +159,20 @@ function summarizeStoreProducts(products: PurchasesStoreProduct[]): string {
 
 async function ensureConfigured(reportStep?: PurchaseStepReporter): Promise<typeof Purchases | null> {
   if (!isNativePlatform()) return null;
-  if (configured) return Purchases;
+  if (configured) return purchasesPlugin;
+  if (!purchasesPluginPromise) {
+    purchasesPluginPromise = import("@revenuecat/purchases-capacitor")
+      .then((module) => {
+        const plugin = module.Purchases as PurchasesPlugin;
+        return plugin;
+      })
+      .catch((error) => {
+        console.log("RevenueCat plugin could not be loaded.", { error });
+        return null;
+      });
+  }
+  const Purchases = await purchasesPluginPromise;
+  if (!Purchases) return null;
 
   const apiKey = getRevenueCatApiKey();
   if (!apiKey) {
@@ -178,7 +191,7 @@ async function ensureConfigured(reportStep?: PurchaseStepReporter): Promise<type
     if (!import.meta.env.PROD) {
       reportStep?.("Preparing purchase logs...");
       await withNativeTimeout(
-        Purchases.setLogLevel({ level: LOG_LEVEL.DEBUG }),
+        Purchases.setLogLevel({ level: "DEBUG" }),
         NATIVE_SETUP_TIMEOUT_MS,
         "RevenueCat log setup",
       );
@@ -190,6 +203,7 @@ async function ensureConfigured(reportStep?: PurchaseStepReporter): Promise<type
       "RevenueCat configuration",
     );
     configured = true;
+    purchasesPlugin = Purchases;
     return Purchases;
   } catch (error) {
     lastConfigurationReason =
