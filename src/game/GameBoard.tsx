@@ -53,6 +53,7 @@ import { PowerUpBadge } from "./PowerUpLibrary";
 import { POWER_UP_UNLOCK_LEVELS } from "./powerUps";
 import { showInterstitialIfReady } from "./ads";
 import { useIsTabletLayout } from "./responsive";
+import { ElementalBossBoard } from "./ElementalBossBoard";
 
 interface Props {
   levelId: number;
@@ -636,7 +637,15 @@ function calculateStars(
 
 }
 
-export function GameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "campaign", resumeSavedRun = false }: Props) {
+export function GameBoard(props: Props) {
+  const level = getLevelById(props.levelId);
+  if (props.mode === "elemental-boss" || level?.specialStage === "elemental-boss") {
+    return <ElementalBossBoard {...props} mode="elemental-boss" />;
+  }
+  return <StandardGameBoard {...props} />;
+}
+
+function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "campaign", resumeSavedRun = false }: Props) {
   const isTabletLayout = useIsTabletLayout();
   const level = getLevelById(levelId) ?? LEVELS[0];
   const gameMode = getGameMode(mode);
@@ -1835,16 +1844,48 @@ export function GameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "camp
   const [boardW, setBoardW] = useState(360);
   const [boardH, setBoardH] = useState(480);
   useEffect(() => {
-    const update = () => {
-      setBoardW(boardRef.current?.clientWidth ?? 360);
-      setBoardH(boardRef.current?.clientHeight ?? 480);
+    if (typeof window === "undefined") return;
+    const MIN_BOARD_W = 280;
+    const MIN_BOARD_H = 360;
+    const DEFAULT_BOARD_W = 360;
+    const DEFAULT_BOARD_H = 480;
+    const readBoardSize = () => {
+      const element = boardRef.current;
+      if (!element) {
+        setBoardW(DEFAULT_BOARD_W);
+        setBoardH(DEFAULT_BOARD_H);
+        return;
+      }
+      const nextWidth = element.clientWidth;
+      const nextHeight = element.clientHeight;
+      setBoardW(
+        Number.isFinite(nextWidth) && nextWidth >= MIN_BOARD_W ? nextWidth : DEFAULT_BOARD_W,
+      );
+      setBoardH(
+        Number.isFinite(nextHeight) && nextHeight >= MIN_BOARD_H ? nextHeight : DEFAULT_BOARD_H,
+      );
     };
-    update();
-    window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
+
+    readBoardSize();
+    const frame = window.requestAnimationFrame(readBoardSize);
+    const timeout = window.setTimeout(readBoardSize, 120);
+    window.addEventListener("resize", readBoardSize);
+
+    let observer: ResizeObserver | null = null;
+    if ("ResizeObserver" in window && boardRef.current) {
+      observer = new ResizeObserver(() => readBoardSize());
+      observer.observe(boardRef.current);
+    }
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.clearTimeout(timeout);
+      window.removeEventListener("resize", readBoardSize);
+      observer?.disconnect();
+    };
   }, []);
   const cellSize = useMemo(
-    () => Math.floor((boardW - 8) / level.gridCols),
+    () => Math.max(28, Math.floor((Math.max(boardW, 320) - 8) / level.gridCols)),
     [boardW, level.gridCols],
   );
   const ballSize = Math.floor(cellSize * 0.86);

@@ -510,16 +510,20 @@ export function Shop({ onBack }: { onBack: () => void }) {
                     <PowerUpBadge icon={powerUp.id} size={34} />
                   </span>
                   <div>
-                    <div style={{ fontSize: 13, fontWeight: 900 }}>{powerUp.name}</div>
+                    <div style={{ fontSize: 13, fontWeight: 900 }}>
+                      {isUnlocked ? powerUp.name : "Secret"}
+                    </div>
                     <div
                       style={{ fontSize: 11, color: "var(--muted-foreground)", lineHeight: 1.35 }}
                     >
-                      {powerUp.description}
+                      {isUnlocked
+                        ? powerUp.description
+                        : `Unlocked at level ${powerUp.unlockLevel}.`}
                     </div>
                     <div style={{ fontSize: 11, color: "var(--accent)", marginTop: 3 }}>
                       {isUnlocked
                         ? `Owned: ${powerUpInventory[powerUp.id]}`
-                        : `Introduced at level ${powerUp.unlockLevel}`}
+                        : `Secret unlock at level ${powerUp.unlockLevel}`}
                     </div>
                   </div>
                   <button
@@ -546,9 +550,9 @@ export function Shop({ onBack }: { onBack: () => void }) {
                         <GoldCoinIcon size={14} />
                         {powerUp.coinCost}
                       </span>
-                    ) : (
-                      `Level ${powerUp.unlockLevel}`
-                    )}
+                      ) : (
+                        "Secret"
+                      )}
                   </button>
                 </div>
               );

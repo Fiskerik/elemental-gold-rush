@@ -40,6 +40,8 @@ export interface Level {
   milestoneFact?: string;
   /** Tutorial stage that clears by using a specific power-up correctly. */
   powerUpStage?: PowerUpStageId;
+  /** Special one-off stage renderer. */
+  specialStage?: "elemental-boss";
 }
 
 type LevelSeed = Pick<
@@ -468,7 +470,31 @@ const CHALLENGE_LEVELS: Level[] = Object.keys(MOLECULE_CHALLENGE_BY_LEVEL).map((
   };
 });
 
-export const LEVELS: Level[] = [...ATOM_LEVELS, ...CHALLENGE_LEVELS].sort((a, b) => a.id - b.id);
+const SPECIAL_LEVELS: Level[] = [
+  {
+    id: 63,
+    name: "Elemental Boss",
+    description: "Match the open eyes, charge Blank atoms, and bring the creature down in 100 shots.",
+    lore: "A warped elemental beholder crawls out of the lab ceiling. Its orbiting eye-stalks answer only to clean reactions and relentless pressure.",
+    targetElement: 10,
+    maxQueueElement: 10,
+    queueDecay: 0.45,
+    gridCols: 10,
+    gridRows: 12,
+    scoreMultiplier: 4.8,
+    parShots: 55,
+    starShotsThree: 40,
+    starShotsTwo: 70,
+    parTimeSec: 240,
+    scoreGoal: 60_000,
+    comboGoal: 4,
+    milestoneFact:
+      "Boss atoms never rise above Neon. This fight is about recognition, timing, and setting up the perfect Blank shot.",
+    specialStage: "elemental-boss",
+  },
+];
+
+export const LEVELS: Level[] = [...ATOM_LEVELS, ...CHALLENGE_LEVELS, ...SPECIAL_LEVELS].sort((a, b) => a.id - b.id);
 
 export function getLevelById(id: number): Level | undefined {
   return LEVELS.find((l) => l.id === id);

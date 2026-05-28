@@ -3,6 +3,7 @@ import { Level } from "./levels";
 export type GameModeId =
   | "campaign"
   | "survival"
+  | "elemental-boss"
   | "unstable-isotopes"
   | "gravity-surge"
   | "pure-hydrogen"
@@ -37,11 +38,25 @@ export const GAME_MODES: GameModeConfig[] = [
     emoji: "🛡️",
     kind: "endless",
     description: "Keep fusing while the red danger bar rises 5% every minute from the bottom.",
-    unlockedAtLevel: 1,
+    unlockedAtLevel: 6,
     rules: [
       "No fixed target pressure",
       "Danger zone rises 5% every minute",
       "Last as long as possible",
+    ],
+  },
+  {
+    id: "elemental-boss",
+    name: "Elemental Boss",
+    emoji: "Eye",
+    kind: "challenge",
+    description:
+      "Face a five-eyed elemental horror. Match its open eyes, charge a Blank atom in the center, and bring it down in 100 shots.",
+    unlockedAtLevel: 1,
+    rules: [
+      "The boss has 20 health and only opens 1-2 eyes at a time",
+      "Matching an open eye deals 1 damage, or 2 if your shot is shimmering",
+      "Charge the center eye to 10 and earn a Blank atom for a guaranteed hit",
     ],
   },
   {
@@ -50,7 +65,7 @@ export const GAME_MODES: GameModeConfig[] = [
     emoji: "☢️",
     kind: "challenge",
     description: "Some atoms become unstable isotopes with period-based decay shells.",
-    unlockedAtLevel: 2,
+    unlockedAtLevel: 12,
     rules: [
       "Unstable atoms lose 1 ring segment after each shot",
       "Merging stabilizes the isotope into the new atom for double points",
@@ -63,7 +78,7 @@ export const GAME_MODES: GameModeConfig[] = [
     emoji: "🌀",
     kind: "challenge",
     description: "Every 5 shots, all atoms shift slightly downward toward danger.",
-    unlockedAtLevel: 3,
+    unlockedAtLevel: 18,
     rules: ["Every 5 shots pushes the board downward", "Plan space before each surge"],
   },
   {
@@ -72,7 +87,7 @@ export const GAME_MODES: GameModeConfig[] = [
     emoji: "H",
     kind: "challenge",
     description: "The queue starts mostly Hydrogen and Helium for long reaction chains.",
-    unlockedAtLevel: 4,
+    unlockedAtLevel: 24,
     rules: [
       "Queue is biased toward Hydrogen and Helium",
       "Combos matter more than lucky high tiers",
@@ -84,7 +99,7 @@ export const GAME_MODES: GameModeConfig[] = [
     emoji: "🔒",
     kind: "challenge",
     description: "Noble gases are stable and cannot merge until a power-up activates the board.",
-    unlockedAtLevel: 6,
+    unlockedAtLevel: 30,
     rules: [
       "Noble gases block normal merges",
       "Use E-gun, Gravity, Emission, or Grab to unlock reactions",
@@ -96,7 +111,7 @@ export const GAME_MODES: GameModeConfig[] = [
     emoji: "⏱️",
     kind: "challenge",
     description: "Reach the target before the lab clock expires.",
-    unlockedAtLevel: 8,
+    unlockedAtLevel: 36,
     timerSec: 180,
     rules: ["180-second countdown", "Game over when time runs out"],
   },
@@ -106,7 +121,7 @@ export const GAME_MODES: GameModeConfig[] = [
     emoji: "🧪",
     kind: "challenge",
     description: "Every 20 shots, every atom on the board lowers by 1 tier.",
-    unlockedAtLevel: 5,
+    unlockedAtLevel: 42,
     rules: [
       "Every 20 shots, all non-Hydrogen atoms decay by 1",
       "The shot counter flashes red on the warning shot",
@@ -126,5 +141,6 @@ export function getUnlockedGameModes(unlockedLevel: number): GameModeConfig[] {
 export function getModeLevelLabel(mode: GameModeConfig, level: Level): string {
   if (mode.id === "campaign") return `Level ${level.id}`;
   if (mode.id === "survival") return "Endless";
+  if (mode.id === "elemental-boss") return level.id >= 63 ? `Boss • Level ${level.id}` : "Boss Event";
   return `Challenge • Level ${level.id}`;
 }

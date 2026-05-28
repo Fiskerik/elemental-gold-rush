@@ -66,6 +66,20 @@ export function Profile({ onBack }: Props) {
   );
   const completionPercent = Math.round((discoveredElements.length / ELEMENTS.length) * 100);
 
+  function handleUnlockAllStages() {
+    if (unlockedLevel >= MAX_LEVEL) {
+      setUnlockedLevel(1);
+      return;
+    }
+    const entered = window.prompt("Enter unlock password");
+    if (entered == null) return;
+    if (entered === "MussePigg14!") {
+      setUnlockedLevel(MAX_LEVEL);
+      return;
+    }
+    window.alert("Wrong password.");
+  }
+
   return (
     <div className="app-shell" style={{ padding: isTabletLayout ? 28 : 20, paddingTop: isTabletLayout ? 36 : 32, minHeight: "100dvh" }}>
       <div style={{ position: "relative", zIndex: 1, maxWidth: isTabletLayout ? 980 : 620, margin: "0 auto" }}>
@@ -205,7 +219,7 @@ export function Profile({ onBack }: Props) {
             />
             <button
               type="button"
-              onClick={() => setUnlockedLevel(unlockedLevel >= MAX_LEVEL ? 1 : MAX_LEVEL)}
+              onClick={handleUnlockAllStages}
               style={profileActionButton}
             >
               {unlockedLevel >= MAX_LEVEL ? "Lock stages" : "Unlock all stages"}
