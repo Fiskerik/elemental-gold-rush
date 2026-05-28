@@ -38,6 +38,11 @@ function getRewardedId(): string {
   return configuredEnvValue(import.meta.env.VITE_ADMOB_IOS_REWARDED_ID) || TEST_REWARDED_ID;
 }
 
+function shouldRequestTrackingAuthorization(): boolean {
+  const raw = configuredEnvValue(import.meta.env.VITE_ENABLE_ATT_TRACKING).toLowerCase();
+  return raw === "1" || raw === "true" || raw === "yes";
+}
+
 function describeAdError(error: unknown): string {
   if (error instanceof Error) return error.message;
   if (typeof error === "string") return error;
@@ -149,10 +154,12 @@ export async function initAds(hasProPack: boolean): Promise<void> {
     });
     initialized = true;
 
-    try {
-      await AdMob.requestTrackingAuthorization();
-    } catch {
-      // ATT prompt availability depends on iOS version and prior user choice.
+    if (shouldRequestTrackingAuthorization()) {
+      try {
+        await AdMob.requestTrackingAuthorization();
+      } catch {
+        // ATT prompt availability depends on iOS version and prior user choice.
+      }
     }
 
     try {
