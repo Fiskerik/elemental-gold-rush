@@ -7,6 +7,11 @@ let ctx: AudioContext | null = null;
 let musicTimer: number | null = null;
 let musicMaster: GainNode | null = null;
 let musicStep = 0;
+const MIN_EXP_VALUE = 0.0001;
+
+function finitePositive(value: number, fallback: number): number {
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+}
 
 function getCtx(): AudioContext | null {
   if (typeof window === "undefined") return null;
@@ -46,12 +51,12 @@ export function playMergeSound(chainDepth: number) {
     const osc = c.createOscillator();
     const gain = c.createGain();
     osc.type = "sine";
-    const baseFreq = 320 + chainDepth * 90;
+    const baseFreq = finitePositive(320 + chainDepth * 90, 320);
     osc.frequency.setValueAtTime(baseFreq, now);
     osc.frequency.exponentialRampToValueAtTime(baseFreq * 1.6, now + 0.18);
-    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.setValueAtTime(MIN_EXP_VALUE, now);
     gain.gain.exponentialRampToValueAtTime(0.25, now + 0.01);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.25);
+    gain.gain.exponentialRampToValueAtTime(MIN_EXP_VALUE, now + 0.25);
     osc.connect(gain).connect(c.destination);
     osc.start(now);
     osc.stop(now + 0.3);
@@ -111,9 +116,9 @@ function playAmbientStep(c: AudioContext, now: number) {
     0,4,5,3, 0,5,4,0
   ];
 
-  const measure = musicStep % 64;
-  const chordIdx = songStructure[measure];
-  const chord = lib[chordIdx];
+  const measure = musicStep % songStructure.length;
+  const chordIdx = songStructure[measure] ?? 0;
+  const chord = lib[chordIdx] ?? lib[0];
   musicStep += 1;
 
   const hasBass = measure >= 12;
@@ -131,11 +136,11 @@ function playAmbientStep(c: AudioContext, now: number) {
     const osc = c.createOscillator();
     const gain = c.createGain();
     osc.type = i === 0 ? "sine" : "triangle";
-    osc.frequency.setValueAtTime(freq, now);
-    gain.gain.setValueAtTime(0.0001, now);
+    osc.frequency.setValueAtTime(finitePositive(freq, 220), now);
+    gain.gain.setValueAtTime(MIN_EXP_VALUE, now);
     gain.gain.linearRampToValueAtTime(padVol, now + 0.8);
     gain.gain.linearRampToValueAtTime(padVol * 0.65, now + 2.4);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 3.0);
+    gain.gain.exponentialRampToValueAtTime(MIN_EXP_VALUE, now + 3.0);
     osc.connect(gain).connect(master);
     osc.start(now); osc.stop(now + 3.2);
   });
@@ -196,7 +201,7 @@ function playAmbientStep(c: AudioContext, now: number) {
 
   // 3. BASS
   if (hasBass) {
-    const bassFreq = chord[0] / 2;
+    const bassFreq = finitePositive((chord[0] ?? 220) / 2, 110);
     for (let i = 0; i < 4; i++) {
       const t = now + i * 0.5;
       const b = c.createOscillator();
@@ -205,9 +210,9 @@ function playAmbientStep(c: AudioContext, now: number) {
       b.type = "sawtooth";
       b.frequency.setValueAtTime(bassFreq, t);
       f.type = "lowpass"; f.frequency.setValueAtTime(650, t);
-      g.gain.setValueAtTime(0.0001, t);
+      g.gain.setValueAtTime(MIN_EXP_VALUE, t);
       g.gain.exponentialRampToValueAtTime(0.065, t + 0.03);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.45);
+      g.gain.exponentialRampToValueAtTime(MIN_EXP_VALUE, t + 0.45);
       b.connect(f).connect(g).connect(master);
       b.start(t); b.stop(t + 0.5);
     }
@@ -218,15 +223,15 @@ function playAmbientStep(c: AudioContext, now: number) {
     const arpPattern = [0,1,2,1, 0,2,1,2];
     for (let i = 0; i < 8; i++) {
       const t = now + i * 0.25;
-      const note = chord[arpPattern[i % 8]] * (i % 3 === 2 ? 2 : 4); // varierar oktav
+      const note = finitePositive(chord[arpPattern[i % 8]] ?? chord[0] ?? 220, 220) * (i % 3 === 2 ? 2 : 4); // varierar oktav
 
       const o = c.createOscillator();
       const g = c.createGain();
       o.type = "square";
       o.frequency.setValueAtTime(note, t);
-      g.gain.setValueAtTime(0.0001, t);
+      g.gain.setValueAtTime(MIN_EXP_VALUE, t);
       g.gain.exponentialRampToValueAtTime(0.016, t + 0.02);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.16);
+      g.gain.exponentialRampToValueAtTime(MIN_EXP_VALUE, t + 0.16);
       o.connect(g).connect(master);
       o.start(t); o.stop(t + 0.2);
     }
@@ -234,34 +239,34 @@ function playAmbientStep(c: AudioContext, now: number) {
 
   // 5. LEAD MELODY + HARMONY (riktig polyfoni!)
   if (hasMelody) {
-    const melodyPattern = [0, 2, 4, 5, 4, 2, 0, 2];
-    const harmPattern   = [2, 4, 0, 2, 0, 4, 2, 4];
+    const melodyPattern = [0, 2, 1, 2, 1, 2, 0, 1];
+    const harmPattern   = [2, 1, 0, 1, 0, 1, 2, 0];
 
     for (let i = 0; i < 4; i++) {
       const t = now + i * 0.5;
       const idx = (measure + i) % 8;
 
       // Lead
-      const leadFreq = chord[melodyPattern[idx]] * 4;
+      const leadFreq = finitePositive(chord[melodyPattern[idx]] ?? chord[0] ?? 220, 220) * 4;
       const lead = c.createOscillator();
       const lg = c.createGain();
       lead.type = "sawtooth";
       lead.frequency.setValueAtTime(leadFreq, t);
-      lg.gain.setValueAtTime(0.0001, t);
+      lg.gain.setValueAtTime(MIN_EXP_VALUE, t);
       lg.gain.linearRampToValueAtTime(0.032, t + 0.1);
-      lg.gain.exponentialRampToValueAtTime(0.0001, t + 0.55);
+      lg.gain.exponentialRampToValueAtTime(MIN_EXP_VALUE, t + 0.55);
       lead.connect(lg).connect(master);
       lead.start(t); lead.stop(t + 0.6);
 
       // Harmony (tredje ovan)
-      const harmFreq = chord[harmPattern[idx]] * 4;
+      const harmFreq = finitePositive(chord[harmPattern[idx]] ?? chord[1] ?? chord[0] ?? 220, 220) * 4;
       const harm = c.createOscillator();
       const hg = c.createGain();
       harm.type = "triangle";
       harm.frequency.setValueAtTime(harmFreq, t);
-      hg.gain.setValueAtTime(0.0001, t);
+      hg.gain.setValueAtTime(MIN_EXP_VALUE, t);
       hg.gain.linearRampToValueAtTime(0.022, t + 0.12);
-      hg.gain.exponentialRampToValueAtTime(0.0001, t + 0.55);
+      hg.gain.exponentialRampToValueAtTime(MIN_EXP_VALUE, t + 0.55);
       harm.connect(hg).connect(master);
       harm.start(t); harm.stop(t + 0.6);
     }
@@ -279,9 +284,9 @@ function playAmbientStep(c: AudioContext, now: number) {
     nf.type = "bandpass";
     nf.frequency.setValueAtTime(900, now);
     nf.frequency.exponentialRampToValueAtTime(4200, now + 1.2);
-    ng.gain.setValueAtTime(0.0001, now);
+    ng.gain.setValueAtTime(MIN_EXP_VALUE, now);
     ng.gain.exponentialRampToValueAtTime(0.028, now + 0.4);
-    ng.gain.exponentialRampToValueAtTime(0.0001, now + 1.8);
+    ng.gain.exponentialRampToValueAtTime(MIN_EXP_VALUE, now + 1.8);
     noise.connect(nf).connect(ng).connect(master);
     noise.start(now); noise.stop(now + 2);
   }
@@ -314,7 +319,7 @@ export function stopAmbientMusic() {
     musicTimer = null;
   }
   if (musicMaster) {
-    musicMaster.gain.exponentialRampToValueAtTime(0.0001, musicMaster.context.currentTime + 0.4);
+    musicMaster.gain.exponentialRampToValueAtTime(MIN_EXP_VALUE, musicMaster.context.currentTime + 0.4);
     setTimeout(() => { musicMaster?.disconnect(); musicMaster = null; }, 500);
   }
 }
