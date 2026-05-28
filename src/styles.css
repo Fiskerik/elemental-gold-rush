@@ -107,6 +107,45 @@
   --sidebar-ring: oklch(0.704 0.04 256.788);
 }
 
+.theme-light {
+  --background: oklch(0.965 0.008 92);
+  --foreground: oklch(0.16 0.02 78);
+  --surface: oklch(0.985 0.004 95);
+  --surface-elevated: oklch(1 0 0);
+  --surface-high: oklch(0.93 0.012 94);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.16 0.02 78);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.16 0.02 78);
+  --primary: oklch(0.72 0.14 82);
+  --primary-foreground: oklch(0.16 0.02 78);
+  --primary-glow: oklch(0.72 0.14 82 / 0.34);
+  --secondary: oklch(0.78 0.09 220);
+  --secondary-foreground: oklch(0.16 0.02 78);
+  --muted: oklch(0.9 0.012 92);
+  --muted-foreground: oklch(0.48 0.02 78);
+  --accent: oklch(0.76 0.15 84);
+  --accent-foreground: oklch(0.16 0.02 78);
+  --accent-glow: oklch(0.76 0.15 84 / 0.34);
+  --success: oklch(0.62 0.16 150);
+  --warning: oklch(0.76 0.15 84);
+  --destructive: oklch(0.58 0.2 25);
+  --destructive-foreground: oklch(1 0 0);
+  --danger-glow: oklch(0.58 0.2 25 / 0.32);
+  --border: oklch(0.84 0.018 92);
+  --input: oklch(0.9 0.012 92);
+  --ring: oklch(0.64 0.12 82);
+  --grid-line: oklch(0.5 0.03 235 / 0.1);
+  --sidebar: oklch(0.985 0.004 95);
+  --sidebar-foreground: oklch(0.16 0.02 78);
+  --sidebar-primary: oklch(0.72 0.14 82);
+  --sidebar-primary-foreground: oklch(0.16 0.02 78);
+  --sidebar-accent: oklch(0.93 0.012 94);
+  --sidebar-accent-foreground: oklch(0.16 0.02 78);
+  --sidebar-border: oklch(0.84 0.018 92);
+  --sidebar-ring: oklch(0.64 0.12 82);
+}
+
 .dark {
   --background: oklch(0.129 0.042 264.695);
   --foreground: oklch(0.984 0.003 247.858);
@@ -202,6 +241,20 @@
   overflow-y: auto;
   overscroll-behavior-y: contain;
   -webkit-overflow-scrolling: touch;
+}
+.theme-light .app-shell {
+  background:
+    radial-gradient(ellipse at top, oklch(1 0 0) 0%, oklch(0.965 0.008 92) 62%) no-repeat,
+    var(--background);
+}
+.theme-light .app-shell::before {
+  opacity: 0.58;
+  mask-image: radial-gradient(ellipse at center, black 26%, transparent 78%);
+}
+.theme-light .gold-text {
+  background: none;
+  color: var(--foreground);
+  animation: none;
 }
 .app-shell::before {
   content: "";

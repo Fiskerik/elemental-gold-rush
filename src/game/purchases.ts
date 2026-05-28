@@ -9,10 +9,13 @@ import { PRODUCT_IDS, ProductId, getProductById } from "./products";
 const FALLBACK_REVENUECAT_IOS_API_KEY = "appl_wleIrbzZnDKaUaQgnbmYbTYVxfX";
 const DEFAULT_PRO_ENTITLEMENT = "atomic_fusion_lifetime";
 const DEFAULT_OFFERING_ID = "default";
+const NATIVE_SETUP_TIMEOUT_MS = 15_000;
+const NATIVE_PURCHASE_TIMEOUT_MS = 45_000;
 
 let configured = false;
 let customerInfoListenerId: string | null = null;
 let missingConfigLogged = false;
+let lastConfigurationReason = "";
 
 export type PurchaseGoldCoinResult = {
   coins: number;
@@ -25,6 +28,26 @@ export type PurchaseProductResult = {
 };
 
 let lastPackageLookupReason = "";
+
+async function withNativeTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  label: string,
+): Promise<T> {
+  let timeoutId: ReturnType<typeof window.setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timeoutId = window.setTimeout(() => {
+          reject(new Error(`${label} timed out after ${Math.round(timeoutMs / 1000)} seconds.`));
+        }, timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeoutId) window.clearTimeout(timeoutId);
+  }
+}
 
 function isNativePlatform(): boolean {
   return Capacitor.isNativePlatform();
@@ -86,6 +109,12 @@ function describePurchaseError(error: unknown): string {
   return fields.join(": ");
 }
 
+function purchaseSetupHint(reason: string): string {
+  const base = reason || "The App Store purchase sheet did not respond.";
+  if (!/timed out|timeout/i.test(base)) return base;
+  return `${base} Check that the App Store product is available for this bundle ID, included in RevenueCat offering '${getOfferingId()}', and ready for TestFlight sandbox purchases.`;
+}
+
 function summarizePackages(packages: PurchasesPackage[]): string {
   if (!packages.length) return "none";
   return packages
@@ -106,24 +135,50 @@ async function ensureConfigured(): Promise<typeof Purchases | null> {
       );
       missingConfigLogged = true;
     }
+    lastConfigurationReason =
+      "RevenueCat is not configured in this build. Add VITE_REVENUECAT_IOS_API_KEY in Codemagic.";
     return null;
   }
-  if (!import.meta.env.PROD) {
-    await Purchases.setLogLevel({ level: LOG_LEVEL.DEBUG });
+  lastConfigurationReason = "";
+  try {
+    if (!import.meta.env.PROD) {
+      await withNativeTimeout(
+        Purchases.setLogLevel({ level: LOG_LEVEL.DEBUG }),
+        NATIVE_SETUP_TIMEOUT_MS,
+        "RevenueCat log setup",
+      );
+    }
+    await withNativeTimeout(
+      Purchases.configure({ apiKey }),
+      NATIVE_SETUP_TIMEOUT_MS,
+      "RevenueCat configuration",
+    );
+    configured = true;
+    return Purchases;
+  } catch (error) {
+    lastConfigurationReason =
+      describePurchaseError(error) || "RevenueCat could not be initialized in this build.";
+    console.log("RevenueCat configuration failed.", { error, reason: lastConfigurationReason });
+    return null;
   }
-  await Purchases.configure({ apiKey });
-  configured = true;
-  return Purchases;
 }
 
 async function findPackage(productId: ProductId): Promise<PurchasesPackage | null> {
   lastPackageLookupReason = "";
   const purchases = await ensureConfigured();
-  if (!purchases) return null;
+  if (!purchases) {
+    lastPackageLookupReason =
+      lastConfigurationReason || "RevenueCat is not configured in this build.";
+    return null;
+  }
 
   let offerings;
   try {
-    offerings = await purchases.getOfferings();
+    offerings = await withNativeTimeout(
+      purchases.getOfferings(),
+      NATIVE_SETUP_TIMEOUT_MS,
+      "RevenueCat offerings lookup",
+    );
   } catch (error) {
     lastPackageLookupReason =
       describePurchaseError(error) || "RevenueCat offerings could not be loaded. Check the RevenueCat app setup.";
@@ -200,14 +255,22 @@ async function findPackage(productId: ProductId): Promise<PurchasesPackage | nul
 export async function initPurchases(): Promise<boolean> {
   const purchases = await ensureConfigured();
   if (!purchases) return false;
-  const { customerInfo } = await purchases.getCustomerInfo();
+  const { customerInfo } = await withNativeTimeout(
+    purchases.getCustomerInfo(),
+    NATIVE_SETUP_TIMEOUT_MS,
+    "RevenueCat customer info lookup",
+  );
   return hasProEntitlement(customerInfo);
 }
 
 export async function syncCustomerInfoEntitlement(): Promise<boolean> {
   const purchases = await ensureConfigured();
   if (!purchases) return false;
-  const { customerInfo } = await purchases.getCustomerInfo();
+  const { customerInfo } = await withNativeTimeout(
+    purchases.getCustomerInfo(),
+    NATIVE_SETUP_TIMEOUT_MS,
+    "RevenueCat customer info sync",
+  );
   return hasProEntitlement(customerInfo);
 }
 
@@ -242,7 +305,11 @@ export async function presentCustomerCenter(): Promise<boolean> {
   if (!purchases) return false;
 
   try {
-    const { customerInfo } = await purchases.getCustomerInfo();
+    const { customerInfo } = await withNativeTimeout(
+      purchases.getCustomerInfo(),
+      NATIVE_SETUP_TIMEOUT_MS,
+      "RevenueCat customer management lookup",
+    );
     const managementURL =
       (customerInfo as CustomerInfo & { managementURL?: string | null; managementUrl?: string | null })
         .managementURL ??
@@ -280,9 +347,13 @@ export async function purchaseProductWithResult(productId: ProductId): Promise<P
   }
 
   try {
-    const { customerInfo } = await purchases.purchasePackage({
-      aPackage: packageToPurchase,
-    });
+    const { customerInfo } = await withNativeTimeout(
+      purchases.purchasePackage({
+        aPackage: packageToPurchase,
+      }),
+      NATIVE_PURCHASE_TIMEOUT_MS,
+      "App Store purchase",
+    );
     if (productId !== PRODUCT_IDS.proLabPack) return { purchased: true };
     if (hasProEntitlement(customerInfo)) return { purchased: true };
     return {
@@ -290,7 +361,9 @@ export async function purchaseProductWithResult(productId: ProductId): Promise<P
       reason: `Purchase completed, but entitlement '${getEntitlementId()}' is not active yet. Try Restore after a moment.`,
     };
   } catch (error) {
-    const reason = describePurchaseError(error) || "App Store purchase could not be completed right now.";
+    const reason = purchaseSetupHint(
+      describePurchaseError(error) || "App Store purchase could not be completed right now.",
+    );
     console.log("Native App Store purchase could not be completed.", { productId, error, reason });
     return { purchased: false, reason };
   }
@@ -313,7 +386,9 @@ export async function purchaseGoldCoinPack(productId: ProductId): Promise<Purcha
   if (!purchases) {
     return {
       coins: 0,
-      reason: "RevenueCat is not configured in this build. Add VITE_REVENUECAT_IOS_API_KEY in Codemagic.",
+      reason:
+        lastConfigurationReason ||
+        "RevenueCat is not configured in this build. Add VITE_REVENUECAT_IOS_API_KEY in Codemagic.",
     };
   }
   const packageToPurchase = await findPackage(productId);
@@ -326,10 +401,16 @@ export async function purchaseGoldCoinPack(productId: ProductId): Promise<Purcha
     };
   }
   try {
-    await purchases.purchasePackage({ aPackage: packageToPurchase });
+    await withNativeTimeout(
+      purchases.purchasePackage({ aPackage: packageToPurchase }),
+      NATIVE_PURCHASE_TIMEOUT_MS,
+      "App Store coin purchase",
+    );
     return { coins: product.coins };
   } catch (error) {
-    const message = describePurchaseError(error) || "App Store purchase could not be completed right now.";
+    const message = purchaseSetupHint(
+      describePurchaseError(error) || "App Store purchase could not be completed right now.",
+    );
     return { coins: 0, reason: message };
   }
 }
@@ -340,6 +421,10 @@ export async function restorePurchases(): Promise<ProductId[]> {
     console.log("Purchase restore requested, but RevenueCat is not configured in this build.");
     return [];
   }
-  const { customerInfo } = await purchases.restorePurchases();
+  const { customerInfo } = await withNativeTimeout(
+    purchases.restorePurchases(),
+    NATIVE_SETUP_TIMEOUT_MS,
+    "RevenueCat restore purchases",
+  );
   return hasProEntitlement(customerInfo) ? [PRODUCT_IDS.proLabPack] : [];
 }

@@ -10,6 +10,20 @@ declare global {
   }
 }
 
+function getStoredTheme(): "dark" | "light" {
+  try {
+    const raw = window.localStorage.getItem("elemental-gold-rush");
+    const state = raw ? (JSON.parse(raw) as { state?: { appTheme?: unknown } }) : null;
+    return state?.state?.appTheme === "light" ? "light" : "dark";
+  } catch {
+    return "dark";
+  }
+}
+
+const storedTheme = getStoredTheme();
+document.documentElement.classList.add(storedTheme === "light" ? "theme-light" : "theme-dark");
+document.documentElement.style.colorScheme = storedTheme;
+
 const rootElement = document.getElementById("root");
 
 if (!rootElement) {
@@ -22,8 +36,12 @@ createRoot(rootElement).render(<RouterProvider router={router} />);
 
 if (Capacitor.getPlatform() === "ios") {
   void StatusBar.setOverlaysWebView({ overlay: true }).catch(() => {});
-  void StatusBar.setStyle({ style: Style.Light }).catch(() => {});
-  void StatusBar.setBackgroundColor({ color: "#0A0A1A" }).catch(() => {});
+  void StatusBar.setStyle({ style: storedTheme === "light" ? Style.Dark : Style.Light }).catch(
+    () => {},
+  );
+  void StatusBar.setBackgroundColor({
+    color: storedTheme === "light" ? "#f7f5ef" : "#0A0A1A",
+  }).catch(() => {});
 }
 
 window.requestAnimationFrame(() => {

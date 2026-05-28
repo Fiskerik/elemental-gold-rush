@@ -2,7 +2,7 @@ import { useProgress } from "./store";
 import { startAmbientMusic, stopAmbientMusic } from "./audio";
 
 export function Settings({ onBack }: { onBack: () => void }) {
-  const { soundEnabled, musicEnabled, hapticsEnabled, shootingStyle, toggleSound, toggleMusic, toggleHaptics, setShootingStyle, reset } =
+  const { soundEnabled, musicEnabled, hapticsEnabled, appTheme, shootingStyle, toggleSound, toggleMusic, toggleHaptics, toggleAppTheme, setShootingStyle, reset } =
     useProgress();
   const handleMusicToggle = () => {
     if (!musicEnabled) startAmbientMusic();
@@ -20,6 +20,11 @@ export function Settings({ onBack }: { onBack: () => void }) {
           <Row label="Music" value={musicEnabled} onToggle={handleMusicToggle} />
           <Row label="Sound effects" value={soundEnabled} onToggle={toggleSound} />
           <Row label="Haptics" value={hapticsEnabled} onToggle={toggleHaptics} />
+          <Row
+            label={`Theme: ${appTheme === "dark" ? "Dark" : "Light"}`}
+            value={appTheme === "light"}
+            onToggle={toggleAppTheme}
+          />
           <Row
             label={`Play style: ${shootingStyle === "hold" ? "Hold" : "Press"}`}
             value={shootingStyle === "press"}

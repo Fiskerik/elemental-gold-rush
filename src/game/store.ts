@@ -32,6 +32,8 @@ export type InventoryPowerUpId = (typeof INVENTORY_POWER_UPS)[number];
 
 export type PowerUpInventory = Record<InventoryPowerUpId, number>;
 
+export type AppTheme = "dark" | "light";
+
 export const emptyPowerUpInventory = (): PowerUpInventory => ({
   transmute: 0,
   "fusion-jump": 0,
@@ -93,6 +95,7 @@ interface ProgressState {
   soundEnabled: boolean;
   musicEnabled: boolean;
   hapticsEnabled: boolean;
+  appTheme: AppTheme;
   shootingStyle: "hold" | "press";
   hasChosenShootingStyle: boolean;
   dailyQuestDate: string;
@@ -141,6 +144,8 @@ interface ProgressState {
   toggleSound: () => void;
   toggleMusic: () => void;
   toggleHaptics: () => void;
+  setAppTheme: (theme: AppTheme) => void;
+  toggleAppTheme: () => void;
   setShootingStyle: (style: "hold" | "press") => void;
   reset: () => void;
 }
@@ -162,6 +167,7 @@ export const useProgress = create<ProgressState>()(
       soundEnabled: true,
       musicEnabled: true,
       hapticsEnabled: true,
+      appTheme: "dark",
       shootingStyle: "hold",
       hasChosenShootingStyle: false,
       dailyQuestDate: initialQuestDate,
@@ -397,6 +403,9 @@ export const useProgress = create<ProgressState>()(
       toggleSound: () => set((s) => ({ soundEnabled: !s.soundEnabled })),
       toggleMusic: () => set((s) => ({ musicEnabled: !s.musicEnabled })),
       toggleHaptics: () => set((s) => ({ hapticsEnabled: !s.hapticsEnabled })),
+      setAppTheme: (theme) => set({ appTheme: theme }),
+      toggleAppTheme: () =>
+        set((s) => ({ appTheme: s.appTheme === "dark" ? "light" : "dark" })),
       setShootingStyle: (style) => set({ shootingStyle: style, hasChosenShootingStyle: true }),
       reset: () =>
         set({
@@ -410,6 +419,7 @@ export const useProgress = create<ProgressState>()(
           soundEnabled: true,
           musicEnabled: true,
           hapticsEnabled: true,
+          appTheme: "dark",
           shootingStyle: "hold",
           hasChosenShootingStyle: false,
           dailyQuestDate: getTodayQuestDate(),
@@ -451,6 +461,7 @@ export const useProgress = create<ProgressState>()(
           soundEnabled: persistedState?.soundEnabled ?? current.soundEnabled,
           musicEnabled: persistedState?.musicEnabled ?? current.musicEnabled,
           hapticsEnabled: persistedState?.hapticsEnabled ?? current.hapticsEnabled,
+          appTheme: persistedState?.appTheme === "light" ? "light" : "dark",
           shootingStyle: persistedState?.shootingStyle ?? current.shootingStyle,
           hasChosenShootingStyle:
             persistedState?.hasChosenShootingStyle ?? current.hasChosenShootingStyle,

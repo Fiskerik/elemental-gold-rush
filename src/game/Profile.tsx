@@ -41,8 +41,10 @@ export function Profile({ onBack }: Props) {
     levelStars,
     challengeBestScores,
     hasProPack,
+    appTheme,
     grantProPack,
     setUnlockedLevel,
+    setAppTheme,
   } = useProgress();
   const [proPackMessage, setProPackMessage] = useState("");
   const [proPackBusy, setProPackBusy] = useState<"purchase" | "restore" | "manage" | "">("");
@@ -259,6 +261,31 @@ export function Profile({ onBack }: Props) {
         </section>
 
         <section style={card}>
+          <div style={sectionHeading}>Display</div>
+          <div style={themeToggle}>
+            <span style={{ fontSize: 13, fontWeight: 850 }}>Theme</span>
+            <div style={{ display: "inline-grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+              {(["dark", "light"] as const).map((theme) => (
+                <button
+                  key={theme}
+                  type="button"
+                  onClick={() => setAppTheme(theme)}
+                  style={{
+                    ...themeChoiceButton,
+                    background: appTheme === theme ? "var(--primary)" : "var(--surface)",
+                    color:
+                      appTheme === theme ? "var(--primary-foreground)" : "var(--foreground)",
+                    borderColor: appTheme === theme ? "var(--primary)" : "var(--border)",
+                  }}
+                >
+                  {theme === "dark" ? "Dark" : "Light"}
+                </button>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section style={card}>
           <div style={sectionHeading}>Daily Lab</div>
           <div style={{ color: "var(--muted-foreground)", fontSize: 13, marginBottom: 12 }}>
             {completedDailyQuests}/{dailyQuests.length} quests complete today.
@@ -435,6 +462,22 @@ const card: React.CSSProperties = {
   background: "var(--surface-elevated)",
   border: "1px solid var(--border)",
   marginBottom: 12,
+};
+
+const themeToggle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 12,
+};
+
+const themeChoiceButton: React.CSSProperties = {
+  border: "1px solid var(--border)",
+  borderRadius: 999,
+  padding: "7px 12px",
+  fontSize: 12,
+  fontWeight: 900,
+  cursor: "pointer",
 };
 
 const proPackCard: React.CSSProperties = {

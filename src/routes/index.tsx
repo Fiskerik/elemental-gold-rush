@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import type { CSSProperties } from "react";
 import { useEffect, useState } from "react";
 import { Capacitor } from "@capacitor/core";
+import { StatusBar, Style } from "@capacitor/status-bar";
 import { MainMenu } from "@/game/MainMenu";
 import { clearSavedRun, GameBoard, getSavedRunSummary } from "@/game/GameBoard";
 import { LevelSelect } from "@/game/LevelSelect";
@@ -53,9 +54,25 @@ function Index() {
   const unlockedLevel = useProgress((s) => s.unlockedLevel);
   const hasProPack = useProgress((s) => s.hasProPack);
   const grantProPack = useProgress((s) => s.grantProPack);
+  const appTheme = useProgress((s) => s.appTheme);
   const [screen, setScreen] = useState<Screen>({ name: "menu" });
   const [showLaunchScreen, setShowLaunchScreen] = useState(() => Capacitor.isNativePlatform());
   const [resumePrompt, setResumePrompt] = useState<ReturnType<typeof getSavedRunSummary>>(null);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.toggle("theme-light", appTheme === "light");
+    root.classList.toggle("theme-dark", appTheme === "dark");
+    root.style.colorScheme = appTheme;
+    if (Capacitor.getPlatform() === "ios") {
+      void StatusBar.setStyle({ style: appTheme === "light" ? Style.Dark : Style.Light }).catch(
+        () => {},
+      );
+      void StatusBar.setBackgroundColor({
+        color: appTheme === "light" ? "#f7f5ef" : "#0A0A1A",
+      }).catch(() => {});
+    }
+  }, [appTheme]);
 
   useEffect(() => {
     if (!showLaunchScreen) return;
