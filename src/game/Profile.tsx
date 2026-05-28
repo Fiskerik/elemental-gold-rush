@@ -17,8 +17,7 @@ import { useProgress } from "./store";
 interface Props {
   onBack: () => void;
 }
-<<<<<<< HEAD
-=======
+
 const PURCHASE_GUARD_TIMEOUT_MS = 12_000;
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
@@ -32,7 +31,7 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string)
     }),
   ]);
 }
->>>>>>> 73d0c6169861eec1ca5081f8c73af26f2f63c5ff
+
 
 export function Profile({ onBack }: Props) {
   const {
