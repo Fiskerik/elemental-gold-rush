@@ -1,13 +1,32 @@
 import { Capacitor } from "@capacitor/core";
-import {
-  LOG_LEVEL,
-  PRODUCT_CATEGORY,
-  Purchases,
-  type CustomerInfo,
-  type PurchasesPackage,
-  type PurchasesStoreProduct,
-} from "@revenuecat/purchases-capacitor";
 import { PRODUCT_IDS, ProductId, getProductById } from "./products";
+
+type CustomerInfo = {
+  entitlements?: { active?: Record<string, unknown> };
+  managementURL?: string | null;
+  managementUrl?: string | null;
+};
+
+type PurchasesStoreProduct = { identifier: string };
+type PurchasesPackage = { identifier: string; product: PurchasesStoreProduct };
+type PurchasesOffering = {
+  identifier: string;
+  availablePackages?: PurchasesPackage[];
+  lifetime?: PurchasesPackage | null;
+};
+type PurchasesPlugin = {
+  setLogLevel: (options: { level: string }) => Promise<void>;
+  configure: (options: { apiKey: string }) => Promise<void>;
+  getOfferings: () => Promise<{ current?: PurchasesOffering | null; all?: Record<string, PurchasesOffering> }>;
+  getProducts: (options: { productIdentifiers: string[]; type: string }) => Promise<{ products: PurchasesStoreProduct[] }>;
+  getCustomerInfo: () => Promise<{ customerInfo: CustomerInfo }>;
+  addCustomerInfoUpdateListener: (listener: (customerInfo: CustomerInfo) => void) => Promise<string>;
+  removeCustomerInfoUpdateListener: (options: { listenerToRemove: string }) => Promise<unknown>;
+  purchaseStoreProduct: (options: { product: PurchasesStoreProduct }) => Promise<{ customerInfo: CustomerInfo }>;
+  purchasePackage: (options: { aPackage: PurchasesPackage }) => Promise<{ customerInfo: CustomerInfo }>;
+  restorePurchases: () => Promise<{ customerInfo: CustomerInfo }>;
+};
+
 const FALLBACK_REVENUECAT_IOS_API_KEY = "appl_wleIrbzZnDKaUaQgnbmYbTYVxfX";
 const DEFAULT_PRO_ENTITLEMENT = "atomic_fusion_lifetime";
 const DEFAULT_OFFERING_ID = "default";
@@ -15,6 +34,8 @@ const NATIVE_SETUP_TIMEOUT_MS = 15_000;
 const NATIVE_PURCHASE_TIMEOUT_MS = 20_000;
 
 let configured = false;
+let purchasesPlugin: PurchasesPlugin | null = null;
+let purchasesPluginPromise: Promise<PurchasesPlugin | null> | null = null;
 let customerInfoListenerId: string | null = null;
 let missingConfigLogged = false;
 let lastConfigurationReason = "";
@@ -39,7 +60,7 @@ async function withNativeTimeout<T>(
   timeoutMs: number,
   label: string,
 ): Promise<T> {
-  let timeoutId: ReturnType<typeof window.setTimeout> | undefined;
+  let timeoutId: number | undefined;
   try {
     return await Promise.race([
       promise,
@@ -138,7 +159,20 @@ function summarizeStoreProducts(products: PurchasesStoreProduct[]): string {
 
 async function ensureConfigured(reportStep?: PurchaseStepReporter): Promise<typeof Purchases | null> {
   if (!isNativePlatform()) return null;
-  if (configured) return Purchases;
+  if (configured) return purchasesPlugin;
+  if (!purchasesPluginPromise) {
+    purchasesPluginPromise = import("@revenuecat/purchases-capacitor")
+      .then((module) => {
+        const plugin = module.Purchases as unknown as PurchasesPlugin;
+        return plugin;
+      })
+      .catch((error) => {
+        console.log("RevenueCat plugin could not be loaded.", { error });
+        return null;
+      });
+  }
+  const Purchases = await purchasesPluginPromise;
+  if (!Purchases) return null;
 
   const apiKey = getRevenueCatApiKey();
   if (!apiKey) {
@@ -157,7 +191,7 @@ async function ensureConfigured(reportStep?: PurchaseStepReporter): Promise<type
     if (!import.meta.env.PROD) {
       reportStep?.("Preparing purchase logs...");
       await withNativeTimeout(
-        Purchases.setLogLevel({ level: LOG_LEVEL.DEBUG }),
+        Purchases.setLogLevel({ level: "DEBUG" }),
         NATIVE_SETUP_TIMEOUT_MS,
         "RevenueCat log setup",
       );
@@ -169,6 +203,7 @@ async function ensureConfigured(reportStep?: PurchaseStepReporter): Promise<type
       "RevenueCat configuration",
     );
     configured = true;
+    purchasesPlugin = Purchases;
     return Purchases;
   } catch (error) {
     lastConfigurationReason =
@@ -285,7 +320,7 @@ async function findStoreProduct(
     const { products } = await withNativeTimeout(
       purchases.getProducts({
         productIdentifiers: [productId],
-        type: PRODUCT_CATEGORY.NON_SUBSCRIPTION,
+        type: "NON_SUBSCRIPTION",
       }),
       NATIVE_SETUP_TIMEOUT_MS,
       "App Store product lookup",

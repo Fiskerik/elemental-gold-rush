@@ -89,7 +89,7 @@ const APP_STORE_COIN_PACKS = [
 const SHOP_PURCHASE_GUARD_TIMEOUT_MS = 12_000;
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
-  let timeoutId: ReturnType<typeof window.setTimeout> | undefined;
+  let timeoutId: number | undefined;
   return Promise.race([
     promise.finally(() => {
       if (timeoutId) window.clearTimeout(timeoutId);
