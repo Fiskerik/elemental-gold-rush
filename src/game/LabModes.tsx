@@ -2,6 +2,7 @@ import { Atom, Clock, FlaskConical, LockKeyhole, Map, RotateCcw, Shield, type Lu
 import { MAX_LEVEL } from "./levels";
 import { GAME_MODES, GameModeId, getUnlockedGameModes } from "./challenges";
 import { useProgress } from "./store";
+import { useIsTabletLayout } from "./responsive";
 
 interface Props {
   onBack: () => void;
@@ -9,13 +10,14 @@ interface Props {
 }
 
 export function LabModes({ onBack, onStart }: Props) {
+  const isTabletLayout = useIsTabletLayout();
   const unlockedLevel = useProgress((s) => s.unlockedLevel);
   const unlockedModes = new Set(getUnlockedGameModes(unlockedLevel).map((mode) => mode.id));
   const levelId = Math.min(unlockedLevel, MAX_LEVEL);
 
   return (
-    <div className="app-shell" style={{ padding: 20, paddingTop: 32, minHeight: "100dvh" }}>
-      <div style={{ position: "relative", zIndex: 1, maxWidth: 560, margin: "0 auto" }}>
+    <div className="app-shell" style={{ padding: isTabletLayout ? 28 : 20, paddingTop: isTabletLayout ? 36 : 32, minHeight: "100dvh" }}>
+      <div style={{ position: "relative", zIndex: 1, maxWidth: isTabletLayout ? 920 : 560, margin: "0 auto" }}>
         <button onClick={onBack} style={backBtn}>
           ← Menu
         </button>
@@ -30,7 +32,7 @@ export function LabModes({ onBack, onStart }: Props) {
             Try campaign variants, challenge rules, and Survival.
           </p>
         </header>
-        <div style={{ display: "grid", gap: 12 }}>
+        <div style={{ display: "grid", gridTemplateColumns: isTabletLayout ? "1fr 1fr" : "1fr", gap: isTabletLayout ? 16 : 12 }}>
           {GAME_MODES.map((mode) => {
             const locked = !unlockedModes.has(mode.id);
             return (

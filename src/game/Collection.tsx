@@ -5,8 +5,10 @@ import { ElementBall } from "./ElementBall";
 import { BADGES, BADGE_GROUPS } from "./badges";
 import { COMPOUNDS, getCompoundHint, type CompoundDefinition } from "./compounds";
 import { MoleculeVisual } from "./MoleculeVisual";
+import { useIsTabletLayout } from "./responsive";
 
 export function Collection({ onBack }: { onBack: () => void }) {
+  const isTabletLayout = useIsTabletLayout();
   const { discoveredElements, discoveredCompounds, compoundCounts, earnedBadges } = useProgress();
   const [selected, setSelected] = useState<number | null>(null);
   const [selectedCompound, setSelectedCompound] = useState<CompoundDefinition | null>(null);
@@ -16,8 +18,8 @@ export function Collection({ onBack }: { onBack: () => void }) {
   const el = selected ? ELEMENTS[selected - 1] : null;
 
   return (
-    <div className="app-shell" style={{ padding: 16, paddingBottom: 32 }}>
-      <div style={{ position: "relative", zIndex: 1, maxWidth: 600, margin: "0 auto" }}>
+    <div className="app-shell" style={{ padding: isTabletLayout ? 24 : 16, paddingBottom: isTabletLayout ? 40 : 32 }}>
+      <div style={{ position: "relative", zIndex: 1, maxWidth: isTabletLayout ? 980 : 600, margin: "0 auto" }}>
         <div style={{ display: "flex", alignItems: "center", marginBottom: 16, gap: 12 }}>
           <button
             onClick={onBack}
@@ -142,7 +144,13 @@ export function Collection({ onBack }: { onBack: () => void }) {
           >
             COMPOUNDS
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 8 }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: `repeat(auto-fit, minmax(${isTabletLayout ? 220 : 150}px, 1fr))`,
+              gap: isTabletLayout ? 12 : 8,
+            }}
+          >
             {COMPOUNDS.map((compound) => {
               const unlocked = foundCompounds.has(compound.id);
               const foundCount = compoundCounts[compound.id] ?? (unlocked ? 1 : 0);
@@ -234,8 +242,8 @@ export function Collection({ onBack }: { onBack: () => void }) {
                   <div
                     style={{
                       display: "grid",
-                      gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
-                      gap: 8,
+                      gridTemplateColumns: `repeat(auto-fit, minmax(${isTabletLayout ? 220 : 150}px, 1fr))`,
+                      gap: isTabletLayout ? 12 : 8,
                     }}
                   >
                     {groupBadges.map((badge) => {
@@ -330,7 +338,7 @@ export function Collection({ onBack }: { onBack: () => void }) {
               border: "1px solid var(--border)",
               borderRadius: 18,
               padding: 24,
-              maxWidth: 380,
+              maxWidth: isTabletLayout ? 560 : 380,
               width: "100%",
               animation: "pop-in 240ms ease-out",
             }}
@@ -406,7 +414,7 @@ export function Collection({ onBack }: { onBack: () => void }) {
               border: "1px solid var(--border)",
               borderRadius: 18,
               padding: 24,
-              maxWidth: 380,
+              maxWidth: isTabletLayout ? 560 : 380,
               width: "100%",
               animation: "pop-in 240ms ease-out",
             }}

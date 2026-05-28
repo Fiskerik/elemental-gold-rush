@@ -4,12 +4,14 @@ import { GAME_MODES } from "./challenges";
 import { PowerUpBadge } from "./PowerUpLibrary";
 import { POWER_UPS } from "./powerUps";
 import { useProgress } from "./store";
+import { useIsTabletLayout } from "./responsive";
 
 interface Props {
   onBack: () => void;
 }
 
 export function GameLibrary({ onBack }: Props) {
+  const isTabletLayout = useIsTabletLayout();
   const unlockedLevel = useProgress((s) => s.unlockedLevel);
   const [tab, setTab] = useState<"challenges" | "powerups">("powerups");
   const powerUpsByOccurrence = [...POWER_UPS].sort(
@@ -17,8 +19,8 @@ export function GameLibrary({ onBack }: Props) {
   );
 
   return (
-    <div className="app-shell" style={{ padding: 20, paddingTop: 32, minHeight: "100dvh" }}>
-      <div style={{ position: "relative", zIndex: 1, maxWidth: 640, margin: "0 auto" }}>
+    <div className="app-shell" style={{ padding: isTabletLayout ? 28 : 20, paddingTop: isTabletLayout ? 36 : 32, minHeight: "100dvh" }}>
+      <div style={{ position: "relative", zIndex: 1, maxWidth: isTabletLayout ? 1020 : 640, margin: "0 auto" }}>
         <button onClick={onBack} style={backBtn}>
           ← Menu
         </button>
@@ -51,7 +53,7 @@ export function GameLibrary({ onBack }: Props) {
 
         {tab === "challenges" && (
           <section style={sectionCard}>
-            <div style={{ display: "grid", gap: 12 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isTabletLayout ? "1fr 1fr" : "1fr", gap: isTabletLayout ? 16 : 12 }}>
             {GAME_MODES.filter((mode) => mode.kind !== "campaign").map((mode) => {
               const locked = unlockedLevel < mode.unlockedAtLevel;
               return (
@@ -82,7 +84,7 @@ export function GameLibrary({ onBack }: Props) {
 
         {tab === "powerups" && (
           <section style={sectionCard}>
-            <div style={{ display: "grid", gap: 12 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isTabletLayout ? "1fr 1fr" : "1fr", gap: isTabletLayout ? 16 : 12 }}>
             {powerUpsByOccurrence.map((powerUp) => (
               <article key={powerUp.name} style={rowCard}>
                 <div style={iconWrap}>

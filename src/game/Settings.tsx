@@ -1,7 +1,9 @@
 import { useProgress } from "./store";
 import { startAmbientMusic, stopAmbientMusic } from "./audio";
+import { useIsTabletLayout } from "./responsive";
 
 export function Settings({ onBack }: { onBack: () => void }) {
+  const isTabletLayout = useIsTabletLayout();
   const { soundEnabled, musicEnabled, hapticsEnabled, appTheme, shootingStyle, toggleSound, toggleMusic, toggleHaptics, toggleAppTheme, setShootingStyle, reset } =
     useProgress();
   const handleMusicToggle = () => {
@@ -10,8 +12,8 @@ export function Settings({ onBack }: { onBack: () => void }) {
     toggleMusic();
   };
   return (
-    <div className="app-shell" style={{ padding: 16 }}>
-      <div style={{ position: "relative", zIndex: 1, maxWidth: 480, margin: "0 auto" }}>
+    <div className="app-shell" style={{ padding: isTabletLayout ? 24 : 16 }}>
+      <div style={{ position: "relative", zIndex: 1, maxWidth: isTabletLayout ? 760 : 480, margin: "0 auto" }}>
         <div style={{ display: "flex", alignItems: "center", marginBottom: 16, gap: 12 }}>
           <button onClick={onBack} style={{ background: "var(--surface)", border: "1px solid var(--border)", color: "var(--foreground)", borderRadius: 10, padding: "6px 12px", fontSize: 13, cursor: "pointer" }}>← Back</button>
           <h1 style={{ fontSize: 22, margin: 0, fontWeight: 800 }}>Settings</h1>

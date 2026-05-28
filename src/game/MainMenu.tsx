@@ -22,6 +22,7 @@ import { ELEMENTS } from "./elements";
 import { ElementBall } from "./ElementBall";
 import { trackMenuAction } from "./analytics";
 import { getWeeklyPlayBonusView } from "./weeklyBonus";
+import { useIsTabletLayout } from "./responsive";
 
 interface Props {
   onPlay: () => void;
@@ -44,6 +45,7 @@ export function MainMenu({
   onLibrary,
   onProfile,
 }: Props) {
+  const isTabletLayout = useIsTabletLayout();
   const {
     unlockedLevel,
     highestElement,
@@ -120,18 +122,18 @@ export function MainMenu({
   }
 
   return (
-    <div className="app-shell" style={{ padding: 20, paddingTop: 26 }}>
+    <div className="app-shell" style={{ padding: isTabletLayout ? 28 : 20, paddingTop: isTabletLayout ? 30 : 26 }}>
       <div
         style={{
           position: "relative",
           zIndex: 1,
-          maxWidth: 560,
+          maxWidth: isTabletLayout ? 980 : 560,
           margin: "0 auto",
           display: "flex",
           flexDirection: "column",
-          gap: 18,
+          gap: isTabletLayout ? 22 : 18,
           minHeight: "100dvh",
-          paddingBottom: 28,
+          paddingBottom: isTabletLayout ? 36 : 28,
         }}
       >
         <header style={topBar}>
@@ -164,7 +166,7 @@ export function MainMenu({
           </button>
         </header>
 
-        <section style={playPanel}>
+        <section style={{ ...playPanel, padding: isTabletLayout ? 22 : playPanel.padding }}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
             <div>
               <div style={eyebrow}>NEXT RUN</div>
@@ -209,7 +211,13 @@ export function MainMenu({
           </div>
         </section>
 
-        <nav style={subpageRow} aria-label="Main game sections">
+        <nav
+          style={{
+            ...subpageRow,
+            gap: isTabletLayout ? 14 : subpageRow.gap,
+          }}
+          aria-label="Main game sections"
+        >
           <NavPill
             icon={Atom}
             label="Collection"
@@ -248,7 +256,7 @@ export function MainMenu({
           />
         </nav>
 
-        <section style={dailyPanel}>
+        <section style={{ ...dailyPanel, padding: isTabletLayout ? 18 : dailyPanel.padding }}>
           {dailyRewardToast && (
             <div style={dailyToast} role="status" aria-live="polite">
               <Sparkles size={15} aria-hidden="true" />

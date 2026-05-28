@@ -249,6 +249,15 @@
   min-height: auto;
   overflow-y: visible;
 }
+
+@media (min-width: 768px) {
+  .app-shell {
+    padding-left: max(24px, calc(env(safe-area-inset-left, 0px) + 24px));
+    padding-right: max(24px, calc(env(safe-area-inset-right, 0px) + 24px));
+    padding-top: calc(env(safe-area-inset-top, 0px) + 22px) !important;
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 22px) !important;
+  }
+}
 .theme-light .app-shell {
   background:
     radial-gradient(ellipse at top, oklch(1 0 0) 0%, oklch(0.965 0.008 92) 62%) no-repeat,

@@ -10,6 +10,7 @@ import {
   restorePurchases,
 } from "./purchases";
 import { showRewardedForCoin } from "./ads";
+import { useIsTabletLayout } from "./responsive";
 
 const SHOP_POWER_UPS: Array<{
   id: InventoryPowerUpId;
@@ -101,6 +102,7 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string)
 }
 
 export function Shop({ onBack }: { onBack: () => void }) {
+  const isTabletLayout = useIsTabletLayout();
   const {
     goldCoins,
     unlockedLevel,
@@ -236,16 +238,16 @@ export function Shop({ onBack }: { onBack: () => void }) {
   }
 
   return (
-    <div className="app-shell" style={{ padding: 20, paddingTop: 32 }}>
+    <div className="app-shell" style={{ padding: isTabletLayout ? 28 : 20, paddingTop: isTabletLayout ? 36 : 32 }}>
       <div
         style={{
           position: "relative",
           zIndex: 1,
-          maxWidth: 480,
+          maxWidth: isTabletLayout ? 980 : 480,
           margin: "0 auto",
           display: "flex",
           flexDirection: "column",
-          gap: 16,
+          gap: isTabletLayout ? 20 : 16,
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -406,7 +408,7 @@ export function Shop({ onBack }: { onBack: () => void }) {
           >
             {pendingProductId === "rewarded" ? "Loading ad..." : "Watch rewarded ad for +1 coin"}
           </button>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
+          <div style={{ display: "grid", gridTemplateColumns: isTabletLayout ? "repeat(4, minmax(0, 1fr))" : "repeat(2, minmax(0, 1fr))", gap: isTabletLayout ? 12 : 8 }}>
             {APP_STORE_COIN_PACKS.map((productId) => {
               const product = getProductById(productId);
               if (!product?.coins) return null;
@@ -473,7 +475,7 @@ export function Shop({ onBack }: { onBack: () => void }) {
             Buy extra inventory copies with gold coins. Before each level, you can choose up to 3
             inventory power-ups to start with.
           </p>
-          <div style={{ display: "grid", gap: 10 }}>
+          <div style={{ display: "grid", gridTemplateColumns: isTabletLayout ? "1fr 1fr" : "1fr", gap: isTabletLayout ? 12 : 10 }}>
             {SHOP_POWER_UPS_BY_PRICE.map((powerUp) => {
               const isUnlocked = unlockedLevel >= powerUp.unlockLevel;
               const canAfford = goldCoins >= powerUp.coinCost;

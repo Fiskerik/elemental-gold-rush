@@ -13,6 +13,7 @@ import { ELEMENTS } from "./elements";
 import { MAX_LEVEL } from "./levels";
 import { formatScore } from "./logic";
 import { useProgress } from "./store";
+import { useIsTabletLayout } from "./responsive";
 
 interface Props {
   onBack: () => void;
@@ -34,6 +35,7 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string)
 
 
 export function Profile({ onBack }: Props) {
+  const isTabletLayout = useIsTabletLayout();
   const {
     unlockedLevel,
     highestElement,
@@ -65,8 +67,8 @@ export function Profile({ onBack }: Props) {
   const completionPercent = Math.round((discoveredElements.length / ELEMENTS.length) * 100);
 
   return (
-    <div className="app-shell" style={{ padding: 20, paddingTop: 32, minHeight: "100dvh" }}>
-      <div style={{ position: "relative", zIndex: 1, maxWidth: 620, margin: "0 auto" }}>
+    <div className="app-shell" style={{ padding: isTabletLayout ? 28 : 20, paddingTop: isTabletLayout ? 36 : 32, minHeight: "100dvh" }}>
+      <div style={{ position: "relative", zIndex: 1, maxWidth: isTabletLayout ? 980 : 620, margin: "0 auto" }}>
         <button onClick={onBack} style={backBtn}>
           ← Menu
         </button>
@@ -89,7 +91,7 @@ export function Profile({ onBack }: Props) {
           </div>
         </header>
 
-        <section style={grid}>
+        <section style={{ ...grid, gridTemplateColumns: isTabletLayout ? "repeat(4, minmax(0, 1fr))" : grid.gridTemplateColumns }}>
           <ProfileStat label="Total Score" value={formatScore(totalScore)} sub="career" />
           <ProfileStat label="Gold Coins" value={`${goldCoins}`} sub="shop currency" />
           <ProfileStat

@@ -52,6 +52,7 @@ import { MoleculeVisual } from "./MoleculeVisual";
 import { PowerUpBadge } from "./PowerUpLibrary";
 import { POWER_UP_UNLOCK_LEVELS } from "./powerUps";
 import { showInterstitialIfReady } from "./ads";
+import { useIsTabletLayout } from "./responsive";
 
 interface Props {
   levelId: number;
@@ -636,6 +637,7 @@ function calculateStars(
 }
 
 export function GameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "campaign", resumeSavedRun = false }: Props) {
+  const isTabletLayout = useIsTabletLayout();
   const level = getLevelById(levelId) ?? LEVELS[0];
   const gameMode = getGameMode(mode);
   const shimmerEnabled = level.id >= SHIMMER_MIN_LEVEL;
@@ -4305,7 +4307,7 @@ export function GameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "camp
         display: "flex",
         flexDirection: "column",
         minHeight: "100dvh",
-        padding: 12,
+        padding: isTabletLayout ? 20 : 12,
         paddingTop: "calc(env(safe-area-inset-top, 0px) + 12px)",
         paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 12px)",
       }}
@@ -4317,7 +4319,7 @@ export function GameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "camp
           display: "flex",
           flexDirection: "column",
           flex: 1,
-          maxWidth: 480,
+          maxWidth: isTabletLayout ? 820 : 480,
           margin: "0 auto",
           width: "100%",
         }}
@@ -5594,7 +5596,7 @@ export function GameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "camp
                 border: "1px solid var(--border)",
                 borderRadius: 18,
                 padding: 22,
-                maxWidth: 320,
+                maxWidth: isTabletLayout ? 420 : 320,
                 width: "100%",
                 textAlign: "center",
                 boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
@@ -5824,7 +5826,7 @@ function FeatureTip({
     >
       <div
         style={{
-          maxWidth: 360,
+          maxWidth: isTabletLayout ? 460 : 360,
           width: "100%",
           background: "var(--surface-elevated)",
           border: `1px solid ${accent}`,

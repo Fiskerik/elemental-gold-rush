@@ -7,6 +7,7 @@ import { formatScore } from "./logic";
 import { COMPOUNDS, type CompoundDefinition } from "./compounds";
 import { MoleculeVisual } from "./MoleculeVisual";
 import { PowerUpBadge } from "./PowerUpLibrary";
+import { useIsTabletLayout } from "./responsive";
 
 function getMoleculeChallenge(levelId: number): CompoundDefinition | null {
   const id = MOLECULE_CHALLENGE_BY_LEVEL[levelId];
@@ -20,13 +21,14 @@ export function LevelSelect({
   onPick: (id: number) => void;
   onBack: () => void;
 }) {
+  const isTabletLayout = useIsTabletLayout();
   const { unlockedLevel, levelStars, levelStats, goldCoins, skipLevelForCoins } = useProgress();
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [statsOpen, setStatsOpen] = useState(false);
   const [modalMessage, setModalMessage] = useState("");
 
-  const MAP_W = 360;
-  const ROW_H = 86;
+  const MAP_W = isTabletLayout ? 700 : 360;
+  const ROW_H = isTabletLayout ? 110 : 86;
   const COLS = [0.16, 0.39, 0.61, 0.84];
   const nodes = useMemo(
     () =>
@@ -40,7 +42,7 @@ export function LevelSelect({
           y: 58 + row * ROW_H,
         };
       }),
-    [],
+    [MAP_W, ROW_H],
   );
   const mapRows = Math.ceil(LEVELS.length / COLS.length);
   const mapH = 112 + (mapRows - 1) * ROW_H;
@@ -88,8 +90,8 @@ export function LevelSelect({
   }
 
   return (
-    <div className="app-shell" style={{ padding: 16 }}>
-      <div style={{ position: "relative", zIndex: 1, maxWidth: 480, margin: "0 auto" }}>
+    <div className="app-shell" style={{ padding: isTabletLayout ? 24 : 16 }}>
+      <div style={{ position: "relative", zIndex: 1, maxWidth: isTabletLayout ? 920 : 480, margin: "0 auto" }}>
         <Header title="Campaign Map" onBack={onBack} />
         <div
           style={{
@@ -315,7 +317,7 @@ export function LevelSelect({
               onClick={(e) => e.stopPropagation()}
               style={{
                 width: "100%",
-                maxWidth: 440,
+                maxWidth: isTabletLayout ? 560 : 440,
                 background: "var(--surface-elevated)",
                 border: "1px solid var(--border)",
                 borderRadius: 18,
