@@ -39,7 +39,7 @@ async function withNativeTimeout<T>(
   timeoutMs: number,
   label: string,
 ): Promise<T> {
-  let timeoutId: ReturnType<typeof window.setTimeout> | undefined;
+  let timeoutId: number | undefined;
   try {
     return await Promise.race([
       promise,
