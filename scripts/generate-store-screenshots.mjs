@@ -8,6 +8,12 @@ const STORAGE_KEY = "elemental-gold-rush";
 const SAVED_RUN_STORAGE_KEY = "elemental-gold-rush-saved-run";
 
 const iphone = { width: 430, height: 932 };
+const ipad = { width: 1024, height: 1366 };
+
+const devices = [
+  { prefix: "iphone", viewport: iphone, deviceScaleFactor: 3 },
+  { prefix: "ipad", viewport: ipad, deviceScaleFactor: 2 },
+];
 
 const sharedState = {
   appTheme: "dark",
@@ -57,9 +63,7 @@ const sharedState = {
 
 const scenes = [
   {
-    key: "iphone_gameplay",
-    caption: ["Fuse Your Way to Carbon", "Chain early atoms into bigger discoveries"],
-    bg: ["#07153a", "#662f90"],
+    key: "gameplay",
     state: {
       ...sharedState,
       unlockedLevel: 10,
@@ -77,9 +81,7 @@ const scenes = [
     },
   },
   {
-    key: "iphone_map",
-    caption: ["Climb the Campaign Map", "Push through chemistry-inspired stages"],
-    bg: ["#0d1b43", "#6d2b74"],
+    key: "map",
     state: sharedState,
     goto: async (page) => {
       await page.goto(`${BASE_URL}/`, { waitUntil: "networkidle" });
@@ -89,9 +91,7 @@ const scenes = [
     },
   },
   {
-    key: "iphone_library",
-    caption: ["Unlock Lab Power-Ups", "Learn the tools that transform every run"],
-    bg: ["#0c3d2f", "#7b8c22"],
+    key: "library",
     state: sharedState,
     goto: async (page) => {
       await page.goto(`${BASE_URL}/`, { waitUntil: "networkidle" });
@@ -101,9 +101,7 @@ const scenes = [
     },
   },
   {
-    key: "iphone_collection",
-    caption: ["Complete the Periodic Table", "Track discoveries, compounds, and achievements"],
-    bg: ["#30135f", "#9b4896"],
+    key: "collection",
     state: sharedState,
     goto: async (page) => {
       await page.goto(`${BASE_URL}/`, { waitUntil: "networkidle" });
@@ -119,21 +117,30 @@ const scenes = [
 await mkdir(OUTPUT_DIR, { recursive: true });
 
 const browser = await chromium.launch({ headless: true });
-const context = await browser.newContext({
-  viewport: iphone,
-  deviceScaleFactor: 3,
-});
 
 try {
-  for (const scene of scenes) {
-    await captureSceneFrame(context, scene, join(OUTPUT_DIR, `${scene.key}.png`));
+  for (const device of devices) {
+    const context = await browser.newContext({
+      viewport: device.viewport,
+      deviceScaleFactor: device.deviceScaleFactor,
+    });
+    try {
+      for (const scene of scenes) {
+        await captureSceneFrame(
+          context,
+          scene,
+          join(OUTPUT_DIR, `${device.prefix}_${scene.key}.png`),
+        );
+      }
+    } finally {
+      await context.close();
+    }
   }
 } finally {
-  await context.close();
   await browser.close();
 }
 
-console.log(`Generated iPhone store screenshots in ${OUTPUT_DIR}`);
+console.log(`Generated iPhone and iPad store screenshots in ${OUTPUT_DIR}`);
 
 async function captureSceneFrame(context, scene, outputPath) {
   const page = await context.newPage();
