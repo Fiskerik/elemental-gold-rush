@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Eye } from "lucide-react";
 import { LEVELS, MOLECULE_CHALLENGE_BY_LEVEL } from "./levels";
 import { ELEMENTS } from "./elements";
 import { useProgress, type LevelStats } from "./store";
@@ -186,6 +187,7 @@ export function LevelSelect({
               const challenge = getMoleculeChallenge(lvl.id);
               const isChallenge = challenge != null;
               const isPowerUpStage = lvl.powerUpStage != null;
+              const isBossStage = lvl.specialStage === "elemental-boss";
               return (
                 <button
                   key={lvl.id}
@@ -210,7 +212,7 @@ export function LevelSelect({
                       position: "relative",
                       width: 50,
                       height: 50,
-                      borderRadius: isChallenge || isPowerUpStage ? 13 : "50%",
+                      borderRadius: isChallenge || isPowerUpStage || isBossStage ? 13 : "50%",
                       background: "var(--surface)",
                       border: `2px solid ${
                         isCurrent
@@ -230,7 +232,9 @@ export function LevelSelect({
                       animation: isCurrent ? "decay-warn-flash 1.6s ease-in-out infinite" : undefined,
                     }}
                   >
-                    {isPowerUpStage && lvl.powerUpStage ? (
+                    {isBossStage ? (
+                      <BossMapNode />
+                    ) : isPowerUpStage && lvl.powerUpStage ? (
                       <PowerUpMapNode powerUp={lvl.powerUpStage} />
                     ) : isChallenge && challenge ? (
                       <ChallengeMapNode compound={challenge} />
@@ -239,7 +243,7 @@ export function LevelSelect({
                     ) : (
                       <ElementBall atomicNumber={lvl.targetElement} size={38} glow />
                     )}
-                    {locked && (isChallenge || isPowerUpStage) && (
+                    {locked && (isChallenge || isPowerUpStage || isBossStage) && (
                       <div
                         aria-hidden="true"
                         style={{
@@ -327,7 +331,22 @@ export function LevelSelect({
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                {selected.powerUpStage ? (
+                {selected.specialStage === "elemental-boss" ? (
+                  <div
+                    style={{
+                      width: 58,
+                      height: 58,
+                      borderRadius: 14,
+                      display: "grid",
+                      placeItems: "center",
+                      background: "var(--surface)",
+                      border: "2px solid var(--accent)",
+                      boxShadow: "0 0 18px var(--accent-glow)",
+                    }}
+                  >
+                    <Eye size={34} color="var(--accent)" />
+                  </div>
+                ) : selected.powerUpStage ? (
                   <div
                     style={{
                       width: 58,
@@ -362,7 +381,7 @@ export function LevelSelect({
                 )}
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 11, color: "var(--muted-foreground)", letterSpacing: 1 }}>
-                    LEVEL {selected.id} {"→"} {ELEMENTS[selected.targetElement - 1]?.symbol}
+                    LEVEL {selected.id} {"→"} {selected.specialStage === "elemental-boss" ? "BOSS" : ELEMENTS[selected.targetElement - 1]?.symbol}
                   </div>
                   <div style={{ fontSize: 18, fontWeight: 800 }}>{selected.name}</div>
                   <div
@@ -521,6 +540,26 @@ function PowerUpMapNode({ powerUp }: { powerUp: NonNullable<(typeof LEVELS)[0]["
       }}
     >
       <PowerUpBadge icon={powerUp} size={32} />
+    </div>
+  );
+}
+
+function BossMapNode() {
+  return (
+    <div
+      aria-hidden="true"
+      style={{
+        width: 40,
+        height: 40,
+        borderRadius: 11,
+        display: "grid",
+        placeItems: "center",
+        background:
+          "linear-gradient(135deg, color-mix(in oklch, var(--accent) 24%, var(--surface)), color-mix(in oklch, var(--primary) 22%, var(--surface-high)))",
+        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.22), 0 0 14px var(--accent-glow)",
+      }}
+    >
+      <Eye size={24} color="var(--foreground)" />
     </div>
   );
 }

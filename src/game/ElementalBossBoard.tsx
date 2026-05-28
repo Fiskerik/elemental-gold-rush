@@ -1,22 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { Eye, Shield, Sparkles, Swords, Zap } from "lucide-react";
-import { trackGameOver, trackGameStart, trackLevelWin, trackShot } from "./analytics";
-import {
-  playMergeSound,
-  playShootSound,
-  playWinSound,
-  primeAudio,
-  startAmbientMusic,
-  stopAmbientMusic,
-  vibrate,
-} from "./audio";
-import { BOSSES } from "./bosses";
-import { GameModeId } from "./challenges";
-import { ELEMENTS } from "./elements";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Eye, HeartCrack } from "lucide-react";
 import { ElementBall } from "./ElementBall";
+import { BOSSES } from "./bosses";
 import { getLevelById, getNextLevel } from "./levels";
-import { useIsTabletLayout } from "./responsive";
+import { trackGameOver, trackGameStart, trackLevelWin, trackShot } from "./analytics";
+import { playMergeSound, playShootSound, playWinSound, primeAudio, startAmbientMusic, stopAmbientMusic, vibrate } from "./audio";
 import { useProgress } from "./store";
+import { useIsTabletLayout } from "./responsive";
+import type { GameModeId } from "./challenges";
 
 interface Props {
   levelId: number;
@@ -26,865 +17,1114 @@ interface Props {
   mode?: GameModeId;
 }
 
-type BossFlash = "hit" | "charge" | null;
-type BossResult = { won: boolean; stars: number; nextLevelId: number | null } | null;
 type OuterEyeId = (typeof BOSSES)["elemental-boss"]["outerEyes"][number]["id"];
 
-const BOSS = BOSSES["elemental-boss"];
+interface EyePose {
+  id: OuterEyeId;
+  atom: number;
+  x: number;
+  y: number;
+  radius: number;
+  open: boolean;
+  closedMs: number;
+}
+
+interface ProjectileAnim {
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+  x: number;
+  y: number;
+  startedAt: number;
+  durationMs: number;
+  atom: number;
+  shimmer: boolean;
+  blank: boolean;
+  outcome:
+    | { type: "miss" }
+    | { type: "center" }
+    | { type: "outer"; eyeId: OuterEyeId };
+}
+
+const OUTER_COOLDOWN_MS = 10_000;
+const CENTER_COOLDOWN_MS = 5_000;
+const PROJECTILE_SPEED = 930;
 const QUEUE_SIZE = 4;
-const HIT_SCORE = 2_400;
-const BLANK_SCORE = 1_200;
-const CHARGE_SCORE = 250;
-const OUTER_EYE_IDS = BOSS.outerEyes.map((eye) => eye.id) as OuterEyeId[];
+const SHIMMER_CHANCE = 0.13;
+const CLEAR_SCORE = 20_000;
 
-function pickEyeAtom(): number {
-  return 1 + Math.floor(Math.random() * BOSS.maxEyeElement);
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
 }
 
-function createEyeAtoms(): Record<OuterEyeId, number> {
-  const assigned = new Set<number>();
-  const atoms = {} as Record<OuterEyeId, number>;
-  for (const eyeId of OUTER_EYE_IDS) {
-    let candidate = pickEyeAtom();
-    let guard = 0;
-    while (assigned.has(candidate) && guard < 24) {
-      candidate = pickEyeAtom();
-      guard += 1;
-    }
-    assigned.add(candidate);
-    atoms[eyeId] = candidate;
+function pickDistinctAtoms(max: number, count: number): number[] {
+  const pool = Array.from({ length: max }, (_, index) => index + 1);
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
   }
-  return atoms;
+  return pool.slice(0, count);
 }
 
-function randomOpenEyes(): OuterEyeId[] {
-  const shuffled = [...OUTER_EYE_IDS].sort(() => Math.random() - 0.5);
-  const count = Math.random() < 0.52 ? 1 : 2;
-  return shuffled.slice(0, count);
+function generateBossAtom(eyeAtoms: number[]): number {
+  if (Math.random() < 0.76) {
+    return eyeAtoms[Math.floor(Math.random() * eyeAtoms.length)] ?? 1;
+  }
+  return 1 + Math.floor(Math.random() * 10);
 }
 
-function rollQueuedShot(eyeAtoms: Record<OuterEyeId, number>): { atom: number; shimmer: boolean } {
-  const eyePool = Object.values(eyeAtoms);
-  const usePool = Math.random() < 0.78;
-  const atom = usePool
-    ? eyePool[Math.floor(Math.random() * eyePool.length)]
-    : 1 + Math.floor(Math.random() * BOSS.maxEyeElement);
+function distance(x1: number, y1: number, x2: number, y2: number): number {
+  return Math.hypot(x2 - x1, y2 - y1);
+}
+
+function normalize(dx: number, dy: number): { x: number; y: number } {
+  const len = Math.hypot(dx, dy) || 1;
+  return { x: dx / len, y: dy / len };
+}
+
+function rayExitPoint(
+  startX: number,
+  startY: number,
+  dirX: number,
+  dirY: number,
+  width: number,
+  height: number,
+): { x: number; y: number; t: number } {
+  const candidates: number[] = [];
+  if (dirX > 0.0001) candidates.push((width - startX) / dirX);
+  if (dirX < -0.0001) candidates.push((0 - startX) / dirX);
+  if (dirY > 0.0001) candidates.push((height - startY) / dirY);
+  if (dirY < -0.0001) candidates.push((0 - startY) / dirY);
+  const t = Math.min(...candidates.filter((candidate) => candidate > 0));
+  return { x: startX + dirX * t, y: startY + dirY * t, t };
+}
+
+function rayCircleHit(
+  startX: number,
+  startY: number,
+  dirX: number,
+  dirY: number,
+  cx: number,
+  cy: number,
+  radius: number,
+): number | null {
+  const ox = startX - cx;
+  const oy = startY - cy;
+  const b = 2 * (ox * dirX + oy * dirY);
+  const c = ox * ox + oy * oy - radius * radius;
+  const disc = b * b - 4 * c;
+  if (disc < 0) return null;
+  const sqrtDisc = Math.sqrt(disc);
+  const t1 = (-b - sqrtDisc) / 2;
+  const t2 = (-b + sqrtDisc) / 2;
+  const hits = [t1, t2].filter((value) => value >= 0);
+  return hits.length ? Math.min(...hits) : null;
+}
+
+function makeEyeAssignments(): Record<OuterEyeId, number> {
+  const ids = BOSSES["elemental-boss"].outerEyes.map((eye) => eye.id as OuterEyeId);
+  const atoms = pickDistinctAtoms(BOSSES["elemental-boss"].maxEyeElement, ids.length);
+  return ids.reduce<Record<OuterEyeId, number>>((acc, id, index) => {
+    acc[id] = atoms[index] ?? 1;
+    return acc;
+  }, {} as Record<OuterEyeId, number>);
+}
+
+function makeInitialQueue(eyeAtoms: Record<OuterEyeId, number>): { queue: number[]; shimmer: boolean[] } {
+  const atomValues = Object.values(eyeAtoms);
   return {
-    atom,
-    shimmer: Math.random() < 0.1,
+    queue: Array.from({ length: QUEUE_SIZE }, () => generateBossAtom(atomValues)),
+    shimmer: Array.from({ length: QUEUE_SIZE }, (_, index) => index > 0 && Math.random() < SHIMMER_CHANCE),
   };
 }
 
-function createInitialQueue(eyeAtoms: Record<OuterEyeId, number>) {
-  const queue: number[] = [];
-  const shimmerQueue: boolean[] = [];
-  for (let index = 0; index < QUEUE_SIZE; index += 1) {
-    const shot = rollQueuedShot(eyeAtoms);
-    queue.push(shot.atom);
-    shimmerQueue.push(shot.shimmer);
-  }
-  return { queue, shimmerQueue };
+function formatSeconds(ms: number): string {
+  return `${Math.ceil(ms / 1000)}s`;
 }
 
-function calculateBossStars(shotsUsed: number): number {
-  if (shotsUsed <= 40) return 3;
-  if (shotsUsed <= 70) return 2;
-  return 1;
-}
-
-function formatCountdown(msRemaining: number): string {
-  return `${Math.max(0, Math.ceil(msRemaining / 1000))}s`;
-}
-
-export function ElementalBossBoard({
-  levelId,
-  onExit,
-  onWin,
-  onMap = onExit,
-  mode = "elemental-boss",
-}: Props) {
+export function ElementalBossBoard({ levelId, onExit, onWin, onMap = onExit, mode = "elemental-boss" }: Props) {
+  const config = BOSSES["elemental-boss"];
+  const level = getLevelById(levelId) ?? getLevelById(config.levelId);
+  const nextLevel = getNextLevel(levelId);
   const isTabletLayout = useIsTabletLayout();
-  const level = getLevelById(levelId) ?? getLevelById(BOSS.levelId)!;
-  const nextLevel = getNextLevel(level.id)?.id ?? null;
-  const fireLockRef = useRef(false);
+  const arenaRef = useRef<HTMLDivElement | null>(null);
+  const projectileRef = useRef<ProjectileAnim | null>(null);
+  const outerClosedUntilRef = useRef<Record<OuterEyeId, number>>({
+    "north-west": 0,
+    "north-east": 0,
+    "south-west": 0,
+    "south-east": 0,
+  });
+  const centerClosedUntilRef = useRef(0);
+  const clockRef = useRef(Date.now());
+  const runRecordedRef = useRef(false);
+  const [clock, setClock] = useState(() => Date.now());
+  const [arenaSize, setArenaSize] = useState({ width: isTabletLayout ? 860 : 380, height: isTabletLayout ? 710 : 600 });
+  const [aimPoint, setAimPoint] = useState({ x: arenaSize.width / 2, y: 120 });
+  const [eyeAtoms] = useState<Record<OuterEyeId, number>>(() => makeEyeAssignments());
+  const [queueState, setQueueState] = useState(() => makeInitialQueue(eyeAtoms));
+  const [blankCharges, setBlankCharges] = useState(0);
+  const [bossHealth, setBossHealth] = useState(config.maxHealth);
+  const [shotsUsed, setShotsUsed] = useState(0);
+  const [centerCharge, setCenterCharge] = useState(0);
+  const [projectile, setProjectile] = useState<ProjectileAnim | null>(null);
+  const [bossFlash, setBossFlash] = useState<"hit" | "charge" | null>(null);
+  const [result, setResult] = useState<null | "win" | "lose">(null);
+  const [score, setScore] = useState(0);
+  const [damageHits, setDamageHits] = useState(0);
   const {
-    musicEnabled,
+    addScore,
+    hasProPack,
     incrementLevelAttempt,
     recordLevelRun,
-    reportQuestProgress,
     setChallengeBestScore,
     setLevelStars,
     unlockLevel,
   } = useProgress();
-  const [eyeAtoms] = useState<Record<OuterEyeId, number>>(() => createEyeAtoms());
-  const [startingQueue] = useState(() => createInitialQueue(eyeAtoms));
-  const [queue, setQueue] = useState<number[]>(startingQueue.queue);
-  const [shimmerQueue, setShimmerQueue] = useState<boolean[]>(startingQueue.shimmerQueue);
-  const [bossHealth, setBossHealth] = useState(BOSS.maxHealth);
-  const [shotsUsed, setShotsUsed] = useState(0);
-  const [centerCharge, setCenterCharge] = useState(0);
-  const [blankCharges, setBlankCharges] = useState(0);
-  const [blankArmed, setBlankArmed] = useState(false);
-  const [openEyes, setOpenEyes] = useState<OuterEyeId[]>(() => randomOpenEyes());
-  const [nextEyeShiftAt, setNextEyeShiftAt] = useState(() => Date.now() + BOSS.openDurationMs);
-  const [clockNow, setClockNow] = useState(() => Date.now());
-  const [score, setScore] = useState(0);
-  const [flash, setFlash] = useState<BossFlash>(null);
-  const [statusText, setStatusText] = useState(
-    "Watch the open eyes, charge the core eye, and finish the boss in 100 shots.",
-  );
-  const [result, setResult] = useState<BossResult>(null);
 
-  const currentAtom = queue[0];
-  const currentShimmer = shimmerQueue[0];
-  const shotsLeft = Math.max(0, BOSS.maxShots - shotsUsed);
-  const healthPct = (bossHealth / BOSS.maxHealth) * 100;
-  const chargePct = (centerCharge / BOSS.centerChargeGoal) * 100;
-  const openWindowMs = Math.max(0, nextEyeShiftAt - clockNow);
-  const matchingOpenEyes = useMemo(
-    () => openEyes.filter((eyeId) => eyeAtoms[eyeId] === currentAtom),
-    [currentAtom, eyeAtoms, openEyes],
+  const launcher = useMemo(
+    () => ({
+      x: arenaSize.width * 0.5,
+      y: arenaSize.height - (isTabletLayout ? 78 : 70),
+    }),
+    [arenaSize.height, arenaSize.width, isTabletLayout],
   );
 
-  useEffect(() => {
-    incrementLevelAttempt(level.id);
-    trackGameStart(level.id, mode);
-    primeAudio();
-  }, [incrementLevelAttempt, level.id, mode]);
+  const currentShot = blankCharges > 0 ? 0 : queueState.queue[0] ?? 1;
+  const currentShimmer = blankCharges > 0 ? false : queueState.shimmer[0] ?? false;
+  const shotsLeft = Math.max(0, config.maxShots - shotsUsed);
+  const healthPct = clamp(bossHealth / config.maxHealth, 0, 1);
+  const chargePct = clamp(centerCharge / config.centerChargeGoal, 0, 1);
+
+  const outerEyes = useMemo(() => {
+    return config.outerEyes.map<EyePose>((layout) => {
+      const phase = clock / 760 + layout.swayPhase;
+      const x = (layout.xPct / 100) * arenaSize.width + Math.sin(phase) * layout.swayX;
+      const y = (layout.yPct / 100) * arenaSize.height + Math.cos(phase * 1.15) * layout.swayY;
+      const closedUntil = outerClosedUntilRef.current[layout.id as OuterEyeId] ?? 0;
+      return {
+        id: layout.id as OuterEyeId,
+        atom: eyeAtoms[layout.id as OuterEyeId],
+        x,
+        y,
+        radius: layout.size * (isTabletLayout ? 0.62 : 0.58),
+        open: clock >= closedUntil,
+        closedMs: Math.max(0, closedUntil - clock),
+      };
+    });
+  }, [arenaSize.height, arenaSize.width, clock, config.outerEyes, eyeAtoms, isTabletLayout]);
+
+  const centerEye = useMemo(() => {
+    const x = (config.centerEye.xPct / 100) * arenaSize.width;
+    const y = (config.centerEye.yPct / 100) * arenaSize.height;
+    const closedMs = Math.max(0, centerClosedUntilRef.current - clock);
+    return {
+      x,
+      y,
+      radius: config.centerEye.size * (isTabletLayout ? 0.36 : 0.34),
+      open: clock >= centerClosedUntilRef.current,
+      closedMs,
+    };
+  }, [arenaSize.height, arenaSize.width, clock, config.centerEye, isTabletLayout]);
+
+  const consumeQueuedShot = useCallback(() => {
+    setQueueState((prev) => {
+      const eyePool = Object.values(eyeAtoms);
+      if (blankCharges > 0) {
+        return {
+          queue: [...prev.queue.slice(1), generateBossAtom(eyePool)],
+          shimmer: [...prev.shimmer.slice(1), Math.random() < SHIMMER_CHANCE],
+        };
+      }
+      return {
+        queue: [...prev.queue.slice(1), generateBossAtom(eyePool)],
+        shimmer: [...prev.shimmer.slice(1), Math.random() < SHIMMER_CHANCE],
+      };
+    });
+    if (blankCharges > 0) {
+      setBlankCharges((value) => Math.max(0, value - 1));
+    }
+  }, [blankCharges, eyeAtoms]);
+
+  const finishRun = useCallback(
+    (didWin: boolean, finalScore: number, successfulHits: number, finalShotsUsed: number) => {
+      if (runRecordedRef.current) return;
+      runRecordedRef.current = true;
+      const stars = didWin ? (finalShotsUsed <= 40 ? 3 : finalShotsUsed <= 70 ? 2 : 1) : 0;
+      recordLevelRun(levelId, {
+        score: finalScore,
+        shots: finalShotsUsed,
+        powerUpsUsed: 0,
+        won: didWin,
+      });
+      if (didWin) {
+        setLevelStars(levelId, stars);
+        unlockLevel(getNextLevel(levelId)?.id ?? levelId + 1);
+        setChallengeBestScore(mode, finalScore);
+        trackLevelWin(levelId, finalScore, finalShotsUsed, Math.min(10, successfulHits), mode);
+      } else {
+        trackGameOver(levelId, finalScore, finalShotsUsed, Math.min(10, successfulHits), mode);
+      }
+    },
+    [levelId, mode, recordLevelRun, setChallengeBestScore, setLevelStars, unlockLevel],
+  );
+
+  const triggerFlash = useCallback((kind: "hit" | "charge") => {
+    setBossFlash(kind);
+    window.setTimeout(() => setBossFlash((current) => (current === kind ? null : current)), 220);
+  }, []);
+
+  const handleWin = useCallback(
+    (nextBossHealth: number, nextShotsUsed: number, successfulHits: number, nextScore: number) => {
+      if (nextBossHealth > 0) return;
+      const finalScore = nextScore + CLEAR_SCORE;
+      setScore(finalScore);
+      addScore(CLEAR_SCORE);
+      setResult("win");
+      playWinSound();
+      vibrate([40, 40, 80]);
+      finishRun(true, finalScore, successfulHits, nextShotsUsed);
+    },
+    [addScore, finishRun],
+  );
+
+  const handleLoss = useCallback(
+    (nextShotsUsed: number, successfulHits: number) => {
+      if (result) return;
+      setResult("lose");
+      finishRun(false, score, successfulHits, nextShotsUsed);
+    },
+    [finishRun, result, score],
+  );
+
+  const resolveOutcome = useCallback(
+    (anim: ProjectileAnim) => {
+      const baseShotsUsed = shotsUsed + 1;
+      setShotsUsed(baseShotsUsed);
+      consumeQueuedShot();
+
+      if (anim.outcome.type === "miss") {
+        if (baseShotsUsed >= config.maxShots && bossHealth > 0) {
+          handleLoss(baseShotsUsed, damageHits);
+        }
+        return;
+      }
+
+      if (anim.outcome.type === "center") {
+        centerClosedUntilRef.current = Date.now() + CENTER_COOLDOWN_MS;
+        triggerFlash("charge");
+        setCenterCharge((value) => {
+          const next = value + 1;
+          if (next >= config.centerChargeGoal) {
+            setBlankCharges((current) => current + 1);
+            return 0;
+          }
+          return next;
+        });
+        if (baseShotsUsed >= config.maxShots && bossHealth > 0) {
+          handleLoss(baseShotsUsed, damageHits);
+        }
+        return;
+      }
+
+      const eyeId = anim.outcome.eyeId;
+      outerClosedUntilRef.current[eyeId] = Date.now() + OUTER_COOLDOWN_MS;
+      const matchedEye = eyeAtoms[eyeId] === anim.atom || anim.blank;
+      if (matchedEye) {
+        const hitDamage = anim.shimmer ? 2 : 1;
+        const nextHealth = Math.max(0, bossHealth - hitDamage);
+        const nextHits = damageHits + hitDamage;
+        const nextScore = score + hitDamage * 1000;
+        setDamageHits(nextHits);
+        setBossHealth(nextHealth);
+        setScore(nextScore);
+        triggerFlash("hit");
+        playMergeSound(hitDamage);
+        vibrate([20, 24, 20]);
+        handleWin(nextHealth, baseShotsUsed, nextHits, nextScore);
+        return;
+      }
+
+      if (baseShotsUsed >= config.maxShots && bossHealth > 0) {
+        handleLoss(baseShotsUsed, damageHits);
+      }
+    },
+    [
+      bossHealth,
+      config.maxHealth,
+      config.maxShots,
+      config.centerChargeGoal,
+      consumeQueuedShot,
+      damageHits,
+      eyeAtoms,
+      handleLoss,
+      handleWin,
+      score,
+      shotsUsed,
+      triggerFlash,
+    ],
+  );
+
+  const animateProjectile = useCallback(
+    (anim: ProjectileAnim) => {
+      projectileRef.current = anim;
+      setProjectile(anim);
+      const startedAt = performance.now();
+
+      function step(now: number) {
+        const live = projectileRef.current;
+        if (!live) return;
+        const progress = clamp((now - startedAt) / live.durationMs, 0, 1);
+        const next = {
+          ...live,
+          x: live.startX + (live.endX - live.startX) * progress,
+          y: live.startY + (live.endY - live.startY) * progress,
+        };
+        projectileRef.current = next;
+        setProjectile(next);
+        if (progress >= 1) {
+          projectileRef.current = null;
+          setProjectile(null);
+          resolveOutcome(live);
+          return;
+        }
+        requestAnimationFrame(step);
+      }
+
+      requestAnimationFrame(step);
+    },
+    [resolveOutcome],
+  );
+
+  const fireShot = useCallback(
+    (targetX: number, targetY: number) => {
+      if (projectileRef.current || result) return;
+      const dir = normalize(targetX - launcher.x, targetY - launcher.y);
+      const exit = rayExitPoint(launcher.x, launcher.y, dir.x, dir.y, arenaSize.width, arenaSize.height);
+
+      const hitCandidates: Array<{
+        t: number;
+        outcome: ProjectileAnim["outcome"];
+        endX: number;
+        endY: number;
+      }> = [];
+
+      for (const eye of outerEyes) {
+        if (!eye.open) continue;
+        const t = rayCircleHit(launcher.x, launcher.y, dir.x, dir.y, eye.x, eye.y, eye.radius);
+        if (t != null && t <= exit.t) {
+          hitCandidates.push({
+            t,
+            outcome: { type: "outer", eyeId: eye.id },
+            endX: launcher.x + dir.x * t,
+            endY: launcher.y + dir.y * t,
+          });
+        }
+      }
+
+      if (centerEye.open) {
+        const t = rayCircleHit(launcher.x, launcher.y, dir.x, dir.y, centerEye.x, centerEye.y, centerEye.radius);
+        if (t != null && t <= exit.t) {
+          hitCandidates.push({
+            t,
+            outcome: { type: "center" },
+            endX: launcher.x + dir.x * t,
+            endY: launcher.y + dir.y * t,
+          });
+        }
+      }
+
+      const bestHit = hitCandidates.sort((a, b) => a.t - b.t)[0];
+      const endX = bestHit?.endX ?? exit.x;
+      const endY = bestHit?.endY ?? exit.y;
+      const travel = Math.max(120, distance(launcher.x, launcher.y, endX, endY));
+      const atom = currentShot === 0 ? eyeAtoms[outerEyes[0]?.id ?? "north-west"] : currentShot;
+
+      trackShot(levelId, currentShot === 0 ? -1 : atom, Math.atan2(targetY - launcher.y, targetX - launcher.x) * (180 / Math.PI), mode);
+      playShootSound();
+
+      animateProjectile({
+        startX: launcher.x,
+        startY: launcher.y,
+        endX,
+        endY,
+        x: launcher.x,
+        y: launcher.y,
+        startedAt: performance.now(),
+        durationMs: (travel / PROJECTILE_SPEED) * 1000,
+        atom,
+        shimmer: currentShimmer,
+        blank: currentShot === 0,
+        outcome: bestHit?.outcome ?? { type: "miss" },
+      });
+    },
+    [
+      animateProjectile,
+      arenaSize.height,
+      arenaSize.width,
+      centerEye.open,
+      centerEye.radius,
+      centerEye.x,
+      centerEye.y,
+      currentShimmer,
+      currentShot,
+      eyeAtoms,
+      launcher.x,
+      launcher.y,
+      levelId,
+      mode,
+      outerEyes,
+      result,
+    ],
+  );
+
+  const handleArenaPointer = useCallback(
+    (clientX: number, clientY: number, shouldFire: boolean) => {
+      const arena = arenaRef.current;
+      if (!arena) return;
+      const rect = arena.getBoundingClientRect();
+      const nextX = clamp(clientX - rect.left, 24, rect.width - 24);
+      const nextY = clamp(clientY - rect.top, 36, rect.height - 24);
+      setAimPoint({ x: nextX, y: nextY });
+      if (shouldFire) {
+        fireShot(nextX, nextY);
+      }
+    },
+    [fireShot],
+  );
 
   useEffect(() => {
-    if (!musicEnabled) return;
-    startAmbientMusic();
-    return () => stopAmbientMusic();
-  }, [musicEnabled]);
+    function measure() {
+      const arena = arenaRef.current;
+      if (!arena) return;
+      const rect = arena.getBoundingClientRect();
+      setArenaSize({
+        width: Math.max(320, rect.width),
+        height: Math.max(isTabletLayout ? 600 : 520, rect.height),
+      });
+      setAimPoint((current) => ({
+        x: clamp(current.x, 24, Math.max(24, rect.width - 24)),
+        y: clamp(current.y, 36, Math.max(36, rect.height - 24)),
+      }));
+    }
+
+    measure();
+    const observer = new ResizeObserver(measure);
+    if (arenaRef.current) observer.observe(arenaRef.current);
+    const raf = window.requestAnimationFrame(measure);
+    return () => {
+      window.cancelAnimationFrame(raf);
+      observer.disconnect();
+    };
+  }, [isTabletLayout]);
 
   useEffect(() => {
-    const timer = window.setInterval(() => setClockNow(Date.now()), 120);
-    return () => window.clearInterval(timer);
+    clockRef.current = clock;
+  }, [clock]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setClock(Date.now()), 80);
+    return () => window.clearInterval(interval);
   }, []);
 
   useEffect(() => {
-    if (result || clockNow < nextEyeShiftAt) return;
-    setOpenEyes(randomOpenEyes());
-    setNextEyeShiftAt(clockNow + BOSS.openDurationMs);
-  }, [clockNow, nextEyeShiftAt, result]);
-
-  useEffect(() => {
-    if (!flash) return;
-    const timeoutId = window.setTimeout(() => setFlash(null), flash === "hit" ? 260 : 180);
-    return () => window.clearTimeout(timeoutId);
-  }, [flash]);
-
-  const consumeQueuedShot = useCallback(() => {
-    const nextRoll = rollQueuedShot(eyeAtoms);
-    setQueue((current) => [...current.slice(1), nextRoll.atom]);
-    setShimmerQueue((current) => [...current.slice(1), nextRoll.shimmer]);
-  }, [eyeAtoms]);
-
-  const finishRun = useCallback(
-    (won: boolean, finalScore: number, finalShots: number, finalHighest: number) => {
-      if (result) return;
-      recordLevelRun(level.id, {
-        score: finalScore,
-        shots: finalShots,
-        powerUpsUsed: 0,
-        won,
-      });
-      if (won) {
-        const stars = calculateBossStars(finalShots);
-        setLevelStars(level.id, stars);
-        unlockLevel(nextLevel ?? level.id);
-        setChallengeBestScore("elemental-boss", finalScore);
-        reportQuestProgress({ levelCleared: true, starsEarned: stars });
-        trackLevelWin(level.id, finalScore, finalShots, finalHighest, mode);
-        playWinSound();
-        vibrate([30, 20, 40, 20, 60]);
-        setResult({ won: true, stars, nextLevelId: nextLevel });
-        setStatusText("Boss defeated. The lab is safe... for now.");
-        return;
-      }
-      trackGameOver(level.id, finalScore, finalShots, finalHighest, mode);
-      vibrate([80, 40, 80]);
-      setResult({ won: false, stars: 0, nextLevelId: null });
-      setStatusText("The boss outlasted your 100 shots. Regroup and try again.");
-    },
-    [
-      level.id,
-      mode,
-      nextLevel,
-      recordLevelRun,
-      reportQuestProgress,
-      result,
-      setChallengeBestScore,
-      setLevelStars,
-      unlockLevel,
-    ],
-  );
-
-  const fireAt = useCallback(
-    (target: OuterEyeId | "center") => {
-      if (result || shotsUsed >= BOSS.maxShots || fireLockRef.current) return;
-      fireLockRef.current = true;
-      window.setTimeout(() => {
-        fireLockRef.current = false;
-      }, 150);
-
-      primeAudio();
-      playShootSound();
-
-      const usingBlank = target !== "center" && blankArmed && blankCharges > 0;
-      const aimSnapshot = target === "center" ? 0 : OUTER_EYE_IDS.indexOf(target) * 24 - 36;
-      trackShot(level.id, usingBlank ? 0 : currentAtom, aimSnapshot, mode);
-
-      let nextHealth = bossHealth;
-      let nextCenterCharge = centerCharge;
-      let nextBlankCharges = blankCharges;
-      let nextBlankArmed = blankArmed;
-      let nextScore = score;
-      let damage = 0;
-      let message = "Missed the weak point.";
-
-      if (target === "center") {
-        nextCenterCharge += 1;
-        nextScore += CHARGE_SCORE;
-        setFlash("charge");
-        vibrate(20);
-        if (nextCenterCharge >= BOSS.centerChargeGoal) {
-          nextCenterCharge = 0;
-          nextBlankCharges += 1;
-          nextBlankArmed = true;
-          message = "Blank atom charged. Your next shot can hit any eye.";
-        } else {
-          message = `Core charge ${nextCenterCharge}/${BOSS.centerChargeGoal}`;
-        }
-      } else if (usingBlank) {
-        damage = 1;
-        nextHealth = Math.max(0, bossHealth - damage);
-        nextBlankCharges = Math.max(0, blankCharges - 1);
-        nextBlankArmed = false;
-        nextScore += BLANK_SCORE;
-        message = "Blank atom pierced the boss eye.";
-      } else if (openEyes.includes(target) && currentAtom === eyeAtoms[target]) {
-        damage = currentShimmer ? 2 : 1;
-        nextHealth = Math.max(0, bossHealth - damage);
-        nextScore += HIT_SCORE * damage;
-        message = currentShimmer ? "Shimmer strike. Two hits landed." : "Direct hit.";
-      } else if (openEyes.includes(target)) {
-        message = "Wrong atom. Aim for the center eye to charge a Blank shot.";
-      } else {
-        message = "That eye is closed. Wait for it to open.";
-      }
-
-      const nextShots = shotsUsed + 1;
-      if (damage > 0) {
-        playMergeSound(damage + 1);
-        setFlash("hit");
-        vibrate(currentShimmer ? [16, 20, 34] : 28);
-      }
-
-      if (!usingBlank) consumeQueuedShot();
-
-      setBossHealth(nextHealth);
-      setCenterCharge(nextCenterCharge);
-      setBlankCharges(nextBlankCharges);
-      setBlankArmed(nextBlankArmed);
-      setScore(nextScore);
-      setShotsUsed(nextShots);
-      setStatusText(message);
-
-      if (nextHealth <= 0) {
-        finishRun(true, nextScore, nextShots, BOSS.maxEyeElement);
-        return;
-      }
-
-      if (nextShots >= BOSS.maxShots) {
-        finishRun(false, nextScore, nextShots, BOSS.maxEyeElement);
-      }
-    },
-    [
-      blankArmed,
-      blankCharges,
-      bossHealth,
-      centerCharge,
-      consumeQueuedShot,
-      currentAtom,
-      currentShimmer,
-      eyeAtoms,
-      finishRun,
-      level.id,
-      mode,
-      openEyes,
-      result,
-      score,
-      shotsUsed,
-    ],
-  );
-
-  const actionLabel = blankArmed
-    ? "Blank atom armed"
-    : matchingOpenEyes.length > 0
-      ? `Matching eye ready: ${matchingOpenEyes.length}`
-      : "No match. Charge the center eye.";
+    primeAudio();
+    startAmbientMusic();
+    incrementLevelAttempt(levelId);
+    trackGameStart(levelId, mode);
+    return () => {
+      stopAmbientMusic();
+    };
+  }, [incrementLevelAttempt, levelId, mode]);
 
   return (
-    <div
-      className="app-shell"
-      style={{
-        minHeight: "100dvh",
-        padding: isTabletLayout ? 22 : 14,
-        paddingTop: "calc(env(safe-area-inset-top, 0px) + 12px)",
-        paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)",
-      }}
-    >
+    <div className="app-shell" style={{ padding: isTabletLayout ? 24 : 14 }}>
       <div
         style={{
           position: "relative",
           zIndex: 1,
-          width: "100%",
-          maxWidth: isTabletLayout ? 940 : 540,
+          maxWidth: isTabletLayout ? 980 : 560,
           margin: "0 auto",
           display: "grid",
           gap: 14,
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <button type="button" onClick={onExit} style={backButton}>
-            {"<- Menu"}
-          </button>
-          <div style={{ flex: 1 }}>
-            <div style={eyebrow}>SPECIAL EVENT</div>
-            <h1 className="gold-text" style={{ margin: "4px 0 0", fontSize: isTabletLayout ? 34 : 28 }}>
-              {BOSS.name}
-            </h1>
-            <div style={{ color: "var(--muted-foreground)", fontSize: 13 }}>
-              {level.id >= 63 ? `Level ${level.id}` : "Lab event"} - 20 hits to win
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+          }}
+        >
+          <button
+            type="button"
+            onClick={onMap}
+            style={{
+              background: "var(--surface)",
+              border: "1px solid var(--border)",
+              color: "var(--foreground)",
+              borderRadius: 12,
+              padding: "8px 14px",
+              fontSize: 14,
+              fontWeight: 800,
+              cursor: "pointer",
+            }}
+            >
+              {"<- Back"}
+            </button>
+          <div style={{ textAlign: "center", flex: 1 }}>
+            <div
+              style={{
+                fontSize: 12,
+                letterSpacing: 4,
+                color: "var(--accent)",
+                fontWeight: 900,
+                textTransform: "uppercase",
+              }}
+            >
+              Special Encounter
             </div>
+            <div style={{ fontSize: isTabletLayout ? 28 : 22, fontWeight: 900 }}>{level?.name ?? config.name}</div>
           </div>
-          <div style={counterPill}>
-            <Shield size={16} />
-            <span>{shotsLeft} shots</span>
+          <div
+            style={{
+              minWidth: isTabletLayout ? 134 : 112,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 10,
+              background: "var(--surface)",
+              border: "1px solid var(--border)",
+              borderRadius: 14,
+              padding: "8px 12px",
+            }}
+          >
+            <HeartCrack size={18} color="var(--accent)" />
+            <span style={{ fontWeight: 900 }}>{shotsLeft}</span>
+            {hasProPack && (
+              <span style={{ color: "var(--accent)", fontSize: 11, fontWeight: 900 }}>PRO</span>
+            )}
           </div>
         </div>
 
-        <section style={bossArenaCard}>
-          <div
-            style={{
-              display: "grid",
-              gap: 8,
-              marginBottom: 12,
-            }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
-              <div style={{ fontWeight: 900, fontSize: 14, letterSpacing: 1.1, color: "var(--accent)" }}>
-                BOSS VITALS
-              </div>
-              <div style={{ color: "var(--muted-foreground)", fontSize: 13 }}>
-                Eyes shift in {formatCountdown(openWindowMs)}
-              </div>
+        <div
+          style={{
+            display: "grid",
+            gap: 10,
+            background: "color-mix(in oklch, var(--surface-elevated) 94%, black)",
+            border: "1px solid var(--border)",
+            borderRadius: 18,
+            padding: isTabletLayout ? 16 : 12,
+            boxShadow: "0 16px 36px rgba(0,0,0,0.34)",
+          }}
+        >
+          <div style={{ display: "grid", gap: 8 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+              <span style={{ fontSize: 12, letterSpacing: 2, color: "var(--muted-foreground)", fontWeight: 800 }}>
+                Boss health
+              </span>
+              <span style={{ fontWeight: 900 }}>{bossHealth}/{config.maxHealth}</span>
             </div>
-            <div style={barTrack}>
+            <div
+              style={{
+                height: 14,
+                borderRadius: 999,
+                background: "rgba(255,255,255,0.08)",
+                overflow: "hidden",
+                border: "1px solid rgba(255,255,255,0.08)",
+              }}
+            >
               <div
                 style={{
-                  ...barFill,
-                  width: `${healthPct}%`,
+                  width: `${healthPct * 100}%`,
+                  height: "100%",
                   background:
-                    "linear-gradient(90deg, oklch(0.67 0.22 24), oklch(0.78 0.18 50))",
-                  boxShadow: "0 0 18px var(--danger-glow)",
+                    bossFlash === "hit"
+                      ? "linear-gradient(90deg, #ff7d7d, #ff3b3b)"
+                      : "linear-gradient(90deg, var(--accent), #ff7f50)",
+                  boxShadow: bossFlash === "hit" ? "0 0 18px rgba(255,70,70,0.6)" : "0 0 16px var(--accent-glow)",
+                  transition: "width 180ms ease, background 120ms ease",
+                }}
+              />
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+              <span style={{ fontSize: 12, letterSpacing: 2, color: "var(--muted-foreground)", fontWeight: 800 }}>
+                Blank charge
+              </span>
+              <span style={{ fontWeight: 900 }}>
+                {centerCharge}/{config.centerChargeGoal}
+                {blankCharges > 0 ? `  |  Blank x${blankCharges}` : ""}
+              </span>
+            </div>
+            <div
+              style={{
+                height: 12,
+                borderRadius: 999,
+                background: "rgba(255,255,255,0.08)",
+                overflow: "hidden",
+                border: "1px solid rgba(255,255,255,0.08)",
+              }}
+            >
+              <div
+                style={{
+                  width: `${chargePct * 100}%`,
+                  height: "100%",
+                  background:
+                    bossFlash === "charge"
+                      ? "linear-gradient(90deg, rgba(230,230,230,0.7), rgba(168,168,168,0.9))"
+                      : "linear-gradient(90deg, #7be1ff, #64b6ff)",
+                  boxShadow:
+                    bossFlash === "charge"
+                      ? "0 0 18px rgba(235,235,235,0.35)"
+                      : "0 0 16px rgba(100,182,255,0.5)",
+                  transition: "width 180ms ease, background 120ms ease",
                 }}
               />
             </div>
           </div>
 
           <div
+            ref={arenaRef}
+            onPointerMove={(event) => handleArenaPointer(event.clientX, event.clientY, false)}
+            onPointerDown={(event) => handleArenaPointer(event.clientX, event.clientY, true)}
             style={{
               position: "relative",
-              height: isTabletLayout ? 400 : 320,
-              borderRadius: 24,
-              background:
-                flash === "hit"
-                  ? "radial-gradient(circle at center, rgba(255,98,98,0.18), transparent 60%), linear-gradient(180deg, rgba(10,10,26,0.96), rgba(15,15,38,0.96))"
-                  : flash === "charge"
-                    ? "radial-gradient(circle at center, rgba(208,215,224,0.16), transparent 60%), linear-gradient(180deg, rgba(10,10,26,0.96), rgba(15,15,38,0.96))"
-                    : "linear-gradient(180deg, rgba(10,10,26,0.96), rgba(15,15,38,0.96))",
-              border: "1px solid rgba(255,255,255,0.08)",
+              minHeight: isTabletLayout ? 620 : 540,
+              borderRadius: 18,
               overflow: "hidden",
+              background:
+                "radial-gradient(circle at 50% 12%, rgba(92,113,255,0.18), transparent 18%)," +
+                "linear-gradient(180deg, rgba(11,14,34,0.98), rgba(7,10,28,1))",
+              border: "1px solid rgba(255,255,255,0.08)",
+              touchAction: "none",
             }}
           >
             <div
+              aria-hidden="true"
               style={{
                 position: "absolute",
-                inset: "8% 18% 22%",
-                borderRadius: "50% 50% 42% 42%",
-                background:
-                  "radial-gradient(circle at 50% 28%, rgba(84, 115, 255, 0.22), transparent 22%), radial-gradient(circle at 50% 50%, rgba(26, 26, 53, 0.95), rgba(8, 8, 20, 0.98))",
-                boxShadow: "inset 0 -22px 40px rgba(0,0,0,0.45), 0 22px 44px rgba(0,0,0,0.32)",
+                inset: 0,
+                backgroundImage:
+                  "linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px)",
+                backgroundSize: isTabletLayout ? "36px 36px" : "28px 28px",
               }}
             />
 
-            {BOSS.outerEyes.map((eye, index) => {
-              const swayX = Math.sin(clockNow / 850 + eye.swayPhase) * eye.swayX;
-              const swayY = Math.cos(clockNow / 920 + eye.swayPhase) * eye.swayY;
-              const isOpen = openEyes.includes(eye.id as OuterEyeId);
-              const usingBlankCanHit = blankArmed && blankCharges > 0;
-              const enabled = isOpen || usingBlankCanHit;
-              const eyeAtom = eyeAtoms[eye.id as OuterEyeId];
-              const lineAngle = Math.atan2(
-                eye.yPct + swayY / 8 - BOSS.centerEye.yPct,
-                eye.xPct + swayX / 8 - BOSS.centerEye.xPct,
-              );
-              const lineLength = Math.hypot(
-                eye.xPct + swayX / 8 - BOSS.centerEye.xPct,
-                eye.yPct + swayY / 8 - BOSS.centerEye.yPct,
-              );
-              return (
-                <div key={eye.id}>
-                  <div
-                    aria-hidden="true"
-                    style={{
-                      position: "absolute",
-                      left: `${BOSS.centerEye.xPct}%`,
-                      top: `${BOSS.centerEye.yPct}%`,
-                      width: `${lineLength * 3.2}%`,
-                      height: 10,
-                      transform: `translate(-2px, -50%) rotate(${lineAngle}rad)`,
-                      transformOrigin: "0 50%",
-                      borderRadius: 999,
-                      background:
-                        "linear-gradient(90deg, rgba(100,120,255,0.15), rgba(255,255,255,0.06))",
-                      filter: "blur(1px)",
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => fireAt(eye.id as OuterEyeId)}
-                    disabled={!enabled}
-                    style={{
-                      position: "absolute",
-                      left: `${eye.xPct}%`,
-                      top: `${eye.yPct}%`,
-                      transform: `translate(-50%, -50%) translate(${swayX}px, ${swayY}px)`,
-                      width: eye.size + 26,
-                      height: eye.size + 26,
-                      borderRadius: "50%",
-                      border: isOpen
-                        ? "1px solid rgba(255,214,0,0.65)"
-                        : "1px solid rgba(255,255,255,0.08)",
-                      background: isOpen
-                        ? "radial-gradient(circle at 35% 30%, rgba(255,255,255,0.4), rgba(28,28,56,0.96) 66%)"
-                        : "radial-gradient(circle at 35% 30%, rgba(210,210,220,0.1), rgba(16,16,38,0.96) 66%)",
-                      boxShadow: isOpen
-                        ? "0 0 22px rgba(255,214,0,0.22)"
-                        : "0 8px 18px rgba(0,0,0,0.26)",
-                      display: "grid",
-                      placeItems: "center",
-                      cursor: enabled ? "pointer" : "default",
-                      opacity: enabled ? 1 : 0.74,
-                    }}
-                  >
-                    {isOpen ? (
-                      <ElementBall
-                        atomicNumber={eyeAtom}
-                        size={eye.size}
-                        glow
-                        shimmer={usingBlankCanHit ? false : currentShimmer && currentAtom === eyeAtom}
-                      />
-                    ) : (
-                      <div
-                        style={{
-                          width: eye.size,
-                          height: eye.size * 0.48,
-                          borderRadius: 999,
-                          background:
-                            "linear-gradient(180deg, rgba(28,28,56,0.9), rgba(6,6,18,0.96))",
-                          border: "1px solid rgba(255,255,255,0.08)",
-                        }}
-                      />
-                    )}
-                  </button>
-                </div>
-              );
-            })}
+            <svg
+              viewBox={`0 0 ${arenaSize.width} ${arenaSize.height}`}
+              preserveAspectRatio="none"
+              style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
+            >
+              {outerEyes.map((eye) => (
+                <path
+                  key={`arm-${eye.id}`}
+                  d={`M ${arenaSize.width * 0.5} ${arenaSize.height * 0.24}
+                      C ${arenaSize.width * 0.52} ${arenaSize.height * 0.2},
+                        ${eye.x} ${eye.y - eye.radius * 0.8},
+                        ${eye.x} ${eye.y}`}
+                  fill="none"
+                  stroke="rgba(138,149,255,0.26)"
+                  strokeWidth={isTabletLayout ? 16 : 12}
+                  strokeLinecap="round"
+                />
+              ))}
+            </svg>
 
-            <button
-              type="button"
-              onClick={() => fireAt("center")}
+            <div
+              aria-hidden="true"
               style={{
                 position: "absolute",
-                left: `${BOSS.centerEye.xPct}%`,
-                top: `${BOSS.centerEye.yPct}%`,
-                transform: "translate(-50%, -50%)",
-                width: BOSS.centerEye.size + 28,
-                height: BOSS.centerEye.size + 28,
-                borderRadius: "50%",
-                border: "1px solid rgba(255,255,255,0.1)",
+                left: "50%",
+                top: "11%",
+                width: isTabletLayout ? 310 : 230,
+                height: isTabletLayout ? 170 : 132,
+                transform: "translateX(-50%)",
+                borderRadius: "50% 50% 42% 42%",
                 background:
-                  "radial-gradient(circle at 40% 38%, rgba(255,255,255,0.45), rgba(160,160,176,0.26) 32%, rgba(14,14,30,0.96) 72%)",
-                boxShadow:
-                  flash === "charge"
-                    ? "0 0 30px rgba(208,215,224,0.3)"
-                    : "0 16px 34px rgba(0,0,0,0.34)",
-                display: "grid",
-                placeItems: "center",
+                  bossFlash === "hit"
+                    ? "radial-gradient(circle at 50% 38%, rgba(255,110,110,0.45), transparent 35%), linear-gradient(180deg, rgba(40,16,22,0.92), rgba(24,10,18,0.96))"
+                    : bossFlash === "charge"
+                      ? "radial-gradient(circle at 50% 38%, rgba(220,220,220,0.18), transparent 32%), linear-gradient(180deg, rgba(28,32,50,0.96), rgba(18,20,36,0.98))"
+                      : "radial-gradient(circle at 50% 38%, rgba(255,190,90,0.1), transparent 34%), linear-gradient(180deg, rgba(31,34,60,0.96), rgba(18,20,38,0.98))",
+                boxShadow: "0 22px 48px rgba(0,0,0,0.46)",
+                border: "1px solid rgba(255,255,255,0.08)",
               }}
-            >
+            />
+
+            {outerEyes.map((eye) => (
               <div
+                key={eye.id}
                 style={{
-                  width: BOSS.centerEye.size * 0.78,
-                  height: BOSS.centerEye.size * 0.78,
+                  position: "absolute",
+                  left: eye.x - eye.radius,
+                  top: eye.y - eye.radius,
+                  width: eye.radius * 2,
+                  height: eye.radius * 2,
                   borderRadius: "50%",
-                  background:
-                    "radial-gradient(circle at 38% 34%, rgba(255,255,255,0.9), rgba(255,255,255,0.6) 16%, rgba(77,105,160,0.85) 17%, rgba(20,20,28,0.98) 58%)",
                   display: "grid",
                   placeItems: "center",
-                  overflow: "hidden",
+                  background: eye.open
+                    ? "radial-gradient(circle at 50% 45%, rgba(255,255,255,0.92), rgba(180,185,220,0.5) 62%, rgba(25,28,50,0.9) 100%)"
+                    : "linear-gradient(180deg, rgba(34,38,70,0.95), rgba(10,12,26,0.95))",
+                  border: eye.open ? "2px solid rgba(255,255,255,0.25)" : "2px solid rgba(110,120,170,0.22)",
+                  boxShadow: eye.open
+                    ? "0 0 22px rgba(125,147,255,0.22)"
+                    : "inset 0 0 18px rgba(0,0,0,0.45)",
+                  transform: `rotate(${Math.sin(clock / 950 + eye.x * 0.01) * 5}deg)`,
+                  transition: "background 160ms ease, box-shadow 160ms ease",
                 }}
               >
-                <div
-                  style={{
-                    width: BOSS.centerEye.size * 0.2,
-                    height: BOSS.centerEye.size * 0.46,
-                    borderRadius: 999,
-                    background: "rgba(0,0,0,0.88)",
-                  }}
-                />
+                {eye.open ? (
+                  <div style={{ display: "grid", gap: 4, justifyItems: "center" }}>
+                    <ElementBall atomicNumber={eye.atom} size={eye.radius * 1.1} glow />
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      display: "grid",
+                      gap: 6,
+                      justifyItems: "center",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: eye.radius * 1.25,
+                        height: Math.max(8, eye.radius * 0.22),
+                        borderRadius: 999,
+                        background: "linear-gradient(180deg, rgba(154,165,214,0.72), rgba(60,70,110,0.68))",
+                      }}
+                    />
+                    <span style={{ fontSize: 11, fontWeight: 800, color: "var(--muted-foreground)" }}>
+                      {formatSeconds(eye.closedMs)}
+                    </span>
+                  </div>
+                )}
               </div>
-            </button>
+            ))}
 
             <div
               style={{
                 position: "absolute",
-                left: "50%",
-                top: `calc(${BOSS.centerEye.yPct}% + ${BOSS.centerEye.size * 0.56}px)`,
-                transform: "translateX(-50%)",
-                width: isTabletLayout ? 320 : 240,
+                left: centerEye.x - centerEye.radius,
+                top: centerEye.y - centerEye.radius,
+                width: centerEye.radius * 2,
+                height: centerEye.radius * 2,
+                borderRadius: "50%",
                 display: "grid",
-                gap: 6,
+                placeItems: "center",
+                background: centerEye.open
+                  ? "radial-gradient(circle at 50% 44%, rgba(255,255,255,0.98), rgba(210,220,250,0.7) 50%, rgba(26,29,52,0.95) 100%)"
+                  : "linear-gradient(180deg, rgba(46,49,76,0.95), rgba(10,12,26,0.95))",
+                border: "2px solid rgba(255,255,255,0.24)",
+                boxShadow: centerEye.open
+                  ? "0 0 28px rgba(122,214,255,0.24)"
+                  : "inset 0 0 18px rgba(0,0,0,0.48)",
+                transform: `scale(${centerEye.open ? 1 + Math.sin(clock / 260) * 0.03 : 0.96})`,
+                transition: "background 150ms ease, transform 100ms linear",
               }}
             >
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--muted-foreground)" }}>
-                <span>Blank charge</span>
-                <span>
-                  {centerCharge}/{BOSS.centerChargeGoal}
-                </span>
-              </div>
-              <div style={barTrack}>
+              {centerEye.open ? (
                 <div
                   style={{
-                    ...barFill,
-                    width: `${chargePct}%`,
-                    background:
-                      "linear-gradient(90deg, rgba(196, 205, 220, 0.88), rgba(255,255,255,0.92))",
+                    width: centerEye.radius * 0.9,
+                    height: centerEye.radius * 0.9,
+                    borderRadius: "50%",
+                    display: "grid",
+                    placeItems: "center",
+                    background: "radial-gradient(circle at 45% 40%, rgba(135,209,255,0.95), rgba(35,77,140,0.95) 65%, rgba(8,16,33,0.95))",
+                    color: "white",
+                    fontSize: isTabletLayout ? 30 : 24,
+                    fontWeight: 900,
                   }}
-                />
+                >
+                  <Eye size={isTabletLayout ? 34 : 28} />
+                </div>
+              ) : (
+                <div style={{ display: "grid", gap: 6, justifyItems: "center" }}>
+                  <div
+                    style={{
+                      width: centerEye.radius * 1.2,
+                      height: Math.max(10, centerEye.radius * 0.22),
+                      borderRadius: 999,
+                      background: "linear-gradient(180deg, rgba(188,193,220,0.7), rgba(62,68,98,0.68))",
+                    }}
+                  />
+                  <span style={{ fontSize: 11, fontWeight: 800, color: "var(--muted-foreground)" }}>
+                    {formatSeconds(centerEye.closedMs)}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <div
+              aria-hidden="true"
+              style={{
+                position: "absolute",
+                left: launcher.x,
+                top: launcher.y,
+                width: 2,
+                height: projectile ? 0 : distance(launcher.x, launcher.y, aimPoint.x, aimPoint.y),
+                background: "linear-gradient(180deg, rgba(123,225,255,0), rgba(123,225,255,0.65), rgba(255,220,120,0.8))",
+                transformOrigin: "top center",
+                transform: `translateX(-50%) rotate(${Math.atan2(aimPoint.y - launcher.y, aimPoint.x - launcher.x) * (180 / Math.PI) + 90}deg)`,
+                opacity: projectile ? 0 : 0.75,
+                pointerEvents: "none",
+              }}
+            />
+
+            {projectile && (
+              <div
+                style={{
+                  position: "absolute",
+                  left: projectile.x - 18,
+                  top: projectile.y - 18,
+                  width: 36,
+                  height: 36,
+                  display: "grid",
+                  placeItems: "center",
+                  pointerEvents: "none",
+                  transform: projectile.blank ? "scale(0.92)" : undefined,
+                }}
+              >
+                {projectile.blank ? (
+                  <div
+                    style={{
+                      width: 28,
+                      height: 28,
+                      borderRadius: "50%",
+                      display: "grid",
+                      placeItems: "center",
+                      background: "radial-gradient(circle at 35% 35%, rgba(255,255,255,0.98), rgba(200,216,255,0.9) 55%, rgba(120,136,200,0.85))",
+                      color: "#10162a",
+                      fontWeight: 900,
+                    }}
+                  >
+                    ?
+                  </div>
+                ) : (
+                  <ElementBall atomicNumber={projectile.atom} size={34} glow={projectile.shimmer} />
+                )}
               </div>
+            )}
+
+            <div
+              style={{
+                position: "absolute",
+                left: launcher.x - 40,
+                top: launcher.y - 40,
+                width: 80,
+                height: 80,
+                borderRadius: "50%",
+                display: "grid",
+                placeItems: "center",
+                background: "radial-gradient(circle at 50% 45%, rgba(18,28,64,0.98), rgba(6,10,26,0.98))",
+                border: "1px solid rgba(255,255,255,0.12)",
+                boxShadow: "0 0 24px rgba(0,0,0,0.5)",
+              }}
+            >
+              {currentShot === 0 ? (
+                <div
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: "50%",
+                    display: "grid",
+                    placeItems: "center",
+                    background: "radial-gradient(circle at 35% 35%, rgba(255,255,255,0.98), rgba(210,226,255,0.88) 55%, rgba(120,136,200,0.82))",
+                    color: "#11162d",
+                    fontWeight: 900,
+                    boxShadow: "0 0 18px rgba(187,226,255,0.48)",
+                  }}
+                >
+                  ?
+                </div>
+              ) : (
+                <ElementBall atomicNumber={currentShot} size={56} glow={currentShimmer} />
+              )}
             </div>
 
             <div
               style={{
                 position: "absolute",
-                insetInline: 18,
-                bottom: 16,
-                display: "grid",
+                left: 14,
+                right: 14,
+                bottom: 14,
+                display: "flex",
+                alignItems: "flex-end",
+                justifyContent: "space-between",
                 gap: 12,
               }}
             >
               <div
                 style={{
+                  flex: 1,
                   display: "grid",
-                  gridTemplateColumns: isTabletLayout ? "1.2fr auto" : "1fr",
-                  gap: 12,
-                  alignItems: "center",
+                  gap: 8,
+                  background: "rgba(10,14,34,0.82)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  borderRadius: 16,
+                  padding: isTabletLayout ? 14 : 12,
+                  backdropFilter: "blur(8px)",
                 }}
               >
-                <div style={statusCard}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <Swords size={16} color="var(--accent)" />
-                    <div style={{ fontWeight: 800 }}>{actionLabel}</div>
-                  </div>
-                  <div style={{ color: "var(--muted-foreground)", fontSize: 13 }}>{statusText}</div>
-                </div>
-                <button
-                  type="button"
-                  disabled={blankCharges <= 0}
-                  onClick={() => setBlankArmed((current) => (blankCharges > 0 ? !current : false))}
-                  style={{
-                    ...blankButton,
-                    opacity: blankCharges > 0 ? 1 : 0.55,
-                    background: blankArmed
-                      ? "linear-gradient(135deg, rgba(255,255,255,0.95), rgba(176, 205, 255, 0.95))"
-                      : blankButton.background,
-                    color: blankArmed ? "#09101f" : "var(--foreground)",
-                  }}
-                >
-                  <Sparkles size={18} />
-                  <span>{blankArmed ? "Blank armed" : `Use Blank x${blankCharges}`}</span>
-                </button>
-              </div>
-
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: isTabletLayout ? "1.1fr 1fr" : "1fr",
-                  gap: 12,
-                  alignItems: "center",
-                }}
-              >
-                <div style={queueCard}>
-                  <div style={{ fontWeight: 850, fontSize: 12, letterSpacing: 1.2, color: "var(--accent)" }}>
-                    CURRENT SHOT
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                    <div
-                      style={{
-                        width: 88,
-                        height: 88,
-                        borderRadius: "50%",
-                        display: "grid",
-                        placeItems: "center",
-                        background: "rgba(255,255,255,0.03)",
-                        border: "1px solid rgba(255,255,255,0.08)",
-                      }}
-                    >
-                      {blankArmed ? (
-                        <div style={blankAtomVisual}>
-                          <Sparkles size={22} />
-                          <span style={{ fontSize: 12, fontWeight: 900 }}>BLANK</span>
-                        </div>
-                      ) : (
-                        <ElementBall
-                          atomicNumber={currentAtom}
-                          size={62}
-                          glow
-                          shimmer={currentShimmer}
-                        />
-                      )}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+                  <div>
+                    <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--muted-foreground)", fontWeight: 800 }}>
+                      Current shot
                     </div>
-                    <div style={{ display: "grid", gap: 8 }}>
-                      <div style={{ color: "var(--muted-foreground)", fontSize: 13 }}>
-                        Shoot a matching open eye for damage. Shoot the center eye if you need a Blank atom.
-                      </div>
-                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                        {queue.slice(1).map((atom, index) => (
-                          <div
-                            key={`${atom}-${index}`}
-                            style={{
-                              width: 54,
-                              height: 54,
-                              display: "grid",
-                              placeItems: "center",
-                              borderRadius: "50%",
-                              background: "rgba(255,255,255,0.03)",
-                              border: "1px solid rgba(255,255,255,0.06)",
-                            }}
-                          >
-                            <ElementBall
-                              atomicNumber={atom}
-                              size={38}
-                              shimmer={shimmerQueue[index + 1]}
-                            />
-                          </div>
-                        ))}
-                      </div>
+                    <div style={{ fontSize: 13, color: "var(--muted-foreground)" }}>
+                      {currentShot === 0 ? "Blank atom" : `Match one of the open eyes`}
                     </div>
                   </div>
-                </div>
-
-                <div style={factCard}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                    <Eye size={16} color="var(--accent)" />
-                    <div style={{ fontWeight: 850, fontSize: 12, letterSpacing: 1.2, color: "var(--accent)" }}>
-                      KNOWN WEAK POINTS
-                    </div>
-                  </div>
-                  <div style={{ display: "grid", gap: 8 }}>
-                    {OUTER_EYE_IDS.map((eyeId) => (
-                      <div key={eyeId} style={weakPointRow}>
-                        <span style={{ color: openEyes.includes(eyeId) ? "var(--foreground)" : "var(--muted-foreground)" }}>
-                          {eyeId.replace("-", " ")}
-                        </span>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <ElementBall atomicNumber={eyeAtoms[eyeId]} size={28} />
-                          <span style={{ color: "var(--muted-foreground)", fontSize: 12 }}>
-                            {ELEMENTS[eyeAtoms[eyeId] - 1]?.name}
-                          </span>
-                        </div>
-                      </div>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    {queueState.queue.slice(1).map((atom, index) => (
+                      <ElementBall
+                        key={`${atom}-${index}-${queueState.shimmer[index + 1] ? "s" : "n"}`}
+                        atomicNumber={atom}
+                        size={isTabletLayout ? 32 : 28}
+                        glow={queueState.shimmer[index + 1]}
+                      />
                     ))}
                   </div>
                 </div>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 13 }}>
+                  <span style={{ color: "var(--muted-foreground)" }}>Successful hits: <strong style={{ color: "var(--foreground)" }}>{damageHits}/20</strong></span>
+                  <span style={{ color: "var(--muted-foreground)" }}>Score: <strong style={{ color: "var(--foreground)" }}>{score}</strong></span>
+                </div>
               </div>
             </div>
-          </div>
-        </section>
 
-        {result && (
-          <section style={resultCard}>
-            <div style={eyebrow}>{result.won ? "BOSS DOWN" : "RUN FAILED"}</div>
-            <h2 style={{ margin: "4px 0 0", fontSize: isTabletLayout ? 32 : 28 }}>
-              {result.won ? "The Elemental Boss is defeated." : "The lab needs another try."}
-            </h2>
-            <p style={{ color: "var(--muted-foreground)", margin: "8px 0 0" }}>
-              Score {score} - Shots used {shotsUsed} - {result.won ? `${result.stars} stars` : "0 stars"}
-            </p>
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 16 }}>
-              <button type="button" onClick={onExit} style={secondaryButton}>
-                Back to menu
-              </button>
-              <button type="button" onClick={() => onWin(level.id)} style={secondaryButton}>
-                Retry
-              </button>
-              {result.won && result.nextLevelId ? (
-                <button type="button" onClick={() => onWin(result.nextLevelId)} style={primaryButton}>
-                  Continue
-                </button>
-              ) : result.won ? (
-                <button type="button" onClick={onMap} style={primaryButton}>
-                  Open map
-                </button>
-              ) : null}
-            </div>
-          </section>
-        )}
+            {result && (
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  background: "rgba(4,6,16,0.7)",
+                  display: "grid",
+                  placeItems: "center",
+                  padding: 20,
+                }}
+              >
+                <div
+                  style={{
+                    width: "100%",
+                    maxWidth: 420,
+                    background: "var(--surface-elevated)",
+                    border: "1px solid var(--border)",
+                    borderRadius: 18,
+                    padding: 18,
+                    display: "grid",
+                    gap: 14,
+                    boxShadow: "0 20px 44px rgba(0,0,0,0.42)",
+                  }}
+                >
+                  <div>
+                    <div
+                      style={{
+                        fontSize: 12,
+                        letterSpacing: 3,
+                        color: result === "win" ? "var(--accent)" : "var(--muted-foreground)",
+                        fontWeight: 900,
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      {result === "win" ? "Boss defeated" : "Experiment failed"}
+                    </div>
+                    <div style={{ fontSize: 28, fontWeight: 900, marginTop: 4 }}>
+                      {result === "win" ? "The core is shattered." : "Out of atoms."}
+                    </div>
+                    <div style={{ color: "var(--muted-foreground)", marginTop: 6, lineHeight: 1.5 }}>
+                      {result === "win"
+                        ? `You earned ${CLEAR_SCORE} points for clearing the fight.`
+                        : "You can jump back in immediately and learn the eye pattern."}
+                    </div>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10 }}>
+                    <MetricCard label="Shots used" value={`${shotsUsed}`} />
+                    <MetricCard label="Boss hits" value={`${damageHits}`} />
+                    <MetricCard label="Score" value={`${score}`} />
+                  </div>
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <button
+                      type="button"
+                      onClick={onExit}
+                      style={{
+                        flex: 1,
+                        borderRadius: 12,
+                        border: "1px solid var(--border)",
+                        background: "var(--surface)",
+                        color: "var(--foreground)",
+                        padding: "12px 14px",
+                        fontWeight: 900,
+                        cursor: "pointer",
+                      }}
+                    >
+                      Menu
+                    </button>
+                    {result === "lose" ? (
+                      <button
+                        type="button"
+                        onClick={() => window.location.reload()}
+                        style={{
+                          flex: 1.2,
+                          borderRadius: 12,
+                          border: "none",
+                          background: "linear-gradient(135deg, var(--primary), oklch(0.58 0.17 230))",
+                          color: "var(--primary-foreground)",
+                          padding: "12px 14px",
+                          fontWeight: 900,
+                          cursor: "pointer",
+                        }}
+                      >
+                        Retry
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => onWin(nextLevel?.id ?? null)}
+                        style={{
+                          flex: 1.2,
+                          borderRadius: 12,
+                          border: "none",
+                          background: "linear-gradient(135deg, var(--accent), var(--primary))",
+                          color: "var(--primary-foreground)",
+                          padding: "12px 14px",
+                          fontWeight: 900,
+                          cursor: "pointer",
+                        }}
+                      >
+                        {nextLevel ? "Continue" : "Finish"}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
-const backButton: CSSProperties = {
-  border: "1px solid rgba(255,255,255,0.1)",
-  background: "rgba(20,20,38,0.9)",
-  color: "var(--foreground)",
-  borderRadius: 16,
-  padding: "12px 16px",
-  fontWeight: 800,
-  cursor: "pointer",
-};
-
-const eyebrow: CSSProperties = {
-  fontSize: 12,
-  letterSpacing: 2.4,
-  color: "var(--accent)",
-  fontWeight: 900,
-};
-
-const counterPill: CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 8,
-  padding: "10px 14px",
-  borderRadius: 999,
-  background: "rgba(18,18,40,0.95)",
-  border: "1px solid rgba(255,255,255,0.08)",
-  fontWeight: 850,
-};
-
-const bossArenaCard: CSSProperties = {
-  borderRadius: 28,
-  padding: 18,
-  background: "linear-gradient(180deg, rgba(24,24,52,0.98), rgba(14,14,30,0.98))",
-  border: "1px solid rgba(255,255,255,0.08)",
-  boxShadow: "0 20px 48px rgba(0,0,0,0.32)",
-};
-
-const barTrack: CSSProperties = {
-  width: "100%",
-  height: 12,
-  borderRadius: 999,
-  background: "rgba(255,255,255,0.08)",
-  overflow: "hidden",
-};
-
-const barFill: CSSProperties = {
-  height: "100%",
-  borderRadius: 999,
-  transition: "width 180ms ease-out",
-};
-
-const statusCard: CSSProperties = {
-  display: "grid",
-  gap: 6,
-  padding: "14px 16px",
-  borderRadius: 18,
-  background: "rgba(12,12,28,0.76)",
-  border: "1px solid rgba(255,255,255,0.06)",
-};
-
-const blankButton: CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  gap: 10,
-  minHeight: 54,
-  borderRadius: 18,
-  padding: "0 18px",
-  border: "1px solid rgba(255,255,255,0.1)",
-  background: "linear-gradient(135deg, rgba(36,40,92,0.96), rgba(16,20,44,0.96))",
-  color: "var(--foreground)",
-  fontWeight: 850,
-  cursor: "pointer",
-};
-
-const queueCard: CSSProperties = {
-  display: "grid",
-  gap: 12,
-  padding: 16,
-  borderRadius: 20,
-  background: "rgba(16,16,38,0.82)",
-  border: "1px solid rgba(255,255,255,0.06)",
-};
-
-const factCard: CSSProperties = {
-  display: "grid",
-  gap: 6,
-  padding: 16,
-  borderRadius: 20,
-  background: "rgba(16,16,38,0.82)",
-  border: "1px solid rgba(255,255,255,0.06)",
-};
-
-const weakPointRow: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  gap: 12,
-  padding: "8px 0",
-  borderBottom: "1px solid rgba(255,255,255,0.05)",
-};
-
-const blankAtomVisual: CSSProperties = {
-  width: 68,
-  height: 68,
-  borderRadius: "50%",
-  display: "grid",
-  placeItems: "center",
-  gap: 2,
-  background:
-    "radial-gradient(circle at 35% 30%, rgba(255,255,255,0.95), rgba(176,205,255,0.86) 40%, rgba(50,80,160,0.92) 76%)",
-  color: "#071322",
-  boxShadow: "0 0 24px rgba(180, 214, 255, 0.34)",
-};
-
-const resultCard: CSSProperties = {
-  borderRadius: 24,
-  padding: 20,
-  background: "rgba(16,16,38,0.96)",
-  border: "1px solid rgba(255,255,255,0.08)",
-  boxShadow: "0 16px 40px rgba(0,0,0,0.28)",
-};
-
-const secondaryButton: CSSProperties = {
-  borderRadius: 16,
-  padding: "12px 18px",
-  border: "1px solid rgba(255,255,255,0.08)",
-  background: "rgba(28,28,56,0.9)",
-  color: "var(--foreground)",
-  fontWeight: 850,
-  cursor: "pointer",
-};
-
-const primaryButton: CSSProperties = {
-  ...secondaryButton,
-  background: "linear-gradient(135deg, rgba(79,195,247,0.96), rgba(120,225,255,0.92))",
-  color: "#07101d",
-  border: "none",
-};
+function MetricCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div
+      style={{
+        background: "var(--surface)",
+        border: "1px solid var(--border)",
+        borderRadius: 12,
+        padding: 12,
+        textAlign: "center",
+      }}
+    >
+      <div style={{ fontSize: 11, letterSpacing: 1.6, color: "var(--muted-foreground)", fontWeight: 800 }}>
+        {label.toUpperCase()}
+      </div>
+      <div style={{ fontSize: 22, fontWeight: 900, marginTop: 6 }}>{value}</div>
+    </div>
+  );
+}

@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
+import { Capacitor } from "@capacitor/core";
 
 export const TABLET_BREAKPOINT_PX = 768;
 
 function readIsTabletLayout(): boolean {
   if (typeof window === "undefined") return false;
-  return window.innerWidth >= TABLET_BREAKPOINT_PX;
+  return Capacitor.isNativePlatform() && window.innerWidth >= TABLET_BREAKPOINT_PX;
 }
 
 export function useIsTabletLayout(): boolean {
