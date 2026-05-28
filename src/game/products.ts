@@ -1,5 +1,5 @@
 export const PRODUCT_IDS = {
-  proLabPack: "lifetime",
+  proLabPack: "pro_lab_pack_lifetime",
   coins5: "coins_5",
   coins20: "coins_20",
   coins50: "coins_50",

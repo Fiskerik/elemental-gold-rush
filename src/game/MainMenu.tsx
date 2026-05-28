@@ -21,6 +21,7 @@ import { formatScore } from "./logic";
 import { ELEMENTS } from "./elements";
 import { ElementBall } from "./ElementBall";
 import { trackMenuAction } from "./analytics";
+import { initAds } from "./ads";
 import { getWeeklyPlayBonusView } from "./weeklyBonus";
 import { useIsTabletLayout } from "./responsive";
 
@@ -85,6 +86,11 @@ export function MainMenu({
   useEffect(() => {
     refreshDailyLab();
   }, [refreshDailyLab]);
+
+  useEffect(() => {
+    if (hasProPack) return;
+    void initAds(false);
+  }, [hasProPack]);
 
   useEffect(
     () => () => {

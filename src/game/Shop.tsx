@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { Clapperboard } from "lucide-react";
 import { type InventoryPowerUpId, useProgress } from "./store";
 import { POWER_UP_UNLOCK_LEVELS } from "./powerUps";
 import { PowerUpBadge } from "./PowerUpLibrary";
@@ -9,7 +10,7 @@ import {
   purchaseProductWithResult,
   restorePurchases,
 } from "./purchases";
-import { showRewardedForCoin } from "./ads";
+import { initAds, showRewardedForCoin } from "./ads";
 import { useIsTabletLayout } from "./responsive";
 
 const SHOP_POWER_UPS: Array<{
@@ -117,6 +118,11 @@ export function Shop({ onBack }: { onBack: () => void }) {
   const [proPackMessage, setProPackMessage] = useState("");
   const [proPackBusy, setProPackBusy] = useState<"purchase" | "restore" | "manage" | "">("");
   const proPack = getProductById(PRODUCT_IDS.proLabPack);
+
+  useEffect(() => {
+    if (hasProPack) return;
+    void initAds(false);
+  }, [hasProPack]);
 
   function handlePowerUpPurchase(
     powerUp: InventoryPowerUpId,
@@ -406,7 +412,10 @@ export function Shop({ onBack }: { onBack: () => void }) {
               cursor: hasProPack || pendingProductId ? "not-allowed" : "pointer",
             }}
           >
-            {pendingProductId === "rewarded" ? "Loading ad..." : "Watch rewarded ad for +1 coin"}
+            <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+              <Clapperboard size={18} aria-hidden="true" />
+              {pendingProductId === "rewarded" ? "Loading ad..." : "Watch rewarded ad for +1 coin"}
+            </span>
           </button>
           <div style={{ display: "grid", gridTemplateColumns: isTabletLayout ? "repeat(4, minmax(0, 1fr))" : "repeat(2, minmax(0, 1fr))", gap: isTabletLayout ? 12 : 8 }}>
             {APP_STORE_COIN_PACKS.map((productId) => {
