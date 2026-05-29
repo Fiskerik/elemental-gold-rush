@@ -1,4 +1,4 @@
-export type BossId = "elemental-boss" | "periodic-guardian";
+export type BossId = "elemental-boss" | "periodic-guardian" | "nucleus-core";
 
 export interface BossEyeLayout {
   id: string;
@@ -71,6 +71,28 @@ export const BOSSES: Record<BossId, BossConfig> = {
       xPct: 50,
       yPct: 27,
       size: 114,
+    },
+  },
+  "nucleus-core": {
+    id: "nucleus-core",
+    levelId: 65,
+    name: "The Nucleus",
+    shortLabel: "Magnetic Core",
+    maxHealth: 13,
+    maxShots: 70,
+    centerChargeGoal: 0,
+    openDurationMs: 5_000,
+    maxEyeElement: 10,
+    outerEyes: [
+      { id: "orbit-a", xPct: 0, yPct: 0, size: 0, swayX: 0, swayY: 0, swayPhase: 0 },
+      { id: "orbit-b", xPct: 0, yPct: 0, size: 0, swayX: 0, swayY: 0, swayPhase: 0 },
+      { id: "orbit-c", xPct: 0, yPct: 0, size: 0, swayX: 0, swayY: 0, swayPhase: 0 },
+      { id: "orbit-d", xPct: 0, yPct: 0, size: 0, swayX: 0, swayY: 0, swayPhase: 0 },
+    ],
+    centerEye: {
+      xPct: 50,
+      yPct: 26,
+      size: 112,
     },
   },
 };

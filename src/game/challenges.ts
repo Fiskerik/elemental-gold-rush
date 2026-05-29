@@ -5,6 +5,7 @@ export type GameModeId =
   | "survival"
   | "elemental-boss"
   | "periodic-guardian"
+  | "nucleus-core"
   | "unstable-isotopes"
   | "gravity-surge"
   | "pure-hydrogen"
@@ -72,6 +73,20 @@ export const GAME_MODES: GameModeConfig[] = [
       "The weak spot cycles through Metals, Halogens, and Noble Gases every 3 seconds",
       "Land 20 correct group shots before you run out of 50 attempts",
       "Wait 7 seconds and the guardian vaporizes your current queued atom with an e-beam",
+    ],
+  },
+  {
+    id: "nucleus-core",
+    name: "The Nucleus",
+    emoji: "Core",
+    kind: "challenge",
+    description:
+      "A magnetic core bends every shot. Strip away its orbiting atoms, expose the hidden eye, and finish the core before it eats your queue.",
+    unlockedAtLevel: 1,
+    rules: [
+      "A black hole curves your shots and makes bounce angles matter",
+      "Every 5 seconds the core fires out an atom and destroys your queued shot if you wait",
+      "Merge all orbit atoms away, then hit the exposed eye 3 times to win",
     ],
   },
   {
@@ -156,7 +171,7 @@ export function getUnlockedGameModes(unlockedLevel: number): GameModeConfig[] {
 export function getModeLevelLabel(mode: GameModeConfig, level: Level): string {
   if (mode.id === "campaign") return `Level ${level.id}`;
   if (mode.id === "survival") return "Endless";
-  if (mode.id === "elemental-boss" || mode.id === "periodic-guardian") {
+  if (mode.id === "elemental-boss" || mode.id === "periodic-guardian" || mode.id === "nucleus-core") {
     return level.id >= 63 ? `Boss • Level ${level.id}` : "Boss Event";
   }
   return `Challenge • Level ${level.id}`;

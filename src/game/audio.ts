@@ -7,6 +7,8 @@ let ctx: AudioContext | null = null;
 let musicTimer: number | null = null;
 let musicMaster: GainNode | null = null;
 let musicStep = 0;
+export type MusicTheme = "default" | "boss" | "powerup" | "compound";
+let currentMusicTheme: MusicTheme = "default";
 const MIN_EXP_VALUE = 0.0001;
 
 function finitePositive(value: number, fallback: number): number {
@@ -92,18 +94,111 @@ export function playWinSound() {
 }
 
 // ====================== POLYPHONIC AMBIENT ======================
-function playAmbientStep(c: AudioContext, now: number) {
+function scheduleTone(
+  c: AudioContext,
+  master: GainNode,
+  {
+    type,
+    frequency,
+    start,
+    duration,
+    peak,
+    attack = 0.02,
+    decay = duration,
+    endFrequency,
+    filterFrequency,
+    filterType,
+  }: {
+    type: OscillatorType;
+    frequency: number;
+    start: number;
+    duration: number;
+    peak: number;
+    attack?: number;
+    decay?: number;
+    endFrequency?: number;
+    filterFrequency?: number;
+    filterType?: BiquadFilterType;
+  },
+) {
+  const osc = c.createOscillator();
+  const gain = c.createGain();
+  const output = filterType ? c.createBiquadFilter() : null;
+  osc.type = type;
+  osc.frequency.setValueAtTime(finitePositive(frequency, 220), start);
+  if (endFrequency) {
+    osc.frequency.exponentialRampToValueAtTime(finitePositive(endFrequency, frequency), start + duration);
+  }
+  gain.gain.setValueAtTime(MIN_EXP_VALUE, start);
+  gain.gain.exponentialRampToValueAtTime(Math.max(peak, MIN_EXP_VALUE * 2), start + attack);
+  gain.gain.exponentialRampToValueAtTime(MIN_EXP_VALUE, start + Math.max(decay, attack + 0.01));
+
+  if (output) {
+    output.type = filterType!;
+    output.frequency.setValueAtTime(filterFrequency ?? 1200, start);
+    osc.connect(output).connect(gain).connect(master);
+  } else {
+    osc.connect(gain).connect(master);
+  }
+  osc.start(start);
+  osc.stop(start + duration + 0.05);
+}
+
+function noiseBurst(
+  c: AudioContext,
+  master: GainNode,
+  {
+    start,
+    duration,
+    peak,
+    filterType = "bandpass",
+    frequency = 1600,
+  }: {
+    start: number;
+    duration: number;
+    peak: number;
+    filterType?: BiquadFilterType;
+    frequency?: number;
+  },
+) {
+  const source = c.createBufferSource();
+  const gain = c.createGain();
+  const filter = c.createBiquadFilter();
+  const buffer = c.createBuffer(1, Math.max(1, Math.floor(c.sampleRate * duration)), c.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+  source.buffer = buffer;
+  filter.type = filterType;
+  filter.frequency.setValueAtTime(frequency, start);
+  gain.gain.setValueAtTime(Math.max(peak, MIN_EXP_VALUE * 2), start);
+  gain.gain.exponentialRampToValueAtTime(MIN_EXP_VALUE, start + duration);
+  source.connect(filter).connect(gain).connect(master);
+  source.start(start);
+  source.stop(start + duration + 0.02);
+}
+
+function kick(c: AudioContext, master: GainNode, start: number, peak: number, startFreq = 140, endFreq = 42) {
+  scheduleTone(c, master, {
+    type: "sine",
+    frequency: startFreq,
+    endFrequency: endFreq,
+    start,
+    duration: 0.26,
+    peak,
+    attack: 0.004,
+    decay: 0.22,
+  });
+}
+
+function chordLibraryFromRoots(roots: number[]) {
+  return roots.map((root) => [root, root * 1.2599, root * 1.4983]);
+}
+
+function playDefaultThemeStep(c: AudioContext, now: number) {
   if (!musicMaster) return;
   const master = musicMaster;
 
-  const lib = [
-    [261.63, 329.63, 392.00], // 0: C
-    [293.66, 369.99, 440.00], // 1: D
-    [329.63, 415.30, 493.88], // 2: E
-    [349.23, 440.00, 523.25], // 3: F
-    [392.00, 493.88, 587.33], // 4: G
-    [440.00, 554.37, 659.25], // 5: A
-  ];
+  const lib = chordLibraryFromRoots([261.63, 293.66, 329.63, 349.23, 392.0, 440.0]);
 
   const songStructure = [
     0,4,5,3, 0,4,5,1,
@@ -292,24 +387,231 @@ function playAmbientStep(c: AudioContext, now: number) {
   }
 }
 
-export function startAmbientMusic() {
+function playBossThemeStep(c: AudioContext, now: number) {
+  if (!musicMaster) return;
+  const master = musicMaster;
+  const lib = [
+    [220.0, 261.63, 329.63],
+    [196.0, 246.94, 293.66],
+    [174.61, 220.0, 261.63],
+    [246.94, 293.66, 349.23],
+  ];
+  const progression = [0, 1, 2, 3, 0, 1, 3, 2];
+  const chord = lib[progression[musicStep % progression.length] ?? 0] ?? lib[0];
+  musicStep += 1;
+
+  chord.forEach((freq, index) => {
+    scheduleTone(c, master, {
+      type: index === 0 ? "sawtooth" : "triangle",
+      frequency: freq,
+      start: now,
+      duration: 2.6,
+      peak: index === 0 ? 0.024 : 0.018,
+      attack: 0.04,
+      decay: 2.4,
+      filterType: "lowpass",
+      filterFrequency: 1800,
+    });
+  });
+
+  for (let i = 0; i < 8; i++) {
+    const t = now + i * 0.25;
+    if (i % 2 === 0) kick(c, master, t, 0.42, 156, 45);
+    if (i % 4 === 2) noiseBurst(c, master, { start: t, duration: 0.18, peak: 0.24, frequency: 1400 });
+    if (i % 2 === 1) noiseBurst(c, master, { start: t, duration: 0.08, peak: 0.05, filterType: "highpass", frequency: 7200 });
+
+    scheduleTone(c, master, {
+      type: "square",
+      frequency: finitePositive((chord[0] ?? 220) / 2, 110),
+      start: t,
+      duration: 0.21,
+      peak: 0.06,
+      attack: 0.01,
+      decay: 0.19,
+      filterType: "lowpass",
+      filterFrequency: 720,
+    });
+  }
+
+  const leadPattern = [2, 1, 0, 1, 2, 1, 2, 0];
+  for (let i = 0; i < 4; i++) {
+    const t = now + 0.125 + i * 0.5;
+    const note = finitePositive(chord[leadPattern[(musicStep + i) % leadPattern.length] ?? 0] ?? chord[0] ?? 220, 220) * 2;
+    scheduleTone(c, master, {
+      type: "sawtooth",
+      frequency: note,
+      start: t,
+      duration: 0.34,
+      peak: 0.032,
+      attack: 0.02,
+      decay: 0.28,
+      filterType: "lowpass",
+      filterFrequency: 2200,
+    });
+  }
+}
+
+function playPowerupThemeStep(c: AudioContext, now: number) {
+  if (!musicMaster) return;
+  const master = musicMaster;
+  const lib = chordLibraryFromRoots([261.63, 329.63, 392.0, 440.0]);
+  const progression = [0, 1, 2, 1, 3, 2, 1, 0];
+  const chord = lib[progression[musicStep % progression.length] ?? 0] ?? lib[0];
+  musicStep += 1;
+
+  chord.forEach((freq) => {
+    scheduleTone(c, master, {
+      type: "triangle",
+      frequency: freq,
+      start: now,
+      duration: 2.4,
+      peak: 0.016,
+      attack: 0.08,
+      decay: 2.1,
+    });
+  });
+
+  for (let i = 0; i < 8; i++) {
+    const t = now + i * 0.25;
+    const note = finitePositive(chord[[0, 1, 2, 1, 2, 1, 0, 2][i] ?? 0] ?? chord[0] ?? 220, 220) * (i % 2 === 0 ? 4 : 2);
+    scheduleTone(c, master, {
+      type: "square",
+      frequency: note,
+      start: t,
+      duration: 0.14,
+      peak: 0.016,
+      attack: 0.01,
+      decay: 0.12,
+    });
+    if (i % 4 === 0) {
+      scheduleTone(c, master, {
+        type: "sine",
+        frequency: finitePositive((chord[0] ?? 220) / 2, 110),
+        start: t,
+        duration: 0.3,
+        peak: 0.024,
+        attack: 0.02,
+        decay: 0.24,
+      });
+    }
+  }
+
+  noiseBurst(c, master, {
+    start: now + 1.65,
+    duration: 0.2,
+    peak: 0.03,
+    filterType: "highpass",
+    frequency: 6200,
+  });
+}
+
+function playCompoundThemeStep(c: AudioContext, now: number) {
+  if (!musicMaster) return;
+  const master = musicMaster;
+  const lib = [
+    [246.94, 311.13, 369.99],
+    [220.0, 277.18, 329.63],
+    [261.63, 329.63, 392.0],
+    [293.66, 369.99, 440.0],
+  ];
+  const progression = [0, 1, 2, 1, 0, 3, 2, 1];
+  const chord = lib[progression[musicStep % progression.length] ?? 0] ?? lib[0];
+  musicStep += 1;
+
+  chord.forEach((freq, index) => {
+    scheduleTone(c, master, {
+      type: index === 1 ? "sine" : "triangle",
+      frequency: freq,
+      start: now,
+      duration: 2.7,
+      peak: 0.015,
+      attack: 0.1,
+      decay: 2.3,
+      filterType: "lowpass",
+      filterFrequency: 1500,
+    });
+  });
+
+  for (let i = 0; i < 4; i++) {
+    const t = now + i * 0.5;
+    scheduleTone(c, master, {
+      type: "triangle",
+      frequency: finitePositive((chord[0] ?? 220) / 2, 110),
+      start: t,
+      duration: 0.36,
+      peak: 0.028,
+      attack: 0.02,
+      decay: 0.3,
+      filterType: "lowpass",
+      filterFrequency: 900,
+    });
+  }
+
+  const arpPattern = [0, 2, 1, 2, 0, 1, 2, 1];
+  for (let i = 0; i < 8; i++) {
+    const t = now + i * 0.25;
+    const note = finitePositive(chord[arpPattern[i] ?? 0] ?? chord[0] ?? 220, 220) * 4;
+    scheduleTone(c, master, {
+      type: "sine",
+      frequency: note,
+      start: t,
+      duration: 0.18,
+      peak: 0.012,
+      attack: 0.012,
+      decay: 0.16,
+    });
+  }
+
+  if (musicStep % 2 === 0) {
+    noiseBurst(c, master, {
+      start: now + 1.1,
+      duration: 0.12,
+      peak: 0.018,
+      filterType: "bandpass",
+      frequency: 2600,
+    });
+  }
+}
+
+function playMusicStep(c: AudioContext, now: number) {
+  switch (currentMusicTheme) {
+    case "boss":
+      playBossThemeStep(c, now);
+      break;
+    case "powerup":
+      playPowerupThemeStep(c, now);
+      break;
+    case "compound":
+      playCompoundThemeStep(c, now);
+      break;
+    default:
+      playDefaultThemeStep(c, now);
+      break;
+  }
+}
+
+export function startAmbientMusic(theme: MusicTheme = "default") {
   const c = getCtx();
-  if (!c || musicTimer != null) return;
+  if (!c) return;
   if (c.state === "suspended") {
-    void c.resume().then(() => startAmbientMusic()).catch(() => {});
+    void c.resume().then(() => startAmbientMusic(theme)).catch(() => {});
     return;
   }
+  if (musicTimer != null && musicMaster && currentMusicTheme === theme) return;
+  if (musicTimer != null) stopAmbientMusic();
+
+  currentMusicTheme = theme;
 
   musicMaster = c.createGain();
   musicMaster.gain.setValueAtTime(0.072, c.currentTime);
   musicMaster.connect(c.destination);
 
   musicStep = 0;
-  playAmbientStep(c, c.currentTime + 0.05);
+  playMusicStep(c, c.currentTime + 0.05);
 
   musicTimer = window.setInterval(() => {
     const active = getCtx();
-    if (active) playAmbientStep(active, active.currentTime + 0.05);
+    if (active) playMusicStep(active, active.currentTime + 0.05);
   }, 2000);
 }
 
@@ -319,8 +621,10 @@ export function stopAmbientMusic() {
     musicTimer = null;
   }
   if (musicMaster) {
-    musicMaster.gain.exponentialRampToValueAtTime(MIN_EXP_VALUE, musicMaster.context.currentTime + 0.4);
-    setTimeout(() => { musicMaster?.disconnect(); musicMaster = null; }, 500);
+    const master = musicMaster;
+    musicMaster = null;
+    master.gain.exponentialRampToValueAtTime(MIN_EXP_VALUE, master.context.currentTime + 0.4);
+    setTimeout(() => { master.disconnect(); }, 500);
   }
 }
 

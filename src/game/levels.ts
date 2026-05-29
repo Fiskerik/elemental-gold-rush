@@ -41,7 +41,7 @@ export interface Level {
   /** Tutorial stage that clears by using a specific power-up correctly. */
   powerUpStage?: PowerUpStageId;
   /** Special one-off stage renderer. */
-  specialStage?: "elemental-boss" | "periodic-guardian";
+  specialStage?: "elemental-boss" | "periodic-guardian" | "nucleus-core";
 }
 
 type LevelSeed = Pick<
@@ -512,6 +512,27 @@ const SPECIAL_LEVELS: Level[] = [
     milestoneFact:
       "The guardian only recognizes three elemental families: Metals, Halogens, and Noble Gases. Learn the rhythm and the whole table starts to feel alive.",
     specialStage: "periodic-guardian",
+  },
+  {
+    id: 65,
+    name: "The Nucleus",
+    description: "Bank shots around a black hole, peel away the orbit atoms, and expose the eye before the core burns through your queue.",
+    lore: "A magnetic singularity anchors a living nucleus in the upper chamber. Its orbiting atoms shred careless lines, and its hidden eye punishes hesitation.",
+    targetElement: 10,
+    maxQueueElement: 10,
+    queueDecay: 0.48,
+    gridCols: 10,
+    gridRows: 12,
+    scoreMultiplier: 5.6,
+    parShots: 42,
+    starShotsThree: 28,
+    starShotsTwo: 46,
+    parTimeSec: 220,
+    scoreGoal: 95_000,
+    comboGoal: 5,
+    milestoneFact:
+      "The Nucleus bends trajectory instead of rules. You win by reading curved lines, not by forcing straight shots.",
+    specialStage: "nucleus-core",
   },
 ];
 

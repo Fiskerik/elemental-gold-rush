@@ -55,6 +55,7 @@ import { showInterstitialIfReady } from "./ads";
 import { useIsTabletLayout } from "./responsive";
 import { ElementalBossBoard } from "./ElementalBossBoard";
 import { PeriodicGuardianBoard } from "./PeriodicGuardianBoard";
+import { NucleusCoreBoard } from "./NucleusCoreBoard";
 
 interface Props {
   levelId: number;
@@ -646,6 +647,9 @@ export function GameBoard(props: Props) {
   if (props.mode === "periodic-guardian" || level?.specialStage === "periodic-guardian") {
     return <PeriodicGuardianBoard {...props} mode="periodic-guardian" />;
   }
+  if (props.mode === "nucleus-core" || level?.specialStage === "nucleus-core") {
+    return <NucleusCoreBoard {...props} mode="nucleus-core" />;
+  }
   return <StandardGameBoard {...props} />;
 }
 
@@ -1006,16 +1010,22 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     if (hapticsEnabled) vibrate(ms);
   };
   const toggleInGameMusic = () => {
-    if (!musicEnabled) startAmbientMusic();
+    if (!musicEnabled) startAmbientMusic(ambientMusicTheme);
     else stopAmbientMusic();
     toggleMusic();
   };
 
+  const ambientMusicTheme = isMoleculeChallenge
+    ? "compound"
+    : isPowerUpStage
+      ? "powerup"
+      : "default";
+
   useEffect(() => {
-    if (musicEnabled && !gameOver && !won) startAmbientMusic();
+    if (musicEnabled && !gameOver && !won) startAmbientMusic(ambientMusicTheme);
     else stopAmbientMusic();
     return () => stopAmbientMusic();
-  }, [musicEnabled, gameOver, won]);
+  }, [musicEnabled, gameOver, won, ambientMusicTheme]);
 
   // Tooltip queue — small dismissable boxes that explain new mechanics.
   const [activeTip, setActiveTip] = useState<null | {
@@ -2539,7 +2549,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
   function shoot() {
     if (busy || gameOver || won || inventoryPickerOpen || paused || settingsOpen || playStylePromptOpen || confirmAction) return;
     primeAudio();
-    if (musicEnabled) startAmbientMusic();
+    if (musicEnabled) startAmbientMusic(ambientMusicTheme);
     trackShot(levelId, pendingStone ? -1 : currentIsEGun ? 0 : current, aimDeg, mode);
     queueUndoRef.current = null;
     setPendingReversiblePowerUp(null);
@@ -5850,6 +5860,7 @@ function FeatureTip({
   tone?: "default" | "danger";
   onClose: () => void;
 }) {
+  const isTabletLayout = useIsTabletLayout();
   const isDanger = tone === "danger";
   const accent = isDanger ? "var(--destructive)" : "var(--accent)";
   const glow = isDanger ? "oklch(0.58 0.22 25 / 0.45)" : "var(--accent-glow)";

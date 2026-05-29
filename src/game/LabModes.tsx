@@ -1,4 +1,4 @@
-import { Atom, Clock, Eye, FlaskConical, LockKeyhole, Map, RotateCcw, Shield, Sparkles, type LucideIcon } from "lucide-react";
+import { Atom, Clock, Eye, FlaskConical, LockKeyhole, Map, Orbit, RotateCcw, Shield, Sparkles, type LucideIcon } from "lucide-react";
 import { MAX_LEVEL } from "./levels";
 import { GAME_MODES, GameModeId, getUnlockedGameModes } from "./challenges";
 import { useProgress } from "./store";
@@ -72,7 +72,16 @@ export function LabModes({ onBack, onStart }: Props) {
                   <button
                     disabled={locked}
                     onClick={() =>
-                      onStart(mode.id, mode.id === "elemental-boss" ? 63 : mode.id === "periodic-guardian" ? 64 : levelId)
+                      onStart(
+                        mode.id,
+                        mode.id === "elemental-boss"
+                          ? 63
+                          : mode.id === "periodic-guardian"
+                            ? 64
+                            : mode.id === "nucleus-core"
+                              ? 65
+                              : levelId,
+                      )
                     }
                     style={startBtn}
                   >
@@ -93,6 +102,7 @@ const CHALLENGE_ICONS: Record<string, LucideIcon> = {
   survival: Shield,
   "elemental-boss": Eye,
   "periodic-guardian": Sparkles,
+  "nucleus-core": Orbit,
   "unstable-isotopes": Atom,
   "gravity-surge": RotateCcw,
   "pure-hydrogen": FlaskConical,
@@ -122,6 +132,12 @@ const CHALLENGE_ICON_STYLES: Record<string, { color: string; background: string;
     background:
       "radial-gradient(circle at 50% 22%, oklch(0.98 0.16 100), transparent 28%), linear-gradient(135deg, oklch(0.44 0.13 190), oklch(0.3 0.11 280))",
     glow: "oklch(0.8 0.15 92 / 0.52)",
+  },
+  "nucleus-core": {
+    color: "oklch(0.96 0.08 250)",
+    background:
+      "radial-gradient(circle at 50% 26%, oklch(0.96 0.09 255), transparent 26%), linear-gradient(135deg, oklch(0.4 0.13 250), oklch(0.12 0.04 265))",
+    glow: "oklch(0.72 0.12 252 / 0.5)",
   },
   "unstable-isotopes": {
     color: "oklch(0.9 0.19 55)",

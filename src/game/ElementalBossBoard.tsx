@@ -47,8 +47,18 @@ interface ProjectileAnim {
     | { type: "outer"; eyeId: OuterEyeId };
 }
 
+interface VictorySummary {
+  clearTimeMs: number;
+  shotBonus: number;
+  speedBonus: number;
+  finalScore: number;
+  newBest: boolean;
+}
+
 const OUTER_COOLDOWN_MS = 10_000;
 const CENTER_COOLDOWN_MS = 5_000;
+const BLINK_CLOSED_MS = 3_000;
+const BLINK_CYCLE_MS = 6_000;
 const PROJECTILE_SPEED = 930;
 const QUEUE_SIZE = 4;
 const SHIMMER_CHANCE = 0.13;
@@ -143,6 +153,35 @@ function formatSeconds(ms: number): string {
   return `${Math.ceil(ms / 1000)}s`;
 }
 
+function formatDurationShort(ms: number): string {
+  const totalSeconds = Math.max(0, Math.round(ms / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+}
+
+function computeBossBattleScore({
+  maxShots,
+  shotsUsed,
+  elapsedMs,
+  clearScore,
+  hitScore,
+}: {
+  maxShots: number;
+  shotsUsed: number;
+  elapsedMs: number;
+  clearScore: number;
+  hitScore: number;
+}) {
+  const shotBonus = Math.max(0, maxShots - shotsUsed) * 250;
+  const speedBonus = Math.max(0, Math.round((90_000 - elapsedMs) / 1000)) * 180;
+  return {
+    shotBonus,
+    speedBonus,
+    finalScore: hitScore + clearScore + shotBonus + speedBonus,
+  };
+}
+
 export function ElementalBossBoard({ levelId, onExit, onWin, onMap = onExit, mode = "elemental-boss" }: Props) {
   const config = BOSSES["elemental-boss"];
   const level = getLevelById(levelId) ?? getLevelById(config.levelId);
@@ -156,8 +195,15 @@ export function ElementalBossBoard({ levelId, onExit, onWin, onMap = onExit, mod
     "south-west": 0,
     "south-east": 0,
   });
+  const blinkClosedUntilRef = useRef<Record<OuterEyeId, number>>({
+    "north-west": 0,
+    "north-east": 0,
+    "south-west": 0,
+    "south-east": 0,
+  });
   const centerClosedUntilRef = useRef(0);
   const clockRef = useRef(Date.now());
+  const runStartRef = useRef(Date.now());
   const runRecordedRef = useRef(false);
   const [clock, setClock] = useState(() => Date.now());
   const [arenaSize, setArenaSize] = useState({ width: isTabletLayout ? 860 : 380, height: isTabletLayout ? 710 : 600 });
@@ -173,8 +219,10 @@ export function ElementalBossBoard({ levelId, onExit, onWin, onMap = onExit, mod
   const [result, setResult] = useState<null | "win" | "lose">(null);
   const [score, setScore] = useState(0);
   const [damageHits, setDamageHits] = useState(0);
+  const [victorySummary, setVictorySummary] = useState<VictorySummary | null>(null);
   const {
     addScore,
+    challengeBestScores,
     hasProPack,
     incrementLevelAttempt,
     recordLevelRun,
@@ -202,7 +250,9 @@ export function ElementalBossBoard({ levelId, onExit, onWin, onMap = onExit, mod
       const phase = clock / 760 + layout.swayPhase;
       const x = (layout.xPct / 100) * arenaSize.width + Math.sin(phase) * layout.swayX;
       const y = (layout.yPct / 100) * arenaSize.height + Math.cos(phase * 1.15) * layout.swayY;
-      const closedUntil = outerClosedUntilRef.current[layout.id as OuterEyeId] ?? 0;
+      const cooldownUntil = outerClosedUntilRef.current[layout.id as OuterEyeId] ?? 0;
+      const blinkUntil = blinkClosedUntilRef.current[layout.id as OuterEyeId] ?? 0;
+      const closedUntil = Math.max(cooldownUntil, blinkUntil);
       return {
         id: layout.id as OuterEyeId,
         atom: eyeAtoms[layout.id as OuterEyeId],
@@ -259,6 +309,7 @@ export function ElementalBossBoard({ levelId, onExit, onWin, onMap = onExit, mod
         won: didWin,
       });
       if (didWin) {
+        addScore(finalScore);
         setLevelStars(levelId, stars);
         unlockLevel(getNextLevel(levelId)?.id ?? levelId + 1);
         setChallengeBestScore(mode, finalScore);
@@ -267,7 +318,7 @@ export function ElementalBossBoard({ levelId, onExit, onWin, onMap = onExit, mod
         trackGameOver(levelId, finalScore, finalShotsUsed, Math.min(10, successfulHits), mode);
       }
     },
-    [levelId, mode, recordLevelRun, setChallengeBestScore, setLevelStars, unlockLevel],
+    [addScore, levelId, mode, recordLevelRun, setChallengeBestScore, setLevelStars, unlockLevel],
   );
 
   const triggerFlash = useCallback((kind: "hit" | "charge") => {
@@ -278,15 +329,29 @@ export function ElementalBossBoard({ levelId, onExit, onWin, onMap = onExit, mod
   const handleWin = useCallback(
     (nextBossHealth: number, nextShotsUsed: number, successfulHits: number, nextScore: number) => {
       if (nextBossHealth > 0) return;
-      const finalScore = nextScore + CLEAR_SCORE;
+      const elapsedMs = Date.now() - runStartRef.current;
+      const { shotBonus, speedBonus, finalScore } = computeBossBattleScore({
+        maxShots: config.maxShots,
+        shotsUsed: nextShotsUsed,
+        elapsedMs,
+        clearScore: CLEAR_SCORE,
+        hitScore: nextScore,
+      });
+      const previousBest = challengeBestScores[mode] ?? 0;
+      setVictorySummary({
+        clearTimeMs: elapsedMs,
+        shotBonus,
+        speedBonus,
+        finalScore,
+        newBest: finalScore > previousBest,
+      });
       setScore(finalScore);
-      addScore(CLEAR_SCORE);
       setResult("win");
       playWinSound();
       vibrate([40, 40, 80]);
       finishRun(true, finalScore, successfulHits, nextShotsUsed);
     },
-    [addScore, finishRun],
+    [challengeBestScores, config.maxShots, finishRun, mode],
   );
 
   const handleLoss = useCallback(
@@ -345,6 +410,8 @@ export function ElementalBossBoard({ levelId, onExit, onWin, onMap = onExit, mod
         handleWin(nextHealth, baseShotsUsed, nextHits, nextScore);
         return;
       }
+
+      setBossHealth((value) => Math.min(config.maxHealth, value + 1));
 
       if (baseShotsUsed >= config.maxShots && bossHealth > 0) {
         handleLoss(baseShotsUsed, damageHits);
@@ -529,8 +596,23 @@ export function ElementalBossBoard({ levelId, onExit, onWin, onMap = onExit, mod
   }, []);
 
   useEffect(() => {
+    if (result) return;
+    const interval = window.setInterval(() => {
+      const ids = config.outerEyes.map((eye) => eye.id as OuterEyeId);
+      const shuffled = [...ids].sort(() => Math.random() - 0.5);
+      const picked = shuffled.slice(0, 2);
+      const until = Date.now() + BLINK_CLOSED_MS;
+      for (const id of picked) {
+        blinkClosedUntilRef.current[id] = until;
+      }
+      setClock(Date.now());
+    }, BLINK_CYCLE_MS);
+    return () => window.clearInterval(interval);
+  }, [config.outerEyes, result]);
+
+  useEffect(() => {
     primeAudio();
-    startAmbientMusic();
+    startAmbientMusic("boss");
     incrementLevelAttempt(levelId);
     trackGameStart(levelId, mode);
     return () => {
@@ -650,23 +732,23 @@ export function ElementalBossBoard({ levelId, onExit, onWin, onMap = onExit, mod
             <div
               style={{
                 position: "absolute",
-                top: 10,
-                left: 10,
-                right: 10,
+                top: 8,
+                left: 8,
+                right: 8,
                 display: "flex",
                 alignItems: "flex-start",
                 justifyContent: "space-between",
-                gap: 10,
+                gap: 8,
                 zIndex: 2,
               }}
             >
               <div
                 style={{
                   display: "grid",
-                  gap: 7,
-                  minWidth: isTabletLayout ? 250 : 184,
-                  padding: isTabletLayout ? "9px 10px" : "8px 9px",
-                  borderRadius: 14,
+                  gap: 6,
+                  minWidth: isTabletLayout ? 220 : 160,
+                  padding: isTabletLayout ? "7px 9px" : "6px 8px",
+                  borderRadius: 12,
                   background: "rgba(10,14,34,0.84)",
                   border: "1px solid rgba(255,255,255,0.08)",
                   backdropFilter: "blur(8px)",
@@ -703,21 +785,21 @@ export function ElementalBossBoard({ levelId, onExit, onWin, onMap = onExit, mod
               <div
                 style={{
                   display: "grid",
-                  gap: 7,
+                  gap: 5,
                   justifyItems: "end",
-                  padding: isTabletLayout ? "9px 10px" : "8px 9px",
-                  borderRadius: 14,
+                  padding: isTabletLayout ? "7px 9px" : "6px 8px",
+                  borderRadius: 12,
                   background: "rgba(10,14,34,0.84)",
                   border: "1px solid rgba(255,255,255,0.08)",
                   backdropFilter: "blur(8px)",
-                  minWidth: isTabletLayout ? 220 : 170,
+                  minWidth: isTabletLayout ? 182 : 142,
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <div style={{ fontSize: 10, letterSpacing: 1.8, color: "var(--muted-foreground)", fontWeight: 800 }}>
                     CURRENT SHOT
                   </div>
-                  <span style={{ fontSize: 11, color: "var(--muted-foreground)", fontWeight: 800 }}>
+                  <span style={{ fontSize: 10, color: "var(--muted-foreground)", fontWeight: 800 }}>
                     {currentShot === 0 ? "Blank" : `${shotsLeft} left`}
                   </span>
                 </div>
@@ -752,10 +834,6 @@ export function ElementalBossBoard({ levelId, onExit, onWin, onMap = onExit, mod
                     ))}
                   </div>
                 </div>
-                <div style={{ display: "flex", gap: 10, fontSize: 11, color: "var(--muted-foreground)", fontWeight: 800 }}>
-                  <span>Hits {damageHits}/20</span>
-                  <span>Score {score}</span>
-                </div>
               </div>
             </div>
 
@@ -784,7 +862,7 @@ export function ElementalBossBoard({ levelId, onExit, onWin, onMap = onExit, mod
               style={{
                 position: "absolute",
                 left: "50%",
-                top: "11%",
+                top: "16%",
                 width: isTabletLayout ? 318 : 238,
                 height: isTabletLayout ? 198 : 150,
                 transform: "translateX(-50%)",
@@ -804,7 +882,7 @@ export function ElementalBossBoard({ levelId, onExit, onWin, onMap = onExit, mod
               style={{
                 position: "absolute",
                 left: "50%",
-                top: "13%",
+                top: "18%",
                 width: isTabletLayout ? 300 : 220,
                 height: isTabletLayout ? 50 : 40,
                 transform: "translateX(-50%)",
@@ -818,7 +896,7 @@ export function ElementalBossBoard({ levelId, onExit, onWin, onMap = onExit, mod
               style={{
                 position: "absolute",
                 left: "50%",
-                top: "31%",
+                top: "36%",
                 width: isTabletLayout ? 180 : 136,
                 height: isTabletLayout ? 40 : 28,
                 transform: "translateX(-50%)",
@@ -1099,9 +1177,22 @@ export function ElementalBossBoard({ levelId, onExit, onWin, onMap = onExit, mod
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10 }}>
                     <MetricCard label="Shots used" value={`${shotsUsed}`} />
-                    <MetricCard label="Boss hits" value={`${damageHits}`} />
+                    <MetricCard label="Kill time" value={victorySummary ? formatDurationShort(victorySummary.clearTimeMs) : "--"} />
                     <MetricCard label="Score" value={`${score}`} />
                   </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10 }}>
+                    <MetricCard label="Boss hits" value={`${damageHits}`} />
+                    <MetricCard label="Shot bonus" value={victorySummary ? `${victorySummary.shotBonus}` : "--"} />
+                    <MetricCard
+                      label={victorySummary?.newBest ? "New best" : "Best score"}
+                      value={`${Math.max(victorySummary?.finalScore ?? 0, challengeBestScores[mode] ?? 0)}`}
+                    />
+                  </div>
+                  {victorySummary && (
+                    <div style={{ color: "var(--muted-foreground)", fontSize: 13, fontWeight: 700 }}>
+                      Speed bonus: {victorySummary.speedBonus}
+                    </div>
+                  )}
                   <div style={{ display: "flex", gap: 10 }}>
                     <button
                       type="button"
@@ -1174,12 +1265,16 @@ function MetricCard({ label, value }: { label: string; value: string }) {
         borderRadius: 12,
         padding: 12,
         textAlign: "center",
+        minHeight: 96,
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "space-between",
       }}
     >
       <div style={{ fontSize: 11, letterSpacing: 1.6, color: "var(--muted-foreground)", fontWeight: 800 }}>
         {label.toUpperCase()}
       </div>
-      <div style={{ fontSize: 22, fontWeight: 900, marginTop: 6 }}>{value}</div>
+      <div style={{ fontSize: 22, fontWeight: 900, marginTop: 8, lineHeight: 1.05 }}>{value}</div>
     </div>
   );
 }

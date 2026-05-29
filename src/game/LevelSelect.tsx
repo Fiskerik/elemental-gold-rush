@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Eye, Sparkles } from "lucide-react";
+import { Eye, Orbit, Sparkles } from "lucide-react";
 import { LEVELS, MOLECULE_CHALLENGE_BY_LEVEL } from "./levels";
 import { ELEMENTS } from "./elements";
 import { useProgress, type LevelStats } from "./store";
@@ -66,7 +66,7 @@ export function LevelSelect({
   const selectedStars = selectedId != null ? (levelStars[selectedId] ?? 0) : 0;
   const canSkipLevel =
     Boolean(selected) &&
-    selected.id === unlockedLevel &&
+    selected?.id === unlockedLevel &&
     selectedStars === 0 &&
     (selectedStats?.fails ?? 0) > 0;
 
@@ -346,6 +346,8 @@ export function LevelSelect({
                   >
                     {selected.specialStage === "periodic-guardian" ? (
                       <Sparkles size={34} color="var(--accent)" />
+                    ) : selected.specialStage === "nucleus-core" ? (
+                      <Orbit size={34} color="var(--accent)" />
                     ) : (
                       <Eye size={34} color="var(--accent)" />
                     )}
@@ -565,6 +567,8 @@ function BossMapNode({ bossType }: { bossType: NonNullable<(typeof LEVELS)[0]["s
     >
       {bossType === "periodic-guardian" ? (
         <Sparkles size={24} color="var(--foreground)" />
+      ) : bossType === "nucleus-core" ? (
+        <Orbit size={24} color="var(--foreground)" />
       ) : (
         <Eye size={24} color="var(--foreground)" />
       )}

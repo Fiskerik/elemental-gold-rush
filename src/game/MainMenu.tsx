@@ -116,7 +116,7 @@ export function MainMenu({
   function handleDailyRewardClaim() {
     if (!dailyComplete || claimedDailyReward) return;
     claimDailyReward();
-    showDailyRewardToast(`+${dailyRewardAmount} gold coin${dailyRewardAmount === 1 ? "" : "s"} claimed`);
+    showDailyRewardToast(`+${dailyRewardAmount} gold coins claimed`);
   }
 
   function handleWeeklyDayClaim() {
