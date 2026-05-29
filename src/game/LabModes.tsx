@@ -1,4 +1,4 @@
-import { Atom, Clock, Eye, FlaskConical, LockKeyhole, Map, RotateCcw, Shield, type LucideIcon } from "lucide-react";
+import { Atom, Clock, Eye, FlaskConical, LockKeyhole, Map, RotateCcw, Shield, Sparkles, type LucideIcon } from "lucide-react";
 import { MAX_LEVEL } from "./levels";
 import { GAME_MODES, GameModeId, getUnlockedGameModes } from "./challenges";
 import { useProgress } from "./store";
@@ -71,7 +71,9 @@ export function LabModes({ onBack, onStart }: Props) {
                   </ul>
                   <button
                     disabled={locked}
-                    onClick={() => onStart(mode.id, mode.id === "elemental-boss" ? 63 : levelId)}
+                    onClick={() =>
+                      onStart(mode.id, mode.id === "elemental-boss" ? 63 : mode.id === "periodic-guardian" ? 64 : levelId)
+                    }
                     style={startBtn}
                   >
                     {locked ? "Locked" : mode.id === "campaign" ? "Play Campaign" : "Start Mode"}
@@ -90,6 +92,7 @@ const CHALLENGE_ICONS: Record<string, LucideIcon> = {
   campaign: Map,
   survival: Shield,
   "elemental-boss": Eye,
+  "periodic-guardian": Sparkles,
   "unstable-isotopes": Atom,
   "gravity-surge": RotateCcw,
   "pure-hydrogen": FlaskConical,
@@ -113,6 +116,12 @@ const CHALLENGE_ICON_STYLES: Record<string, { color: string; background: string;
     color: "oklch(0.95 0.14 10)",
     background: "radial-gradient(circle at 50% 30%, oklch(0.98 0.12 20), transparent 25%), linear-gradient(135deg, oklch(0.48 0.16 8), oklch(0.22 0.11 280))",
     glow: "oklch(0.74 0.16 12 / 0.52)",
+  },
+  "periodic-guardian": {
+    color: "oklch(0.96 0.14 85)",
+    background:
+      "radial-gradient(circle at 50% 22%, oklch(0.98 0.16 100), transparent 28%), linear-gradient(135deg, oklch(0.44 0.13 190), oklch(0.3 0.11 280))",
+    glow: "oklch(0.8 0.15 92 / 0.52)",
   },
   "unstable-isotopes": {
     color: "oklch(0.9 0.19 55)",

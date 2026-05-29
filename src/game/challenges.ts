@@ -4,6 +4,7 @@ export type GameModeId =
   | "campaign"
   | "survival"
   | "elemental-boss"
+  | "periodic-guardian"
   | "unstable-isotopes"
   | "gravity-surge"
   | "pure-hydrogen"
@@ -57,6 +58,20 @@ export const GAME_MODES: GameModeConfig[] = [
       "The boss has 20 health and only opens 1-2 eyes at a time",
       "Matching an open eye deals 1 damage, or 2 if your shot is shimmering",
       "Charge the center eye to 10 and earn a Blank atom for a guaranteed hit",
+    ],
+  },
+  {
+    id: "periodic-guardian",
+    name: "Periodic Guardian",
+    emoji: "Guardian",
+    kind: "challenge",
+    description:
+      "An ancient table guardian cycles through elemental phases. Match the active group, survive its e-beam, and break the core in 50 shots.",
+    unlockedAtLevel: 1,
+    rules: [
+      "The weak spot cycles through Metals, Halogens, and Noble Gases every 3 seconds",
+      "Land 20 correct group shots before you run out of 50 attempts",
+      "Wait 7 seconds and the guardian vaporizes your current queued atom with an e-beam",
     ],
   },
   {
@@ -141,6 +156,8 @@ export function getUnlockedGameModes(unlockedLevel: number): GameModeConfig[] {
 export function getModeLevelLabel(mode: GameModeConfig, level: Level): string {
   if (mode.id === "campaign") return `Level ${level.id}`;
   if (mode.id === "survival") return "Endless";
-  if (mode.id === "elemental-boss") return level.id >= 63 ? `Boss • Level ${level.id}` : "Boss Event";
+  if (mode.id === "elemental-boss" || mode.id === "periodic-guardian") {
+    return level.id >= 63 ? `Boss • Level ${level.id}` : "Boss Event";
+  }
   return `Challenge • Level ${level.id}`;
 }

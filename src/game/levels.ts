@@ -41,7 +41,7 @@ export interface Level {
   /** Tutorial stage that clears by using a specific power-up correctly. */
   powerUpStage?: PowerUpStageId;
   /** Special one-off stage renderer. */
-  specialStage?: "elemental-boss";
+  specialStage?: "elemental-boss" | "periodic-guardian";
 }
 
 type LevelSeed = Pick<
@@ -491,6 +491,27 @@ const SPECIAL_LEVELS: Level[] = [
     milestoneFact:
       "Boss atoms never rise above Neon. This fight is about recognition, timing, and setting up the perfect Blank shot.",
     specialStage: "elemental-boss",
+  },
+  {
+    id: 64,
+    name: "The Periodic Guardian",
+    description: "Read the guardian's active element group and strike the core 20 times before your 50 shots run dry.",
+    lore: "A living monument of the periodic table rises from the archive. Its shell rotates through the great families, and only the right group can pierce its heart.",
+    targetElement: 18,
+    maxQueueElement: 18,
+    queueDecay: 0.5,
+    gridCols: 10,
+    gridRows: 12,
+    scoreMultiplier: 5.2,
+    parShots: 32,
+    starShotsThree: 24,
+    starShotsTwo: 38,
+    parTimeSec: 210,
+    scoreGoal: 80_000,
+    comboGoal: 5,
+    milestoneFact:
+      "The guardian only recognizes three elemental families: Metals, Halogens, and Noble Gases. Learn the rhythm and the whole table starts to feel alive.",
+    specialStage: "periodic-guardian",
   },
 ];
 

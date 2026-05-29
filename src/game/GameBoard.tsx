@@ -54,6 +54,7 @@ import { POWER_UP_UNLOCK_LEVELS } from "./powerUps";
 import { showInterstitialIfReady } from "./ads";
 import { useIsTabletLayout } from "./responsive";
 import { ElementalBossBoard } from "./ElementalBossBoard";
+import { PeriodicGuardianBoard } from "./PeriodicGuardianBoard";
 
 interface Props {
   levelId: number;
@@ -641,6 +642,9 @@ export function GameBoard(props: Props) {
   const level = getLevelById(props.levelId);
   if (props.mode === "elemental-boss" || level?.specialStage === "elemental-boss") {
     return <ElementalBossBoard {...props} mode="elemental-boss" />;
+  }
+  if (props.mode === "periodic-guardian" || level?.specialStage === "periodic-guardian") {
+    return <PeriodicGuardianBoard {...props} mode="periodic-guardian" />;
   }
   return <StandardGameBoard {...props} />;
 }

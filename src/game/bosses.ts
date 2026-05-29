@@ -1,4 +1,4 @@
-export type BossId = "elemental-boss";
+export type BossId = "elemental-boss" | "periodic-guardian";
 
 export interface BossEyeLayout {
   id: string;
@@ -14,6 +14,7 @@ export interface BossConfig {
   id: BossId;
   levelId: number;
   name: string;
+  shortLabel: string;
   maxHealth: number;
   maxShots: number;
   centerChargeGoal: number;
@@ -32,6 +33,7 @@ export const BOSSES: Record<BossId, BossConfig> = {
     id: "elemental-boss",
     levelId: 63,
     name: "Elemental Boss",
+    shortLabel: "Eye Tyrant",
     maxHealth: 20,
     maxShots: 100,
     centerChargeGoal: 10,
@@ -49,5 +51,26 @@ export const BOSSES: Record<BossId, BossConfig> = {
       size: 108,
     },
   },
+  "periodic-guardian": {
+    id: "periodic-guardian",
+    levelId: 64,
+    name: "The Periodic Guardian",
+    shortLabel: "Guardian",
+    maxHealth: 20,
+    maxShots: 50,
+    centerChargeGoal: 0,
+    openDurationMs: 3_000,
+    maxEyeElement: 18,
+    outerEyes: [
+      { id: "north-west", xPct: 24, yPct: 22, size: 56, swayX: 9, swayY: 5, swayPhase: 0.2 },
+      { id: "north-east", xPct: 76, yPct: 22, size: 56, swayX: 9, swayY: 5, swayPhase: 1.4 },
+      { id: "south-west", xPct: 22, yPct: 43, size: 54, swayX: 12, swayY: 7, swayPhase: 2.3 },
+      { id: "south-east", xPct: 78, yPct: 43, size: 54, swayX: 12, swayY: 7, swayPhase: 3.5 },
+    ],
+    centerEye: {
+      xPct: 50,
+      yPct: 27,
+      size: 114,
+    },
+  },
 };
-

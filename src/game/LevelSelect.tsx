@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Eye } from "lucide-react";
+import { Eye, Sparkles } from "lucide-react";
 import { LEVELS, MOLECULE_CHALLENGE_BY_LEVEL } from "./levels";
 import { ELEMENTS } from "./elements";
 import { useProgress, type LevelStats } from "./store";
@@ -187,7 +187,7 @@ export function LevelSelect({
               const challenge = getMoleculeChallenge(lvl.id);
               const isChallenge = challenge != null;
               const isPowerUpStage = lvl.powerUpStage != null;
-              const isBossStage = lvl.specialStage === "elemental-boss";
+              const isBossStage = Boolean(lvl.specialStage);
               return (
                 <button
                   key={lvl.id}
@@ -233,7 +233,7 @@ export function LevelSelect({
                     }}
                   >
                     {isBossStage ? (
-                      <BossMapNode />
+                      <BossMapNode bossType={lvl.specialStage ?? "elemental-boss"} />
                     ) : isPowerUpStage && lvl.powerUpStage ? (
                       <PowerUpMapNode powerUp={lvl.powerUpStage} />
                     ) : isChallenge && challenge ? (
@@ -331,7 +331,7 @@ export function LevelSelect({
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                {selected.specialStage === "elemental-boss" ? (
+                {selected.specialStage ? (
                   <div
                     style={{
                       width: 58,
@@ -344,7 +344,11 @@ export function LevelSelect({
                       boxShadow: "0 0 18px var(--accent-glow)",
                     }}
                   >
-                    <Eye size={34} color="var(--accent)" />
+                    {selected.specialStage === "periodic-guardian" ? (
+                      <Sparkles size={34} color="var(--accent)" />
+                    ) : (
+                      <Eye size={34} color="var(--accent)" />
+                    )}
                   </div>
                 ) : selected.powerUpStage ? (
                   <div
@@ -381,7 +385,7 @@ export function LevelSelect({
                 )}
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 11, color: "var(--muted-foreground)", letterSpacing: 1 }}>
-                    LEVEL {selected.id} {"→"} {selected.specialStage === "elemental-boss" ? "BOSS" : ELEMENTS[selected.targetElement - 1]?.symbol}
+                    LEVEL {selected.id} {"→"} {selected.specialStage ? "BOSS" : ELEMENTS[selected.targetElement - 1]?.symbol}
                   </div>
                   <div style={{ fontSize: 18, fontWeight: 800 }}>{selected.name}</div>
                   <div
@@ -544,7 +548,7 @@ function PowerUpMapNode({ powerUp }: { powerUp: NonNullable<(typeof LEVELS)[0]["
   );
 }
 
-function BossMapNode() {
+function BossMapNode({ bossType }: { bossType: NonNullable<(typeof LEVELS)[0]["specialStage"]> }) {
   return (
     <div
       aria-hidden="true"
@@ -559,7 +563,11 @@ function BossMapNode() {
         boxShadow: "inset 0 1px 0 rgba(255,255,255,0.22), 0 0 14px var(--accent-glow)",
       }}
     >
-      <Eye size={24} color="var(--foreground)" />
+      {bossType === "periodic-guardian" ? (
+        <Sparkles size={24} color="var(--foreground)" />
+      ) : (
+        <Eye size={24} color="var(--foreground)" />
+      )}
     </div>
   );
 }

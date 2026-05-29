@@ -571,14 +571,14 @@ export function ElementalBossBoard({ levelId, onExit, onWin, onMap = onExit, mod
               fontWeight: 800,
               cursor: "pointer",
             }}
-            >
-              {"<- Back"}
-            </button>
+          >
+            {"<- Back"}
+          </button>
           <div style={{ textAlign: "center", flex: 1 }}>
             <div
               style={{
-                fontSize: 12,
-                letterSpacing: 4,
+                fontSize: 11,
+                letterSpacing: 3,
                 color: "var(--accent)",
                 fontWeight: 900,
                 textTransform: "uppercase",
@@ -586,25 +586,25 @@ export function ElementalBossBoard({ levelId, onExit, onWin, onMap = onExit, mod
             >
               Special Encounter
             </div>
-            <div style={{ fontSize: isTabletLayout ? 28 : 22, fontWeight: 900 }}>{level?.name ?? config.name}</div>
+            <div style={{ fontSize: isTabletLayout ? 22 : 18, fontWeight: 900 }}>{level?.name ?? config.name}</div>
           </div>
           <div
             style={{
-              minWidth: isTabletLayout ? 134 : 112,
+              minWidth: isTabletLayout ? 112 : 96,
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
-              gap: 10,
+              gap: 8,
               background: "var(--surface)",
               border: "1px solid var(--border)",
-              borderRadius: 14,
-              padding: "8px 12px",
+              borderRadius: 12,
+              padding: "7px 10px",
             }}
           >
-            <HeartCrack size={18} color="var(--accent)" />
-            <span style={{ fontWeight: 900 }}>{shotsLeft}</span>
+            <HeartCrack size={16} color="var(--accent)" />
+            <span style={{ fontWeight: 900, fontSize: 13 }}>{shotsLeft}</span>
             {hasProPack && (
-              <span style={{ color: "var(--accent)", fontSize: 11, fontWeight: 900 }}>PRO</span>
+              <span style={{ color: "var(--accent)", fontSize: 10, fontWeight: 900 }}>PRO</span>
             )}
           </div>
         </div>
@@ -616,76 +616,10 @@ export function ElementalBossBoard({ levelId, onExit, onWin, onMap = onExit, mod
             background: "color-mix(in oklch, var(--surface-elevated) 94%, black)",
             border: "1px solid var(--border)",
             borderRadius: 18,
-            padding: isTabletLayout ? 16 : 12,
+            padding: isTabletLayout ? 12 : 10,
             boxShadow: "0 16px 36px rgba(0,0,0,0.34)",
           }}
         >
-          <div style={{ display: "grid", gap: 8 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-              <span style={{ fontSize: 12, letterSpacing: 2, color: "var(--muted-foreground)", fontWeight: 800 }}>
-                Boss health
-              </span>
-              <span style={{ fontWeight: 900 }}>{bossHealth}/{config.maxHealth}</span>
-            </div>
-            <div
-              style={{
-                height: 14,
-                borderRadius: 999,
-                background: "rgba(255,255,255,0.08)",
-                overflow: "hidden",
-                border: "1px solid rgba(255,255,255,0.08)",
-              }}
-            >
-              <div
-                style={{
-                  width: `${healthPct * 100}%`,
-                  height: "100%",
-                  background:
-                    bossFlash === "hit"
-                      ? "linear-gradient(90deg, #ff7d7d, #ff3b3b)"
-                      : "linear-gradient(90deg, var(--accent), #ff7f50)",
-                  boxShadow: bossFlash === "hit" ? "0 0 18px rgba(255,70,70,0.6)" : "0 0 16px var(--accent-glow)",
-                  transition: "width 180ms ease, background 120ms ease",
-                }}
-              />
-            </div>
-
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-              <span style={{ fontSize: 12, letterSpacing: 2, color: "var(--muted-foreground)", fontWeight: 800 }}>
-                Blank charge
-              </span>
-              <span style={{ fontWeight: 900 }}>
-                {centerCharge}/{config.centerChargeGoal}
-                {blankCharges > 0 ? `  |  Blank x${blankCharges}` : ""}
-              </span>
-            </div>
-            <div
-              style={{
-                height: 12,
-                borderRadius: 999,
-                background: "rgba(255,255,255,0.08)",
-                overflow: "hidden",
-                border: "1px solid rgba(255,255,255,0.08)",
-              }}
-            >
-              <div
-                style={{
-                  width: `${chargePct * 100}%`,
-                  height: "100%",
-                  background:
-                    bossFlash === "charge"
-                      ? "linear-gradient(90deg, rgba(230,230,230,0.7), rgba(168,168,168,0.9))"
-                      : "linear-gradient(90deg, #7be1ff, #64b6ff)",
-                  boxShadow:
-                    bossFlash === "charge"
-                      ? "0 0 18px rgba(235,235,235,0.35)"
-                      : "0 0 16px rgba(100,182,255,0.5)",
-                  transition: "width 180ms ease, background 120ms ease",
-                }}
-              />
-            </div>
-          </div>
-
           <div
             ref={arenaRef}
             onPointerMove={(event) => handleArenaPointer(event.clientX, event.clientY, false)}
@@ -713,6 +647,118 @@ export function ElementalBossBoard({ levelId, onExit, onWin, onMap = onExit, mod
               }}
             />
 
+            <div
+              style={{
+                position: "absolute",
+                top: 10,
+                left: 10,
+                right: 10,
+                display: "flex",
+                alignItems: "flex-start",
+                justifyContent: "space-between",
+                gap: 10,
+                zIndex: 2,
+              }}
+            >
+              <div
+                style={{
+                  display: "grid",
+                  gap: 7,
+                  minWidth: isTabletLayout ? 250 : 184,
+                  padding: isTabletLayout ? "9px 10px" : "8px 9px",
+                  borderRadius: 14,
+                  background: "rgba(10,14,34,0.84)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  backdropFilter: "blur(8px)",
+                }}
+              >
+                <CompactBar
+                  label="Boss"
+                  value={`${bossHealth}/${config.maxHealth}`}
+                  fillPercent={healthPct}
+                  fill={
+                    bossFlash === "hit"
+                      ? "linear-gradient(90deg, #ff7d7d, #ff3b3b)"
+                      : "linear-gradient(90deg, var(--accent), #ff7f50)"
+                  }
+                  shadow={bossFlash === "hit" ? "0 0 18px rgba(255,70,70,0.6)" : "0 0 16px var(--accent-glow)"}
+                />
+                <CompactBar
+                  label="Blank"
+                  value={`${centerCharge}/${config.centerChargeGoal}${blankCharges > 0 ? ` | x${blankCharges}` : ""}`}
+                  fillPercent={chargePct}
+                  fill={
+                    bossFlash === "charge"
+                      ? "linear-gradient(90deg, rgba(230,230,230,0.7), rgba(168,168,168,0.9))"
+                      : "linear-gradient(90deg, #7be1ff, #64b6ff)"
+                  }
+                  shadow={
+                    bossFlash === "charge"
+                      ? "0 0 18px rgba(235,235,235,0.35)"
+                      : "0 0 16px rgba(100,182,255,0.5)"
+                  }
+                />
+              </div>
+
+              <div
+                style={{
+                  display: "grid",
+                  gap: 7,
+                  justifyItems: "end",
+                  padding: isTabletLayout ? "9px 10px" : "8px 9px",
+                  borderRadius: 14,
+                  background: "rgba(10,14,34,0.84)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  backdropFilter: "blur(8px)",
+                  minWidth: isTabletLayout ? 220 : 170,
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ fontSize: 10, letterSpacing: 1.8, color: "var(--muted-foreground)", fontWeight: 800 }}>
+                    CURRENT SHOT
+                  </div>
+                  <span style={{ fontSize: 11, color: "var(--muted-foreground)", fontWeight: 800 }}>
+                    {currentShot === 0 ? "Blank" : `${shotsLeft} left`}
+                  </span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  {currentShot === 0 ? (
+                    <div
+                      style={{
+                        width: 34,
+                        height: 34,
+                        borderRadius: "50%",
+                        display: "grid",
+                        placeItems: "center",
+                        background: "radial-gradient(circle at 35% 35%, rgba(255,255,255,0.98), rgba(210,226,255,0.88) 55%, rgba(120,136,200,0.82))",
+                        color: "#11162d",
+                        fontWeight: 900,
+                        boxShadow: "0 0 18px rgba(187,226,255,0.48)",
+                      }}
+                    >
+                      ?
+                    </div>
+                  ) : (
+                    <ElementBall atomicNumber={currentShot} size={40} glow={currentShimmer} />
+                  )}
+                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                    {queueState.queue.slice(1).map((atom, index) => (
+                      <ElementBall
+                        key={`${atom}-${index}-${queueState.shimmer[index + 1] ? "s" : "n"}`}
+                        atomicNumber={atom}
+                        size={isTabletLayout ? 24 : 22}
+                        glow={queueState.shimmer[index + 1]}
+                      />
+                    ))}
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 10, fontSize: 11, color: "var(--muted-foreground)", fontWeight: 800 }}>
+                  <span>Hits {damageHits}/20</span>
+                  <span>Score {score}</span>
+                </div>
+              </div>
+            </div>
+
             <svg
               viewBox={`0 0 ${arenaSize.width} ${arenaSize.height}`}
               preserveAspectRatio="none"
@@ -739,10 +785,10 @@ export function ElementalBossBoard({ levelId, onExit, onWin, onMap = onExit, mod
                 position: "absolute",
                 left: "50%",
                 top: "11%",
-                width: isTabletLayout ? 310 : 230,
-                height: isTabletLayout ? 170 : 132,
+                width: isTabletLayout ? 318 : 238,
+                height: isTabletLayout ? 198 : 150,
                 transform: "translateX(-50%)",
-                borderRadius: "50% 50% 42% 42%",
+                borderRadius: "44% 44% 38% 38% / 50% 50% 34% 34%",
                 background:
                   bossFlash === "hit"
                     ? "radial-gradient(circle at 50% 38%, rgba(255,110,110,0.45), transparent 35%), linear-gradient(180deg, rgba(40,16,22,0.92), rgba(24,10,18,0.96))"
@@ -753,6 +799,47 @@ export function ElementalBossBoard({ levelId, onExit, onWin, onMap = onExit, mod
                 border: "1px solid rgba(255,255,255,0.08)",
               }}
             />
+            <div
+              aria-hidden="true"
+              style={{
+                position: "absolute",
+                left: "50%",
+                top: "13%",
+                width: isTabletLayout ? 300 : 220,
+                height: isTabletLayout ? 50 : 40,
+                transform: "translateX(-50%)",
+                borderRadius: "50% 50% 42% 42%",
+                background: "linear-gradient(180deg, rgba(7,10,27,0.92), rgba(27,31,58,0.45))",
+                boxShadow: "0 10px 20px rgba(0,0,0,0.28)",
+              }}
+            />
+            <div
+              aria-hidden="true"
+              style={{
+                position: "absolute",
+                left: "50%",
+                top: "31%",
+                width: isTabletLayout ? 180 : 136,
+                height: isTabletLayout ? 40 : 28,
+                transform: "translateX(-50%)",
+                borderRadius: "0 0 999px 999px",
+                background: "linear-gradient(180deg, rgba(11, 7, 20, 0.98), rgba(44, 14, 22, 0.92))",
+                border: "1px solid rgba(255,255,255,0.08)",
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  position: "absolute",
+                  inset: "0 8% auto 8%",
+                  height: "55%",
+                  background:
+                    "repeating-linear-gradient(90deg, rgba(255,255,255,0.82) 0 9%, transparent 9% 16%)",
+                  clipPath: "polygon(0 0, 100% 0, 94% 100%, 6% 100%)",
+                  opacity: 0.72,
+                }}
+              />
+            </div>
 
             {outerEyes.map((eye) => (
               <div
@@ -865,15 +952,34 @@ export function ElementalBossBoard({ levelId, onExit, onWin, onMap = onExit, mod
                 position: "absolute",
                 left: launcher.x,
                 top: launcher.y,
-                width: 2,
+                width: 4,
                 height: projectile ? 0 : distance(launcher.x, launcher.y, aimPoint.x, aimPoint.y),
-                background: "linear-gradient(180deg, rgba(123,225,255,0), rgba(123,225,255,0.65), rgba(255,220,120,0.8))",
+                background:
+                  "linear-gradient(180deg, rgba(123,225,255,0), rgba(123,225,255,0.82), rgba(255,220,120,0.96))",
                 transformOrigin: "top center",
                 transform: `translateX(-50%) rotate(${Math.atan2(aimPoint.y - launcher.y, aimPoint.x - launcher.x) * (180 / Math.PI) + 90}deg)`,
-                opacity: projectile ? 0 : 0.75,
+                opacity: projectile ? 0 : 0.95,
+                borderRadius: 999,
+                boxShadow: "0 0 18px rgba(123,225,255,0.42), 0 0 26px rgba(255,220,120,0.18)",
                 pointerEvents: "none",
               }}
             />
+            {!projectile && (
+              <div
+                aria-hidden="true"
+                style={{
+                  position: "absolute",
+                  left: aimPoint.x - 7,
+                  top: aimPoint.y - 7,
+                  width: 14,
+                  height: 14,
+                  borderRadius: "50%",
+                  border: "2px solid rgba(123,225,255,0.82)",
+                  boxShadow: "0 0 14px rgba(123,225,255,0.36)",
+                  pointerEvents: "none",
+                }}
+              />
+            )}
 
             {projectile && (
               <div
@@ -913,10 +1019,10 @@ export function ElementalBossBoard({ levelId, onExit, onWin, onMap = onExit, mod
             <div
               style={{
                 position: "absolute",
-                left: launcher.x - 40,
-                top: launcher.y - 40,
-                width: 80,
-                height: 80,
+                left: launcher.x - 34,
+                top: launcher.y - 34,
+                width: 68,
+                height: 68,
                 borderRadius: "50%",
                 display: "grid",
                 placeItems: "center",
@@ -928,8 +1034,8 @@ export function ElementalBossBoard({ levelId, onExit, onWin, onMap = onExit, mod
               {currentShot === 0 ? (
                 <div
                   style={{
-                    width: 44,
-                    height: 44,
+                    width: 38,
+                    height: 38,
                     borderRadius: "50%",
                     display: "grid",
                     placeItems: "center",
@@ -938,64 +1044,13 @@ export function ElementalBossBoard({ levelId, onExit, onWin, onMap = onExit, mod
                     fontWeight: 900,
                     boxShadow: "0 0 18px rgba(187,226,255,0.48)",
                   }}
-                >
-                  ?
-                </div>
-              ) : (
-                <ElementBall atomicNumber={currentShot} size={56} glow={currentShimmer} />
-              )}
-            </div>
-
-            <div
-              style={{
-                position: "absolute",
-                left: 14,
-                right: 14,
-                bottom: 14,
-                display: "flex",
-                alignItems: "flex-end",
-                justifyContent: "space-between",
-                gap: 12,
-              }}
-            >
-              <div
-                style={{
-                  flex: 1,
-                  display: "grid",
-                  gap: 8,
-                  background: "rgba(10,14,34,0.82)",
-                  border: "1px solid rgba(255,255,255,0.08)",
-                  borderRadius: 16,
-                  padding: isTabletLayout ? 14 : 12,
-                  backdropFilter: "blur(8px)",
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-                  <div>
-                    <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--muted-foreground)", fontWeight: 800 }}>
-                      Current shot
-                    </div>
-                    <div style={{ fontSize: 13, color: "var(--muted-foreground)" }}>
-                      {currentShot === 0 ? "Blank atom" : `Match one of the open eyes`}
-                    </div>
+                  >
+                    ?
                   </div>
-                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                    {queueState.queue.slice(1).map((atom, index) => (
-                      <ElementBall
-                        key={`${atom}-${index}-${queueState.shimmer[index + 1] ? "s" : "n"}`}
-                        atomicNumber={atom}
-                        size={isTabletLayout ? 32 : 28}
-                        glow={queueState.shimmer[index + 1]}
-                      />
-                    ))}
-                  </div>
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 13 }}>
-                  <span style={{ color: "var(--muted-foreground)" }}>Successful hits: <strong style={{ color: "var(--foreground)" }}>{damageHits}/20</strong></span>
-                  <span style={{ color: "var(--muted-foreground)" }}>Score: <strong style={{ color: "var(--foreground)" }}>{score}</strong></span>
-                </div>
+                ) : (
+                  <ElementBall atomicNumber={currentShot} size={48} glow={currentShimmer} />
+                )}
               </div>
-            </div>
 
             {result && (
               <div
@@ -1125,6 +1180,59 @@ function MetricCard({ label, value }: { label: string; value: string }) {
         {label.toUpperCase()}
       </div>
       <div style={{ fontSize: 22, fontWeight: 900, marginTop: 6 }}>{value}</div>
+    </div>
+  );
+}
+
+function CompactBar({
+  label,
+  value,
+  fillPercent,
+  fill,
+  shadow,
+}: {
+  label: string;
+  value: string;
+  fillPercent: number;
+  fill: string;
+  shadow: string;
+}) {
+  return (
+    <div style={{ display: "grid", gap: 4 }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          gap: 8,
+          fontSize: 10,
+          fontWeight: 900,
+          letterSpacing: 1.5,
+          color: "var(--muted-foreground)",
+        }}
+      >
+        <span>{label.toUpperCase()}</span>
+        <span>{value}</span>
+      </div>
+      <div
+        style={{
+          position: "relative",
+          height: 10,
+          borderRadius: 999,
+          overflow: "hidden",
+          background: "rgba(255,255,255,0.08)",
+          border: "1px solid rgba(255,255,255,0.08)",
+        }}
+      >
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            width: `${Math.max(0, Math.min(100, fillPercent * 100))}%`,
+            background: fill,
+            boxShadow: shadow,
+          }}
+        />
+      </div>
     </div>
   );
 }

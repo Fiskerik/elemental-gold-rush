@@ -56,7 +56,7 @@ function Index() {
   const grantProPack = useProgress((s) => s.grantProPack);
   const appTheme = useProgress((s) => s.appTheme);
   const [screen, setScreen] = useState<Screen>({ name: "menu" });
-  const [showLaunchScreen, setShowLaunchScreen] = useState(() => Capacitor.isNativePlatform());
+  const [showLaunchScreen, setShowLaunchScreen] = useState(true);
   const [resumePrompt, setResumePrompt] = useState<ReturnType<typeof getSavedRunSummary>>(null);
 
   useEffect(() => {
@@ -99,7 +99,7 @@ function Index() {
     };
   }, [grantProPack]);
 
-  if (showLaunchScreen) return <NativeLaunchScreen />;
+  if (showLaunchScreen) return <LaunchScreen />;
 
   function startCampaign() {
     const saved = getSavedRunSummary();
@@ -188,7 +188,7 @@ function Index() {
   }
 }
 
-function NativeLaunchScreen() {
+function LaunchScreen() {
   return (
     <div
       style={{
@@ -204,17 +204,45 @@ function NativeLaunchScreen() {
           src="/game-icon.png"
           alt="Elemental Gold Rush"
           style={{
-            width: 98,
-            height: 98,
-            borderRadius: 24,
-            boxShadow: "0 18px 46px rgba(0,0,0,0.46)",
+            width: 110,
+            height: 110,
+            borderRadius: 28,
+            boxShadow: "0 18px 46px rgba(0,0,0,0.46), 0 0 24px rgba(255, 205, 80, 0.18)",
           }}
         />
-        <div className="gold-text" style={{ fontSize: 22, fontWeight: 900 }}>
+        <div className="gold-text" style={{ fontSize: 24, fontWeight: 900 }}>
           Elemental Gold Rush
         </div>
-        <div style={{ fontSize: 12, color: "var(--muted-foreground)", letterSpacing: 0.4 }}>
+        <div
+          style={{
+            fontSize: 12,
+            color: "var(--muted-foreground)",
+            letterSpacing: 0.4,
+            textTransform: "uppercase",
+          }}
+        >
           Loading compounds...
+        </div>
+        <div
+          aria-hidden="true"
+          style={{
+            width: 120,
+            height: 6,
+            borderRadius: 999,
+            overflow: "hidden",
+            background: "rgba(255,255,255,0.12)",
+          }}
+        >
+          <div
+            style={{
+              width: "55%",
+              height: "100%",
+              borderRadius: 999,
+              background: "linear-gradient(90deg, var(--accent), var(--primary))",
+              boxShadow: "0 0 16px rgba(255, 214, 84, 0.35)",
+              animation: "shimmer-wave 1.3s ease-in-out infinite",
+            }}
+          />
         </div>
       </div>
     </div>
