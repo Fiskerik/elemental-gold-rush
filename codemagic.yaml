@@ -25,7 +25,7 @@ workflows:
           sips -z 1024 1024 src/logo.png --out ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png
       - name: Prepare Vite iOS env
         script: |
-          RC_KEY="${VITE_REVENUECAT_IOS_API_KEY:-${REVENUECAT_IOS_API_KEY:-}}"
+          RC_KEY="${VITE_REVENUECAT_IOS_API_KEY:-${REVENUECAT_IOS_API_KEY:-${VITE_REVENUECAT_API_KEY:-${VITE_RC_IOS_API_KEY:-}}}}"
           RC_ENTITLEMENT="${VITE_REVENUECAT_ENTITLEMENT_ID:-${REVENUECAT_ENTITLEMENT_ID:-atomic_fusion_lifetime}}"
           RC_OFFERING="${VITE_REVENUECAT_OFFERING_ID:-${REVENUECAT_OFFERING_ID:-default}}"
           ADMOB_APP_ID="${VITE_ADMOB_IOS_APP_ID:-ca-app-pub-8854735603167656~9228353443}"
@@ -43,7 +43,7 @@ workflows:
           } > .env.production.local
 
           if [ -z "$RC_KEY" ]; then
-            echo "ERROR: RevenueCat API key is missing. Set VITE_REVENUECAT_IOS_API_KEY or REVENUECAT_IOS_API_KEY in Codemagic environment variables."
+            echo "ERROR: RevenueCat API key is missing. Set one of these Codemagic environment variables: VITE_REVENUECAT_IOS_API_KEY, REVENUECAT_IOS_API_KEY, VITE_REVENUECAT_API_KEY, or VITE_RC_IOS_API_KEY."
             exit 1
           fi
       - name: Build web + sync Capacitor iOS
