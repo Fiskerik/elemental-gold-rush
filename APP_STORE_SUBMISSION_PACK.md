@@ -13,7 +13,7 @@
 Merge atoms, unlock 118 elements, and build your lab in a strategic puzzle adventure. Daily quests, streak rewards, and optional power-ups await.
 
 ### Description
-Elemental Gold Rush is a science-inspired merge puzzle where you fuse atoms, discover compounds, and progress across 62 campaign levels.
+Atomic Fusion Rush is a science-inspired merge puzzle where you fuse atoms, discover compounds, and progress across 62 campaign levels.
 
 - Merge atoms to discover higher elements
 - Complete daily quests and maintain streaks
@@ -21,7 +21,7 @@ Elemental Gold Rush is a science-inspired merge puzzle where you fuse atoms, dis
 - Use power-ups to recover difficult runs
 - Optional one-time Pro upgrade removes forced interstitial ads
 
-Designed for short sessions and long-term progression, Elemental Gold Rush blends strategy, planning, and satisfying chain reactions.
+Designed for short sessions and long-term progression, Atomic Fusion Rush blends strategy, planning, and satisfying chain reactions.
 
 ### Keywords (100-byte target)
 merge,puzzle,chemistry,elements,periodic table,science,strategy,casual,logic,brain game

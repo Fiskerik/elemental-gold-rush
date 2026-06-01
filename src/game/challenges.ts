@@ -137,7 +137,7 @@ export const GAME_MODES: GameModeConfig[] = [
   },
   {
     id: "gold-rush-timer",
-    name: "Gold Rush Timer",
+    name: "Fusion Rush Timer",
     emoji: "⏱️",
     kind: "challenge",
     description: "Reach the target before the lab clock expires.",

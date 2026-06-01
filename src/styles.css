@@ -63,7 +63,7 @@
 
 :root {
   --radius: 0.625rem;
-  /* Elemental Gold Rush — dark science theme (from theme.ts) */
+  /* Atomic Fusion Rush — dark science theme (from theme.ts) */
   --background: oklch(0.13 0.04 275);          /* #0A0A1A */
   --foreground: oklch(1 0 0);
   --surface: oklch(0.18 0.05 275);             /* #111128 */
@@ -92,6 +92,11 @@
   --input: oklch(0.28 0.07 275);
   --ring: oklch(0.78 0.13 230);
   --grid-line: oklch(0.78 0.13 230 / 0.12);
+  --campaign-map-bg:
+    radial-gradient(circle at 20% 18%, oklch(0.78 0.16 85 / 0.22), transparent 16%),
+    radial-gradient(circle at 84% 24%, oklch(0.68 0.18 210 / 0.18), transparent 15%),
+    radial-gradient(circle at 72% 84%, oklch(0.72 0.18 145 / 0.16), transparent 18%),
+    linear-gradient(155deg, oklch(0.18 0.04 245), oklch(0.12 0.03 260) 48%, oklch(0.18 0.05 70));
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -136,6 +141,11 @@
   --input: oklch(0.9 0.012 92);
   --ring: oklch(0.64 0.12 82);
   --grid-line: oklch(0.5 0.03 235 / 0.1);
+  --campaign-map-bg:
+    radial-gradient(circle at 20% 18%, oklch(0.86 0.14 86 / 0.2), transparent 18%),
+    radial-gradient(circle at 84% 24%, oklch(0.68 0.12 220 / 0.13), transparent 17%),
+    radial-gradient(circle at 72% 84%, oklch(0.72 0.13 145 / 0.12), transparent 20%),
+    linear-gradient(155deg, oklch(0.99 0.005 95), oklch(0.95 0.012 95) 52%, oklch(0.92 0.018 86));
   --sidebar: oklch(0.985 0.004 95);
   --sidebar-foreground: oklch(0.16 0.02 78);
   --sidebar-primary: oklch(0.72 0.14 82);

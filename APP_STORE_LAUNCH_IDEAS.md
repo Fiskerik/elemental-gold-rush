@@ -1,8 +1,8 @@
-# Elemental Gold Rush: Gamification, Monetization, and App Store Launch Ideas
+# Atomic Fusion Rush: Gamification, Monetization, and App Store Launch Ideas
 
 ## Overview
 
-This document captures feature ideas and implementation directions for improving **Elemental Gold Rush** before an App Store launch. The current game already has a strong foundation: level progression, element discovery, persistent progress, sound/haptics toggles, a collection screen with periodic-table facts, scoring, and a physics-style merge board.
+This document captures feature ideas and implementation directions for improving **Atomic Fusion Rush** before an App Store launch. The current game already has a strong foundation: level progression, element discovery, persistent progress, sound/haptics toggles, a collection screen with periodic-table facts, scoring, and a physics-style merge board.
 
 The biggest pre-launch opportunities are:
 
@@ -157,7 +157,7 @@ Suggested challenge modifiers:
 2. **Gravity Surge** — after every 5 shots, all balls shift slightly downward.
 3. **Pure Hydrogen Run** — the queue starts with mostly Hydrogen and Helium.
 4. **Noble Gas Lock** — noble gases cannot merge unless activated by a power-up.
-5. **Gold Rush Timer** — reach the target before a countdown expires.
+5. **Fusion Rush Timer** — reach the target before a countdown expires.
 
 Add a `mode` prop to `src/game/GameBoard.tsx`, defaulting to normal level play.
 

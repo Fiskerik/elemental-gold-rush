@@ -13,7 +13,7 @@ const indexHtml = `<!doctype html>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>Elemental Gold Rush</title>
+    <title>Atomic Fusion Rush</title>
     <link rel="icon" href="/favicon.ico" />
     <link rel="icon" type="image/png" href="/favicon.png" />
     ${css ? `<link rel="stylesheet" href="/assets/${css}" />` : ""}
@@ -84,7 +84,7 @@ const indexHtml = `<!doctype html>
     <div id="root"></div>
     <div id="boot-fallback">
       <div>
-        <h1>Elemental Gold Rush</h1>
+        <h1>Atomic Fusion Rush</h1>
         <p>Loading...</p>
       </div>
     </div>
@@ -100,7 +100,7 @@ const staticPageChrome = (title, body) => `<!doctype html>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>${title} | Elemental Gold Rush</title>
+    <title>${title} | Atomic Fusion Rush</title>
     <link rel="icon" href="/favicon.ico" />
     <link rel="icon" type="image/png" href="/favicon.png" />
     ${css ? `<link rel="stylesheet" href="/assets/${css}" />` : ""}
@@ -162,7 +162,7 @@ const termsBody = `
   <p class="muted">Last updated: May 28, 2026</p>
   <section class="card">
     <h2>Acceptance of Terms</h2>
-    <p>By using Elemental Gold Rush, you agree to these Terms and our Privacy Policy.</p>
+    <p>By using Atomic Fusion Rush, you agree to these Terms and our Privacy Policy.</p>
   </section>
   <section class="card">
     <h2>License to Use</h2>
@@ -183,7 +183,7 @@ const privacyBody = `
   <p class="muted">Last updated: May 28, 2026</p>
   <section class="card">
     <h2>Overview</h2>
-    <p>This policy explains how Elemental Gold Rush handles gameplay data, purchase status, and ad-related metadata on supported platforms.</p>
+    <p>This policy explains how Atomic Fusion Rush handles gameplay data, purchase status, and ad-related metadata on supported platforms.</p>
   </section>
   <section class="card">
     <h2>Data We Process</h2>
@@ -201,7 +201,7 @@ const privacyBody = `
 
 const supportBody = `
   <h1>Support</h1>
-  <p class="muted">Need help with Elemental Gold Rush? We are happy to help.</p>
+  <p class="muted">Need help with Atomic Fusion Rush? We are happy to help.</p>
   <section class="card">
     <h2>Contact</h2>
     <p>Email: <a href="mailto:eaconsulting.supp@gmail.com">eaconsulting.supp@gmail.com</a></p>

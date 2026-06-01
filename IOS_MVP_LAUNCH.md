@@ -1,4 +1,4 @@
-# Elemental Gold Rush iPhone MVP
+# Atomic Fusion Rush iPhone MVP
 
 ## Native Build Path
 

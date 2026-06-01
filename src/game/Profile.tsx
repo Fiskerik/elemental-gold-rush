@@ -96,7 +96,7 @@ export function Profile({ onBack }: Props) {
               PLAYER PROFILE
             </div>
             <h1 className="gold-text" style={{ margin: "4px 0", fontSize: 34 }}>
-              Gold Rush Chemist
+              Fusion Rush Chemist
             </h1>
             <p style={{ margin: 0, color: "var(--muted-foreground)", fontSize: 13 }}>
               {hasProPack ? "Pro Lab active" : "Free Lab"} • Level {unlockedLevel} / {MAX_LEVEL}

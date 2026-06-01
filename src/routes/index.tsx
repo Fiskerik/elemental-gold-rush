@@ -22,13 +22,13 @@ import {
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Elemental Gold Rush — Periodic Table Merge Puzzle" },
+      { title: "Atomic Fusion Rush — Periodic Table Merge Puzzle" },
       {
         name: "description",
         content:
           "Fuse atoms, climb the periodic table, and chase Gold in this addictive merge puzzle game. 118 elements with real chemistry facts.",
       },
-      { property: "og:title", content: "Elemental Gold Rush" },
+      { property: "og:title", content: "Atomic Fusion Rush" },
       {
         property: "og:description",
         content:
@@ -202,7 +202,7 @@ function LaunchScreen() {
       <div style={{ display: "grid", justifyItems: "center", gap: 14 }}>
         <img
           src="/game-icon.png"
-          alt="Elemental Gold Rush"
+          alt="Atomic Fusion Rush"
           style={{
             width: 110,
             height: 110,
@@ -211,7 +211,7 @@ function LaunchScreen() {
           }}
         />
         <div className="gold-text" style={{ fontSize: 24, fontWeight: 900 }}>
-          Elemental Gold Rush
+          Atomic Fusion Rush
         </div>
         <div
           style={{

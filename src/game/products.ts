@@ -31,7 +31,7 @@ export const PRODUCTS: ProductDefinition[] = [
       "Unlock the Pro Lab profile badge.",
       "Includes 50 starting gold coins in the App Store build.",
       "Adds +2 extra gold coins on daily gold claims.",
-      "Support future Elemental Gold Rush updates.",
+      "Support future Atomic Fusion Rush updates.",
     ],
   },
   {

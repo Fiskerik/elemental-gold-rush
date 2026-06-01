@@ -32,6 +32,7 @@ const DEFAULT_PRO_ENTITLEMENT = "atomic_fusion_lifetime";
 const DEFAULT_OFFERING_ID = "default";
 const NATIVE_SETUP_TIMEOUT_MS = 15_000;
 const NATIVE_PURCHASE_TIMEOUT_MS = 20_000;
+const NATIVE_IMPORT_TIMEOUT_MS = 8_000;
 
 let configured = false;
 let purchasesPlugin: PurchasesPlugin | null = null;
@@ -92,6 +93,21 @@ function getRevenueCatApiKey(): string {
     configuredEnvValue(import.meta.env.VITE_RC_IOS_API_KEY) ||
     FALLBACK_REVENUECAT_IOS_API_KEY
   );
+}
+
+function maskApiKey(value: string): string {
+  if (!value) return "missing";
+  return `${value.slice(0, 10)}...${value.slice(-4)}`;
+}
+
+function getRevenueCatApiKeyDebug(): string {
+  const iosKey = configuredEnvValue(import.meta.env.VITE_REVENUECAT_IOS_API_KEY);
+  const genericKey = configuredEnvValue(import.meta.env.VITE_REVENUECAT_API_KEY);
+  const rcKey = configuredEnvValue(import.meta.env.VITE_RC_IOS_API_KEY);
+  if (iosKey) return `VITE_REVENUECAT_IOS_API_KEY=${maskApiKey(iosKey)}`;
+  if (genericKey) return `VITE_REVENUECAT_API_KEY=${maskApiKey(genericKey)}`;
+  if (rcKey) return `VITE_RC_IOS_API_KEY=${maskApiKey(rcKey)}`;
+  return `fallback=${maskApiKey(FALLBACK_REVENUECAT_IOS_API_KEY)}`;
 }
 
 function getEntitlementId(): string {
@@ -158,9 +174,17 @@ function summarizeStoreProducts(products: PurchasesStoreProduct[]): string {
 }
 
 async function ensureConfigured(reportStep?: PurchaseStepReporter): Promise<typeof Purchases | null> {
+  reportStep?.(`Platform: ${Capacitor.getPlatform()}`);
+  reportStep?.(`Is native: ${Capacitor.isNativePlatform()}`);
+  reportStep?.(`RC key: ${getRevenueCatApiKeyDebug()}`);
+  reportStep?.(`RC offering id: ${getOfferingId()}`);
   if (!isNativePlatform()) return null;
-  if (configured) return purchasesPlugin;
+  if (configured) {
+    reportStep?.("RevenueCat already configured.");
+    return purchasesPlugin;
+  }
   if (!purchasesPluginPromise) {
+    reportStep?.("Importing RevenueCat plugin...");
     purchasesPluginPromise = import("@revenuecat/purchases-capacitor")
       .then((module) => {
         const plugin = module.Purchases as unknown as PurchasesPlugin;
@@ -171,8 +195,22 @@ async function ensureConfigured(reportStep?: PurchaseStepReporter): Promise<type
         return null;
       });
   }
-  const Purchases = await purchasesPluginPromise;
+  let Purchases: PurchasesPlugin | null;
+  try {
+    Purchases = await withNativeTimeout(
+      purchasesPluginPromise,
+      NATIVE_IMPORT_TIMEOUT_MS,
+      "RevenueCat plugin import",
+    );
+  } catch (error) {
+    purchasesPluginPromise = null;
+    lastConfigurationReason =
+      describePurchaseError(error) || "RevenueCat plugin import timed out.";
+    reportStep?.(`RevenueCat plugin import ERROR: ${lastConfigurationReason}`);
+    return null;
+  }
   if (!Purchases) return null;
+  reportStep?.("RevenueCat plugin imported.");
 
   const apiKey = getRevenueCatApiKey();
   if (!apiKey) {
@@ -202,6 +240,7 @@ async function ensureConfigured(reportStep?: PurchaseStepReporter): Promise<type
       NATIVE_SETUP_TIMEOUT_MS,
       "RevenueCat configuration",
     );
+    reportStep?.("RevenueCat configured OK.");
     configured = true;
     purchasesPlugin = Purchases;
     return Purchases;
@@ -368,6 +407,7 @@ export async function logRevenueCatOfferingsDiagnostic(onLine?: (line: string) =
   }
 
   try {
+    log("RevenueCat diagnostic: Loading offerings...");
     const offerings = await withNativeTimeout(
       purchases.getOfferings(),
       NATIVE_SETUP_TIMEOUT_MS,

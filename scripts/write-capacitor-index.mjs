@@ -15,7 +15,7 @@ const indexHtml = `<!doctype html>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>Elemental Gold Rush</title>
+    <title>Atomic Fusion Rush</title>
     ${css ? `<link rel="stylesheet" href="/assets/${css}" />` : ""}
     <style>
       body {
@@ -111,7 +111,7 @@ const indexHtml = `<!doctype html>
     <div id="root"></div>
     <div id="boot-fallback">
       <div>
-        <h1>Elemental Gold Rush</h1>
+        <h1>Atomic Fusion Rush</h1>
         <p>Loading...</p>
       </div>
     </div>

@@ -106,11 +106,7 @@ export function LevelSelect({
               position: "relative",
               width: "100%",
               aspectRatio: `${MAP_W} / ${mapH}`,
-              background:
-                "radial-gradient(circle at 20% 18%, oklch(0.78 0.16 85 / 0.22), transparent 16%)," +
-                "radial-gradient(circle at 84% 24%, oklch(0.68 0.18 210 / 0.18), transparent 15%)," +
-                "radial-gradient(circle at 72% 84%, oklch(0.72 0.18 145 / 0.16), transparent 18%)," +
-                "linear-gradient(155deg, oklch(0.18 0.04 245), oklch(0.12 0.03 260) 48%, oklch(0.18 0.05 70))",
+              background: "var(--campaign-map-bg)",
               border: "1px solid var(--border)",
               borderRadius: 18,
               overflow: "hidden",
