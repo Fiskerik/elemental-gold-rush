@@ -43,7 +43,8 @@ workflows:
           } > .env.production.local
 
           if [ -z "$RC_KEY" ]; then
-            echo "WARNING: RevenueCat API key is missing. Native coin purchases will not work in this build."
+            echo "ERROR: RevenueCat API key is missing. Set VITE_REVENUECAT_IOS_API_KEY or REVENUECAT_IOS_API_KEY in Codemagic environment variables."
+            exit 1
           fi
       - name: Build web + sync Capacitor iOS
         script: |
