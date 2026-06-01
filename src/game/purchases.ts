@@ -1,4 +1,5 @@
 import { Capacitor } from "@capacitor/core";
+import { Purchases as RevenueCatPurchases } from "@revenuecat/purchases-capacitor";
 import { PRODUCT_IDS, ProductId, getProductById } from "./products";
 
 type CustomerInfo = {
@@ -32,11 +33,9 @@ const DEFAULT_PRO_ENTITLEMENT = "atomic_fusion_lifetime";
 const DEFAULT_OFFERING_ID = "default";
 const NATIVE_SETUP_TIMEOUT_MS = 15_000;
 const NATIVE_PURCHASE_TIMEOUT_MS = 20_000;
-const NATIVE_IMPORT_TIMEOUT_MS = 8_000;
 
 let configured = false;
 let purchasesPlugin: PurchasesPlugin | null = null;
-let purchasesPluginPromise: Promise<PurchasesPlugin | null> | null = null;
 let customerInfoListenerId: string | null = null;
 let missingConfigLogged = false;
 let lastConfigurationReason = "";
@@ -173,7 +172,7 @@ function summarizeStoreProducts(products: PurchasesStoreProduct[]): string {
     .join(", ");
 }
 
-async function ensureConfigured(reportStep?: PurchaseStepReporter): Promise<typeof Purchases | null> {
+async function ensureConfigured(reportStep?: PurchaseStepReporter): Promise<PurchasesPlugin | null> {
   reportStep?.(`Platform: ${Capacitor.getPlatform()}`);
   reportStep?.(`Is native: ${Capacitor.isNativePlatform()}`);
   reportStep?.(`RC key: ${getRevenueCatApiKeyDebug()}`);
@@ -183,34 +182,8 @@ async function ensureConfigured(reportStep?: PurchaseStepReporter): Promise<type
     reportStep?.("RevenueCat already configured.");
     return purchasesPlugin;
   }
-  if (!purchasesPluginPromise) {
-    reportStep?.("Importing RevenueCat plugin...");
-    purchasesPluginPromise = import("@revenuecat/purchases-capacitor")
-      .then((module) => {
-        const plugin = module.Purchases as unknown as PurchasesPlugin;
-        return plugin;
-      })
-      .catch((error) => {
-        console.log("RevenueCat plugin could not be loaded.", { error });
-        return null;
-      });
-  }
-  let Purchases: PurchasesPlugin | null;
-  try {
-    Purchases = await withNativeTimeout(
-      purchasesPluginPromise,
-      NATIVE_IMPORT_TIMEOUT_MS,
-      "RevenueCat plugin import",
-    );
-  } catch (error) {
-    purchasesPluginPromise = null;
-    lastConfigurationReason =
-      describePurchaseError(error) || "RevenueCat plugin import timed out.";
-    reportStep?.(`RevenueCat plugin import ERROR: ${lastConfigurationReason}`);
-    return null;
-  }
-  if (!Purchases) return null;
-  reportStep?.("RevenueCat plugin imported.");
+  const Purchases = RevenueCatPurchases as unknown as PurchasesPlugin;
+  reportStep?.("RevenueCat plugin loaded.");
 
   const apiKey = getRevenueCatApiKey();
   if (!apiKey) {

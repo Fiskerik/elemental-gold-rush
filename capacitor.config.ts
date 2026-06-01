@@ -1,6 +1,6 @@
 const config = {
   appId: "com.eaconsulting.atomicfusion",
-  appName: "Atomic Fusion",
+  appName: "Atomic Fusion Rush",
   webDir: "dist/client",
   bundledWebRuntime: false,
   server: {
