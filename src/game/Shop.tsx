@@ -89,7 +89,7 @@ const APP_STORE_COIN_PACKS = [
   PRODUCT_IDS.coins50,
   PRODUCT_IDS.coins100,
 ] as const;
-const SHOP_PURCHASE_GUARD_TIMEOUT_MS = 12_000;
+const SHOP_PURCHASE_GUARD_TIMEOUT_MS = 75_000;
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
   let timeoutId: number | undefined;

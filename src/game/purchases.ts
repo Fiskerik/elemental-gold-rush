@@ -31,8 +31,8 @@ type PurchasesPlugin = {
 const FALLBACK_REVENUECAT_IOS_API_KEY = "appl_wleIrbzZnDKaUaQgnbmYbTYVxfX";
 const DEFAULT_PRO_ENTITLEMENT = "atomic_fusion_lifetime";
 const DEFAULT_OFFERING_ID = "default";
-const NATIVE_SETUP_TIMEOUT_MS = 15_000;
-const NATIVE_PURCHASE_TIMEOUT_MS = 20_000;
+const NATIVE_SETUP_TIMEOUT_MS = 30_000;
+const NATIVE_PURCHASE_TIMEOUT_MS = 60_000;
 
 let configured = false;
 let purchasesPlugin: PurchasesPlugin | null = null;
@@ -54,6 +54,14 @@ export type PurchaseProductResult = {
 type PurchaseStepReporter = (message: string) => void;
 
 let lastPackageLookupReason = "";
+
+const EXPECTED_REVENUECAT_PRODUCT_IDS: ProductId[] = [
+  PRODUCT_IDS.proLabPack,
+  PRODUCT_IDS.coins5,
+  PRODUCT_IDS.coins20,
+  PRODUCT_IDS.coins50,
+  PRODUCT_IDS.coins100,
+];
 
 async function withNativeTimeout<T>(
   promise: Promise<T>,
@@ -388,10 +396,18 @@ export async function logRevenueCatOfferingsDiagnostic(onLine?: (line: string) =
     );
     const current = offerings.current ?? null;
     const packages = current?.availablePackages ?? [];
+    const packageProductIds = new Set(packages.map((pkg) => pkg.product.identifier));
     log("RevenueCat diagnostic current offering:", current?.identifier ?? null);
     log("RevenueCat diagnostic package count:", packages.length);
     for (const pkg of packages) {
       log(`RevenueCat diagnostic package: ${pkg.identifier} / ${pkg.product.identifier}`);
+    }
+    for (const expectedProductId of EXPECTED_REVENUECAT_PRODUCT_IDS) {
+      log(
+        packageProductIds.has(expectedProductId)
+          ? `RevenueCat diagnostic product OK: ${expectedProductId}`
+          : `RevenueCat diagnostic product MISSING: ${expectedProductId}`,
+      );
     }
     log("RevenueCat diagnostic all offerings:", Object.keys(offerings.all ?? {}));
   } catch (error) {
