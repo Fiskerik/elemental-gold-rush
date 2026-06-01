@@ -54,7 +54,7 @@ export const GAME_MODES: GameModeConfig[] = [
     kind: "challenge",
     description:
       "Face a five-eyed elemental horror. Match its open eyes, charge a Blank atom in the center, and bring it down in 100 shots.",
-    unlockedAtLevel: 1,
+    unlockedAtLevel: 22,
     rules: [
       "The boss has 20 health and only opens 1-2 eyes at a time",
       "Matching an open eye deals 1 damage, or 2 if your shot is shimmering",
@@ -68,11 +68,11 @@ export const GAME_MODES: GameModeConfig[] = [
     kind: "challenge",
     description:
       "An ancient table guardian cycles through elemental phases. Match the active group, survive its e-beam, and break the core in 50 shots.",
-    unlockedAtLevel: 1,
+    unlockedAtLevel: 42,
     rules: [
       "The weak spot cycles through Metals, Halogens, and Noble Gases every 3 seconds",
       "Land 20 correct group shots before you run out of 50 attempts",
-      "Wait 7 seconds and the guardian vaporizes your current queued atom with an e-beam",
+      "Wait 5 seconds and the guardian vaporizes your current queued atom with an E-beam",
     ],
   },
   {
@@ -82,10 +82,10 @@ export const GAME_MODES: GameModeConfig[] = [
     kind: "challenge",
     description:
       "A magnetic core bends every shot. Strip away its orbiting atoms, expose the hidden eye, and finish the core before it eats your queue.",
-    unlockedAtLevel: 1,
+    unlockedAtLevel: 66,
     rules: [
       "A black hole curves your shots and makes bounce angles matter",
-      "Every 5 seconds the core fires out an atom and destroys your queued shot if you wait",
+      "Every few seconds the core fires one of its remaining orbit atoms",
       "Merge all orbit atoms away, then hit the exposed eye 3 times to win",
     ],
   },
@@ -172,7 +172,7 @@ export function getModeLevelLabel(mode: GameModeConfig, level: Level): string {
   if (mode.id === "campaign") return `Level ${level.id}`;
   if (mode.id === "survival") return "Endless";
   if (mode.id === "elemental-boss" || mode.id === "periodic-guardian" || mode.id === "nucleus-core") {
-    return level.id >= 63 ? `Boss • Level ${level.id}` : "Boss Event";
+    return level.specialStage ? `Boss • Level ${level.id}` : "Boss Event";
   }
   return `Challenge • Level ${level.id}`;
 }

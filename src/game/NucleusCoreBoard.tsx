@@ -35,6 +35,7 @@ interface OrbitPose extends Point {
 }
 
 interface AttackAnim {
+  id: string;
   atom: number;
   startedAt: number;
   durationMs: number;
@@ -64,7 +65,7 @@ const CLEAR_SCORE = 20_000;
 const EYE_HEALTH = 3;
 const PROJECTILE_SPEED = 780;
 const QUEUE_SIZE = 4;
-const CORE_ATTACK_MS = 5_000;
+const CORE_ATTACK_MS = 4_200;
 const EYE_DODGE_INTERVAL_MIN_MS = 3_000;
 const EYE_DODGE_INTERVAL_MAX_MS = 5_000;
 const EYE_CLOSE_MS = 1_200;
@@ -270,6 +271,7 @@ export function NucleusCoreBoard({ levelId, onExit, onWin, onMap = onExit, mode 
     recordLevelRun,
     setChallengeBestScore,
     setLevelStars,
+    shootingStyle,
     unlockLevel,
   } = useProgress();
 
@@ -291,10 +293,10 @@ export function NucleusCoreBoard({ levelId, onExit, onWin, onMap = onExit, mode 
   const bossCenter = useMemo(() => {
     const exposed = coreAtoms.length === 0;
     return {
-      x: arenaSize.width * 0.5 + Math.sin(clock / 900) * arenaSize.width * 0.18,
+      x: arenaSize.width * 0.5 + Math.sin(clock / 1250) * arenaSize.width * 0.12,
       y:
-        arenaSize.height * (exposed ? 0.24 : 0.22) +
-        (exposed ? Math.cos(clock / 1100) * 18 : 0),
+        arenaSize.height * (exposed ? 0.34 : 0.32) +
+        (exposed ? Math.cos(clock / 1300) * 12 : 0),
     };
   }, [arenaSize.height, arenaSize.width, clock, coreAtoms.length]);
 
@@ -307,15 +309,16 @@ export function NucleusCoreBoard({ levelId, onExit, onWin, onMap = onExit, mode 
   );
 
   const orbitAtoms = useMemo<OrbitPose[]>(() => {
-    const orbitRadius = coreAtoms.length > 6 ? (isTabletLayout ? 76 : 62) : coreAtoms.length > 3 ? (isTabletLayout ? 62 : 50) : (isTabletLayout ? 52 : 42);
+    const orbitRadius = coreAtoms.length > 6 ? (isTabletLayout ? 116 : 86) : coreAtoms.length > 3 ? (isTabletLayout ? 94 : 72) : (isTabletLayout ? 74 : 58);
     return coreAtoms.map((item, index) => {
-      const angle = item.baseAngle + clock / 880 + index * 0.18;
+      const visibleIndex = Math.max(1, coreAtoms.length);
+      const angle = (Math.PI * 2 * index) / visibleIndex + clock / 620;
       return {
         id: item.id,
         atom: item.atom,
         x: bossCenter.x + Math.cos(angle) * orbitRadius,
         y: bossCenter.y + Math.sin(angle) * orbitRadius,
-        radius: isTabletLayout ? 24 : 20,
+        radius: isTabletLayout ? 23 : 18,
       };
     });
   }, [bossCenter.x, bossCenter.y, clock, coreAtoms, isTabletLayout]);
@@ -332,18 +335,9 @@ export function NucleusCoreBoard({ levelId, onExit, onWin, onMap = onExit, mode 
     };
   }, [bossCenter, clock, coreAtoms.length, isTabletLayout]);
 
-  const trajectory = useMemo(
-    () =>
-      simulateTrajectory({
-        start: launcher,
-        aim: aimPoint,
-        width: arenaSize.width,
-        height: arenaSize.height,
-        blackHole,
-        orbitAtoms,
-        eye: eyeState,
-      }),
-    [aimPoint, arenaSize.height, arenaSize.width, blackHole, eyeState, launcher, orbitAtoms],
+  const visibleOrbitAtoms = useMemo(
+    () => orbitAtoms.filter((atom) => atom.id !== attackAnim?.id),
+    [attackAnim?.id, orbitAtoms],
   );
 
   const finishRun = useCallback(
@@ -387,7 +381,7 @@ export function NucleusCoreBoard({ levelId, onExit, onWin, onMap = onExit, mode 
   }, [incrementLevelAttempt, level, mode]);
 
   useEffect(() => {
-    const tick = window.setInterval(() => setClock(Date.now()), 80);
+    const tick = window.setInterval(() => setClock(Date.now()), 50);
     return () => window.clearInterval(tick);
   }, []);
 
@@ -430,17 +424,18 @@ export function NucleusCoreBoard({ levelId, onExit, onWin, onMap = onExit, mode 
     if (clock - lastBossAttackRef.current < CORE_ATTACK_MS) return;
     lastBossAttackRef.current = clock;
     setBossFlash("beam");
+    const attackAtom = coreAtoms[Math.floor(Math.random() * coreAtoms.length)] ?? coreAtoms[0];
+    if (!attackAtom) return;
     setAttackAnim({
-      atom: coreAtoms[Math.floor(Math.random() * coreAtoms.length)]?.atom ?? 1,
+      id: attackAtom.id,
+      atom: attackAtom.atom,
       startedAt: clock,
-      durationMs: 760,
+      durationMs: 520,
     });
-    setShotsUsed((current) => current + 1);
-    consumeQueue(coreAtoms.map((item) => item.atom));
     vibrate(22);
     const timeoutId = window.setTimeout(() => setBossFlash(null), 240);
     return () => window.clearTimeout(timeoutId);
-  }, [attackAnim, clock, consumeQueue, coreAtoms, result]);
+  }, [attackAnim, clock, coreAtoms, result]);
 
   useEffect(() => {
     if (!attackAnim) return;
@@ -543,24 +538,16 @@ export function NucleusCoreBoard({ levelId, onExit, onWin, onMap = onExit, mode 
     return () => window.cancelAnimationFrame(rafId);
   }, [projectile, resolveProjectile]);
 
-  const handleArenaPointer = useCallback(
-    (clientX: number, clientY: number, fire: boolean) => {
-      const rect = arenaRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      const nextPoint = {
-        x: clamp(clientX - rect.left, 22, rect.width - 22),
-        y: clamp(clientY - rect.top, 40, rect.height - 40),
-      };
-      setAimPoint(nextPoint);
-      if (!fire || result || projectileRef.current || shotsUsed >= config.maxShots) return;
-
+  const fireShot = useCallback(
+    (nextPoint: Point) => {
+      if (result || projectileRef.current || shotsUsed >= config.maxShots) return;
       const simulation = simulateTrajectory({
         start: launcher,
         aim: nextPoint,
         width: arenaSize.width,
         height: arenaSize.height,
         blackHole,
-        orbitAtoms,
+        orbitAtoms: visibleOrbitAtoms,
         eye: eyeState,
       });
 
@@ -576,7 +563,21 @@ export function NucleusCoreBoard({ levelId, onExit, onWin, onMap = onExit, mode 
       playShootSound();
       trackShot(level?.id ?? config.levelId, currentShot, Math.atan2(nextPoint.y - launcher.y, nextPoint.x - launcher.x) * (180 / Math.PI), mode);
     },
-    [arenaSize.height, arenaSize.width, blackHole, config.levelId, config.maxShots, currentShot, eyeState, launcher, level?.id, mode, orbitAtoms, result, shotsUsed],
+    [arenaSize.height, arenaSize.width, blackHole, config.levelId, config.maxShots, currentShot, eyeState, launcher, level?.id, mode, result, shotsUsed, visibleOrbitAtoms],
+  );
+
+  const handleArenaPointer = useCallback(
+    (clientX: number, clientY: number, fire: boolean) => {
+      const rect = arenaRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const nextPoint = {
+        x: clamp(clientX - rect.left, 22, rect.width - 22),
+        y: clamp(clientY - rect.top, 40, rect.height - 40),
+      };
+      setAimPoint(nextPoint);
+      if (fire) fireShot(nextPoint);
+    },
+    [fireShot],
   );
 
   if (!level) return null;
@@ -586,10 +587,9 @@ export function NucleusCoreBoard({ levelId, onExit, onWin, onMap = onExit, mode 
   const attackAtomPosition = attackAnim
     ? (() => {
         const phase = clamp((clock - attackAnim.startedAt) / attackAnim.durationMs, 0, 1);
-        const mirrored = phase <= 0.5 ? phase * 2 : (1 - phase) * 2;
         return {
-          x: bossCenter.x + (launcher.x - bossCenter.x) * mirrored,
-          y: bossCenter.y + (launcher.y - bossCenter.y) * mirrored,
+          x: bossCenter.x + (launcher.x - bossCenter.x) * phase,
+          y: bossCenter.y + (launcher.y - bossCenter.y) * phase,
         };
       })()
     : null;
@@ -638,7 +638,13 @@ export function NucleusCoreBoard({ levelId, onExit, onWin, onMap = onExit, mode 
         <div
           ref={arenaRef}
           onPointerMove={(event) => handleArenaPointer(event.clientX, event.clientY, false)}
-          onPointerDown={(event) => handleArenaPointer(event.clientX, event.clientY, true)}
+          onPointerDown={(event) => {
+            (event.target as Element).setPointerCapture?.(event.pointerId);
+            handleArenaPointer(event.clientX, event.clientY, false);
+          }}
+          onPointerUp={(event) => {
+            handleArenaPointer(event.clientX, event.clientY, shootingStyle === "hold");
+          }}
           style={{
             position: "relative",
             minHeight: isTabletLayout ? 650 : 560,
@@ -718,18 +724,25 @@ export function NucleusCoreBoard({ levelId, onExit, onWin, onMap = onExit, mode 
 
           <div
             aria-hidden="true"
+            className="nucleus-black-hole"
             style={{
               position: "absolute",
-              left: blackHole.x - (isTabletLayout ? 44 : 36),
-              top: blackHole.y - (isTabletLayout ? 44 : 36),
-              width: isTabletLayout ? 88 : 72,
-              height: isTabletLayout ? 88 : 72,
+              left: blackHole.x - (isTabletLayout ? 52 : 43),
+              top: blackHole.y - (isTabletLayout ? 52 : 43),
+              width: isTabletLayout ? 104 : 86,
+              height: isTabletLayout ? 104 : 86,
               borderRadius: "50%",
-              background: "radial-gradient(circle at 45% 40%, rgba(38,48,94,0.6), rgba(5,8,20,1) 58%, rgba(0,0,0,1) 100%)",
-              boxShadow: "0 0 32px rgba(113,130,255,0.25), inset 0 0 18px rgba(255,255,255,0.1)",
+              background: "radial-gradient(circle at 45% 40%, rgba(72,86,165,0.78), rgba(7,10,27,1) 52%, rgba(0,0,0,1) 76%)",
+              boxShadow: "0 0 42px rgba(113,130,255,0.38), 0 0 18px rgba(255,173,72,0.12), inset 0 0 22px rgba(255,255,255,0.16)",
               zIndex: 1,
             }}
-          />
+          >
+            <span className="nucleus-suction-ring nucleus-suction-ring-a" />
+            <span className="nucleus-suction-ring nucleus-suction-ring-b" />
+            <span className="nucleus-suction-stream nucleus-suction-stream-a" />
+            <span className="nucleus-suction-stream nucleus-suction-stream-b" />
+            <span className="nucleus-suction-stream nucleus-suction-stream-c" />
+          </div>
 
           <div
             aria-hidden="true"
@@ -752,7 +765,7 @@ export function NucleusCoreBoard({ levelId, onExit, onWin, onMap = onExit, mode 
             }}
           />
 
-          {orbitAtoms.map((atom) => (
+          {visibleOrbitAtoms.map((atom) => (
             <div
               key={atom.id}
               style={{
@@ -820,32 +833,6 @@ export function NucleusCoreBoard({ levelId, onExit, onWin, onMap = onExit, mode 
             </div>
           )}
 
-          {!projectile && !result && (
-            <svg
-              viewBox={`0 0 ${arenaSize.width} ${arenaSize.height}`}
-              preserveAspectRatio="none"
-              style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 2 }}
-            >
-              <defs>
-                <linearGradient id="nucleusAimLine" x1="0%" y1="100%" x2="0%" y2="0%">
-                  <stop offset="0%" stopColor="rgba(105, 230, 255, 0)" />
-                  <stop offset="45%" stopColor="rgba(105, 230, 255, 0.58)" />
-                  <stop offset="100%" stopColor="rgba(255, 236, 140, 0.92)" />
-                </linearGradient>
-              </defs>
-              <polyline
-                points={trajectory.path.map((point) => `${point.x},${point.y}`).join(" ")}
-                fill="none"
-                stroke="url(#nucleusAimLine)"
-                strokeWidth={4}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeDasharray="12 9"
-                opacity={0.95}
-              />
-            </svg>
-          )}
-
           {attackAnim && (
             <>
               <svg
@@ -855,18 +842,18 @@ export function NucleusCoreBoard({ levelId, onExit, onWin, onMap = onExit, mode 
               >
                 <defs>
                   <linearGradient id="nucleusBeam" x1="50%" y1="0%" x2="50%" y2="100%">
-                    <stop offset="0%" stopColor="rgba(165,235,255,0.98)" />
-                    <stop offset="60%" stopColor="rgba(117,178,255,0.82)" />
-                    <stop offset="100%" stopColor="rgba(117,178,255,0.06)" />
+                    <stop offset="0%" stopColor="rgba(255,236,170,0.98)" />
+                    <stop offset="55%" stopColor="rgba(255,140,54,0.92)" />
+                    <stop offset="100%" stopColor="rgba(255,91,28,0.04)" />
                   </linearGradient>
                 </defs>
                 <line
                   x1={bossCenter.x}
                   y1={bossCenter.y}
-                  x2={launcher.x}
-                  y2={launcher.y}
+                  x2={attackAtomPosition?.x ?? launcher.x}
+                  y2={attackAtomPosition?.y ?? launcher.y}
                   stroke="url(#nucleusBeam)"
-                  strokeWidth={7}
+                  strokeWidth={8}
                   strokeLinecap="round"
                 />
               </svg>
@@ -901,6 +888,24 @@ export function NucleusCoreBoard({ levelId, onExit, onWin, onMap = onExit, mode 
           )}
 
           <div
+            role={shootingStyle === "press" ? "button" : undefined}
+            tabIndex={shootingStyle === "press" ? 0 : undefined}
+            aria-label={shootingStyle === "press" ? "Shoot queued atom" : undefined}
+            onPointerDown={(event) => {
+              if (shootingStyle !== "press") return;
+              event.stopPropagation();
+            }}
+            onPointerUp={(event) => {
+              if (shootingStyle !== "press") return;
+              event.stopPropagation();
+              fireShot(aimPoint);
+            }}
+            onKeyDown={(event) => {
+              if (shootingStyle !== "press") return;
+              if (event.key !== "Enter" && event.key !== " ") return;
+              event.preventDefault();
+              fireShot(aimPoint);
+            }}
             style={{
               position: "absolute",
               left: launcher.x - (isTabletLayout ? 34 : 30),
@@ -914,6 +919,7 @@ export function NucleusCoreBoard({ levelId, onExit, onWin, onMap = onExit, mode 
               placeItems: "center",
               boxShadow: "0 0 18px rgba(0,0,0,0.35)",
               zIndex: 3,
+              cursor: shootingStyle === "press" ? "pointer" : undefined,
             }}
           >
             <ElementBall atomicNumber={currentShot} size={isTabletLayout ? 48 : 42} glow />

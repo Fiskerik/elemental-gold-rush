@@ -273,7 +273,6 @@ export function PeriodicGuardianBoard({ levelId, onExit, onWin, onMap = onExit, 
   );
 
   const activeGroup = GROUP_ORDER[Math.floor((clock - clockStartRef.current) / PHASE_MS) % GROUP_ORDER.length] ?? "metals";
-  const activeGroupConfig = GROUP_CONFIG[activeGroup];
   const attemptsLeft = Math.max(0, config.maxShots - attemptsUsed);
   const healthPct = clamp(bossHealth / SUCCESS_TARGET, 0, 1);
   const idleRemainingMs = Math.max(0, IDLE_BEAM_MS - (clock - lastPlayerActionRef.current));
@@ -284,9 +283,9 @@ export function PeriodicGuardianBoard({ levelId, onExit, onWin, onMap = onExit, 
     const width = arenaSize.width;
     const height = arenaSize.height;
     return [
-      { group: "metals", x: width * 0.31, y: height * 0.25, radius: isTabletLayout ? 48 : 40 },
-      { group: "halogens", x: width * 0.5, y: height * 0.2, radius: isTabletLayout ? 54 : 44 },
-      { group: "noble-gases", x: width * 0.69, y: height * 0.25, radius: isTabletLayout ? 48 : 40 },
+      { group: "metals", x: width * 0.31, y: height * 0.37, radius: isTabletLayout ? 48 : 38 },
+      { group: "halogens", x: width * 0.5, y: height * 0.32, radius: isTabletLayout ? 54 : 42 },
+      { group: "noble-gases", x: width * 0.69, y: height * 0.37, radius: isTabletLayout ? 48 : 38 },
     ];
   }, [arenaSize.height, arenaSize.width, isTabletLayout]);
 
@@ -669,7 +668,7 @@ export function PeriodicGuardianBoard({ levelId, onExit, onWin, onMap = onExit, 
             style={{
               position: "absolute",
               left: "50%",
-              top: "16%",
+              top: "29%",
               width: isTabletLayout ? 360 : 270,
               height: isTabletLayout ? 240 : 188,
               transform: "translateX(-50%)",
@@ -691,7 +690,7 @@ export function PeriodicGuardianBoard({ levelId, onExit, onWin, onMap = onExit, 
             style={{
               position: "absolute",
               left: "50%",
-              top: "19%",
+              top: "32%",
               width: isTabletLayout ? 286 : 220,
               height: isTabletLayout ? 34 : 28,
               transform: "translateX(-50%)",
@@ -707,7 +706,7 @@ export function PeriodicGuardianBoard({ levelId, onExit, onWin, onMap = onExit, 
             style={{
               position: "absolute",
               left: "50%",
-              top: "35%",
+              top: "48%",
               width: isTabletLayout ? 180 : 136,
               height: isTabletLayout ? 46 : 34,
               transform: "translateX(-50%)",
@@ -735,7 +734,7 @@ export function PeriodicGuardianBoard({ levelId, onExit, onWin, onMap = onExit, 
             style={{
               position: "absolute",
               left: "50%",
-              top: "26%",
+              top: "39%",
               width: isTabletLayout ? 92 : 74,
               height: isTabletLayout ? 92 : 74,
               transform: "translateX(-50%)",
@@ -825,24 +824,6 @@ export function PeriodicGuardianBoard({ levelId, onExit, onWin, onMap = onExit, 
                     {group.marker}
                   </div>
                 )}
-                <div
-                  style={{
-                    position: "absolute",
-                    bottom: -20,
-                    padding: "2px 7px",
-                    borderRadius: 999,
-                    background: "rgba(10,14,34,0.8)",
-                    border: "1px solid rgba(255,255,255,0.08)",
-                    fontSize: 10,
-                    color: active ? group.tint : "var(--muted-foreground)",
-                    fontWeight: 900,
-                    letterSpacing: 1.2,
-                    textTransform: "uppercase",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {group.label}
-                </div>
               </div>
             );
           })}
@@ -892,28 +873,61 @@ export function PeriodicGuardianBoard({ levelId, onExit, onWin, onMap = onExit, 
           )}
 
           {beamAnim && (
-            <svg
-              viewBox={`0 0 ${arenaSize.width} ${arenaSize.height}`}
-              preserveAspectRatio="none"
-              style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 4 }}
-            >
-              <defs>
-                <linearGradient id="guardianBeam" x1="50%" y1="0%" x2="50%" y2="100%">
-                  <stop offset="0%" stopColor="rgba(165,235,255,0.98)" />
-                  <stop offset="60%" stopColor="rgba(117,178,255,0.82)" />
-                  <stop offset="100%" stopColor="rgba(117,178,255,0.06)" />
-                </linearGradient>
-              </defs>
-              <line
-                x1={arenaSize.width * 0.5}
-                y1={arenaSize.height * 0.28}
-                x2={launcher.x}
-                y2={launcher.y}
-                stroke="url(#guardianBeam)"
-                strokeWidth={7}
-                strokeLinecap="round"
-              />
-            </svg>
+            <>
+              <svg
+                viewBox={`0 0 ${arenaSize.width} ${arenaSize.height}`}
+                preserveAspectRatio="none"
+                className="guardian-e-beam"
+                style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 4 }}
+              >
+                <defs>
+                  <linearGradient id="guardianBeam" x1="50%" y1="0%" x2="50%" y2="100%">
+                    <stop offset="0%" stopColor="rgba(255,255,255,0.98)" />
+                    <stop offset="35%" stopColor="rgba(255,230,130,0.98)" />
+                    <stop offset="100%" stopColor="rgba(255,140,42,0.04)" />
+                  </linearGradient>
+                </defs>
+                <line
+                  x1={arenaSize.width * 0.5}
+                  y1={arenaSize.height * 0.39 + (isTabletLayout ? 46 : 37)}
+                  x2={launcher.x}
+                  y2={launcher.y}
+                  stroke="rgba(255,198,78,0.24)"
+                  strokeWidth={30}
+                  strokeLinecap="round"
+                />
+                <line
+                  x1={arenaSize.width * 0.5}
+                  y1={arenaSize.height * 0.39 + (isTabletLayout ? 46 : 37)}
+                  x2={launcher.x}
+                  y2={launcher.y}
+                  stroke="url(#guardianBeam)"
+                  strokeWidth={12}
+                  strokeLinecap="round"
+                />
+                <line
+                  x1={arenaSize.width * 0.5}
+                  y1={arenaSize.height * 0.39 + (isTabletLayout ? 46 : 37)}
+                  x2={launcher.x}
+                  y2={launcher.y}
+                  stroke="white"
+                  strokeWidth={4}
+                  strokeLinecap="round"
+                />
+              </svg>
+              <div
+                className="guardian-vaporized-atom"
+                style={{
+                  position: "absolute",
+                  left: launcher.x - 22,
+                  top: launcher.y - 22,
+                  pointerEvents: "none",
+                  zIndex: 5,
+                }}
+              >
+                <GroupBall atom={queueCurrent.atom} group={queueCurrent.group} size={44} />
+              </div>
+            </>
           )}
 
           {projectile && (
@@ -1087,7 +1101,7 @@ function PeriodicBackdrop({ activeGroup, isTabletLayout }: { activeGroup: Guardi
           backgroundSize: isTabletLayout ? "38px 38px" : "30px 30px",
         }}
       />
-      <div style={{ position: "absolute", top: "17%", left: "10%", right: "10%", display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 18 }}>
+      <div style={{ position: "absolute", top: "30%", left: "10%", right: "10%", display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 18 }}>
         {GROUP_ORDER.map((group) => {
           const info = GROUP_CONFIG[group];
           const active = group === activeGroup;

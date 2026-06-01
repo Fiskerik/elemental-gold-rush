@@ -1,6 +1,7 @@
 import { Atom, Clock, Eye, FlaskConical, LockKeyhole, Map, Orbit, RotateCcw, Shield, Sparkles, type LucideIcon } from "lucide-react";
 import { MAX_LEVEL } from "./levels";
 import { GAME_MODES, GameModeId, getUnlockedGameModes } from "./challenges";
+import { BOSSES, type BossId } from "./bosses";
 import { useProgress } from "./store";
 import { useIsTabletLayout } from "./responsive";
 
@@ -12,8 +13,14 @@ interface Props {
 export function LabModes({ onBack, onStart }: Props) {
   const isTabletLayout = useIsTabletLayout();
   const unlockedLevel = useProgress((s) => s.unlockedLevel);
+  const levelStats = useProgress((s) => s.levelStats);
   const unlockedModes = new Set(getUnlockedGameModes(unlockedLevel).map((mode) => mode.id));
   const levelId = Math.min(unlockedLevel, MAX_LEVEL);
+  const defeatedBosses = new Set(
+    (["elemental-boss", "periodic-guardian", "nucleus-core"] as BossId[]).filter(
+      (id) => (levelStats[BOSSES[id].levelId]?.bestShots ?? null) != null,
+    ),
+  );
 
   return (
     <div className="app-shell" style={{ padding: isTabletLayout ? 28 : 20, paddingTop: isTabletLayout ? 36 : 32, minHeight: "100dvh" }}>
@@ -34,7 +41,8 @@ export function LabModes({ onBack, onStart }: Props) {
         </header>
         <div style={{ display: "grid", gridTemplateColumns: isTabletLayout ? "1fr 1fr" : "1fr", gap: isTabletLayout ? 16 : 12 }}>
           {GAME_MODES.map((mode) => {
-            const locked = !unlockedModes.has(mode.id);
+            const bossId = isBossMode(mode.id) ? mode.id : null;
+            const locked = bossId ? !defeatedBosses.has(bossId) : !unlockedModes.has(mode.id);
             return (
               <article key={mode.id} style={{ ...card, opacity: locked ? 0.55 : 1 }}>
                 <div style={iconWrap}>
@@ -44,7 +52,7 @@ export function LabModes({ onBack, onStart }: Props) {
                   <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
                     <h2 style={{ margin: 0, fontSize: 16 }}>{mode.name}</h2>
                     <span style={{ color: "var(--accent)", fontSize: 11, fontWeight: 800 }}>
-                      {locked ? `Unlocks Lv ${mode.unlockedAtLevel}` : mode.kind.toUpperCase()}
+                      {locked ? `Defeat Lv ${mode.unlockedAtLevel - 1}` : bossId ? "BOSS BATTLE" : mode.kind.toUpperCase()}
                     </span>
                   </div>
                   <p
@@ -74,18 +82,12 @@ export function LabModes({ onBack, onStart }: Props) {
                     onClick={() =>
                       onStart(
                         mode.id,
-                        mode.id === "elemental-boss"
-                          ? 63
-                          : mode.id === "periodic-guardian"
-                            ? 64
-                            : mode.id === "nucleus-core"
-                              ? 65
-                              : levelId,
+                        bossId ? BOSSES[bossId].levelId : levelId,
                       )
                     }
                     style={startBtn}
                   >
-                    {locked ? "Locked" : mode.id === "campaign" ? "Play Campaign" : "Start Mode"}
+                    {locked ? "Locked" : mode.id === "campaign" ? "Play Campaign" : bossId ? "Boss Battle" : "Start Mode"}
                   </button>
                 </div>
               </article>
@@ -95,6 +97,10 @@ export function LabModes({ onBack, onStart }: Props) {
       </div>
     </div>
   );
+}
+
+function isBossMode(id: GameModeId): id is BossId {
+  return id === "elemental-boss" || id === "periodic-guardian" || id === "nucleus-core";
 }
 
 const CHALLENGE_ICONS: Record<string, LucideIcon> = {

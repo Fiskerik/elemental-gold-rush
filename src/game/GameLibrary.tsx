@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Atom, Clock, FlaskConical, LockKeyhole, Map, RotateCcw, Shield, type LucideIcon } from "lucide-react";
+import { Atom, Clock, Eye, FlaskConical, LockKeyhole, Map, Orbit, RotateCcw, Shield, Sparkles, type LucideIcon } from "lucide-react";
 import { GAME_MODES } from "./challenges";
+import { BOSSES, type BossId } from "./bosses";
 import { PowerUpBadge } from "./PowerUpLibrary";
 import { POWER_UPS } from "./powerUps";
 import { useProgress } from "./store";
@@ -13,7 +14,8 @@ interface Props {
 export function GameLibrary({ onBack }: Props) {
   const isTabletLayout = useIsTabletLayout();
   const unlockedLevel = useProgress((s) => s.unlockedLevel);
-  const [tab, setTab] = useState<"challenges" | "powerups">("powerups");
+  const levelStats = useProgress((s) => s.levelStats);
+  const [tab, setTab] = useState<"challenges" | "powerups" | "bosses">("powerups");
   const powerUpsByOccurrence = [...POWER_UPS].sort(
     (a, b) => POWER_UP_OCCURRENCE[a.icon] - POWER_UP_OCCURRENCE[b.icon],
   );
@@ -48,6 +50,12 @@ export function GameLibrary({ onBack }: Props) {
             style={{ ...tabBtn, ...(tab === "challenges" ? tabBtnActive : {}) }}
           >
             Challenges
+          </button>
+          <button
+            onClick={() => setTab("bosses")}
+            style={{ ...tabBtn, ...(tab === "bosses" ? tabBtnActive : {}) }}
+          >
+            Bosses
           </button>
         </div>
 
@@ -104,13 +112,68 @@ export function GameLibrary({ onBack }: Props) {
             </div>
           </section>
         )}
+
+        {tab === "bosses" && (
+          <section style={sectionCard}>
+            <div style={{ display: "grid", gridTemplateColumns: isTabletLayout ? "1fr 1fr" : "1fr", gap: isTabletLayout ? 16 : 12 }}>
+              {BOSS_LIBRARY.map((boss) => {
+                const config = BOSSES[boss.id];
+                const defeated = (levelStats[config.levelId]?.bestShots ?? null) != null;
+                return (
+                  <article key={boss.id} style={{ ...rowCard, opacity: defeated ? 1 : 0.56 }}>
+                    <div style={iconWrap}>
+                      <BossIcon id={boss.id} />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
+                        <h2 style={{ margin: 0, fontSize: 16 }}>{defeated ? config.name : "Unknown Boss"}</h2>
+                        <span style={{ color: "var(--accent)", fontSize: 11, fontWeight: 900 }}>
+                          {defeated ? `LEVEL ${config.levelId}` : `LOCKED LV ${config.levelId}`}
+                        </span>
+                      </div>
+                      <p style={description}>{defeated ? boss.lore : "Defeat this boss in Campaign to archive its field notes."}</p>
+                      {defeated && (
+                        <ul style={rulesList}>
+                          {boss.mechanics.map((rule) => (
+                            <li key={rule}>{rule}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+        )}
       </div>
     </div>
   );
 }
 
+const BOSS_LIBRARY: Array<{ id: BossId; lore: string; mechanics: string[] }> = [
+  {
+    id: "elemental-boss",
+    lore: "The first lab guardian is a stitched-together watcher grown from low-period atoms. It opens only a few eyes at once, forcing clean recognition instead of brute force.",
+    mechanics: ["Match the open eye element to deal damage", "Shimmer shots hit harder", "Charge the center eye to earn Blank atoms"],
+  },
+  {
+    id: "periodic-guardian",
+    lore: "The archive built this sentinel to test whether you understand families, not just symbols. Its core cycles through metals, halogens, and noble gases like a living table.",
+    mechanics: ["Only the active family can damage the core", "Closed weak spots briefly reject shots", "Idle too long and the E-beam vaporizes your queued atom"],
+  },
+  {
+    id: "nucleus-core",
+    lore: "A singularity-bound core that hides its eye behind orbiting atoms. It does not guard a table; it bends the arena until straight-line thinking falls apart.",
+    mechanics: ["The black hole bends live shots", "Removed orbit atoms no longer fire back", "Clear the orbit, then hit the exposed eye three times"],
+  },
+];
+
 const CHALLENGE_ICONS: Record<string, LucideIcon> = {
   campaign: Map,
+  "elemental-boss": Eye,
+  "periodic-guardian": Sparkles,
+  "nucleus-core": Orbit,
   survival: Shield,
   "unstable-isotopes": Atom,
   "gravity-surge": RotateCcw,
@@ -119,6 +182,11 @@ const CHALLENGE_ICONS: Record<string, LucideIcon> = {
   "gold-rush-timer": Clock,
   "isotope-decay": Atom,
 };
+
+function BossIcon({ id }: { id: BossId }) {
+  const Icon = id === "periodic-guardian" ? Sparkles : id === "nucleus-core" ? Orbit : Eye;
+  return <Icon size={30} color="var(--accent)" strokeWidth={2.7} />;
+}
 
 const POWER_UP_OCCURRENCE: Record<string, number> = {
   molecule: 1,

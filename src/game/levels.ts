@@ -340,7 +340,12 @@ export const MOLECULE_CHALLENGE_BY_LEVEL: Record<number, string> = {
   50: "aluminum-oxide",
   55: "calcium-sulfate",
   60: "urea",
+  70: "sodium-chloride",
+  75: "magnesium-oxide",
+  80: "iron-oxide",
 };
+
+const SPECIAL_LEVEL_IDS = new Set([21, 41, 65]);
 
 function makeAtomLevel(seed: LevelSeed, id: number, atomStage: number): Level {
   const target = seed.targetElement;
@@ -417,7 +422,6 @@ const EARLY_LEVELS: Level[] = [
   makePowerUpLevel(17, "stone", "Stone Impact", "Miss three opening shots, then place the loaded Stone.", 10, 10),
   makeAtomLevel({ ...LEVEL_SEEDS[7], targetElement: 13, name: "Aluminum Foil", description: "Reach Aluminum.", lore: "Aluminum is light, conductive, and protected by a thin oxide skin." }, 18, 9),
   makePowerUpLevel(19, "transmute", "Transmute Shot", "Transmute your queued atom, then merge it into the board.", 13, 13),
-  makeAtomLevel(LEVEL_SEEDS[9], 21, 10),
   makePowerUpLevel(22, "fusion-jump", "Fusion Jump", "Arm Fusion Jump and merge Chlorine into Potassium.", 19, 17),
   makeAtomLevel(LEVEL_SEEDS[11], 23, 11),
   makePowerUpLevel(24, "catalyst", "Catalyst Chain", "Activate Catalyst and trigger a chain reaction.", 24, 6),
@@ -435,9 +439,9 @@ const EARLY_LEVEL_IDS = new Set(EARLY_LEVELS.map((level) => level.id));
 let nextPostTutorialLevelId = 36;
 const ATOM_LEVELS: Level[] = [
   ...EARLY_LEVELS,
-  ...LEVEL_SEEDS.slice(18).map((seed, index) => {
+  ...[LEVEL_SEEDS[9], ...LEVEL_SEEDS.slice(18)].map((seed, index) => {
     const atomStage = 16 + index;
-    while (nextPostTutorialLevelId % 5 === 0) nextPostTutorialLevelId += 1;
+    while (nextPostTutorialLevelId % 5 === 0 || SPECIAL_LEVEL_IDS.has(nextPostTutorialLevelId)) nextPostTutorialLevelId += 1;
     const id = nextPostTutorialLevelId;
     nextPostTutorialLevelId += 1;
     return makeAtomLevel(seed, id, atomStage);
@@ -472,7 +476,7 @@ const CHALLENGE_LEVELS: Level[] = Object.keys(MOLECULE_CHALLENGE_BY_LEVEL).map((
 
 const SPECIAL_LEVELS: Level[] = [
   {
-    id: 63,
+    id: 21,
     name: "Elemental Boss",
     description: "Match the open eyes, charge Blank atoms, and bring the creature down in 100 shots.",
     lore: "A warped elemental beholder crawls out of the lab ceiling. Its orbiting eye-stalks answer only to clean reactions and relentless pressure.",
@@ -493,7 +497,7 @@ const SPECIAL_LEVELS: Level[] = [
     specialStage: "elemental-boss",
   },
   {
-    id: 64,
+    id: 41,
     name: "The Periodic Guardian",
     description: "Read the guardian's active element group and strike the core 20 times before your 50 shots run dry.",
     lore: "A living monument of the periodic table rises from the archive. Its shell rotates through the great families, and only the right group can pierce its heart.",
@@ -516,7 +520,7 @@ const SPECIAL_LEVELS: Level[] = [
   {
     id: 65,
     name: "The Nucleus",
-    description: "Bank shots around a black hole, peel away the orbit atoms, and expose the eye before the core burns through your queue.",
+    description: "Bank shots around a black hole, peel away the orbit atoms, and expose the eye before the core overwhelms the field.",
     lore: "A magnetic singularity anchors a living nucleus in the upper chamber. Its orbiting atoms shred careless lines, and its hidden eye punishes hesitation.",
     targetElement: 10,
     maxQueueElement: 10,
