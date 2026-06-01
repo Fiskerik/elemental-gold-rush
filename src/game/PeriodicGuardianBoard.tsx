@@ -192,10 +192,6 @@ function makeInitialQueue(bagRef: MutableRefObject<GuardianGroup[]>): QueueAtom[
   return Array.from({ length: QUEUE_SIZE }, () => drawQueueAtom(bagRef));
 }
 
-function formatSeconds(ms: number): string {
-  return `${Math.ceil(ms / 1000)}s`;
-}
-
 function formatDurationShort(ms: number): string {
   const totalSeconds = Math.max(0, Math.round(ms / 1000));
   const minutes = Math.floor(totalSeconds / 60);
@@ -802,9 +798,6 @@ export function PeriodicGuardianBoard({ levelId, onExit, onWin, onMap = onExit, 
                         background: "linear-gradient(180deg, rgba(188,193,220,0.7), rgba(62,68,98,0.68))",
                       }}
                     />
-                    <span style={{ fontSize: 11, fontWeight: 800, color: "var(--muted-foreground)" }}>
-                      {formatSeconds(groupClosedMs[spot.group])}
-                    </span>
                   </div>
                 ) : (
                   <div

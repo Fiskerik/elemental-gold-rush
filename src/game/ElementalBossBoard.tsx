@@ -26,7 +26,6 @@ interface EyePose {
   y: number;
   radius: number;
   open: boolean;
-  closedMs: number;
 }
 
 interface ProjectileAnim {
@@ -149,10 +148,6 @@ function makeInitialQueue(eyeAtoms: Record<OuterEyeId, number>): { queue: number
   };
 }
 
-function formatSeconds(ms: number): string {
-  return `${Math.ceil(ms / 1000)}s`;
-}
-
 function formatDurationShort(ms: number): string {
   const totalSeconds = Math.max(0, Math.round(ms / 1000));
   const minutes = Math.floor(totalSeconds / 60);
@@ -252,15 +247,13 @@ export function ElementalBossBoard({ levelId, onExit, onWin, onMap = onExit, mod
       const y = (layout.yPct / 100) * arenaSize.height + Math.cos(phase * 1.15) * layout.swayY;
       const cooldownUntil = outerClosedUntilRef.current[layout.id as OuterEyeId] ?? 0;
       const blinkUntil = blinkClosedUntilRef.current[layout.id as OuterEyeId] ?? 0;
-      const closedUntil = Math.max(cooldownUntil, blinkUntil);
       return {
         id: layout.id as OuterEyeId,
         atom: eyeAtoms[layout.id as OuterEyeId],
         x,
         y,
         radius: layout.size * (isTabletLayout ? 0.62 : 0.58),
-        open: clock >= closedUntil,
-        closedMs: Math.max(0, closedUntil - clock),
+        open: clock >= Math.max(cooldownUntil, blinkUntil),
       };
     });
   }, [arenaSize.height, arenaSize.width, clock, config.outerEyes, eyeAtoms, isTabletLayout]);
@@ -268,13 +261,11 @@ export function ElementalBossBoard({ levelId, onExit, onWin, onMap = onExit, mod
   const centerEye = useMemo(() => {
     const x = (config.centerEye.xPct / 100) * arenaSize.width;
     const y = (config.centerEye.yPct / 100) * arenaSize.height;
-    const closedMs = Math.max(0, centerClosedUntilRef.current - clock);
     return {
       x,
       y,
       radius: config.centerEye.size * (isTabletLayout ? 0.36 : 0.34),
       open: clock >= centerClosedUntilRef.current,
-      closedMs,
     };
   }, [arenaSize.height, arenaSize.width, clock, config.centerEye, isTabletLayout]);
 
@@ -962,9 +953,6 @@ export function ElementalBossBoard({ levelId, onExit, onWin, onMap = onExit, mod
                         background: "linear-gradient(180deg, rgba(154,165,214,0.72), rgba(60,70,110,0.68))",
                       }}
                     />
-                    <span style={{ fontSize: 11, fontWeight: 800, color: "var(--muted-foreground)" }}>
-                      {formatSeconds(eye.closedMs)}
-                    </span>
                   </div>
                 )}
               </div>
@@ -1017,9 +1005,6 @@ export function ElementalBossBoard({ levelId, onExit, onWin, onMap = onExit, mod
                       background: "linear-gradient(180deg, rgba(188,193,220,0.7), rgba(62,68,98,0.68))",
                     }}
                   />
-                  <span style={{ fontSize: 11, fontWeight: 800, color: "var(--muted-foreground)" }}>
-                    {formatSeconds(centerEye.closedMs)}
-                  </span>
                 </div>
               )}
             </div>

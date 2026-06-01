@@ -340,9 +340,6 @@ export const MOLECULE_CHALLENGE_BY_LEVEL: Record<number, string> = {
   50: "aluminum-oxide",
   55: "calcium-sulfate",
   60: "urea",
-  70: "sodium-chloride",
-  75: "magnesium-oxide",
-  80: "iron-oxide",
 };
 
 const SPECIAL_LEVEL_IDS = new Set([21, 41, 65]);

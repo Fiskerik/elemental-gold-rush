@@ -50,6 +50,7 @@ interface ProjectileAnim {
   hit:
     | null
     | { type: "orbit"; id: string; atom: number }
+    | { type: "black-hole" }
     | { type: "eye" };
 }
 
@@ -70,7 +71,8 @@ const EYE_DODGE_INTERVAL_MIN_MS = 3_000;
 const EYE_DODGE_INTERVAL_MAX_MS = 5_000;
 const EYE_CLOSE_MS = 1_200;
 const BLACK_HOLE_STRENGTH = 62_000;
-const PROJECTILE_RADIUS = 14;
+const PROJECTILE_RADIUS = 18;
+const BLACK_HOLE_SWALLOW_RADIUS = 34;
 const MAX_TRAJECTORY_STEPS = 720;
 const DT = 1 / 60;
 
@@ -146,6 +148,15 @@ function distance(a: Point, b: Point): number {
   return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
+function distanceToSegment(point: Point, start: Point, end: Point): number {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq <= 0.0001) return distance(point, start);
+  const t = clamp(((point.x - start.x) * dx + (point.y - start.y) * dy) / lenSq, 0, 1);
+  return distance(point, { x: start.x + dx * t, y: start.y + dy * t });
+}
+
 function reflectIfNeeded(
   x: number,
   y: number,
@@ -204,6 +215,7 @@ function simulateTrajectory({
   const path: Point[] = [{ x, y }];
 
   for (let step = 0; step < MAX_TRAJECTORY_STEPS; step += 1) {
+    const previous = { x, y };
     const toHoleX = blackHole.x - x;
     const toHoleY = blackHole.y - y;
     const holeDist = Math.max(48, Math.hypot(toHoleX, toHoleY));
@@ -224,14 +236,19 @@ function simulateTrajectory({
       path.push({ x, y });
     }
 
+    if (distanceToSegment(blackHole, previous, { x, y }) <= BLACK_HOLE_SWALLOW_RADIUS) {
+      path.push({ x: blackHole.x, y: blackHole.y });
+      return { path, hit: { type: "black-hole" } };
+    }
+
     for (const orbitAtom of orbitAtoms) {
-      if (Math.hypot(x - orbitAtom.x, y - orbitAtom.y) <= orbitAtom.radius + PROJECTILE_RADIUS) {
+      if (distanceToSegment(orbitAtom, previous, { x, y }) <= orbitAtom.radius + PROJECTILE_RADIUS) {
         path.push({ x: orbitAtom.x, y: orbitAtom.y });
         return { path, hit: { type: "orbit", id: orbitAtom.id, atom: orbitAtom.atom } };
       }
     }
 
-    if (eye.exposed && eye.open && Math.hypot(x - eye.center.x, y - eye.center.y) <= eye.radius + PROJECTILE_RADIUS) {
+    if (eye.exposed && eye.open && distanceToSegment(eye.center, previous, { x, y }) <= eye.radius + PROJECTILE_RADIUS) {
       path.push({ x: eye.center.x, y: eye.center.y });
       return { path, hit: { type: "eye" } };
     }
@@ -286,17 +303,15 @@ export function NucleusCoreBoard({ levelId, onExit, onWin, onMap = onExit, mode 
   const shotsLeft = Math.max(0, config.maxShots - shotsUsed);
   const remainingHealth = coreAtoms.length + eyeHealth;
   const healthPct = clamp(remainingHealth / config.maxHealth, 0, 1);
-  const attackRemainingMs = Math.max(0, CORE_ATTACK_MS - (clock - lastBossAttackRef.current));
-  const attackPct = clamp(attackRemainingMs / CORE_ATTACK_MS, 0, 1);
   const currentShot = queue[0] ?? 1;
 
   const bossCenter = useMemo(() => {
     const exposed = coreAtoms.length === 0;
     return {
-      x: arenaSize.width * 0.5 + Math.sin(clock / 1250) * arenaSize.width * 0.12,
+      x: arenaSize.width * 0.5 + Math.sin(clock / 2500) * arenaSize.width * 0.12,
       y:
         arenaSize.height * (exposed ? 0.34 : 0.32) +
-        (exposed ? Math.cos(clock / 1300) * 12 : 0),
+        (exposed ? Math.cos(clock / 2600) * 12 : 0),
     };
   }, [arenaSize.height, arenaSize.width, clock, coreAtoms.length]);
 
@@ -312,7 +327,7 @@ export function NucleusCoreBoard({ levelId, onExit, onWin, onMap = onExit, mode 
     const orbitRadius = coreAtoms.length > 6 ? (isTabletLayout ? 116 : 86) : coreAtoms.length > 3 ? (isTabletLayout ? 94 : 72) : (isTabletLayout ? 74 : 58);
     return coreAtoms.map((item, index) => {
       const visibleIndex = Math.max(1, coreAtoms.length);
-      const angle = (Math.PI * 2 * index) / visibleIndex + clock / 620;
+      const angle = (Math.PI * 2 * index) / visibleIndex + clock / 1240;
       return {
         id: item.id,
         atom: item.atom,
@@ -331,7 +346,6 @@ export function NucleusCoreBoard({ levelId, onExit, onWin, onMap = onExit, mode 
       open,
       center: bossCenter,
       radius: isTabletLayout ? 28 : 24,
-      closedMs: Math.max(0, eyeClosedUntilRef.current - clock),
     };
   }, [bossCenter, clock, coreAtoms.length, isTabletLayout]);
 
@@ -343,7 +357,7 @@ export function NucleusCoreBoard({ levelId, onExit, onWin, onMap = onExit, mode 
   const finishRun = useCallback(
     (won: boolean, finalScore: number, finalShotsUsed: number) => {
       if (!level) return;
-      const stars = won ? (finalShotsUsed <= 30 ? 3 : finalShotsUsed <= 48 ? 2 : 1) : 0;
+      const stars = won ? (finalShotsUsed <= 18 ? 3 : finalShotsUsed <= 25 ? 2 : 1) : 0;
       if (won) {
         addScore(finalScore);
         setChallengeBestScore(mode, finalScore);
@@ -583,7 +597,6 @@ export function NucleusCoreBoard({ levelId, onExit, onWin, onMap = onExit, mode 
   if (!level) return null;
 
   const bestScore = Math.max(victorySummary?.finalScore ?? 0, challengeBestScores[mode] ?? 0);
-  const attackProgress = 1 - attackPct;
   const attackAtomPosition = attackAnim
     ? (() => {
         const phase = clamp((clock - attackAnim.startedAt) / attackAnim.durationMs, 0, 1);
@@ -692,7 +705,6 @@ export function NucleusCoreBoard({ levelId, onExit, onWin, onMap = onExit, mode 
               }}
             >
               <CompactBar label="Nucleus" value={`${remainingHealth}/${config.maxHealth}`} fillPercent={healthPct} fill="linear-gradient(90deg, var(--accent), #ff8b56)" shadow="0 0 16px var(--accent-glow)" />
-              <CompactBar label="Core beam" value={`${Math.ceil(attackRemainingMs / 1000)}s`} fillPercent={attackPct} fill="linear-gradient(90deg, rgba(128,228,255,0.95), rgba(97,141,255,0.95))" shadow="0 0 14px rgba(104,180,255,0.45)" />
             </div>
 
             <div
@@ -825,9 +837,6 @@ export function NucleusCoreBoard({ levelId, onExit, onWin, onMap = onExit, mode 
                       background: "linear-gradient(180deg, rgba(188,193,220,0.7), rgba(62,68,98,0.68))",
                     }}
                   />
-                  <span style={{ fontSize: 11, fontWeight: 800, color: "var(--muted-foreground)" }}>
-                    {Math.ceil(eyeState.closedMs / 1000)}s
-                  </span>
                 </div>
               )}
             </div>

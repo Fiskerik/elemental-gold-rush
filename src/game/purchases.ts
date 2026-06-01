@@ -28,7 +28,6 @@ type PurchasesPlugin = {
   restorePurchases: () => Promise<{ customerInfo: CustomerInfo }>;
 };
 
-const FALLBACK_REVENUECAT_IOS_API_KEY = "appl_wleIrbzZnDKaUaQgnbmYbTYVxfX";
 const DEFAULT_PRO_ENTITLEMENT = "atomic_fusion_lifetime";
 const DEFAULT_OFFERING_ID = "default";
 const NATIVE_SETUP_TIMEOUT_MS = 30_000;
@@ -54,14 +53,6 @@ export type PurchaseProductResult = {
 type PurchaseStepReporter = (message: string) => void;
 
 let lastPackageLookupReason = "";
-
-const EXPECTED_REVENUECAT_PRODUCT_IDS: ProductId[] = [
-  PRODUCT_IDS.proLabPack,
-  PRODUCT_IDS.coins5,
-  PRODUCT_IDS.coins20,
-  PRODUCT_IDS.coins50,
-  PRODUCT_IDS.coins100,
-];
 
 async function withNativeTimeout<T>(
   promise: Promise<T>,
@@ -97,24 +88,8 @@ function getRevenueCatApiKey(): string {
   return (
     configuredEnvValue(import.meta.env.VITE_REVENUECAT_IOS_API_KEY) ||
     configuredEnvValue(import.meta.env.VITE_REVENUECAT_API_KEY) ||
-    configuredEnvValue(import.meta.env.VITE_RC_IOS_API_KEY) ||
-    FALLBACK_REVENUECAT_IOS_API_KEY
+    configuredEnvValue(import.meta.env.VITE_RC_IOS_API_KEY)
   );
-}
-
-function maskApiKey(value: string): string {
-  if (!value) return "missing";
-  return `${value.slice(0, 10)}...${value.slice(-4)}`;
-}
-
-function getRevenueCatApiKeyDebug(): string {
-  const iosKey = configuredEnvValue(import.meta.env.VITE_REVENUECAT_IOS_API_KEY);
-  const genericKey = configuredEnvValue(import.meta.env.VITE_REVENUECAT_API_KEY);
-  const rcKey = configuredEnvValue(import.meta.env.VITE_RC_IOS_API_KEY);
-  if (iosKey) return `VITE_REVENUECAT_IOS_API_KEY=${maskApiKey(iosKey)}`;
-  if (genericKey) return `VITE_REVENUECAT_API_KEY=${maskApiKey(genericKey)}`;
-  if (rcKey) return `VITE_RC_IOS_API_KEY=${maskApiKey(rcKey)}`;
-  return `fallback=${maskApiKey(FALLBACK_REVENUECAT_IOS_API_KEY)}`;
 }
 
 function getEntitlementId(): string {
@@ -181,17 +156,9 @@ function summarizeStoreProducts(products: PurchasesStoreProduct[]): string {
 }
 
 async function ensureConfigured(reportStep?: PurchaseStepReporter): Promise<PurchasesPlugin | null> {
-  reportStep?.(`Platform: ${Capacitor.getPlatform()}`);
-  reportStep?.(`Is native: ${Capacitor.isNativePlatform()}`);
-  reportStep?.(`RC key: ${getRevenueCatApiKeyDebug()}`);
-  reportStep?.(`RC offering id: ${getOfferingId()}`);
   if (!isNativePlatform()) return null;
-  if (configured) {
-    reportStep?.("RevenueCat already configured.");
-    return purchasesPlugin;
-  }
+  if (configured) return purchasesPlugin;
   const Purchases = RevenueCatPurchases as unknown as PurchasesPlugin;
-  reportStep?.("RevenueCat plugin loaded.");
 
   const apiKey = getRevenueCatApiKey();
   if (!apiKey) {
@@ -221,7 +188,6 @@ async function ensureConfigured(reportStep?: PurchaseStepReporter): Promise<Purc
       NATIVE_SETUP_TIMEOUT_MS,
       "RevenueCat configuration",
     );
-    reportStep?.("RevenueCat configured OK.");
     configured = true;
     purchasesPlugin = Purchases;
     return Purchases;
@@ -369,52 +335,6 @@ export async function initPurchases(): Promise<boolean> {
     "RevenueCat customer info lookup",
   );
   return hasProEntitlement(customerInfo);
-}
-
-export async function logRevenueCatOfferingsDiagnostic(onLine?: (line: string) => void): Promise<void> {
-  const log = (line: string, data?: unknown) => {
-    console.log(line, data ?? "");
-    onLine?.(data == null ? line : `${line} ${JSON.stringify(data)}`);
-  };
-
-  const purchases = await ensureConfigured((message) => {
-    log(`RevenueCat diagnostic: ${message}`);
-  });
-  if (!purchases) {
-    log("RevenueCat diagnostic: not configured.", {
-      reason: lastConfigurationReason || "No native RevenueCat plugin available.",
-    });
-    return;
-  }
-
-  try {
-    log("RevenueCat diagnostic: Loading offerings...");
-    const offerings = await withNativeTimeout(
-      purchases.getOfferings(),
-      NATIVE_SETUP_TIMEOUT_MS,
-      "RevenueCat diagnostic offerings lookup",
-    );
-    const current = offerings.current ?? null;
-    const packages = current?.availablePackages ?? [];
-    const packageProductIds = new Set(packages.map((pkg) => pkg.product.identifier));
-    log("RevenueCat diagnostic current offering:", current?.identifier ?? null);
-    log("RevenueCat diagnostic package count:", packages.length);
-    for (const pkg of packages) {
-      log(`RevenueCat diagnostic package: ${pkg.identifier} / ${pkg.product.identifier}`);
-    }
-    for (const expectedProductId of EXPECTED_REVENUECAT_PRODUCT_IDS) {
-      log(
-        packageProductIds.has(expectedProductId)
-          ? `RevenueCat diagnostic product OK: ${expectedProductId}`
-          : `RevenueCat diagnostic product MISSING: ${expectedProductId}`,
-      );
-    }
-    log("RevenueCat diagnostic all offerings:", Object.keys(offerings.all ?? {}));
-  } catch (error) {
-    log("RevenueCat diagnostic offerings lookup failed.", {
-      error: describePurchaseError(error) || String(error),
-    });
-  }
 }
 
 export async function syncCustomerInfoEntitlement(): Promise<boolean> {

@@ -79,7 +79,7 @@ export const BOSSES: Record<BossId, BossConfig> = {
     name: "The Nucleus",
     shortLabel: "Magnetic Core",
     maxHealth: 13,
-    maxShots: 70,
+    maxShots: 30,
     centerChargeGoal: 0,
     openDurationMs: 5_000,
     maxEyeElement: 10,

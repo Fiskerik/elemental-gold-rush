@@ -93,21 +93,6 @@ const indexHtml = `<!doctype html>
     </script>
   </head>
   <body>
-    <script>
-      window.__CAPACITOR_DEBUG__ = true;
-      window.addEventListener("error", function (event) {
-        var message = event && event.message ? event.message : "Unknown runtime error";
-        var filename = event && event.filename ? event.filename : "";
-        var line = event && event.lineno ? event.lineno : "";
-        var col = event && event.colno ? event.colno : "";
-        var stack = event && event.error && event.error.stack ? String(event.error.stack) : "";
-        var details = message + "\\n" + filename + ":" + line + ":" + col + (stack ? "\\n\\n" + stack : "");
-        document.body.innerHTML =
-          '<pre style="white-space:pre-wrap;word-break:break-word;color:#ffb4b4;background:#12070a;padding:16px;margin:0;min-height:100dvh;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;">' +
-          details.replace(/</g, "&lt;").replace(/>/g, "&gt;") +
-          "</pre>";
-      });
-    </script>
     <div id="root"></div>
     <div id="boot-fallback">
       <div>

@@ -6,7 +6,6 @@ import { PowerUpBadge } from "./PowerUpLibrary";
 import { PRODUCT_IDS, getProductById, type ProductId } from "./products";
 import {
   presentCustomerCenter,
-  logRevenueCatOfferingsDiagnostic,
   purchaseGoldCoinPack,
   purchaseProductWithResult,
   restorePurchases,
@@ -118,21 +117,12 @@ export function Shop({ onBack }: { onBack: () => void }) {
   const [pendingProductId, setPendingProductId] = useState<ProductId | "rewarded" | null>(null);
   const [proPackMessage, setProPackMessage] = useState("");
   const [proPackBusy, setProPackBusy] = useState<"purchase" | "restore" | "manage" | "">("");
-  const [debugLog, setDebugLog] = useState<string[]>([]);
   const proPack = getProductById(PRODUCT_IDS.proLabPack);
 
   useEffect(() => {
     if (hasProPack) return;
     void initAds(false);
   }, [hasProPack]);
-
-  useEffect(() => {
-    const addDebugLine = (line: string) => {
-      setDebugLog((current) => [...current.slice(-30), line]);
-    };
-    addDebugLine("Checking RevenueCat offerings...");
-    void logRevenueCatOfferingsDiagnostic(addDebugLine);
-  }, []);
 
   function handlePowerUpPurchase(
     powerUp: InventoryPowerUpId,
@@ -570,16 +560,6 @@ export function Shop({ onBack }: { onBack: () => void }) {
           </div>
         </section>
       </div>
-      {debugLog.length > 0 && (
-        <div style={revenueCatDebugPanel}>
-          <div style={{ color: "#9cff9c", fontWeight: 900, marginBottom: 4 }}>
-            RevenueCat Debug
-          </div>
-          {debugLog.map((line, index) => (
-            <div key={`${line}-${index}`}>{line}</div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
@@ -717,22 +697,4 @@ const secondaryShopButton: React.CSSProperties = {
   border: "1px solid var(--border)",
   fontWeight: 800,
   cursor: "pointer",
-};
-
-const revenueCatDebugPanel: React.CSSProperties = {
-  position: "fixed",
-  left: 0,
-  right: 0,
-  bottom: 0,
-  zIndex: 9999,
-  maxHeight: 220,
-  overflow: "auto",
-  padding: "8px 10px calc(8px + env(safe-area-inset-bottom))",
-  background: "rgba(0,0,0,0.88)",
-  color: "#43ff64",
-  fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
-  fontSize: 11,
-  lineHeight: 1.35,
-  borderTop: "1px solid rgba(67,255,100,0.35)",
-  whiteSpace: "pre-wrap",
 };
