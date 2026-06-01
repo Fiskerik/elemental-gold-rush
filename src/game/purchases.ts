@@ -351,6 +351,43 @@ export async function initPurchases(): Promise<boolean> {
   return hasProEntitlement(customerInfo);
 }
 
+export async function logRevenueCatOfferingsDiagnostic(onLine?: (line: string) => void): Promise<void> {
+  const log = (line: string, data?: unknown) => {
+    console.log(line, data ?? "");
+    onLine?.(data == null ? line : `${line} ${JSON.stringify(data)}`);
+  };
+
+  const purchases = await ensureConfigured((message) => {
+    log(`RevenueCat diagnostic: ${message}`);
+  });
+  if (!purchases) {
+    log("RevenueCat diagnostic: not configured.", {
+      reason: lastConfigurationReason || "No native RevenueCat plugin available.",
+    });
+    return;
+  }
+
+  try {
+    const offerings = await withNativeTimeout(
+      purchases.getOfferings(),
+      NATIVE_SETUP_TIMEOUT_MS,
+      "RevenueCat diagnostic offerings lookup",
+    );
+    const current = offerings.current ?? null;
+    const packages = current?.availablePackages ?? [];
+    log("RevenueCat diagnostic current offering:", current?.identifier ?? null);
+    log("RevenueCat diagnostic package count:", packages.length);
+    for (const pkg of packages) {
+      log(`RevenueCat diagnostic package: ${pkg.identifier} / ${pkg.product.identifier}`);
+    }
+    log("RevenueCat diagnostic all offerings:", Object.keys(offerings.all ?? {}));
+  } catch (error) {
+    log("RevenueCat diagnostic offerings lookup failed.", {
+      error: describePurchaseError(error) || String(error),
+    });
+  }
+}
+
 export async function syncCustomerInfoEntitlement(): Promise<boolean> {
   const purchases = await ensureConfigured();
   if (!purchases) return false;
