@@ -1,4 +1,4 @@
-# App Store Submission Pack (iOS 1.0)
+# App Store Submission Pack (iOS 1.0.1)
 
 ## Metadata limits to follow
 - Promotional Text: max 170 characters
@@ -44,7 +44,7 @@ Privacy policy: https://atomic-fusion.lovable.app/privacy
 2026 EA Consulting
 
 ## Left-sidebar checklist before submit
-- iOS App Version 1.0
+- iOS App Version 1.0.1
   - Attach build
   - Upload required screenshot sets
   - Fill promo text, description, keywords, support URL, copyright
