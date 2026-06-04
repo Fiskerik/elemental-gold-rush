@@ -1,5 +1,6 @@
 import { Capacitor } from "@capacitor/core";
 import { Purchases as RevenueCatPurchases } from "@revenuecat/purchases-capacitor";
+import { logDebug } from "../lib/debugLogger";
 import { APP_STORE_PURCHASE_PRODUCT_IDS, PRODUCT_IDS, ProductId, getProductById } from "./products";
 
 type CustomerInfo = {
@@ -16,6 +17,7 @@ type PurchasesOffering = {
   lifetime?: PurchasesPackage | null;
 };
 type PurchasesPlugin = {
+  isConfigured?: () => Promise<{ isConfigured?: boolean } | boolean>;
   setLogLevel: (options: { level: string }) => Promise<void>;
   configure: (options: { apiKey: string }) => Promise<void>;
   getOfferings: () => Promise<{
@@ -70,6 +72,12 @@ export type PurchaseWarmupResult = {
   packageIdentifiers: string[];
   storeProductIdentifiers: string[];
   reason?: string;
+};
+
+export type PurchaseDebugSnapshot = PurchaseWarmupResult & {
+  platform: string;
+  isConfigured?: boolean;
+  activeEntitlements: string[];
 };
 
 type PurchaseStepReporter = (message: string) => void;
@@ -130,6 +138,34 @@ function shouldEnableRevenueCatDebugLogs(): boolean {
   return !import.meta.env.PROD || envFlagEnabled(import.meta.env.VITE_REVENUECAT_DEBUG_LOGS);
 }
 
+export function isPurchaseDebugUiEnabled(): boolean {
+  return envFlagEnabled(import.meta.env.VITE_PURCHASE_DEBUG_UI);
+}
+
+function purchaseDebugLog(message: string, details?: unknown): void {
+  if (!shouldEnableRevenueCatDebugLogs() && !isPurchaseDebugUiEnabled()) return;
+  logDebug(message, details);
+}
+
+function showPurchaseDebugAlert(title: string, details: string): void {
+  if (!isPurchaseDebugUiEnabled()) return;
+  window.alert(`${title}\n\n${details}`);
+}
+
+function stringifyForDebug(value: unknown): string {
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+}
+
+function summarizeErrorForDebug(error: unknown): string {
+  const message = describePurchaseError(error);
+  const raw = stringifyForDebug(error);
+  return message && raw && raw !== "{}" ? `${message}\n\n${raw}` : message || raw;
+}
+
 function hasProEntitlement(customerInfo: CustomerInfo): boolean {
   return Boolean(customerInfo.entitlements?.active?.[getEntitlementId()]);
 }
@@ -187,6 +223,18 @@ function summarizeStoreProducts(products: PurchasesStoreProduct[]): string {
     .join(", ");
 }
 
+async function checkSdkConfigured(purchases: PurchasesPlugin): Promise<boolean | undefined> {
+  if (!purchases.isConfigured) return configured;
+  try {
+    const result = await purchases.isConfigured();
+    if (typeof result === "boolean") return result;
+    if (typeof result?.isConfigured === "boolean") return result.isConfigured;
+  } catch (error) {
+    purchaseDebugLog("RevenueCat isConfigured check failed.", error);
+  }
+  return configured;
+}
+
 async function ensureConfigured(
   reportStep?: PurchaseStepReporter,
 ): Promise<PurchasesPlugin | null> {
@@ -224,7 +272,7 @@ async function ensureConfigured(
     );
     configured = true;
     purchasesPlugin = Purchases;
-    console.log("RevenueCat configured for native purchases.", {
+    purchaseDebugLog("RevenueCat configured for native purchases.", {
       platform: Capacitor.getPlatform(),
       offeringId: getOfferingId(),
       entitlementId: getEntitlementId(),
@@ -234,7 +282,10 @@ async function ensureConfigured(
   } catch (error) {
     lastConfigurationReason =
       describePurchaseError(error) || "RevenueCat could not be initialized in this build.";
-    console.log("RevenueCat configuration failed.", { error, reason: lastConfigurationReason });
+    purchaseDebugLog("RevenueCat configuration failed.", {
+      error,
+      reason: lastConfigurationReason,
+    });
     return null;
   }
 }
@@ -427,7 +478,7 @@ export async function warmUpPurchases(
     hasProPack = hasProEntitlement(customerInfo);
   } catch (error) {
     reason = describePurchaseError(error) || "Customer info warm-up failed.";
-    console.log("RevenueCat customer info warm-up failed.", { error, reason });
+    purchaseDebugLog("RevenueCat customer info warm-up failed.", { error, reason });
   }
 
   try {
@@ -449,7 +500,7 @@ export async function warmUpPurchases(
     }
   } catch (error) {
     reason = reason || describePurchaseError(error) || "RevenueCat offerings warm-up failed.";
-    console.log("RevenueCat offerings warm-up failed.", { error, reason });
+    purchaseDebugLog("RevenueCat offerings warm-up failed.", { error, reason });
   }
 
   try {
@@ -468,10 +519,10 @@ export async function warmUpPurchases(
     }
   } catch (error) {
     reason = reason || describePurchaseError(error) || "App Store products warm-up failed.";
-    console.log("App Store products warm-up failed.", { error, reason });
+    purchaseDebugLog("App Store products warm-up failed.", { error, reason });
   }
 
-  console.log("Native purchase warm-up complete.", {
+  purchaseDebugLog("Native purchase warm-up complete.", {
     configured: true,
     hasProPack,
     offeringId,
@@ -490,6 +541,44 @@ export async function warmUpPurchases(
     storeProductIdentifiers,
     reason: reason || undefined,
   };
+}
+
+export async function debugNativePurchases(
+  reportStep?: PurchaseStepReporter,
+): Promise<PurchaseDebugSnapshot> {
+  const warmup = await warmUpPurchases(reportStep);
+  const purchases = await ensureConfigured(reportStep);
+  const snapshot: PurchaseDebugSnapshot = {
+    ...warmup,
+    platform: Capacitor.getPlatform(),
+    isConfigured: Boolean(purchases),
+    activeEntitlements: [],
+  };
+
+  if (!purchases) {
+    purchaseDebugLog("RevenueCat debug snapshot.", snapshot);
+    return snapshot;
+  }
+
+  snapshot.isConfigured = await checkSdkConfigured(purchases);
+
+  try {
+    reportStep?.("Reading purchase entitlements...");
+    const { customerInfo } = await withNativeTimeout(
+      purchases.getCustomerInfo(),
+      NATIVE_SETUP_TIMEOUT_MS,
+      "RevenueCat customer info debug lookup",
+    );
+    snapshot.activeEntitlements = Object.keys(customerInfo.entitlements?.active ?? {});
+    snapshot.hasProPack = hasProEntitlement(customerInfo);
+  } catch (error) {
+    snapshot.reason =
+      snapshot.reason || describePurchaseError(error) || "Customer info debug lookup failed.";
+    purchaseDebugLog("RevenueCat customer info debug lookup failed.", error);
+  }
+
+  purchaseDebugLog("RevenueCat debug snapshot.", snapshot);
+  return snapshot;
 }
 
 export async function syncCustomerInfoEntitlement(): Promise<boolean> {
@@ -566,11 +655,17 @@ export async function purchaseProductWithResult(
   productId: ProductId,
   reportStep?: PurchaseStepReporter,
 ): Promise<PurchaseProductResult> {
+  purchaseDebugLog("Starting product purchase.", { productId });
   const product = getProductById(productId);
   if (!product || product.type !== "non_consumable") {
+    showPurchaseDebugAlert("Purchase setup error", "Invalid App Store product configuration.");
     return { purchased: false, reason: "Invalid App Store product configuration." };
   }
   if (!isNativePlatform()) {
+    showPurchaseDebugAlert(
+      "Purchase unavailable",
+      "App Store purchases are only available in the iOS app.",
+    );
     return {
       purchased: false,
       reason: "App Store purchases are only available in the iPhone app.",
@@ -586,6 +681,7 @@ export async function purchaseProductWithResult(
       productId,
       reason,
     });
+    showPurchaseDebugAlert("RevenueCat not configured", reason);
     return { purchased: false, reason };
   }
 
@@ -593,6 +689,15 @@ export async function purchaseProductWithResult(
     findStoreProduct(productId, reportStep),
     findPackage(productId, reportStep),
   ]);
+  purchaseDebugLog("Resolved purchase routes.", {
+    productId,
+    storeProduct: storeProduct?.identifier ?? null,
+    revenueCatPackage: packageToPurchase
+      ? `${packageToPurchase.identifier} / ${packageToPurchase.product.identifier}`
+      : null,
+    lastStoreProductLookupReason,
+    lastPackageLookupReason,
+  });
 
   if (!storeProduct && !packageToPurchase) {
     const reason =
@@ -603,11 +708,18 @@ export async function purchaseProductWithResult(
       productId,
       reason,
     });
+    showPurchaseDebugAlert("Product not available", reason);
     return { purchased: false, reason };
   }
 
   try {
     reportStep?.("Waiting for App Store confirmation...");
+    purchaseDebugLog("Calling App Store purchase route.", {
+      route: storeProduct ? "purchaseStoreProduct" : "purchasePackage",
+      storeProduct: storeProduct?.identifier ?? null,
+      revenueCatPackage: packageToPurchase?.identifier ?? null,
+      packageProduct: packageToPurchase?.product.identifier ?? null,
+    });
     const purchaseResult = storeProduct
       ? await withNativeTimeout(
           purchases.purchaseStoreProduct({
@@ -624,11 +736,26 @@ export async function purchaseProductWithResult(
           "App Store purchase",
         );
     const { customerInfo } = purchaseResult;
-    if (productId !== PRODUCT_IDS.proLabPack) return { purchased: true };
-    if (hasProEntitlement(customerInfo)) return { purchased: true };
+    purchaseDebugLog("Purchase returned customer info.", {
+      productId,
+      activeEntitlements: Object.keys(customerInfo.entitlements?.active ?? {}),
+    });
+    if (productId !== PRODUCT_IDS.proLabPack) {
+      showPurchaseDebugAlert("Purchase returned", `Product: ${productId}`);
+      return { purchased: true };
+    }
+    if (hasProEntitlement(customerInfo)) {
+      showPurchaseDebugAlert(
+        "Purchase successful",
+        `Product: ${productId}\nEntitlement: ${getEntitlementId()}`,
+      );
+      return { purchased: true };
+    }
+    const reason = `Purchase completed, but entitlement '${getEntitlementId()}' is not active yet. Try Restore after a moment.`;
+    showPurchaseDebugAlert("Purchase missing entitlement", reason);
     return {
       purchased: false,
-      reason: `Purchase completed, but entitlement '${getEntitlementId()}' is not active yet. Try Restore after a moment.`,
+      reason,
     };
   } catch (error) {
     if (!storeProduct || !packageToPurchase) {
@@ -640,11 +767,16 @@ export async function purchaseProductWithResult(
         error,
         reason,
       });
+      showPurchaseDebugAlert("Purchase failed", summarizeErrorForDebug(error) || reason);
       return { purchased: false, reason };
     }
 
     try {
       reportStep?.("Retrying purchase route...");
+      purchaseDebugLog("Retrying purchase via RevenueCat package.", {
+        revenueCatPackage: packageToPurchase.identifier,
+        packageProduct: packageToPurchase.product.identifier,
+      });
       const { customerInfo } = await withNativeTimeout(
         purchases.purchasePackage({
           aPackage: packageToPurchase,
@@ -652,11 +784,26 @@ export async function purchaseProductWithResult(
         NATIVE_PURCHASE_TIMEOUT_MS,
         "App Store purchase retry",
       );
-      if (productId !== PRODUCT_IDS.proLabPack) return { purchased: true };
-      if (hasProEntitlement(customerInfo)) return { purchased: true };
+      purchaseDebugLog("Purchase retry returned customer info.", {
+        productId,
+        activeEntitlements: Object.keys(customerInfo.entitlements?.active ?? {}),
+      });
+      if (productId !== PRODUCT_IDS.proLabPack) {
+        showPurchaseDebugAlert("Purchase retry returned", `Product: ${productId}`);
+        return { purchased: true };
+      }
+      if (hasProEntitlement(customerInfo)) {
+        showPurchaseDebugAlert(
+          "Purchase retry successful",
+          `Product: ${productId}\nEntitlement: ${getEntitlementId()}`,
+        );
+        return { purchased: true };
+      }
+      const reason = `Purchase completed, but entitlement '${getEntitlementId()}' is not active yet. Try Restore after a moment.`;
+      showPurchaseDebugAlert("Purchase retry missing entitlement", reason);
       return {
         purchased: false,
-        reason: `Purchase completed, but entitlement '${getEntitlementId()}' is not active yet. Try Restore after a moment.`,
+        reason,
       };
     } catch (fallbackError) {
       const reason = purchaseSetupHint(
@@ -670,6 +817,12 @@ export async function purchaseProductWithResult(
         fallbackError,
         reason,
       });
+      showPurchaseDebugAlert(
+        "Purchase failed",
+        `Initial error:\n${summarizeErrorForDebug(error)}\n\nRetry error:\n${summarizeErrorForDebug(
+          fallbackError,
+        )}`,
+      );
       return { purchased: false, reason };
     }
   }
@@ -684,37 +837,62 @@ export async function purchaseGoldCoinPack(
   productId: ProductId,
   reportStep?: PurchaseStepReporter,
 ): Promise<PurchaseGoldCoinResult> {
+  purchaseDebugLog("Starting coin pack purchase.", { productId });
   const product = getProductById(productId);
   if (!product || product.type !== "consumable" || !product.coins) {
+    showPurchaseDebugAlert("Coin purchase setup error", "Invalid product configuration.");
     return { coins: 0, reason: "Invalid product configuration." };
   }
   if (!isNativePlatform()) {
+    showPurchaseDebugAlert(
+      "Coin purchase unavailable",
+      "App Store purchases are only available in the iOS app.",
+    );
     return { coins: 0, reason: "App Store purchases are only available in the iPhone app." };
   }
   const purchases = await ensureConfigured(reportStep);
   if (!purchases) {
+    const reason =
+      lastConfigurationReason ||
+      "RevenueCat is not configured in this build. Add VITE_REVENUECAT_IOS_API_KEY in Codemagic.";
+    showPurchaseDebugAlert("RevenueCat not configured", reason);
     return {
       coins: 0,
-      reason:
-        lastConfigurationReason ||
-        "RevenueCat is not configured in this build. Add VITE_REVENUECAT_IOS_API_KEY in Codemagic.",
+      reason,
     };
   }
   const [storeProduct, packageToPurchase] = await Promise.all([
     findStoreProduct(productId, reportStep),
     findPackage(productId, reportStep),
   ]);
+  purchaseDebugLog("Resolved coin purchase routes.", {
+    productId,
+    storeProduct: storeProduct?.identifier ?? null,
+    revenueCatPackage: packageToPurchase
+      ? `${packageToPurchase.identifier} / ${packageToPurchase.product.identifier}`
+      : null,
+    lastStoreProductLookupReason,
+    lastPackageLookupReason,
+  });
   if (!storeProduct && !packageToPurchase) {
+    const reason =
+      lastStoreProductLookupReason ||
+      lastPackageLookupReason ||
+      `Product not found in RevenueCat offering '${getOfferingId()}'. Check product IDs and offering setup.`;
+    showPurchaseDebugAlert("Coin product not available", reason);
     return {
       coins: 0,
-      reason:
-        lastStoreProductLookupReason ||
-        lastPackageLookupReason ||
-        `Product not found in RevenueCat offering '${getOfferingId()}'. Check product IDs and offering setup.`,
+      reason,
     };
   }
   try {
     reportStep?.("Waiting for App Store confirmation...");
+    purchaseDebugLog("Calling App Store coin purchase route.", {
+      route: storeProduct ? "purchaseStoreProduct" : "purchasePackage",
+      storeProduct: storeProduct?.identifier ?? null,
+      revenueCatPackage: packageToPurchase?.identifier ?? null,
+      packageProduct: packageToPurchase?.product.identifier ?? null,
+    });
     if (storeProduct) {
       await withNativeTimeout(
         purchases.purchaseStoreProduct({ product: storeProduct }),
@@ -728,15 +906,27 @@ export async function purchaseGoldCoinPack(
         "App Store coin purchase",
       );
     }
+    showPurchaseDebugAlert(
+      "Coin purchase returned",
+      `Product: ${productId}\nCoins: ${product.coins}`,
+    );
     return { coins: product.coins };
   } catch (error) {
     if (storeProduct && packageToPurchase) {
       try {
         reportStep?.("Retrying purchase route...");
+        purchaseDebugLog("Retrying coin purchase via RevenueCat package.", {
+          revenueCatPackage: packageToPurchase.identifier,
+          packageProduct: packageToPurchase.product.identifier,
+        });
         await withNativeTimeout(
           purchases.purchasePackage({ aPackage: packageToPurchase }),
           NATIVE_PURCHASE_TIMEOUT_MS,
           "App Store coin purchase retry",
+        );
+        showPurchaseDebugAlert(
+          "Coin purchase retry returned",
+          `Product: ${productId}\nCoins: ${product.coins}`,
         );
         return { coins: product.coins };
       } catch (fallbackError) {
@@ -745,12 +935,19 @@ export async function purchaseGoldCoinPack(
             describePurchaseError(error) ||
             "App Store purchase could not be completed right now.",
         );
+        showPurchaseDebugAlert(
+          "Coin purchase failed",
+          `Initial error:\n${summarizeErrorForDebug(error)}\n\nRetry error:\n${summarizeErrorForDebug(
+            fallbackError,
+          )}`,
+        );
         return { coins: 0, reason: message };
       }
     }
     const message = purchaseSetupHint(
       describePurchaseError(error) || "App Store purchase could not be completed right now.",
     );
+    showPurchaseDebugAlert("Coin purchase failed", summarizeErrorForDebug(error) || message);
     return { coins: 0, reason: message };
   }
 }

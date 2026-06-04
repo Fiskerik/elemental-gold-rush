@@ -5,6 +5,8 @@ import { POWER_UP_UNLOCK_LEVELS } from "./powerUps";
 import { PowerUpBadge } from "./PowerUpLibrary";
 import { PRODUCT_IDS, getProductById, type ProductId } from "./products";
 import {
+  debugNativePurchases,
+  isPurchaseDebugUiEnabled,
   presentCustomerCenter,
   purchaseGoldCoinPack,
   purchaseProductWithResult,
@@ -12,6 +14,7 @@ import {
 } from "./purchases";
 import { initAds, showRewardedForCoin } from "./ads";
 import { useIsTabletLayout } from "./responsive";
+import { clearLogs, getLogs, logDebug } from "../lib/debugLogger";
 
 const SHOP_POWER_UPS: Array<{
   id: InventoryPowerUpId;
@@ -79,7 +82,8 @@ const SHOP_POWER_UPS: Array<{
 ];
 
 const SHOP_POWER_UPS_BY_PRICE = [...SHOP_POWER_UPS].sort(
-  (a, b) => a.coinCost - b.coinCost || a.unlockLevel - b.unlockLevel || a.name.localeCompare(b.name),
+  (a, b) =>
+    a.coinCost - b.coinCost || a.unlockLevel - b.unlockLevel || a.name.localeCompare(b.name),
 );
 
 const APP_STORE_COIN_PACKS = [
@@ -117,12 +121,21 @@ export function Shop({ onBack }: { onBack: () => void }) {
   const [pendingProductId, setPendingProductId] = useState<ProductId | "rewarded" | null>(null);
   const [proPackMessage, setProPackMessage] = useState("");
   const [proPackBusy, setProPackBusy] = useState<"purchase" | "restore" | "manage" | "">("");
+  const [purchaseDebugBusy, setPurchaseDebugBusy] = useState(false);
+  const [purchaseDebugOpen, setPurchaseDebugOpen] = useState(false);
+  const [purchaseDebugLogs, setPurchaseDebugLogs] = useState<string[]>([]);
   const proPack = getProductById(PRODUCT_IDS.proLabPack);
+  const purchaseDebugEnabled = isPurchaseDebugUiEnabled();
 
   useEffect(() => {
     if (hasProPack) return;
     void initAds(false);
   }, [hasProPack]);
+
+  function refreshPurchaseDebugLogs(open = purchaseDebugOpen) {
+    setPurchaseDebugLogs(getLogs());
+    if (open) setPurchaseDebugOpen(true);
+  }
 
   function handlePowerUpPurchase(
     powerUp: InventoryPowerUpId,
@@ -160,9 +173,12 @@ export function Shop({ onBack }: { onBack: () => void }) {
       }
       setProPackMessage(result.reason ?? "Pro Lab Pack is not available right now.");
     } catch (error) {
-      setProPackMessage(error instanceof Error ? error.message : "App Store purchase could not be started.");
+      setProPackMessage(
+        error instanceof Error ? error.message : "App Store purchase could not be started.",
+      );
     } finally {
       setProPackBusy("");
+      if (purchaseDebugEnabled) refreshPurchaseDebugLogs();
     }
   }
 
@@ -178,9 +194,12 @@ export function Shop({ onBack }: { onBack: () => void }) {
       }
       setProPackMessage("No Pro Lab Pack purchase was found.");
     } catch (error) {
-      setProPackMessage(error instanceof Error ? error.message : "Purchases could not be restored.");
+      setProPackMessage(
+        error instanceof Error ? error.message : "Purchases could not be restored.",
+      );
     } finally {
       setProPackBusy("");
+      if (purchaseDebugEnabled) refreshPurchaseDebugLogs();
     }
   }
 
@@ -195,9 +214,12 @@ export function Shop({ onBack }: { onBack: () => void }) {
           : "No App Store management page is available yet. Use Restore to refresh purchases.",
       );
     } catch (error) {
-      setProPackMessage(error instanceof Error ? error.message : "Purchase management could not be opened.");
+      setProPackMessage(
+        error instanceof Error ? error.message : "Purchase management could not be opened.",
+      );
     } finally {
       setProPackBusy("");
+      if (purchaseDebugEnabled) refreshPurchaseDebugLogs();
     }
   }
 
@@ -219,9 +241,12 @@ export function Shop({ onBack }: { onBack: () => void }) {
       }
       setMessage(result.reason ?? "App Store coin purchase is not available right now.");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "App Store coin purchase could not be started.");
+      setMessage(
+        error instanceof Error ? error.message : "App Store coin purchase could not be started.",
+      );
     } finally {
       setPendingProductId(null);
+      if (purchaseDebugEnabled) refreshPurchaseDebugLogs();
     }
   }
 
@@ -235,7 +260,9 @@ export function Shop({ onBack }: { onBack: () => void }) {
         setMessage("Reward complete: +1 gold coin.");
         return;
       }
-      setMessage(result.reason ?? "Rewarded ad not completed or not available yet. Try again shortly.");
+      setMessage(
+        result.reason ?? "Rewarded ad not completed or not available yet. Try again shortly.",
+      );
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Rewarded ad could not be started.");
     } finally {
@@ -243,8 +270,50 @@ export function Shop({ onBack }: { onBack: () => void }) {
     }
   }
 
+  async function handlePurchaseDebug() {
+    setPurchaseDebugBusy(true);
+    setMessage("Checking purchase diagnostics...");
+    logDebug("Manual purchase diagnostics started.");
+    try {
+      const snapshot = await debugNativePurchases((statusMessage) => setMessage(statusMessage));
+      const details = [
+        `Platform: ${snapshot.platform}`,
+        `Configured: ${String(snapshot.isConfigured ?? snapshot.configured)}`,
+        `Offering: ${snapshot.offeringId}`,
+        `Entitlement: ${snapshot.entitlementId}`,
+        `Active entitlements: ${snapshot.activeEntitlements.join(", ") || "none"}`,
+        `Packages: ${snapshot.packageIdentifiers.join(", ") || "none"}`,
+        `Store products: ${snapshot.storeProductIdentifiers.join(", ") || "none"}`,
+        snapshot.reason ? `Reason: ${snapshot.reason}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n");
+      console.log("RevenueCat diagnostics", snapshot);
+      window.alert(details);
+      setMessage(snapshot.reason ?? "Purchase diagnostics complete.");
+      refreshPurchaseDebugLogs(true);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      logDebug("Manual purchase diagnostics failed.", { message });
+      window.alert(`Purchase diagnostics failed.\n\n${message}`);
+      setMessage(message);
+      refreshPurchaseDebugLogs(true);
+    } finally {
+      setPurchaseDebugBusy(false);
+    }
+  }
+
+  function handleClearPurchaseLogs() {
+    clearLogs();
+    setPurchaseDebugLogs([]);
+    setMessage("Purchase debug logs cleared.");
+  }
+
   return (
-    <div className="app-shell" style={{ padding: isTabletLayout ? 28 : 20, paddingTop: isTabletLayout ? 36 : 32 }}>
+    <div
+      className="app-shell"
+      style={{ padding: isTabletLayout ? 28 : 20, paddingTop: isTabletLayout ? 36 : 32 }}
+    >
       <div
         style={{
           position: "relative",
@@ -272,6 +341,48 @@ export function Shop({ onBack }: { onBack: () => void }) {
             {message}
           </p>
         )}
+        {purchaseDebugEnabled && (
+          <section style={debugPanel}>
+            <div style={debugActions}>
+              <button
+                type="button"
+                onClick={handlePurchaseDebug}
+                disabled={purchaseDebugBusy}
+                style={{
+                  ...secondaryShopButton,
+                  opacity: purchaseDebugBusy ? 0.7 : 1,
+                }}
+              >
+                {purchaseDebugBusy ? "Checking..." : "Debug RevenueCat"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  refreshPurchaseDebugLogs(true);
+                }}
+                style={secondaryShopButton}
+              >
+                Show Logs
+              </button>
+              <button type="button" onClick={handleClearPurchaseLogs} style={secondaryShopButton}>
+                Clear Logs
+              </button>
+            </div>
+            {purchaseDebugOpen && (
+              <div style={debugLogBox}>
+                {purchaseDebugLogs.length ? (
+                  purchaseDebugLogs.map((entry, index) => (
+                    <div key={`${index}-${entry}`} style={debugLogLine}>
+                      {entry}
+                    </div>
+                  ))
+                ) : (
+                  <div style={debugLogLine}>No purchase logs yet.</div>
+                )}
+              </div>
+            )}
+          </section>
+        )}
 
         {proPack && (
           <section
@@ -283,7 +394,14 @@ export function Shop({ onBack }: { onBack: () => void }) {
               boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
             }}
           >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", gap: 12 }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "start",
+                gap: 12,
+              }}
+            >
               <div>
                 <div
                   style={{
@@ -304,7 +422,14 @@ export function Shop({ onBack }: { onBack: () => void }) {
                 accent={hasProPack}
               />
             </div>
-            <p style={{ margin: "12px 0 10px", color: "var(--muted-foreground)", fontSize: 14, lineHeight: 1.45 }}>
+            <p
+              style={{
+                margin: "12px 0 10px",
+                color: "var(--muted-foreground)",
+                fontSize: 14,
+                lineHeight: 1.45,
+              }}
+            >
               A one-time premium upgrade for long-term progression.
             </p>
             <div style={{ display: "grid", gap: 7, marginBottom: 14 }}>
@@ -394,7 +519,12 @@ export function Shop({ onBack }: { onBack: () => void }) {
               </div>
               <h2 style={{ margin: 0, fontSize: 22, fontWeight: 900 }}>Buy gold coins</h2>
             </div>
-            <WalletPill label="Coins" value={`${goldCoins}`} icon={<GoldCoinIcon size={18} />} accent />
+            <WalletPill
+              label="Coins"
+              value={`${goldCoins}`}
+              icon={<GoldCoinIcon size={18} />}
+              accent
+            />
           </div>
           <p style={{ margin: "0 0 14px", color: "var(--muted-foreground)", fontSize: 13 }}>
             These packs connect to RevenueCat in the iPhone build. The browser build keeps them as
@@ -408,16 +538,32 @@ export function Shop({ onBack }: { onBack: () => void }) {
               ...shopButton,
               width: "100%",
               marginBottom: 10,
-              opacity: hasProPack || (pendingProductId && pendingProductId !== "rewarded") ? 0.6 : 1,
+              opacity:
+                hasProPack || (pendingProductId && pendingProductId !== "rewarded") ? 0.6 : 1,
               cursor: hasProPack || pendingProductId ? "not-allowed" : "pointer",
             }}
           >
-            <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+              }}
+            >
               <Clapperboard size={18} aria-hidden="true" />
               {pendingProductId === "rewarded" ? "Loading ad..." : "Watch rewarded ad for +1 coin"}
             </span>
           </button>
-          <div style={{ display: "grid", gridTemplateColumns: isTabletLayout ? "repeat(4, minmax(0, 1fr))" : "repeat(2, minmax(0, 1fr))", gap: isTabletLayout ? 12 : 8 }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: isTabletLayout
+                ? "repeat(4, minmax(0, 1fr))"
+                : "repeat(2, minmax(0, 1fr))",
+              gap: isTabletLayout ? 12 : 8,
+            }}
+          >
             {APP_STORE_COIN_PACKS.map((productId) => {
               const product = getProductById(productId);
               if (!product?.coins) return null;
@@ -474,17 +620,26 @@ export function Shop({ onBack }: { onBack: () => void }) {
               </div>
               <h2 style={{ margin: 0, fontSize: 22, fontWeight: 900 }}>Stock your next run</h2>
             </div>
-            <div
-              style={walletWrap}
-            >
-              <WalletPill label="Coins" value={`${goldCoins}`} icon={<GoldCoinIcon size={18} />} accent />
+            <div style={walletWrap}>
+              <WalletPill
+                label="Coins"
+                value={`${goldCoins}`}
+                icon={<GoldCoinIcon size={18} />}
+                accent
+              />
             </div>
           </div>
           <p style={{ margin: "0 0 14px", color: "var(--muted-foreground)", fontSize: 13 }}>
             Buy extra inventory copies with gold coins. Before each level, you can choose up to 3
             inventory power-ups to start with.
           </p>
-          <div style={{ display: "grid", gridTemplateColumns: isTabletLayout ? "1fr 1fr" : "1fr", gap: isTabletLayout ? 12 : 10 }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: isTabletLayout ? "1fr 1fr" : "1fr",
+              gap: isTabletLayout ? 12 : 10,
+            }}
+          >
             {SHOP_POWER_UPS_BY_PRICE.map((powerUp) => {
               const isUnlocked = unlockedLevel >= powerUp.unlockLevel;
               const canAfford = goldCoins >= powerUp.coinCost;
@@ -503,10 +658,7 @@ export function Shop({ onBack }: { onBack: () => void }) {
                     background: "var(--surface)",
                   }}
                 >
-                  <span
-                    style={{ display: "grid", placeItems: "center" }}
-                    aria-hidden="true"
-                  >
+                  <span style={{ display: "grid", placeItems: "center" }} aria-hidden="true">
                     <PowerUpBadge icon={powerUp.id} size={34} />
                   </span>
                   <div>
@@ -550,9 +702,9 @@ export function Shop({ onBack }: { onBack: () => void }) {
                         <GoldCoinIcon size={14} />
                         {powerUp.coinCost}
                       </span>
-                      ) : (
-                        "Secret"
-                      )}
+                    ) : (
+                      "Secret"
+                    )}
                   </button>
                 </div>
               );
@@ -633,6 +785,40 @@ function Benefit({ text }: { text: string }) {
     </div>
   );
 }
+
+const debugPanel: React.CSSProperties = {
+  padding: 12,
+  borderRadius: 14,
+  background: "var(--surface)",
+  border: "1px solid color-mix(in oklch, var(--accent) 45%, var(--border))",
+  display: "grid",
+  gap: 10,
+};
+
+const debugActions: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
+  gap: 8,
+};
+
+const debugLogBox: React.CSSProperties = {
+  maxHeight: 220,
+  overflow: "auto",
+  borderRadius: 10,
+  padding: 10,
+  background: "oklch(0.12 0.02 250)",
+  color: "oklch(0.86 0.18 145)",
+  border: "1px solid var(--border)",
+  fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+  fontSize: 10,
+  lineHeight: 1.45,
+  whiteSpace: "pre-wrap",
+  wordBreak: "break-word",
+};
+
+const debugLogLine: React.CSSProperties = {
+  marginBottom: 6,
+};
 
 const walletWrap: React.CSSProperties = {
   display: "flex",
