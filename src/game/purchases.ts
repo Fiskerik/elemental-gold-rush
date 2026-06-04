@@ -46,6 +46,8 @@ const DEFAULT_PRO_ENTITLEMENT = "atomic_fusion_lifetime";
 const DEFAULT_OFFERING_ID = "default";
 const NATIVE_SETUP_TIMEOUT_MS = 30_000;
 const NATIVE_PURCHASE_TIMEOUT_MS = 60_000;
+const DEBUG_SETUP_TIMEOUT_MS = 12_000;
+const DEBUG_PURCHASE_TIMEOUT_MS = 25_000;
 
 let configured = false;
 let purchasesPlugin: PurchasesPlugin | null = null;
@@ -94,15 +96,35 @@ async function withNativeTimeout<T>(
   label: string,
 ): Promise<T> {
   let timeoutId: number | undefined;
+  const effectiveTimeoutMs =
+    isPurchaseDebugUiEnabled() && timeoutMs === NATIVE_SETUP_TIMEOUT_MS
+      ? DEBUG_SETUP_TIMEOUT_MS
+      : isPurchaseDebugUiEnabled() && timeoutMs === NATIVE_PURCHASE_TIMEOUT_MS
+        ? DEBUG_PURCHASE_TIMEOUT_MS
+        : timeoutMs;
+  purchaseDebugLog(`${label} started.`, {
+    timeoutSeconds: Math.round(effectiveTimeoutMs / 1000),
+  });
   try {
-    return await Promise.race([
+    const result = await Promise.race([
       promise,
       new Promise<T>((_, reject) => {
         timeoutId = window.setTimeout(() => {
-          reject(new Error(`${label} timed out after ${Math.round(timeoutMs / 1000)} seconds.`));
-        }, timeoutMs);
+          const error = new Error(
+            `${label} timed out after ${Math.round(effectiveTimeoutMs / 1000)} seconds.`,
+          );
+          purchaseDebugLog(`${label} timed out.`, {
+            timeoutSeconds: Math.round(effectiveTimeoutMs / 1000),
+          });
+          reject(error);
+        }, effectiveTimeoutMs);
       }),
     ]);
+    purchaseDebugLog(`${label} completed.`);
+    return result;
+  } catch (error) {
+    purchaseDebugLog(`${label} failed.`, { error: summarizeErrorForDebug(error) });
+    throw error;
   } finally {
     if (timeoutId) window.clearTimeout(timeoutId);
   }
@@ -204,7 +226,11 @@ function describePurchaseError(error: unknown): string {
 function purchaseSetupHint(reason: string): string {
   const base = reason || "The App Store purchase sheet did not respond.";
   if (!/timed out|timeout/i.test(base)) return base;
-  return `${base} Check that the App Store product is available for this bundle ID, included in RevenueCat offering '${getOfferingId()}', and ready for TestFlight sandbox purchases.`;
+  return `${base} This usually means the product is not available to StoreKit in this build. Check that the IAPs are attached to the App Store version/build, submitted for review, available for this bundle ID, included in RevenueCat offering '${getOfferingId()}', and ready for TestFlight sandbox purchases.`;
+}
+
+function isTimeoutReason(reason: string): boolean {
+  return /timed out|timeout/i.test(reason);
 }
 
 function summarizePackages(packages: PurchasesPackage[]): string {
@@ -305,6 +331,10 @@ async function findPackage(
   let offerings;
   try {
     reportStep?.("Loading available products...");
+    purchaseDebugLog("Loading RevenueCat offering for product.", {
+      productId,
+      offeringId: getOfferingId(),
+    });
     offerings = await withNativeTimeout(
       purchases.getOfferings(),
       NATIVE_SETUP_TIMEOUT_MS,
@@ -398,6 +428,7 @@ async function findStoreProduct(
 
   try {
     reportStep?.("Loading App Store product...");
+    purchaseDebugLog("Loading StoreKit product.", { productId });
     const { products } = await withNativeTimeout(
       purchases.getProducts({
         productIdentifiers: [productId],
@@ -714,23 +745,24 @@ export async function purchaseProductWithResult(
 
   try {
     reportStep?.("Waiting for App Store confirmation...");
+    const primaryRoute = packageToPurchase ? "purchasePackage" : "purchaseStoreProduct";
     purchaseDebugLog("Calling App Store purchase route.", {
-      route: storeProduct ? "purchaseStoreProduct" : "purchasePackage",
+      route: primaryRoute,
       storeProduct: storeProduct?.identifier ?? null,
       revenueCatPackage: packageToPurchase?.identifier ?? null,
       packageProduct: packageToPurchase?.product.identifier ?? null,
     });
-    const purchaseResult = storeProduct
+    const purchaseResult = packageToPurchase
       ? await withNativeTimeout(
-          purchases.purchaseStoreProduct({
-            product: storeProduct,
+          purchases.purchasePackage({
+            aPackage: packageToPurchase,
           }),
           NATIVE_PURCHASE_TIMEOUT_MS,
           "App Store purchase",
         )
       : await withNativeTimeout(
-          purchases.purchasePackage({
-            aPackage: packageToPurchase!,
+          purchases.purchaseStoreProduct({
+            product: storeProduct!,
           }),
           NATIVE_PURCHASE_TIMEOUT_MS,
           "App Store purchase",
@@ -771,15 +803,21 @@ export async function purchaseProductWithResult(
       return { purchased: false, reason };
     }
 
+    const firstErrorMessage = describePurchaseError(error);
+    if (isPurchaseDebugUiEnabled() && isTimeoutReason(firstErrorMessage)) {
+      const reason = purchaseSetupHint(firstErrorMessage);
+      showPurchaseDebugAlert("Purchase timed out", reason);
+      return { purchased: false, reason };
+    }
+
     try {
       reportStep?.("Retrying purchase route...");
-      purchaseDebugLog("Retrying purchase via RevenueCat package.", {
-        revenueCatPackage: packageToPurchase.identifier,
-        packageProduct: packageToPurchase.product.identifier,
+      purchaseDebugLog("Retrying purchase via StoreKit product.", {
+        storeProduct: storeProduct.identifier,
       });
       const { customerInfo } = await withNativeTimeout(
-        purchases.purchasePackage({
-          aPackage: packageToPurchase,
+        purchases.purchaseStoreProduct({
+          product: storeProduct,
         }),
         NATIVE_PURCHASE_TIMEOUT_MS,
         "App Store purchase retry",
@@ -887,21 +925,22 @@ export async function purchaseGoldCoinPack(
   }
   try {
     reportStep?.("Waiting for App Store confirmation...");
+    const primaryRoute = packageToPurchase ? "purchasePackage" : "purchaseStoreProduct";
     purchaseDebugLog("Calling App Store coin purchase route.", {
-      route: storeProduct ? "purchaseStoreProduct" : "purchasePackage",
+      route: primaryRoute,
       storeProduct: storeProduct?.identifier ?? null,
       revenueCatPackage: packageToPurchase?.identifier ?? null,
       packageProduct: packageToPurchase?.product.identifier ?? null,
     });
-    if (storeProduct) {
+    if (packageToPurchase) {
       await withNativeTimeout(
-        purchases.purchaseStoreProduct({ product: storeProduct }),
+        purchases.purchasePackage({ aPackage: packageToPurchase }),
         NATIVE_PURCHASE_TIMEOUT_MS,
         "App Store coin purchase",
       );
     } else {
       await withNativeTimeout(
-        purchases.purchasePackage({ aPackage: packageToPurchase! }),
+        purchases.purchaseStoreProduct({ product: storeProduct! }),
         NATIVE_PURCHASE_TIMEOUT_MS,
         "App Store coin purchase",
       );
@@ -913,14 +952,20 @@ export async function purchaseGoldCoinPack(
     return { coins: product.coins };
   } catch (error) {
     if (storeProduct && packageToPurchase) {
+      const firstErrorMessage = describePurchaseError(error);
+      if (isPurchaseDebugUiEnabled() && isTimeoutReason(firstErrorMessage)) {
+        const message = purchaseSetupHint(firstErrorMessage);
+        showPurchaseDebugAlert("Coin purchase timed out", message);
+        return { coins: 0, reason: message };
+      }
+
       try {
         reportStep?.("Retrying purchase route...");
-        purchaseDebugLog("Retrying coin purchase via RevenueCat package.", {
-          revenueCatPackage: packageToPurchase.identifier,
-          packageProduct: packageToPurchase.product.identifier,
+        purchaseDebugLog("Retrying coin purchase via StoreKit product.", {
+          storeProduct: storeProduct.identifier,
         });
         await withNativeTimeout(
-          purchases.purchasePackage({ aPackage: packageToPurchase }),
+          purchases.purchaseStoreProduct({ product: storeProduct }),
           NATIVE_PURCHASE_TIMEOUT_MS,
           "App Store coin purchase retry",
         );

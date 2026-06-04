@@ -126,6 +126,7 @@ export function Shop({ onBack }: { onBack: () => void }) {
   const [purchaseDebugLogs, setPurchaseDebugLogs] = useState<string[]>([]);
   const proPack = getProductById(PRODUCT_IDS.proLabPack);
   const purchaseDebugEnabled = isPurchaseDebugUiEnabled();
+  const purchaseDebugLocked = purchaseDebugEnabled && purchaseDebugBusy;
 
   useEffect(() => {
     if (hasProPack) return;
@@ -347,7 +348,7 @@ export function Shop({ onBack }: { onBack: () => void }) {
               <button
                 type="button"
                 onClick={handlePurchaseDebug}
-                disabled={purchaseDebugBusy}
+                disabled={purchaseDebugBusy || Boolean(proPackBusy) || Boolean(pendingProductId)}
                 style={{
                   ...secondaryShopButton,
                   opacity: purchaseDebugBusy ? 0.7 : 1,
@@ -445,10 +446,11 @@ export function Shop({ onBack }: { onBack: () => void }) {
                 <button
                   type="button"
                   onClick={handleProPackRestore}
-                  disabled={Boolean(proPackBusy)}
+                  disabled={Boolean(proPackBusy) || purchaseDebugLocked}
                   style={{
                     ...secondaryShopButton,
-                    opacity: proPackBusy && proPackBusy !== "restore" ? 0.55 : 1,
+                    opacity:
+                      purchaseDebugLocked || (proPackBusy && proPackBusy !== "restore") ? 0.55 : 1,
                   }}
                 >
                   {proPackBusy === "restore" ? "Checking..." : "Restore"}
@@ -456,10 +458,11 @@ export function Shop({ onBack }: { onBack: () => void }) {
                 <button
                   type="button"
                   onClick={handleProPackPurchase}
-                  disabled={Boolean(proPackBusy)}
+                  disabled={Boolean(proPackBusy) || purchaseDebugLocked}
                   style={{
                     ...shopButton,
-                    opacity: proPackBusy && proPackBusy !== "purchase" ? 0.55 : 1,
+                    opacity:
+                      purchaseDebugLocked || (proPackBusy && proPackBusy !== "purchase") ? 0.55 : 1,
                   }}
                 >
                   {proPackBusy === "purchase" ? "Opening..." : "Unlock Pack"}
@@ -469,12 +472,13 @@ export function Shop({ onBack }: { onBack: () => void }) {
             <button
               type="button"
               onClick={handleManagePurchases}
-              disabled={Boolean(proPackBusy)}
+              disabled={Boolean(proPackBusy) || purchaseDebugLocked}
               style={{
                 ...secondaryShopButton,
                 width: "100%",
                 marginTop: 10,
-                opacity: proPackBusy && proPackBusy !== "manage" ? 0.55 : 1,
+                opacity:
+                  purchaseDebugLocked || (proPackBusy && proPackBusy !== "manage") ? 0.55 : 1,
               }}
             >
               {proPackBusy === "manage" ? "Opening..." : "Manage Purchases"}
@@ -572,11 +576,14 @@ export function Shop({ onBack }: { onBack: () => void }) {
                   key={productId}
                   type="button"
                   onClick={() => handleNativeCoinPurchase(productId)}
-                  disabled={Boolean(pendingProductId)}
+                  disabled={Boolean(pendingProductId) || purchaseDebugLocked}
                   style={{
                     ...coinPackButton,
-                    opacity: pendingProductId && pendingProductId !== productId ? 0.55 : 1,
-                    cursor: pendingProductId ? "not-allowed" : "pointer",
+                    opacity:
+                      purchaseDebugLocked || (pendingProductId && pendingProductId !== productId)
+                        ? 0.55
+                        : 1,
+                    cursor: pendingProductId || purchaseDebugLocked ? "not-allowed" : "pointer",
                   }}
                 >
                   <GoldCoinIcon size={28} />
