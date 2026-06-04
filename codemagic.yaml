@@ -13,6 +13,7 @@ workflows:
         BUNDLE_ID: "com.eaconsulting.atomicfusion"
         XCODE_WORKSPACE: "ios/App/App.xcworkspace"
         XCODE_SCHEME: "App"
+        VITE_REVENUECAT_IOS_API_KEY: "appl_wleIrbzZnDKaUaQgnbmYbTYVxfX"
       xcode: latest
       cocoapods: default
       node: 22.16.0
