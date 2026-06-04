@@ -30,7 +30,7 @@ merge,puzzle,chemistry,elements,periodic table,science,strategy,casual,logic,bra
 No login required.
 
 Test path for rewarded ad: Shop -> Watch rewarded ad for +1 coin.
-Test path for IAP: Shop coin packs and Profile -> Unlock Pack.
+Test path for IAP: Main Menu -> Shop -> Unlock Pack. Restore path: Main Menu -> Shop -> Restore. Coin packs are also shown on Main Menu -> Shop.
 
 Support: eaconsulting.supp@gmail.com
 Privacy policy: https://atomic-fusion.lovable.app/privacy

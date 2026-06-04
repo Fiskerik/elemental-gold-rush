@@ -15,12 +15,13 @@
 
 Create these product ids in App Store Connect, then mirror them in RevenueCat:
 
-- `pro_lab_pack_lifetime`: non-consumable, $4.99, attached to entitlement `pro`.
-- `coins_1`: consumable, grants 1 gold coin.
+- `pro_lab_pack_lifetime`: non-consumable, $4.99, attached to entitlement `atomic_fusion_lifetime`.
 - `coins_5`: consumable, grants 5 gold coins.
 - `coins_20`: consumable, grants 20 gold coins.
+- `coins_50`: consumable, grants 50 gold coins.
+- `coins_100`: consumable, grants 100 gold coins.
 
-Set `VITE_REVENUECAT_IOS_API_KEY` for iOS builds. The browser build keeps purchases as safe no-op fallbacks.
+Set `VITE_REVENUECAT_IOS_API_KEY` to the iOS `appl_...` public API key for iOS builds. Codemagic fails the release build if this key is missing. The browser build keeps purchases as safe no-op fallbacks.
 
 ## Ads
 

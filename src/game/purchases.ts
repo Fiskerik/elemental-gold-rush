@@ -1,6 +1,6 @@
 import { Capacitor } from "@capacitor/core";
 import { Purchases as RevenueCatPurchases } from "@revenuecat/purchases-capacitor";
-import { PRODUCT_IDS, ProductId, getProductById } from "./products";
+import { APP_STORE_PURCHASE_PRODUCT_IDS, PRODUCT_IDS, ProductId, getProductById } from "./products";
 
 type CustomerInfo = {
   entitlements?: { active?: Record<string, unknown> };
@@ -18,13 +18,25 @@ type PurchasesOffering = {
 type PurchasesPlugin = {
   setLogLevel: (options: { level: string }) => Promise<void>;
   configure: (options: { apiKey: string }) => Promise<void>;
-  getOfferings: () => Promise<{ current?: PurchasesOffering | null; all?: Record<string, PurchasesOffering> }>;
-  getProducts: (options: { productIdentifiers: string[]; type: string }) => Promise<{ products: PurchasesStoreProduct[] }>;
+  getOfferings: () => Promise<{
+    current?: PurchasesOffering | null;
+    all?: Record<string, PurchasesOffering>;
+  }>;
+  getProducts: (options: {
+    productIdentifiers: string[];
+    type: string;
+  }) => Promise<{ products: PurchasesStoreProduct[] }>;
   getCustomerInfo: () => Promise<{ customerInfo: CustomerInfo }>;
-  addCustomerInfoUpdateListener: (listener: (customerInfo: CustomerInfo) => void) => Promise<string>;
+  addCustomerInfoUpdateListener: (
+    listener: (customerInfo: CustomerInfo) => void,
+  ) => Promise<string>;
   removeCustomerInfoUpdateListener: (options: { listenerToRemove: string }) => Promise<unknown>;
-  purchaseStoreProduct: (options: { product: PurchasesStoreProduct }) => Promise<{ customerInfo: CustomerInfo }>;
-  purchasePackage: (options: { aPackage: PurchasesPackage }) => Promise<{ customerInfo: CustomerInfo }>;
+  purchaseStoreProduct: (options: {
+    product: PurchasesStoreProduct;
+  }) => Promise<{ customerInfo: CustomerInfo }>;
+  purchasePackage: (options: {
+    aPackage: PurchasesPackage;
+  }) => Promise<{ customerInfo: CustomerInfo }>;
   restorePurchases: () => Promise<{ customerInfo: CustomerInfo }>;
 };
 
@@ -50,9 +62,23 @@ export type PurchaseProductResult = {
   reason?: string;
 };
 
+export type PurchaseWarmupResult = {
+  configured: boolean;
+  hasProPack: boolean;
+  offeringId: string;
+  entitlementId: string;
+  packageIdentifiers: string[];
+  storeProductIdentifiers: string[];
+  reason?: string;
+};
+
 type PurchaseStepReporter = (message: string) => void;
 
 let lastPackageLookupReason = "";
+
+function envFlagEnabled(value: unknown): boolean {
+  return typeof value === "string" && /^(1|true|yes|on)$/i.test(value.trim());
+}
 
 async function withNativeTimeout<T>(
   promise: Promise<T>,
@@ -100,6 +126,10 @@ function getOfferingId(): string {
   return import.meta.env.VITE_REVENUECAT_OFFERING_ID ?? DEFAULT_OFFERING_ID;
 }
 
+function shouldEnableRevenueCatDebugLogs(): boolean {
+  return !import.meta.env.PROD || envFlagEnabled(import.meta.env.VITE_REVENUECAT_DEBUG_LOGS);
+}
+
 function hasProEntitlement(customerInfo: CustomerInfo): boolean {
   return Boolean(customerInfo.entitlements?.active?.[getEntitlementId()]);
 }
@@ -126,7 +156,9 @@ function describePurchaseError(error: unknown): string {
     details.message,
     details.underlyingErrorMessage,
   ]
-    .filter((value): value is string | number => typeof value === "string" || typeof value === "number")
+    .filter(
+      (value): value is string | number => typeof value === "string" || typeof value === "number",
+    )
     .map(String)
     .filter(Boolean);
 
@@ -155,7 +187,9 @@ function summarizeStoreProducts(products: PurchasesStoreProduct[]): string {
     .join(", ");
 }
 
-async function ensureConfigured(reportStep?: PurchaseStepReporter): Promise<PurchasesPlugin | null> {
+async function ensureConfigured(
+  reportStep?: PurchaseStepReporter,
+): Promise<PurchasesPlugin | null> {
   if (!isNativePlatform()) return null;
   if (configured) return purchasesPlugin;
   const Purchases = RevenueCatPurchases as unknown as PurchasesPlugin;
@@ -174,7 +208,7 @@ async function ensureConfigured(reportStep?: PurchaseStepReporter): Promise<Purc
   }
   lastConfigurationReason = "";
   try {
-    if (!import.meta.env.PROD) {
+    if (shouldEnableRevenueCatDebugLogs()) {
       reportStep?.("Preparing purchase logs...");
       await withNativeTimeout(
         Purchases.setLogLevel({ level: "DEBUG" }),
@@ -190,6 +224,12 @@ async function ensureConfigured(reportStep?: PurchaseStepReporter): Promise<Purc
     );
     configured = true;
     purchasesPlugin = Purchases;
+    console.log("RevenueCat configured for native purchases.", {
+      platform: Capacitor.getPlatform(),
+      offeringId: getOfferingId(),
+      entitlementId: getEntitlementId(),
+      apiKeyPrefix: `${apiKey.slice(0, 8)}...`,
+    });
     return Purchases;
   } catch (error) {
     lastConfigurationReason =
@@ -199,7 +239,10 @@ async function ensureConfigured(reportStep?: PurchaseStepReporter): Promise<Purc
   }
 }
 
-async function findPackage(productId: ProductId, reportStep?: PurchaseStepReporter): Promise<PurchasesPackage | null> {
+async function findPackage(
+  productId: ProductId,
+  reportStep?: PurchaseStepReporter,
+): Promise<PurchasesPackage | null> {
   lastPackageLookupReason = "";
   const purchases = await ensureConfigured(reportStep);
   if (!purchases) {
@@ -218,7 +261,8 @@ async function findPackage(productId: ProductId, reportStep?: PurchaseStepReport
     );
   } catch (error) {
     lastPackageLookupReason =
-      describePurchaseError(error) || "RevenueCat offerings could not be loaded. Check the RevenueCat app setup.";
+      describePurchaseError(error) ||
+      "RevenueCat offerings could not be loaded. Check the RevenueCat app setup.";
     console.log("RevenueCat offerings lookup failed.", { productId, error });
     return null;
   }
@@ -227,7 +271,7 @@ async function findPackage(productId: ProductId, reportStep?: PurchaseStepReport
   const preferred =
     offerings.current?.identifier === offeringId
       ? offerings.current
-      : offerings.all?.[offeringId] ?? offerings.current;
+      : (offerings.all?.[offeringId] ?? offerings.current);
 
   if (!preferred) {
     lastPackageLookupReason = `No RevenueCat offering was returned. Expected offering '${offeringId}'.`;
@@ -337,6 +381,117 @@ export async function initPurchases(): Promise<boolean> {
   return hasProEntitlement(customerInfo);
 }
 
+export async function warmUpPurchases(
+  reportStep?: PurchaseStepReporter,
+): Promise<PurchaseWarmupResult> {
+  const offeringId = getOfferingId();
+  const entitlementId = getEntitlementId();
+
+  if (!isNativePlatform()) {
+    return {
+      configured: false,
+      hasProPack: false,
+      offeringId,
+      entitlementId,
+      packageIdentifiers: [],
+      storeProductIdentifiers: [],
+      reason: "Native App Store purchases are only available in the iOS app.",
+    };
+  }
+
+  const purchases = await ensureConfigured(reportStep);
+  if (!purchases) {
+    return {
+      configured: false,
+      hasProPack: false,
+      offeringId,
+      entitlementId,
+      packageIdentifiers: [],
+      storeProductIdentifiers: [],
+      reason: lastConfigurationReason || "RevenueCat could not be initialized.",
+    };
+  }
+
+  let hasProPack = false;
+  let packageIdentifiers: string[] = [];
+  let storeProductIdentifiers: string[] = [];
+  let reason = "";
+
+  try {
+    reportStep?.("Checking purchase status...");
+    const { customerInfo } = await withNativeTimeout(
+      purchases.getCustomerInfo(),
+      NATIVE_SETUP_TIMEOUT_MS,
+      "RevenueCat customer info warm-up",
+    );
+    hasProPack = hasProEntitlement(customerInfo);
+  } catch (error) {
+    reason = describePurchaseError(error) || "Customer info warm-up failed.";
+    console.log("RevenueCat customer info warm-up failed.", { error, reason });
+  }
+
+  try {
+    reportStep?.("Preloading RevenueCat offering...");
+    const offerings = await withNativeTimeout(
+      purchases.getOfferings(),
+      NATIVE_SETUP_TIMEOUT_MS,
+      "RevenueCat offerings warm-up",
+    );
+    const preferred =
+      offerings.current?.identifier === offeringId
+        ? offerings.current
+        : (offerings.all?.[offeringId] ?? offerings.current);
+    packageIdentifiers = (preferred?.availablePackages ?? []).map(
+      (pkg) => `${pkg.identifier} / ${pkg.product.identifier}`,
+    );
+    if (!packageIdentifiers.length) {
+      reason = reason || `RevenueCat offering '${offeringId}' returned no packages.`;
+    }
+  } catch (error) {
+    reason = reason || describePurchaseError(error) || "RevenueCat offerings warm-up failed.";
+    console.log("RevenueCat offerings warm-up failed.", { error, reason });
+  }
+
+  try {
+    reportStep?.("Preloading App Store products...");
+    const { products } = await withNativeTimeout(
+      purchases.getProducts({
+        productIdentifiers: [...APP_STORE_PURCHASE_PRODUCT_IDS],
+        type: "NON_SUBSCRIPTION",
+      }),
+      NATIVE_SETUP_TIMEOUT_MS,
+      "App Store products warm-up",
+    );
+    storeProductIdentifiers = products.map((product) => product.identifier);
+    if (!storeProductIdentifiers.length) {
+      reason = reason || "App Store product warm-up returned no products.";
+    }
+  } catch (error) {
+    reason = reason || describePurchaseError(error) || "App Store products warm-up failed.";
+    console.log("App Store products warm-up failed.", { error, reason });
+  }
+
+  console.log("Native purchase warm-up complete.", {
+    configured: true,
+    hasProPack,
+    offeringId,
+    entitlementId,
+    packages: packageIdentifiers,
+    products: storeProductIdentifiers,
+    reason,
+  });
+
+  return {
+    configured: true,
+    hasProPack,
+    offeringId,
+    entitlementId,
+    packageIdentifiers,
+    storeProductIdentifiers,
+    reason: reason || undefined,
+  };
+}
+
 export async function syncCustomerInfoEntitlement(): Promise<boolean> {
   const purchases = await ensureConfigured();
   if (!purchases) return false;
@@ -385,10 +540,18 @@ export async function presentCustomerCenter(): Promise<boolean> {
       "RevenueCat customer management lookup",
     );
     const managementURL =
-      (customerInfo as CustomerInfo & { managementURL?: string | null; managementUrl?: string | null })
-        .managementURL ??
-      (customerInfo as CustomerInfo & { managementURL?: string | null; managementUrl?: string | null })
-        .managementUrl;
+      (
+        customerInfo as CustomerInfo & {
+          managementURL?: string | null;
+          managementUrl?: string | null;
+        }
+      ).managementURL ??
+      (
+        customerInfo as CustomerInfo & {
+          managementURL?: string | null;
+          managementUrl?: string | null;
+        }
+      ).managementUrl;
     if (!managementURL) return false;
 
     window.open(managementURL, "_blank", "noopener,noreferrer");
@@ -408,13 +571,17 @@ export async function purchaseProductWithResult(
     return { purchased: false, reason: "Invalid App Store product configuration." };
   }
   if (!isNativePlatform()) {
-    return { purchased: false, reason: "App Store purchases are only available in the iPhone app." };
+    return {
+      purchased: false,
+      reason: "App Store purchases are only available in the iPhone app.",
+    };
   }
 
   const purchases = await ensureConfigured(reportStep);
   if (!purchases) {
     const reason =
-      lastConfigurationReason || "Native App Store purchase support is not available in this build.";
+      lastConfigurationReason ||
+      "Native App Store purchase support is not available in this build.";
     console.log("Native App Store purchase support is not available in this build.", {
       productId,
       reason,
@@ -468,7 +635,11 @@ export async function purchaseProductWithResult(
       const reason = purchaseSetupHint(
         describePurchaseError(error) || "App Store purchase could not be completed right now.",
       );
-      console.log("Native App Store purchase could not be completed.", { productId, error, reason });
+      console.log("Native App Store purchase could not be completed.", {
+        productId,
+        error,
+        reason,
+      });
       return { purchased: false, reason };
     }
 

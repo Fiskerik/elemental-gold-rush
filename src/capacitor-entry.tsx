@@ -3,6 +3,7 @@ import { StatusBar, Style } from "@capacitor/status-bar";
 import { createRoot } from "react-dom/client";
 import { RouterProvider } from "@tanstack/react-router";
 import { getRouter } from "./router";
+import { warmUpPurchases } from "./game/purchases";
 
 declare global {
   interface Window {
@@ -45,6 +46,16 @@ if (Capacitor.getPlatform() === "ios") {
   }).catch(() => {});
 }
 
+function warmUpNativePurchases() {
+  if (!Capacitor.isNativePlatform()) return;
+  window.setTimeout(() => {
+    void warmUpPurchases((message) => console.log(`[Purchases] ${message}`)).catch((error) => {
+      console.log("Native purchase warm-up failed.", { error });
+    });
+  }, 750);
+}
+
 window.requestAnimationFrame(() => {
   window.__bootReady?.();
+  warmUpNativePurchases();
 });

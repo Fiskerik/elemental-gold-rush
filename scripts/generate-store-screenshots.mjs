@@ -6,6 +6,12 @@ const BASE_URL = process.env.SCREENSHOT_BASE_URL ?? "http://127.0.0.1:4173";
 const OUTPUT_DIR = join(process.cwd(), "screenshots", "store");
 const STORAGE_KEY = "elemental-gold-rush";
 const SAVED_RUN_STORAGE_KEY = "elemental-gold-rush-saved-run";
+const requestedScenes = new Set(
+  (process.env.SCREENSHOT_SCENES ?? "")
+    .split(",")
+    .map((scene) => scene.trim())
+    .filter(Boolean),
+);
 
 const iphone = { width: 430, height: 932 };
 const ipad = { width: 1024, height: 1366 };
@@ -45,16 +51,96 @@ const sharedState = {
     9: 2,
   },
   levelStats: {
-    1: { attempts: 1, fails: 0, maxScore: 2200, bestShots: 5, powerUpsUsed: 0, totalScore: 2200, stars: 3 },
-    2: { attempts: 1, fails: 0, maxScore: 2150, bestShots: 6, powerUpsUsed: 0, totalScore: 2150, stars: 3 },
-    3: { attempts: 2, fails: 1, maxScore: 1980, bestShots: 7, powerUpsUsed: 0, totalScore: 2640, stars: 3 },
-    4: { attempts: 1, fails: 0, maxScore: 1880, bestShots: 7, powerUpsUsed: 0, totalScore: 1880, stars: 2 },
-    5: { attempts: 2, fails: 1, maxScore: 2480, bestShots: 8, powerUpsUsed: 0, totalScore: 3200, stars: 3 },
-    6: { attempts: 2, fails: 1, maxScore: 2750, bestShots: 11, powerUpsUsed: 0, totalScore: 3600, stars: 2 },
-    7: { attempts: 1, fails: 0, maxScore: 3020, bestShots: 11, powerUpsUsed: 0, totalScore: 3020, stars: 2 },
-    8: { attempts: 3, fails: 1, maxScore: 3420, bestShots: 12, powerUpsUsed: 1, totalScore: 5400, stars: 1 },
-    9: { attempts: 2, fails: 1, maxScore: 3650, bestShots: 12, powerUpsUsed: 1, totalScore: 5080, stars: 2 },
-    10: { attempts: 1, fails: 0, maxScore: 0, bestShots: null, powerUpsUsed: 0, totalScore: 0, stars: 0 },
+    1: {
+      attempts: 1,
+      fails: 0,
+      maxScore: 2200,
+      bestShots: 5,
+      powerUpsUsed: 0,
+      totalScore: 2200,
+      stars: 3,
+    },
+    2: {
+      attempts: 1,
+      fails: 0,
+      maxScore: 2150,
+      bestShots: 6,
+      powerUpsUsed: 0,
+      totalScore: 2150,
+      stars: 3,
+    },
+    3: {
+      attempts: 2,
+      fails: 1,
+      maxScore: 1980,
+      bestShots: 7,
+      powerUpsUsed: 0,
+      totalScore: 2640,
+      stars: 3,
+    },
+    4: {
+      attempts: 1,
+      fails: 0,
+      maxScore: 1880,
+      bestShots: 7,
+      powerUpsUsed: 0,
+      totalScore: 1880,
+      stars: 2,
+    },
+    5: {
+      attempts: 2,
+      fails: 1,
+      maxScore: 2480,
+      bestShots: 8,
+      powerUpsUsed: 0,
+      totalScore: 3200,
+      stars: 3,
+    },
+    6: {
+      attempts: 2,
+      fails: 1,
+      maxScore: 2750,
+      bestShots: 11,
+      powerUpsUsed: 0,
+      totalScore: 3600,
+      stars: 2,
+    },
+    7: {
+      attempts: 1,
+      fails: 0,
+      maxScore: 3020,
+      bestShots: 11,
+      powerUpsUsed: 0,
+      totalScore: 3020,
+      stars: 2,
+    },
+    8: {
+      attempts: 3,
+      fails: 1,
+      maxScore: 3420,
+      bestShots: 12,
+      powerUpsUsed: 1,
+      totalScore: 5400,
+      stars: 1,
+    },
+    9: {
+      attempts: 2,
+      fails: 1,
+      maxScore: 3650,
+      bestShots: 12,
+      powerUpsUsed: 1,
+      totalScore: 5080,
+      stars: 2,
+    },
+    10: {
+      attempts: 1,
+      fails: 0,
+      maxScore: 0,
+      bestShots: null,
+      powerUpsUsed: 0,
+      totalScore: 0,
+      stars: 0,
+    },
   },
   dailyStreak: 3,
   claimedDailyReward: false,
@@ -101,6 +187,16 @@ const scenes = [
     },
   },
   {
+    key: "shop",
+    state: sharedState,
+    goto: async (page) => {
+      await page.goto(`${BASE_URL}/`, { waitUntil: "networkidle" });
+      await page.waitForTimeout(700);
+      await page.getByRole("button", { name: "Shop" }).click();
+      await page.waitForTimeout(900);
+    },
+  },
+  {
     key: "collection",
     state: sharedState,
     goto: async (page) => {
@@ -126,6 +222,7 @@ try {
     });
     try {
       for (const scene of scenes) {
+        if (requestedScenes.size && !requestedScenes.has(scene.key)) continue;
         await captureSceneFrame(
           context,
           scene,
@@ -140,7 +237,10 @@ try {
   await browser.close();
 }
 
-console.log(`Generated iPhone and iPad store screenshots in ${OUTPUT_DIR}`);
+const scope = requestedScenes.size
+  ? `selected store screenshots (${[...requestedScenes].join(", ")})`
+  : "iPhone and iPad store screenshots";
+console.log(`Generated ${scope} in ${OUTPUT_DIR}`);
 
 async function captureSceneFrame(context, scene, outputPath) {
   const page = await context.newPage();

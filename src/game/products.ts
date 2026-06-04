@@ -10,6 +10,14 @@ export const PRODUCT_IDS = {
 
 export type ProductId = (typeof PRODUCT_IDS)[keyof typeof PRODUCT_IDS];
 
+export const APP_STORE_PURCHASE_PRODUCT_IDS = [
+  PRODUCT_IDS.proLabPack,
+  PRODUCT_IDS.coins5,
+  PRODUCT_IDS.coins20,
+  PRODUCT_IDS.coins50,
+  PRODUCT_IDS.coins100,
+] as const satisfies readonly ProductId[];
+
 export interface ProductDefinition {
   id: ProductId;
   name: string;
