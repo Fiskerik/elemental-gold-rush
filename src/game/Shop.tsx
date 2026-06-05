@@ -136,9 +136,10 @@ export function Shop({ onBack }: { onBack: () => void }) {
   const proPack = getProductById(PRODUCT_IDS.proLabPack);
   const purchaseDebugEnabled = isPurchaseDebugUiEnabled();
   const purchaseDebugLocked = purchaseDebugEnabled && purchaseDebugBusy;
-  const showPurchaseSupport = Boolean(
-    proPackMessage || message || purchaseSupportMessage || purchaseReport,
-  );
+  const appStorePurchaseBusy = Boolean(proPackBusy) || Boolean(pendingProductId);
+  const showPurchaseSupport =
+    purchaseDebugEnabled &&
+    Boolean(proPackMessage || message || purchaseSupportMessage || purchaseReport);
 
   useEffect(() => {
     if (hasProPack) return;
@@ -169,6 +170,7 @@ export function Shop({ onBack }: { onBack: () => void }) {
   }
 
   async function handleProPackPurchase() {
+    if (appStorePurchaseBusy) return;
     logDebug("Unlock Pack button tapped.", { productId: PRODUCT_IDS.proLabPack });
     setProPackBusy("purchase");
     setProPackMessage("Preparing purchase with App Store...");
@@ -199,6 +201,7 @@ export function Shop({ onBack }: { onBack: () => void }) {
   }
 
   async function handleProPackRestore() {
+    if (appStorePurchaseBusy) return;
     setProPackBusy("restore");
     setProPackMessage("Checking App Store purchases...");
     try {
@@ -220,6 +223,7 @@ export function Shop({ onBack }: { onBack: () => void }) {
   }
 
   async function handleManagePurchases() {
+    if (appStorePurchaseBusy) return;
     setProPackBusy("manage");
     setProPackMessage("Opening App Store purchase management...");
     try {
@@ -240,6 +244,7 @@ export function Shop({ onBack }: { onBack: () => void }) {
   }
 
   async function handleNativeCoinPurchase(productId: ProductId) {
+    if (appStorePurchaseBusy) return;
     logDebug("Coin pack button tapped.", { productId });
     setPendingProductId(productId);
     setMessage("Preparing purchase with App Store...");
@@ -553,11 +558,13 @@ export function Shop({ onBack }: { onBack: () => void }) {
                 <button
                   type="button"
                   onClick={handleProPackRestore}
-                  disabled={Boolean(proPackBusy) || purchaseDebugLocked}
+                  disabled={appStorePurchaseBusy || purchaseDebugLocked}
                   style={{
                     ...secondaryShopButton,
                     opacity:
-                      purchaseDebugLocked || (proPackBusy && proPackBusy !== "restore") ? 0.55 : 1,
+                      purchaseDebugLocked || (appStorePurchaseBusy && proPackBusy !== "restore")
+                        ? 0.55
+                        : 1,
                   }}
                 >
                   {proPackBusy === "restore" ? "Checking..." : "Restore"}
@@ -565,11 +572,13 @@ export function Shop({ onBack }: { onBack: () => void }) {
                 <button
                   type="button"
                   onClick={handleProPackPurchase}
-                  disabled={Boolean(proPackBusy) || purchaseDebugLocked}
+                  disabled={appStorePurchaseBusy || purchaseDebugLocked}
                   style={{
                     ...shopButton,
                     opacity:
-                      purchaseDebugLocked || (proPackBusy && proPackBusy !== "purchase") ? 0.55 : 1,
+                      purchaseDebugLocked || (appStorePurchaseBusy && proPackBusy !== "purchase")
+                        ? 0.55
+                        : 1,
                   }}
                 >
                   {proPackBusy === "purchase" ? "Opening..." : "Unlock Pack"}
@@ -579,13 +588,15 @@ export function Shop({ onBack }: { onBack: () => void }) {
             <button
               type="button"
               onClick={handleManagePurchases}
-              disabled={Boolean(proPackBusy) || purchaseDebugLocked}
+              disabled={appStorePurchaseBusy || purchaseDebugLocked}
               style={{
                 ...secondaryShopButton,
                 width: "100%",
                 marginTop: 10,
                 opacity:
-                  purchaseDebugLocked || (proPackBusy && proPackBusy !== "manage") ? 0.55 : 1,
+                  purchaseDebugLocked || (appStorePurchaseBusy && proPackBusy !== "manage")
+                    ? 0.55
+                    : 1,
               }}
             >
               {proPackBusy === "manage" ? "Opening..." : "Manage Purchases"}
@@ -638,20 +649,19 @@ export function Shop({ onBack }: { onBack: () => void }) {
             />
           </div>
           <p style={{ margin: "0 0 14px", color: "var(--muted-foreground)", fontSize: 13 }}>
-            These packs connect to RevenueCat in the iPhone build. The browser build keeps them as
-            safe purchase-layer checks.
+            Buy extra gold coins for power-ups and experiments. Purchases are processed securely by
+            the App Store.
           </p>
           <button
             type="button"
             onClick={handleRewardedCoin}
-            disabled={hasProPack || Boolean(pendingProductId)}
+            disabled={hasProPack || appStorePurchaseBusy}
             style={{
               ...shopButton,
               width: "100%",
               marginBottom: 10,
-              opacity:
-                hasProPack || (pendingProductId && pendingProductId !== "rewarded") ? 0.6 : 1,
-              cursor: hasProPack || pendingProductId ? "not-allowed" : "pointer",
+              opacity: hasProPack || appStorePurchaseBusy ? 0.6 : 1,
+              cursor: hasProPack || appStorePurchaseBusy ? "not-allowed" : "pointer",
             }}
           >
             <span
@@ -683,14 +693,15 @@ export function Shop({ onBack }: { onBack: () => void }) {
                   key={productId}
                   type="button"
                   onClick={() => handleNativeCoinPurchase(productId)}
-                  disabled={Boolean(pendingProductId) || purchaseDebugLocked}
+                  disabled={appStorePurchaseBusy || purchaseDebugLocked}
                   style={{
                     ...coinPackButton,
                     opacity:
-                      purchaseDebugLocked || (pendingProductId && pendingProductId !== productId)
+                      purchaseDebugLocked ||
+                      (appStorePurchaseBusy && pendingProductId !== productId)
                         ? 0.55
                         : 1,
-                    cursor: pendingProductId || purchaseDebugLocked ? "not-allowed" : "pointer",
+                    cursor: appStorePurchaseBusy || purchaseDebugLocked ? "not-allowed" : "pointer",
                   }}
                 >
                   <GoldCoinIcon size={28} />

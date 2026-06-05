@@ -1,6 +1,6 @@
 const STORAGE_KEY = "atomic-fusion-debug-logs";
 const MAX_LOG_LINES = 80;
-const PURCHASE_DIAGNOSTICS_REVISION = "2026-06-05-no-thenable-plugin-return";
+const PURCHASE_DIAGNOSTICS_REVISION = "2026-06-05-production-single-purchase";
 
 let logs: string[] = loadStoredLogs();
 

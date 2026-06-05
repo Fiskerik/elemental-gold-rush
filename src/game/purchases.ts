@@ -57,6 +57,7 @@ let customerInfoListenerId: string | null = null;
 let missingConfigLogged = false;
 let lastConfigurationReason = "";
 let lastStoreProductLookupReason = "";
+let activePurchaseProductId: ProductId | null = null;
 
 export type PurchaseGoldCoinResult = {
   coins: number;
@@ -224,6 +225,49 @@ function describePurchaseError(error: unknown): string {
     .filter(Boolean);
 
   return fields.join(": ");
+}
+
+function isPurchaseCancellation(error: unknown, reason = describePurchaseError(error)): boolean {
+  if (typeof reason === "string" && /cancel(l)?ed|user.?cancel/i.test(reason)) return true;
+  if (!error || typeof error !== "object") return false;
+
+  const details = error as {
+    code?: unknown;
+    message?: unknown;
+    readableErrorCode?: unknown;
+    readable_error_code?: unknown;
+    underlyingErrorMessage?: unknown;
+    userCancelled?: unknown;
+  };
+  if (details.userCancelled === true) return true;
+
+  return [
+    details.readableErrorCode,
+    details.readable_error_code,
+    details.code,
+    details.message,
+    details.underlyingErrorMessage,
+  ]
+    .filter(
+      (value): value is string | number => typeof value === "string" || typeof value === "number",
+    )
+    .map(String)
+    .some((value) => /cancel(l)?ed|user.?cancel|purchase_cancel/i.test(value));
+}
+
+function beginNativePurchase(productId: ProductId): string | null {
+  if (!activePurchaseProductId) {
+    activePurchaseProductId = productId;
+    return null;
+  }
+  if (activePurchaseProductId === productId) {
+    return "This purchase is already opening. Finish or cancel the App Store sheet first.";
+  }
+  return "Another App Store purchase is already opening. Finish or cancel it first.";
+}
+
+function endNativePurchase(productId: ProductId): void {
+  if (activePurchaseProductId === productId) activePurchaseProductId = null;
 }
 
 function purchaseSetupHint(reason: string): string {
@@ -905,6 +949,15 @@ export async function purchaseProductWithResult(
     return { purchased: false, reason };
   }
 
+  const activePurchaseReason = beginNativePurchase(productId);
+  if (activePurchaseReason) {
+    purchaseDebugLog("Product purchase blocked because another purchase is active.", {
+      productId,
+      activePurchaseProductId,
+    });
+    return { purchased: false, reason: activePurchaseReason };
+  }
+
   try {
     reportStep?.("Waiting for App Store confirmation...");
     const primaryRoute = packageToPurchase ? "purchasePackage" : "purchaseStoreProduct";
@@ -939,6 +992,14 @@ export async function purchaseProductWithResult(
     return productPurchaseResultFromCustomerInfo(productId, refreshedCustomerInfo, "Purchase");
   } catch (error) {
     const firstErrorMessage = describePurchaseError(error);
+    if (isPurchaseCancellation(error, firstErrorMessage)) {
+      const reason = "Purchase was cancelled.";
+      purchaseDebugLog("Purchase cancelled by user; fallback purchase route skipped.", {
+        productId,
+      });
+      return { purchased: false, reason };
+    }
+
     if (isTimeoutReason(firstErrorMessage)) {
       const reason = purchaseSetupHint(firstErrorMessage);
       showPurchaseDebugAlert("Purchase timed out", reason);
@@ -993,6 +1054,12 @@ export async function purchaseProductWithResult(
         "Purchase retry",
       );
     } catch (fallbackError) {
+      if (isPurchaseCancellation(fallbackError)) {
+        const reason = "Purchase was cancelled.";
+        purchaseDebugLog("Purchase retry cancelled by user.", { productId });
+        return { purchased: false, reason };
+      }
+
       const reason = purchaseSetupHint(
         describePurchaseError(fallbackError) ||
           describePurchaseError(error) ||
@@ -1012,6 +1079,8 @@ export async function purchaseProductWithResult(
       );
       return { purchased: false, reason };
     }
+  } finally {
+    endNativePurchase(productId);
   }
 }
 
@@ -1092,6 +1161,15 @@ export async function purchaseGoldCoinPack(
       reason,
     };
   }
+  const activePurchaseReason = beginNativePurchase(productId);
+  if (activePurchaseReason) {
+    purchaseDebugLog("Coin purchase blocked because another purchase is active.", {
+      productId,
+      activePurchaseProductId,
+    });
+    return { coins: 0, reason: activePurchaseReason };
+  }
+
   try {
     reportStep?.("Waiting for App Store confirmation...");
     const primaryRoute = packageToPurchase ? "purchasePackage" : "purchaseStoreProduct";
@@ -1121,6 +1199,14 @@ export async function purchaseGoldCoinPack(
     return { coins: product.coins };
   } catch (error) {
     const firstErrorMessage = describePurchaseError(error);
+    if (isPurchaseCancellation(error, firstErrorMessage)) {
+      const reason = "Purchase was cancelled.";
+      purchaseDebugLog("Coin purchase cancelled by user; fallback purchase route skipped.", {
+        productId,
+      });
+      return { coins: 0, reason };
+    }
+
     if (isTimeoutReason(firstErrorMessage)) {
       const message = purchaseSetupHint(firstErrorMessage);
       showPurchaseDebugAlert("Coin purchase timed out", message);
@@ -1153,6 +1239,12 @@ export async function purchaseGoldCoinPack(
         );
         return { coins: product.coins };
       } catch (fallbackError) {
+        if (isPurchaseCancellation(fallbackError)) {
+          const reason = "Purchase was cancelled.";
+          purchaseDebugLog("Coin purchase retry cancelled by user.", { productId });
+          return { coins: 0, reason };
+        }
+
         const message = purchaseSetupHint(
           describePurchaseError(fallbackError) ||
             describePurchaseError(error) ||
@@ -1172,6 +1264,8 @@ export async function purchaseGoldCoinPack(
     );
     showPurchaseDebugAlert("Coin purchase failed", summarizeErrorForDebug(error) || message);
     return { coins: 0, reason: message };
+  } finally {
+    endNativePurchase(productId);
   }
 }
 
