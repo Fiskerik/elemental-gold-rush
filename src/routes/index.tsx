@@ -15,7 +15,11 @@ import { Profile } from "@/game/Profile";
 import { GameModeId } from "@/game/challenges";
 import { getLevelById } from "@/game/levels";
 import { useProgress } from "@/game/store";
-import { syncCustomerInfoEntitlement } from "@/game/purchases";
+import {
+  clearCustomerInfoListener,
+  setCustomerInfoListener,
+  syncCustomerInfoEntitlement,
+} from "@/game/purchases";
 import { useDomLocalization } from "@/game/useDomLocalization";
 
 export const Route = createFileRoute("/")({
@@ -98,6 +102,19 @@ function Index() {
     return () => {
       cancelled = true;
       window.clearTimeout(timeoutId);
+    };
+  }, [grantProPack]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void setCustomerInfoListener((hasProEntitlement) => {
+      if (!cancelled && hasProEntitlement) grantProPack();
+    }).catch(() => {
+      // Purchase buttons still perform their own entitlement checks.
+    });
+    return () => {
+      cancelled = true;
+      void clearCustomerInfoListener().catch(() => {});
     };
   }, [grantProPack]);
 

@@ -14,7 +14,7 @@ import {
 } from "./purchases";
 import { initAds, showRewardedForCoin } from "./ads";
 import { useIsTabletLayout } from "./responsive";
-import { clearLogs, getLogs, logDebug } from "../lib/debugLogger";
+import { clearLogs, copyDebugReport, getDebugReport, getLogs, logDebug } from "../lib/debugLogger";
 
 const SHOP_POWER_UPS: Array<{
   id: InventoryPowerUpId;
@@ -92,7 +92,7 @@ const APP_STORE_COIN_PACKS = [
   PRODUCT_IDS.coins50,
   PRODUCT_IDS.coins100,
 ] as const;
-const SHOP_PURCHASE_GUARD_TIMEOUT_MS = 75_000;
+const SHOP_PURCHASE_GUARD_TIMEOUT_MS = 25_000;
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
   let timeoutId: number | undefined;
@@ -124,9 +124,15 @@ export function Shop({ onBack }: { onBack: () => void }) {
   const [purchaseDebugBusy, setPurchaseDebugBusy] = useState(false);
   const [purchaseDebugOpen, setPurchaseDebugOpen] = useState(false);
   const [purchaseDebugLogs, setPurchaseDebugLogs] = useState<string[]>([]);
+  const [purchaseSupportBusy, setPurchaseSupportBusy] = useState(false);
+  const [purchaseSupportMessage, setPurchaseSupportMessage] = useState("");
+  const [purchaseReport, setPurchaseReport] = useState("");
   const proPack = getProductById(PRODUCT_IDS.proLabPack);
   const purchaseDebugEnabled = isPurchaseDebugUiEnabled();
   const purchaseDebugLocked = purchaseDebugEnabled && purchaseDebugBusy;
+  const showPurchaseSupport = Boolean(
+    proPackMessage || message || purchaseSupportMessage || purchaseReport,
+  );
 
   useEffect(() => {
     if (hasProPack) return;
@@ -307,7 +313,42 @@ export function Shop({ onBack }: { onBack: () => void }) {
   function handleClearPurchaseLogs() {
     clearLogs();
     setPurchaseDebugLogs([]);
+    setPurchaseReport("");
     setMessage("Purchase debug logs cleared.");
+  }
+
+  async function handlePurchaseSupportCheck() {
+    setPurchaseSupportBusy(true);
+    setPurchaseSupportMessage("Checking purchase setup...");
+    logDebug("Manual purchase support check started.");
+    try {
+      const snapshot = await debugNativePurchases((statusMessage) =>
+        setPurchaseSupportMessage(statusMessage),
+      );
+      setPurchaseSupportMessage(snapshot.reason ?? "Purchase setup check complete.");
+      setPurchaseReport(getDebugReport());
+    } catch (error) {
+      const supportMessage = error instanceof Error ? error.message : String(error);
+      logDebug("Manual purchase support check failed.", { message: supportMessage });
+      setPurchaseSupportMessage(supportMessage);
+      setPurchaseReport(getDebugReport());
+    } finally {
+      setPurchaseSupportBusy(false);
+    }
+  }
+
+  async function handleCopyPurchaseDiagnostics() {
+    const copied = await copyDebugReport();
+    setPurchaseReport(getDebugReport());
+    setPurchaseSupportMessage(
+      copied
+        ? "Purchase diagnostics copied. Paste them into your support note."
+        : "Clipboard copy was not available. Select and copy the report below.",
+    );
+  }
+
+  function handleTogglePurchaseReport() {
+    setPurchaseReport((current) => (current ? "" : getDebugReport()));
   }
 
   return (
@@ -381,6 +422,60 @@ export function Shop({ onBack }: { onBack: () => void }) {
                   <div style={debugLogLine}>No purchase logs yet.</div>
                 )}
               </div>
+            )}
+          </section>
+        )}
+
+        {showPurchaseSupport && (
+          <section style={purchaseSupportPanel}>
+            <div>
+              <div style={purchaseSupportTitle}>Purchase Support</div>
+              <p style={purchaseSupportCopy}>
+                If the App Store sheet does not appear, run a check and copy diagnostics from this
+                TestFlight build.
+              </p>
+            </div>
+            <div style={purchaseSupportActions}>
+              <button
+                type="button"
+                onClick={handlePurchaseSupportCheck}
+                disabled={purchaseSupportBusy || Boolean(proPackBusy) || Boolean(pendingProductId)}
+                style={{
+                  ...secondaryShopButton,
+                  opacity:
+                    purchaseSupportBusy || Boolean(proPackBusy) || Boolean(pendingProductId)
+                      ? 0.6
+                      : 1,
+                }}
+              >
+                {purchaseSupportBusy ? "Checking..." : "Run Check"}
+              </button>
+              <button
+                type="button"
+                onClick={handleCopyPurchaseDiagnostics}
+                style={secondaryShopButton}
+              >
+                Copy Diagnostics
+              </button>
+              <button
+                type="button"
+                onClick={handleTogglePurchaseReport}
+                style={secondaryShopButton}
+              >
+                {purchaseReport ? "Hide Report" : "Show Report"}
+              </button>
+            </div>
+            {purchaseSupportMessage && (
+              <p style={purchaseSupportStatus}>{purchaseSupportMessage}</p>
+            )}
+            {purchaseReport && (
+              <textarea
+                readOnly
+                value={purchaseReport}
+                onFocus={(event) => event.currentTarget.select()}
+                style={purchaseReportBox}
+                aria-label="Purchase diagnostics report"
+              />
             )}
           </section>
         )}
@@ -792,6 +887,57 @@ function Benefit({ text }: { text: string }) {
     </div>
   );
 }
+
+const purchaseSupportPanel: React.CSSProperties = {
+  padding: 12,
+  borderRadius: 14,
+  background: "var(--surface)",
+  border: "1px solid var(--border)",
+  display: "grid",
+  gap: 10,
+};
+
+const purchaseSupportTitle: React.CSSProperties = {
+  fontSize: 11,
+  letterSpacing: 1.6,
+  color: "var(--accent)",
+  fontWeight: 900,
+  textTransform: "uppercase",
+};
+
+const purchaseSupportCopy: React.CSSProperties = {
+  margin: "4px 0 0",
+  color: "var(--muted-foreground)",
+  fontSize: 12,
+  lineHeight: 1.4,
+};
+
+const purchaseSupportActions: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(112px, 1fr))",
+  gap: 8,
+};
+
+const purchaseSupportStatus: React.CSSProperties = {
+  margin: 0,
+  color: "var(--muted-foreground)",
+  fontSize: 12,
+  lineHeight: 1.4,
+};
+
+const purchaseReportBox: React.CSSProperties = {
+  width: "100%",
+  minHeight: 160,
+  resize: "vertical",
+  borderRadius: 10,
+  padding: 10,
+  background: "oklch(0.12 0.02 250)",
+  color: "oklch(0.86 0.18 145)",
+  border: "1px solid var(--border)",
+  fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+  fontSize: 10,
+  lineHeight: 1.45,
+};
 
 const debugPanel: React.CSSProperties = {
   padding: 12,

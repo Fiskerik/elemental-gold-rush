@@ -45,9 +45,9 @@ type PurchasesPlugin = {
 const DEFAULT_PRO_ENTITLEMENT = "atomic_fusion_lifetime";
 const DEFAULT_OFFERING_ID = "default";
 const NATIVE_SETUP_TIMEOUT_MS = 30_000;
-const NATIVE_PURCHASE_TIMEOUT_MS = 60_000;
+const NATIVE_PURCHASE_TIMEOUT_MS = 20_000;
 const DEBUG_SETUP_TIMEOUT_MS = 12_000;
-const DEBUG_PURCHASE_TIMEOUT_MS = 25_000;
+const DEBUG_PURCHASE_TIMEOUT_MS = 15_000;
 
 let configured = false;
 let purchasesPlugin: PurchasesPlugin | null = null;
@@ -165,7 +165,6 @@ export function isPurchaseDebugUiEnabled(): boolean {
 }
 
 function purchaseDebugLog(message: string, details?: unknown): void {
-  if (!shouldEnableRevenueCatDebugLogs() && !isPurchaseDebugUiEnabled()) return;
   logDebug(message, details);
 }
 
@@ -682,6 +681,31 @@ export async function presentCustomerCenter(): Promise<boolean> {
   }
 }
 
+function productPurchaseResultFromCustomerInfo(
+  productId: ProductId,
+  customerInfo: CustomerInfo,
+  context: string,
+): PurchaseProductResult {
+  purchaseDebugLog(`${context} returned customer info.`, {
+    productId,
+    activeEntitlements: Object.keys(customerInfo.entitlements?.active ?? {}),
+  });
+  if (productId !== PRODUCT_IDS.proLabPack) {
+    showPurchaseDebugAlert(context, `Product: ${productId}`);
+    return { purchased: true };
+  }
+  if (hasProEntitlement(customerInfo)) {
+    showPurchaseDebugAlert(context, `Product: ${productId}\nEntitlement: ${getEntitlementId()}`);
+    return { purchased: true };
+  }
+  const reason = `Purchase completed, but entitlement '${getEntitlementId()}' is not active yet. Try Restore after a moment.`;
+  showPurchaseDebugAlert(`${context} missing entitlement`, reason);
+  return {
+    purchased: false,
+    reason,
+  };
+}
+
 export async function purchaseProductWithResult(
   productId: ProductId,
   reportStep?: PurchaseStepReporter,
@@ -745,54 +769,44 @@ export async function purchaseProductWithResult(
 
   try {
     reportStep?.("Waiting for App Store confirmation...");
-    const primaryRoute = packageToPurchase ? "purchasePackage" : "purchaseStoreProduct";
+    const primaryRoute = storeProduct ? "purchaseStoreProduct" : "purchasePackage";
     purchaseDebugLog("Calling App Store purchase route.", {
       route: primaryRoute,
       storeProduct: storeProduct?.identifier ?? null,
       revenueCatPackage: packageToPurchase?.identifier ?? null,
       packageProduct: packageToPurchase?.product.identifier ?? null,
     });
-    const purchaseResult = packageToPurchase
+    const purchaseResult = storeProduct
       ? await withNativeTimeout(
-          purchases.purchasePackage({
-            aPackage: packageToPurchase,
+          purchases.purchaseStoreProduct({
+            product: storeProduct,
           }),
           NATIVE_PURCHASE_TIMEOUT_MS,
           "App Store purchase",
         )
       : await withNativeTimeout(
-          purchases.purchaseStoreProduct({
-            product: storeProduct!,
+          purchases.purchasePackage({
+            aPackage: packageToPurchase!,
           }),
           NATIVE_PURCHASE_TIMEOUT_MS,
           "App Store purchase",
         );
-    const { customerInfo } = purchaseResult;
-    purchaseDebugLog("Purchase returned customer info.", {
+    return productPurchaseResultFromCustomerInfo(
       productId,
-      activeEntitlements: Object.keys(customerInfo.entitlements?.active ?? {}),
-    });
-    if (productId !== PRODUCT_IDS.proLabPack) {
-      showPurchaseDebugAlert("Purchase returned", `Product: ${productId}`);
-      return { purchased: true };
-    }
-    if (hasProEntitlement(customerInfo)) {
-      showPurchaseDebugAlert(
-        "Purchase successful",
-        `Product: ${productId}\nEntitlement: ${getEntitlementId()}`,
-      );
-      return { purchased: true };
-    }
-    const reason = `Purchase completed, but entitlement '${getEntitlementId()}' is not active yet. Try Restore after a moment.`;
-    showPurchaseDebugAlert("Purchase missing entitlement", reason);
-    return {
-      purchased: false,
-      reason,
-    };
+      purchaseResult.customerInfo,
+      "Purchase",
+    );
   } catch (error) {
+    const firstErrorMessage = describePurchaseError(error);
+    if (isTimeoutReason(firstErrorMessage)) {
+      const reason = purchaseSetupHint(firstErrorMessage);
+      showPurchaseDebugAlert("Purchase timed out", reason);
+      return { purchased: false, reason };
+    }
+
     if (!storeProduct || !packageToPurchase) {
       const reason = purchaseSetupHint(
-        describePurchaseError(error) || "App Store purchase could not be completed right now.",
+        firstErrorMessage || "App Store purchase could not be completed right now.",
       );
       console.log("Native App Store purchase could not be completed.", {
         productId,
@@ -803,46 +817,20 @@ export async function purchaseProductWithResult(
       return { purchased: false, reason };
     }
 
-    const firstErrorMessage = describePurchaseError(error);
-    if (isPurchaseDebugUiEnabled() && isTimeoutReason(firstErrorMessage)) {
-      const reason = purchaseSetupHint(firstErrorMessage);
-      showPurchaseDebugAlert("Purchase timed out", reason);
-      return { purchased: false, reason };
-    }
-
     try {
       reportStep?.("Retrying purchase route...");
-      purchaseDebugLog("Retrying purchase via StoreKit product.", {
-        storeProduct: storeProduct.identifier,
+      purchaseDebugLog("Retrying purchase via RevenueCat package.", {
+        revenueCatPackage: packageToPurchase.identifier,
+        packageProduct: packageToPurchase.product.identifier,
       });
       const { customerInfo } = await withNativeTimeout(
-        purchases.purchaseStoreProduct({
-          product: storeProduct,
+        purchases.purchasePackage({
+          aPackage: packageToPurchase,
         }),
         NATIVE_PURCHASE_TIMEOUT_MS,
         "App Store purchase retry",
       );
-      purchaseDebugLog("Purchase retry returned customer info.", {
-        productId,
-        activeEntitlements: Object.keys(customerInfo.entitlements?.active ?? {}),
-      });
-      if (productId !== PRODUCT_IDS.proLabPack) {
-        showPurchaseDebugAlert("Purchase retry returned", `Product: ${productId}`);
-        return { purchased: true };
-      }
-      if (hasProEntitlement(customerInfo)) {
-        showPurchaseDebugAlert(
-          "Purchase retry successful",
-          `Product: ${productId}\nEntitlement: ${getEntitlementId()}`,
-        );
-        return { purchased: true };
-      }
-      const reason = `Purchase completed, but entitlement '${getEntitlementId()}' is not active yet. Try Restore after a moment.`;
-      showPurchaseDebugAlert("Purchase retry missing entitlement", reason);
-      return {
-        purchased: false,
-        reason,
-      };
+      return productPurchaseResultFromCustomerInfo(productId, customerInfo, "Purchase retry");
     } catch (fallbackError) {
       const reason = purchaseSetupHint(
         describePurchaseError(fallbackError) ||
@@ -925,22 +913,22 @@ export async function purchaseGoldCoinPack(
   }
   try {
     reportStep?.("Waiting for App Store confirmation...");
-    const primaryRoute = packageToPurchase ? "purchasePackage" : "purchaseStoreProduct";
+    const primaryRoute = storeProduct ? "purchaseStoreProduct" : "purchasePackage";
     purchaseDebugLog("Calling App Store coin purchase route.", {
       route: primaryRoute,
       storeProduct: storeProduct?.identifier ?? null,
       revenueCatPackage: packageToPurchase?.identifier ?? null,
       packageProduct: packageToPurchase?.product.identifier ?? null,
     });
-    if (packageToPurchase) {
+    if (storeProduct) {
       await withNativeTimeout(
-        purchases.purchasePackage({ aPackage: packageToPurchase }),
+        purchases.purchaseStoreProduct({ product: storeProduct }),
         NATIVE_PURCHASE_TIMEOUT_MS,
         "App Store coin purchase",
       );
     } else {
       await withNativeTimeout(
-        purchases.purchaseStoreProduct({ product: storeProduct! }),
+        purchases.purchasePackage({ aPackage: packageToPurchase! }),
         NATIVE_PURCHASE_TIMEOUT_MS,
         "App Store coin purchase",
       );
@@ -951,21 +939,22 @@ export async function purchaseGoldCoinPack(
     );
     return { coins: product.coins };
   } catch (error) {
-    if (storeProduct && packageToPurchase) {
-      const firstErrorMessage = describePurchaseError(error);
-      if (isPurchaseDebugUiEnabled() && isTimeoutReason(firstErrorMessage)) {
-        const message = purchaseSetupHint(firstErrorMessage);
-        showPurchaseDebugAlert("Coin purchase timed out", message);
-        return { coins: 0, reason: message };
-      }
+    const firstErrorMessage = describePurchaseError(error);
+    if (isTimeoutReason(firstErrorMessage)) {
+      const message = purchaseSetupHint(firstErrorMessage);
+      showPurchaseDebugAlert("Coin purchase timed out", message);
+      return { coins: 0, reason: message };
+    }
 
+    if (storeProduct && packageToPurchase) {
       try {
         reportStep?.("Retrying purchase route...");
-        purchaseDebugLog("Retrying coin purchase via StoreKit product.", {
-          storeProduct: storeProduct.identifier,
+        purchaseDebugLog("Retrying coin purchase via RevenueCat package.", {
+          revenueCatPackage: packageToPurchase.identifier,
+          packageProduct: packageToPurchase.product.identifier,
         });
         await withNativeTimeout(
-          purchases.purchaseStoreProduct({ product: storeProduct }),
+          purchases.purchasePackage({ aPackage: packageToPurchase }),
           NATIVE_PURCHASE_TIMEOUT_MS,
           "App Store coin purchase retry",
         );
