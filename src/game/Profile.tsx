@@ -14,25 +14,16 @@ import { MAX_LEVEL } from "./levels";
 import { formatScore } from "./logic";
 import { useProgress } from "./store";
 import { useIsTabletLayout } from "./responsive";
+import {
+  SUPPORTED_LANGUAGES,
+  t,
+  toIntlLocale,
+  type AppLanguage,
+} from "./localization";
 
 interface Props {
   onBack: () => void;
 }
-
-const PURCHASE_GUARD_TIMEOUT_MS = 12_000;
-
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
-  let timeoutId: number | undefined;
-  return Promise.race([
-    promise.finally(() => {
-      if (timeoutId) window.clearTimeout(timeoutId);
-    }),
-    new Promise<T>((_, reject) => {
-      timeoutId = window.setTimeout(() => reject(new Error(message)), timeoutMs);
-    }),
-  ]);
-}
-
 
 export function Profile({ onBack }: Props) {
   const isTabletLayout = useIsTabletLayout();
@@ -52,9 +43,12 @@ export function Profile({ onBack }: Props) {
     challengeBestScores,
     hasProPack,
     appTheme,
+    appLanguage,
     setUnlockedLevel,
     setAppTheme,
+    setAppLanguage,
   } = useProgress();
+  const tr = (text: string) => t(text, appLanguage);
   const highestEl = ELEMENTS[highestElement - 1];
   const completedDailyQuests = dailyQuests.filter((quest) => quest.completed).length;
   const dailyRewardAmount = hasProPack ? 4 : 2;
@@ -118,7 +112,7 @@ export function Profile({ onBack }: Props) {
             value={`${bestCombo}×`}
             sub={
               bestComboDate
-                ? new Date(bestComboDate).toLocaleDateString(undefined, {
+                ? new Date(bestComboDate).toLocaleDateString(toIntlLocale(appLanguage), {
                     year: "numeric",
                     month: "short",
                     day: "numeric",
@@ -141,7 +135,7 @@ export function Profile({ onBack }: Props) {
 
         <section style={card}>
           <div style={sectionHeading}>Display</div>
-          <div style={themeToggle}>
+          <div style={preferenceRow}>
             <span style={{ fontSize: 13, fontWeight: 850 }}>Theme</span>
             <div style={{ display: "inline-grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
               {(["dark", "light"] as const).map((theme) => (
@@ -157,11 +151,27 @@ export function Profile({ onBack }: Props) {
                     borderColor: appTheme === theme ? "var(--primary)" : "var(--border)",
                   }}
                 >
-                  {theme === "dark" ? "Dark" : "Light"}
+                  {theme === "dark" ? tr("Dark") : tr("Light")}
                 </button>
               ))}
             </div>
           </div>
+          <label style={{ ...preferenceRow, marginTop: 12 }}>
+            <span style={{ fontSize: 13, fontWeight: 850 }}>{tr("Language")}</span>
+            <select
+              value={appLanguage}
+              onChange={(event) => setAppLanguage(event.target.value as AppLanguage)}
+              style={languageSelect}
+              aria-label={tr("Language")}
+              data-no-localize="true"
+            >
+              {SUPPORTED_LANGUAGES.map((language) => (
+                <option key={language.code} value={language.code}>
+                  {language.nativeName} - {language.name}
+                </option>
+              ))}
+            </select>
+          </label>
         </section>
 
         <section style={card}>
@@ -356,7 +366,7 @@ const card: React.CSSProperties = {
   marginBottom: 12,
 };
 
-const themeToggle: React.CSSProperties = {
+const preferenceRow: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
   justifyContent: "space-between",
@@ -369,6 +379,20 @@ const themeChoiceButton: React.CSSProperties = {
   padding: "7px 12px",
   fontSize: 12,
   fontWeight: 900,
+  cursor: "pointer",
+};
+
+const languageSelect: React.CSSProperties = {
+  minWidth: 190,
+  maxWidth: "min(100%, 250px)",
+  border: "1px solid var(--border)",
+  borderRadius: 12,
+  padding: "8px 12px",
+  background: "var(--surface)",
+  color: "var(--foreground)",
+  fontSize: 13,
+  fontWeight: 800,
+  fontFamily: "inherit",
   cursor: "pointer",
 };
 

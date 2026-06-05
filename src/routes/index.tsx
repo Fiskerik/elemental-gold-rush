@@ -15,9 +15,8 @@ import { Profile } from "@/game/Profile";
 import { GameModeId } from "@/game/challenges";
 import { getLevelById } from "@/game/levels";
 import { useProgress } from "@/game/store";
-import {
-  syncCustomerInfoEntitlement,
-} from "@/game/purchases";
+import { syncCustomerInfoEntitlement } from "@/game/purchases";
+import { useDomLocalization } from "@/game/useDomLocalization";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -55,9 +54,12 @@ function Index() {
   const hasProPack = useProgress((s) => s.hasProPack);
   const grantProPack = useProgress((s) => s.grantProPack);
   const appTheme = useProgress((s) => s.appTheme);
+  const appLanguage = useProgress((s) => s.appLanguage);
   const [screen, setScreen] = useState<Screen>({ name: "menu" });
   const [showLaunchScreen, setShowLaunchScreen] = useState(true);
   const [resumePrompt, setResumePrompt] = useState<ReturnType<typeof getSavedRunSummary>>(null);
+
+  useDomLocalization(appLanguage);
 
   useEffect(() => {
     const root = document.documentElement;

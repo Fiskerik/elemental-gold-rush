@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { GameModeId } from "./challenges";
 import { persist } from "zustand/middleware";
 import { getEarnedBadgeIds } from "./badges";
+import { DEFAULT_LANGUAGE, normalizeLanguage, type AppLanguage } from "./localization";
 import {
   DailyQuest,
   QuestProgressEvent,
@@ -121,6 +122,7 @@ interface ProgressState {
   musicEnabled: boolean;
   hapticsEnabled: boolean;
   appTheme: AppTheme;
+  appLanguage: AppLanguage;
   shootingStyle: "hold" | "press";
   hasChosenShootingStyle: boolean;
   dailyQuestDate: string;
@@ -173,6 +175,7 @@ interface ProgressState {
   toggleMusic: () => void;
   toggleHaptics: () => void;
   setAppTheme: (theme: AppTheme) => void;
+  setAppLanguage: (language: AppLanguage) => void;
   toggleAppTheme: () => void;
   setShootingStyle: (style: "hold" | "press") => void;
   reset: () => void;
@@ -196,6 +199,7 @@ export const useProgress = create<ProgressState>()(
       musicEnabled: true,
       hapticsEnabled: true,
       appTheme: "dark",
+      appLanguage: DEFAULT_LANGUAGE,
       shootingStyle: "hold",
       hasChosenShootingStyle: false,
       dailyQuestDate: initialQuestDate,
@@ -471,6 +475,7 @@ export const useProgress = create<ProgressState>()(
       toggleMusic: () => set((s) => ({ musicEnabled: !s.musicEnabled })),
       toggleHaptics: () => set((s) => ({ hapticsEnabled: !s.hapticsEnabled })),
       setAppTheme: (theme) => set({ appTheme: theme }),
+      setAppLanguage: (language) => set({ appLanguage: normalizeLanguage(language) }),
       toggleAppTheme: () =>
         set((s) => ({ appTheme: s.appTheme === "dark" ? "light" : "dark" })),
       setShootingStyle: (style) => set({ shootingStyle: style, hasChosenShootingStyle: true }),
@@ -487,6 +492,7 @@ export const useProgress = create<ProgressState>()(
           musicEnabled: true,
           hapticsEnabled: true,
           appTheme: "dark",
+          appLanguage: DEFAULT_LANGUAGE,
           shootingStyle: "hold",
           hasChosenShootingStyle: false,
           dailyQuestDate: getTodayQuestDate(),
@@ -530,6 +536,7 @@ export const useProgress = create<ProgressState>()(
           musicEnabled: persistedState?.musicEnabled ?? current.musicEnabled,
           hapticsEnabled: persistedState?.hapticsEnabled ?? current.hapticsEnabled,
           appTheme: persistedState?.appTheme === "light" ? "light" : "dark",
+          appLanguage: normalizeLanguage(persistedState?.appLanguage),
           shootingStyle: persistedState?.shootingStyle ?? current.shootingStyle,
           hasChosenShootingStyle:
             persistedState?.hasChosenShootingStyle ?? current.hasChosenShootingStyle,
