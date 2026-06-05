@@ -92,7 +92,7 @@ const APP_STORE_COIN_PACKS = [
   PRODUCT_IDS.coins50,
   PRODUCT_IDS.coins100,
 ] as const;
-const SHOP_PURCHASE_GUARD_TIMEOUT_MS = 25_000;
+const SHOP_PURCHASE_GUARD_TIMEOUT_MS = 60_000;
 
 function withTimeout<T>(
   operation: () => Promise<T>,
@@ -171,7 +171,7 @@ export function Shop({ onBack }: { onBack: () => void }) {
   async function handleProPackPurchase() {
     logDebug("Unlock Pack button tapped.", { productId: PRODUCT_IDS.proLabPack });
     setProPackBusy("purchase");
-    setProPackMessage("Opening App Store purchase...");
+    setProPackMessage("Preparing purchase with App Store...");
     try {
       const result = await withTimeout(
         () =>
@@ -242,7 +242,7 @@ export function Shop({ onBack }: { onBack: () => void }) {
   async function handleNativeCoinPurchase(productId: ProductId) {
     logDebug("Coin pack button tapped.", { productId });
     setPendingProductId(productId);
-    setMessage("Opening App Store purchase...");
+    setMessage("Preparing purchase with App Store...");
     try {
       const result = await withTimeout(
         () => purchaseGoldCoinPack(productId, (statusMessage) => setMessage(statusMessage)),

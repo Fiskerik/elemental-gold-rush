@@ -1,6 +1,6 @@
 const STORAGE_KEY = "atomic-fusion-debug-logs";
 const MAX_LOG_LINES = 80;
-const PURCHASE_DIAGNOSTICS_REVISION = "2026-06-05-lazy-native-purchases-no-startup-warmup";
+const PURCHASE_DIAGNOSTICS_REVISION = "2026-06-05-package-first-offerings-flow";
 
 let logs: string[] = loadStoredLogs();
 
