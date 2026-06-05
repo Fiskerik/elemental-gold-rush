@@ -290,16 +290,44 @@ async function ensureConfigured(
   reportStep?: PurchaseStepReporter,
 ): Promise<PurchasesPlugin | null> {
   if (!isNativePlatform()) return null;
-  if (configured) return purchasesPlugin;
-  if (configurationPromise) {
-    purchaseDebugLog("RevenueCat configuration already in progress; waiting for existing setup.");
-    return configurationPromise;
+
+  if (configured && purchasesPlugin) {
+    purchaseDebugLog("RevenueCat already configured; reusing native purchases instance.");
+    return purchasesPlugin;
   }
 
-  configurationPromise = configurePurchases(reportStep).finally(() => {
-    configurationPromise = null;
+  if (configured && !purchasesPlugin) {
+    purchaseDebugLog(
+      "RevenueCat configured flag set without native purchases instance; reconnecting.",
+    );
+    configured = false;
+  }
+
+  if (!configurationPromise) {
+    purchaseDebugLog("RevenueCat configuration promise created.");
+    configurationPromise = configurePurchases(reportStep);
+  } else {
+    purchaseDebugLog("RevenueCat configuration already in progress; waiting for existing setup.");
+  }
+
+  const activeConfigurationPromise = configurationPromise;
+  try {
+    await activeConfigurationPromise;
+  } finally {
+    if (configurationPromise === activeConfigurationPromise) {
+      configurationPromise = null;
+    }
+  }
+
+  if (configured && purchasesPlugin) {
+    purchaseDebugLog("RevenueCat configuration promise resolved; native purchases ready.");
+    return purchasesPlugin;
+  }
+
+  purchaseDebugLog("RevenueCat configuration promise resolved without native purchases instance.", {
+    reason: lastConfigurationReason,
   });
-  return configurationPromise;
+  return null;
 }
 
 async function configurePurchases(
@@ -343,6 +371,7 @@ async function configurePurchases(
       entitlementId: getEntitlementId(),
       apiKeyPrefix: `${apiKey.slice(0, 8)}...`,
     });
+    purchaseDebugLog("RevenueCat configurePurchases returning native purchases instance.");
     return Purchases;
   } catch (error) {
     lastConfigurationReason =
@@ -810,6 +839,7 @@ export async function purchaseProductWithResult(
     };
   }
 
+  purchaseDebugLog("Ensuring RevenueCat configuration for product purchase.", { productId });
   const purchases = await ensureConfigured(reportStep);
   if (!purchases) {
     const reason =
