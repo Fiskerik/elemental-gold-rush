@@ -45,9 +45,9 @@ type PurchasesPlugin = {
 
 const DEFAULT_PRO_ENTITLEMENT = "atomic_fusion_lifetime";
 const DEFAULT_OFFERING_ID = "default";
-const NATIVE_SETUP_TIMEOUT_MS = 30_000;
+const NATIVE_SETUP_TIMEOUT_MS = 15_000;
 const NATIVE_PURCHASE_TIMEOUT_MS = 20_000;
-const DEBUG_SETUP_TIMEOUT_MS = 12_000;
+const DEBUG_SETUP_TIMEOUT_MS = 10_000;
 const DEBUG_PURCHASE_TIMEOUT_MS = 15_000;
 
 let configured = false;
@@ -360,6 +360,7 @@ async function findPackage(
   reportStep?: PurchaseStepReporter,
 ): Promise<PurchasesPackage | null> {
   lastPackageLookupReason = "";
+  purchaseDebugLog("Ensuring RevenueCat configuration for product purchase.", { productId });
   const purchases = await ensureConfigured(reportStep);
   if (!purchases) {
     lastPackageLookupReason =
@@ -793,6 +794,7 @@ export async function purchaseProductWithResult(
     showPurchaseDebugAlert("RevenueCat not configured", reason);
     return { purchased: false, reason };
   }
+  purchaseDebugLog("RevenueCat configuration available for product purchase.", { productId });
 
   const canMakePayments = await checkCanMakePayments(purchases, reportStep);
   if (canMakePayments === false) {
@@ -958,6 +960,7 @@ export async function purchaseGoldCoinPack(
     );
     return { coins: 0, reason: "App Store purchases are only available in the iPhone app." };
   }
+  purchaseDebugLog("Ensuring RevenueCat configuration for coin purchase.", { productId });
   const purchases = await ensureConfigured(reportStep);
   if (!purchases) {
     const reason =
@@ -969,6 +972,7 @@ export async function purchaseGoldCoinPack(
       reason,
     };
   }
+  purchaseDebugLog("RevenueCat configuration available for coin purchase.", { productId });
   const canMakePayments = await checkCanMakePayments(purchases, reportStep);
   if (canMakePayments === false) {
     const reason =

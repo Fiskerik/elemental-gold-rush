@@ -15,11 +15,6 @@ import { Profile } from "@/game/Profile";
 import { GameModeId } from "@/game/challenges";
 import { getLevelById } from "@/game/levels";
 import { useProgress } from "@/game/store";
-import {
-  clearCustomerInfoListener,
-  setCustomerInfoListener,
-  syncCustomerInfoEntitlement,
-} from "@/game/purchases";
 import { useDomLocalization } from "@/game/useDomLocalization";
 
 export const Route = createFileRoute("/")({
@@ -56,7 +51,6 @@ type Screen =
 function Index() {
   const unlockedLevel = useProgress((s) => s.unlockedLevel);
   const hasProPack = useProgress((s) => s.hasProPack);
-  const grantProPack = useProgress((s) => s.grantProPack);
   const appTheme = useProgress((s) => s.appTheme);
   const appLanguage = useProgress((s) => s.appLanguage);
   const [screen, setScreen] = useState<Screen>({ name: "menu" });
@@ -85,38 +79,6 @@ function Index() {
     const timeoutId = window.setTimeout(() => setShowLaunchScreen(false), 1100);
     return () => window.clearTimeout(timeoutId);
   }, [showLaunchScreen]);
-
-  useEffect(() => {
-    let cancelled = false;
-    // Delay native purchase SDK access to avoid launch-time native SDK crashes on some iOS builds.
-    const timeoutId = window.setTimeout(() => {
-      void syncCustomerInfoEntitlement()
-        .then((hasProEntitlement) => {
-          if (!cancelled && hasProEntitlement) grantProPack();
-        })
-        .catch(() => {
-          // Keep launch resilient even if native billing SDK has runtime issues.
-        });
-    }, 4000);
-
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timeoutId);
-    };
-  }, [grantProPack]);
-
-  useEffect(() => {
-    let cancelled = false;
-    void setCustomerInfoListener((hasProEntitlement) => {
-      if (!cancelled && hasProEntitlement) grantProPack();
-    }).catch(() => {
-      // Purchase buttons still perform their own entitlement checks.
-    });
-    return () => {
-      cancelled = true;
-      void clearCustomerInfoListener().catch(() => {});
-    };
-  }, [grantProPack]);
 
   if (showLaunchScreen) return <LaunchScreen />;
 
