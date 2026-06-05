@@ -12,11 +12,7 @@ import {
   getTodayQuestDate,
   refreshDailyQuests,
 } from "./quests";
-import {
-  WeeklyPlayBonusState,
-  claimWeeklyPlayBonus,
-  createWeeklyPlayBonus,
-} from "./weeklyBonus";
+import { WeeklyPlayBonusState, claimWeeklyPlayBonus, createWeeklyPlayBonus } from "./weeklyBonus";
 
 export const INVENTORY_POWER_UPS = [
   "transmute",
@@ -100,8 +96,7 @@ function normalizeLevelStatsRecord(
       attempts: Math.max(0, Math.floor(value?.attempts ?? base.attempts)),
       fails: Math.max(0, Math.floor(value?.fails ?? base.fails)),
       maxScore: Math.max(0, Math.floor(value?.maxScore ?? base.maxScore)),
-      bestShots:
-        value?.bestShots == null ? null : Math.max(0, Math.floor(value.bestShots)),
+      bestShots: value?.bestShots == null ? null : Math.max(0, Math.floor(value.bestShots)),
       powerUpsUsed: Math.max(0, Math.floor(value?.powerUpsUsed ?? base.powerUpsUsed)),
       totalScore: Math.max(0, Math.floor(value?.totalScore ?? base.totalScore)),
       stars: Math.max(0, Math.min(3, Math.floor(value?.stars ?? base.stars))),
@@ -270,8 +265,7 @@ export const useProgress = create<ProgressState>()(
           const normalizedLevel = Math.max(1, Math.floor(levelId));
           const normalizedCost = Math.max(0, Math.floor(coinCost));
           const stats = s.levelStats[normalizedLevel] ?? emptyLevelStats();
-          const canSkipCurrentLevel =
-            normalizedLevel === s.unlockedLevel && (stats.fails ?? 0) > 0;
+          const canSkipCurrentLevel = normalizedLevel === s.unlockedLevel && (stats.fails ?? 0) > 0;
           if (!canSkipCurrentLevel || s.goldCoins < normalizedCost) return s;
           skipped = true;
           return {
@@ -476,8 +470,7 @@ export const useProgress = create<ProgressState>()(
       toggleHaptics: () => set((s) => ({ hapticsEnabled: !s.hapticsEnabled })),
       setAppTheme: (theme) => set({ appTheme: theme }),
       setAppLanguage: (language) => set({ appLanguage: normalizeLanguage(language) }),
-      toggleAppTheme: () =>
-        set((s) => ({ appTheme: s.appTheme === "dark" ? "light" : "dark" })),
+      toggleAppTheme: () => set((s) => ({ appTheme: s.appTheme === "dark" ? "light" : "dark" })),
       setShootingStyle: (style) => set({ shootingStyle: style, hasChosenShootingStyle: true }),
       reset: () =>
         set({

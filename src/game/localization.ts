@@ -2,11 +2,21 @@ export const DEFAULT_LANGUAGE = "en";
 
 export const SUPPORTED_LANGUAGES = [
   { code: "en", appStoreLocale: "en-US", name: "English", nativeName: "English" },
-  { code: "zh-Hans", appStoreLocale: "zh-Hans", name: "Chinese Simplified", nativeName: "简体中文" },
+  {
+    code: "zh-Hans",
+    appStoreLocale: "zh-Hans",
+    name: "Chinese Simplified",
+    nativeName: "简体中文",
+  },
   { code: "es", appStoreLocale: "es-ES", name: "Spanish", nativeName: "Español" },
   { code: "hi", appStoreLocale: "hi", name: "Hindi", nativeName: "हिन्दी" },
   { code: "ar", appStoreLocale: "ar", name: "Arabic", nativeName: "العربية", dir: "rtl" },
-  { code: "pt-BR", appStoreLocale: "pt-BR", name: "Portuguese Brazil", nativeName: "Português (Brasil)" },
+  {
+    code: "pt-BR",
+    appStoreLocale: "pt-BR",
+    name: "Portuguese Brazil",
+    nativeName: "Português (Brasil)",
+  },
   { code: "fr", appStoreLocale: "fr-FR", name: "French", nativeName: "Français" },
   { code: "de", appStoreLocale: "de-DE", name: "German", nativeName: "Deutsch" },
   { code: "ja", appStoreLocale: "ja", name: "Japanese", nativeName: "日本語" },
@@ -24,8 +34,7 @@ type TranslationMap = Record<string, string>;
 
 export function isSupportedLanguage(value: unknown): value is AppLanguage {
   return (
-    typeof value === "string" &&
-    SUPPORTED_LANGUAGES.some((language) => language.code === value)
+    typeof value === "string" && SUPPORTED_LANGUAGES.some((language) => language.code === value)
   );
 }
 
@@ -202,7 +211,8 @@ const TRANSLATIONS: Partial<Record<AppLanguage, TranslationMap>> = {
     "added to your inventory.": "已加入库存。",
     "is introduced at level": "将在关卡引入",
     Support: "支持",
-    "Need help with Atomic Fusion Rush? We are happy to help.": "需要 Atomic Fusion Rush 帮助？我们很乐意协助。",
+    "Need help with Atomic Fusion Rush? We are happy to help.":
+      "需要 Atomic Fusion Rush 帮助？我们很乐意协助。",
     Contact: "联系",
     "Typical response time: 1-3 business days.": "通常回复时间：1-3 个工作日。",
     "How to Report an Issue": "如何报告问题",
@@ -249,7 +259,8 @@ const TRANSLATIONS: Partial<Record<AppLanguage, TranslationMap>> = {
     Language: "Idioma",
     "Daily Lab": "Laboratorio diario",
     "quests complete today.": "misiones completadas hoy.",
-    "Complete 4 of 6 quests to claim the daily prize of": "Completa 4 de 6 misiones para reclamar el premio diario de",
+    "Complete 4 of 6 quests to claim the daily prize of":
+      "Completa 4 de 6 misiones para reclamar el premio diario de",
     "gold coins.": "monedas de oro.",
     "gold coins": "monedas de oro",
     " (includes +2 Pro bonus)": " (incluye +2 bono Pro)",
@@ -262,15 +273,18 @@ const TRANSLATIONS: Partial<Record<AppLanguage, TranslationMap>> = {
     "Unlock all stages": "Desbloquear todas las fases",
     "Enter unlock password": "Introduce la contraseña",
     "Wrong password.": "Contraseña incorrecta.",
-    "Convert points into gold coins and stock your next run": "Convierte puntos en monedas de oro y prepara tu próxima partida",
+    "Convert points into gold coins and stock your next run":
+      "Convierte puntos en monedas de oro y prepara tu próxima partida",
     "ONE-TIME UPGRADE": "MEJORA ÚNICA",
     "Pro Lab Pack - Lifetime": "Pack Lab Pro - De por vida",
     Available: "Disponible",
-    "A one-time premium upgrade for long-term progression.": "Una mejora premium única para progresar a largo plazo.",
+    "A one-time premium upgrade for long-term progression.":
+      "Una mejora premium única para progresar a largo plazo.",
     "Remove forced interstitial ads.": "Elimina anuncios intersticiales obligatorios.",
     "Unlock the Pro Lab profile badge.": "Desbloquea la insignia de perfil Lab Pro.",
     "Get 50 starting gold coins.": "Obtén 50 monedas de oro iniciales.",
-    "Get +2 extra gold coins on each daily gold claim.": "Obtén +2 monedas de oro extra en cada recompensa diaria.",
+    "Get +2 extra gold coins on each daily gold claim.":
+      "Obtén +2 monedas de oro extra en cada recompensa diaria.",
     Restore: "Restaurar",
     "Unlock Pack": "Desbloquear pack",
     "Manage Purchases": "Gestionar compras",
@@ -291,9 +305,11 @@ const TRANSLATIONS: Partial<Record<AppLanguage, TranslationMap>> = {
     "added to your inventory.": "añadido a tu inventario.",
     "is introduced at level": "se presenta en el nivel",
     Support: "Soporte",
-    "Need help with Atomic Fusion Rush? We are happy to help.": "¿Necesitas ayuda con Atomic Fusion Rush? Encantados de ayudarte.",
+    "Need help with Atomic Fusion Rush? We are happy to help.":
+      "¿Necesitas ayuda con Atomic Fusion Rush? Encantados de ayudarte.",
     Contact: "Contacto",
-    "Typical response time: 1-3 business days.": "Tiempo de respuesta habitual: 1-3 días laborables.",
+    "Typical response time: 1-3 business days.":
+      "Tiempo de respuesta habitual: 1-3 días laborables.",
     "How to Report an Issue": "Cómo informar de un problema",
     "Terms of Service": "Términos del servicio",
     "Privacy Policy": "Política de privacidad",
@@ -443,7 +459,9 @@ for (const language of ["fr", "de", "ja", "ko", "ru", "id", "tr", "it", "vi"] as
   TRANSLATIONS[language] = makeCompactTranslation(language);
 }
 
-function makeCompactTranslation(language: Exclude<AppLanguage, "en" | "zh-Hans" | "es" | "hi" | "ar" | "pt-BR">): TranslationMap {
+function makeCompactTranslation(
+  language: Exclude<AppLanguage, "en" | "zh-Hans" | "es" | "hi" | "ar" | "pt-BR">,
+): TranslationMap {
   const compact: Record<typeof language, TranslationMap> = {
     fr: {
       Menu: "Menu",

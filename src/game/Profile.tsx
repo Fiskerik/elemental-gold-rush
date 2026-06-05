@@ -14,12 +14,7 @@ import { MAX_LEVEL } from "./levels";
 import { formatScore } from "./logic";
 import { useProgress } from "./store";
 import { useIsTabletLayout } from "./responsive";
-import {
-  SUPPORTED_LANGUAGES,
-  t,
-  toIntlLocale,
-  type AppLanguage,
-} from "./localization";
+import { SUPPORTED_LANGUAGES, t, toIntlLocale, type AppLanguage } from "./localization";
 
 interface Props {
   onBack: () => void;
@@ -75,8 +70,22 @@ export function Profile({ onBack }: Props) {
   }
 
   return (
-    <div className="app-shell" style={{ padding: isTabletLayout ? 28 : 20, paddingTop: isTabletLayout ? 36 : 32, minHeight: "100dvh" }}>
-      <div style={{ position: "relative", zIndex: 1, maxWidth: isTabletLayout ? 980 : 620, margin: "0 auto" }}>
+    <div
+      className="app-shell"
+      style={{
+        padding: isTabletLayout ? 28 : 20,
+        paddingTop: isTabletLayout ? 36 : 32,
+        minHeight: "100dvh",
+      }}
+    >
+      <div
+        style={{
+          position: "relative",
+          zIndex: 1,
+          maxWidth: isTabletLayout ? 980 : 620,
+          margin: "0 auto",
+        }}
+      >
         <button onClick={onBack} style={backBtn}>
           ← Menu
         </button>
@@ -99,7 +108,14 @@ export function Profile({ onBack }: Props) {
           </div>
         </header>
 
-        <section style={{ ...grid, gridTemplateColumns: isTabletLayout ? "repeat(4, minmax(0, 1fr))" : grid.gridTemplateColumns }}>
+        <section
+          style={{
+            ...grid,
+            gridTemplateColumns: isTabletLayout
+              ? "repeat(4, minmax(0, 1fr))"
+              : grid.gridTemplateColumns,
+          }}
+        >
           <ProfileStat label="Total Score" value={formatScore(totalScore)} sub="career" />
           <ProfileStat label="Gold Coins" value={`${goldCoins}`} sub="shop currency" />
           <ProfileStat
@@ -146,8 +162,7 @@ export function Profile({ onBack }: Props) {
                   style={{
                     ...themeChoiceButton,
                     background: appTheme === theme ? "var(--primary)" : "var(--surface)",
-                    color:
-                      appTheme === theme ? "var(--primary-foreground)" : "var(--foreground)",
+                    color: appTheme === theme ? "var(--primary-foreground)" : "var(--foreground)",
                     borderColor: appTheme === theme ? "var(--primary)" : "var(--border)",
                   }}
                 >
@@ -219,19 +234,12 @@ export function Profile({ onBack }: Props) {
           <div style={{ display: "grid", gap: 10 }}>
             <RecordRow label="Best challenge score" value={formatScore(bestChallengeScore)} />
             <RecordRow label="Badges earned" value={`${earnedBadges.length}`} />
-            <RecordRow
-              label="Campaign levels unlocked"
-              value={`${unlockedLevel}/${MAX_LEVEL}`}
-            />
+            <RecordRow label="Campaign levels unlocked" value={`${unlockedLevel}/${MAX_LEVEL}`} />
             <RecordRow
               label="Periodic table progress"
               value={`${discoveredElements.length}/${ELEMENTS.length}`}
             />
-            <button
-              type="button"
-              onClick={handleUnlockAllStages}
-              style={profileActionButton}
-            >
+            <button type="button" onClick={handleUnlockAllStages} style={profileActionButton}>
               {unlockedLevel >= MAX_LEVEL ? "Lock stages" : "Unlock all stages"}
             </button>
           </div>
@@ -250,7 +258,7 @@ function QuestIcon({ type, completed }: { type: string; completed: boolean }) {
     merge_atoms: Atom,
     purchase_item: ShoppingBag,
   };
-  const Icon = completed ? CheckCircle2 : iconMap[type] ?? FlaskConical;
+  const Icon = completed ? CheckCircle2 : (iconMap[type] ?? FlaskConical);
   return <Icon size={15} strokeWidth={2.4} aria-hidden="true" />;
 }
 

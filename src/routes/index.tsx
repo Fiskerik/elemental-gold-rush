@@ -140,7 +140,11 @@ function Index() {
               }}
               onStartOver={() => {
                 clearSavedRun();
-                setScreen({ name: "game", levelId: getLevelById(unlockedLevel)?.id ?? 1, mode: "campaign" });
+                setScreen({
+                  name: "game",
+                  levelId: getLevelById(unlockedLevel)?.id ?? 1,
+                  mode: "campaign",
+                });
                 setResumePrompt(null);
               }}
               onCancel={() => setResumePrompt(null)}
@@ -165,7 +169,8 @@ function Index() {
           onExit={() => setScreen({ name: "menu" })}
           onMap={() => setScreen({ name: "levels" })}
           onWin={(nextId) => {
-            if (nextId) setScreen({ name: "game", levelId: nextId, mode: screen.mode ?? "campaign" });
+            if (nextId)
+              setScreen({ name: "game", levelId: nextId, mode: screen.mode ?? "campaign" });
             else setScreen({ name: "menu" });
           }}
         />
