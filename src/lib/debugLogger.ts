@@ -1,5 +1,6 @@
 const STORAGE_KEY = "atomic-fusion-debug-logs";
 const MAX_LOG_LINES = 80;
+const PURCHASE_DIAGNOSTICS_REVISION = "2026-06-05-canMakePayments-deferred-native-timeouts";
 
 let logs: string[] = loadStoredLogs();
 
@@ -22,6 +23,7 @@ export function getDebugReport(): string {
   return [
     "Atomic Fusion Rush purchase diagnostics",
     `Generated: ${new Date().toISOString()}`,
+    `Diagnostics revision: ${PURCHASE_DIAGNOSTICS_REVISION}`,
     `Platform: ${runtime.platform}`,
     `User agent: ${runtime.userAgent}`,
     `URL: ${runtime.url}`,

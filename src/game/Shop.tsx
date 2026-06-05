@@ -163,6 +163,7 @@ export function Shop({ onBack }: { onBack: () => void }) {
   }
 
   async function handleProPackPurchase() {
+    logDebug("Unlock Pack button tapped.", { productId: PRODUCT_IDS.proLabPack });
     setProPackBusy("purchase");
     setProPackMessage("Opening App Store purchase...");
     try {
@@ -184,6 +185,7 @@ export function Shop({ onBack }: { onBack: () => void }) {
         error instanceof Error ? error.message : "App Store purchase could not be started.",
       );
     } finally {
+      logDebug("Product purchase UI flow ended.", { productId: PRODUCT_IDS.proLabPack });
       setProPackBusy("");
       if (purchaseDebugEnabled) refreshPurchaseDebugLogs();
     }
@@ -231,6 +233,7 @@ export function Shop({ onBack }: { onBack: () => void }) {
   }
 
   async function handleNativeCoinPurchase(productId: ProductId) {
+    logDebug("Coin pack button tapped.", { productId });
     setPendingProductId(productId);
     setMessage("Opening App Store purchase...");
     try {
@@ -252,6 +255,7 @@ export function Shop({ onBack }: { onBack: () => void }) {
         error instanceof Error ? error.message : "App Store coin purchase could not be started.",
       );
     } finally {
+      logDebug("Coin purchase UI flow ended.", { productId });
       setPendingProductId(null);
       if (purchaseDebugEnabled) refreshPurchaseDebugLogs();
     }
@@ -286,6 +290,7 @@ export function Shop({ onBack }: { onBack: () => void }) {
       const details = [
         `Platform: ${snapshot.platform}`,
         `Configured: ${String(snapshot.isConfigured ?? snapshot.configured)}`,
+        `Can make payments: ${String(snapshot.canMakePayments ?? "unknown")}`,
         `Offering: ${snapshot.offeringId}`,
         `Entitlement: ${snapshot.entitlementId}`,
         `Active entitlements: ${snapshot.activeEntitlements.join(", ") || "none"}`,

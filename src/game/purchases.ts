@@ -20,6 +20,7 @@ type PurchasesPlugin = {
   isConfigured?: () => Promise<{ isConfigured?: boolean } | boolean>;
   setLogLevel: (options: { level: string }) => Promise<void>;
   configure: (options: { apiKey: string }) => Promise<void>;
+  canMakePayments?: () => Promise<{ canMakePayments: boolean }>;
   getOfferings: () => Promise<{
     current?: PurchasesOffering | null;
     all?: Record<string, PurchasesOffering>;
@@ -51,6 +52,7 @@ const DEBUG_PURCHASE_TIMEOUT_MS = 15_000;
 
 let configured = false;
 let purchasesPlugin: PurchasesPlugin | null = null;
+let configurationPromise: Promise<PurchasesPlugin | null> | null = null;
 let customerInfoListenerId: string | null = null;
 let missingConfigLogged = false;
 let lastConfigurationReason = "";
@@ -73,6 +75,7 @@ export type PurchaseWarmupResult = {
   entitlementId: string;
   packageIdentifiers: string[];
   storeProductIdentifiers: string[];
+  canMakePayments?: boolean;
   reason?: string;
 };
 
@@ -261,11 +264,47 @@ async function checkSdkConfigured(purchases: PurchasesPlugin): Promise<boolean |
   return configured;
 }
 
+async function checkCanMakePayments(
+  purchases: PurchasesPlugin,
+  reportStep?: PurchaseStepReporter,
+): Promise<boolean | undefined> {
+  if (!purchases.canMakePayments) return undefined;
+  try {
+    reportStep?.("Checking App Store purchase permission...");
+    const result = await withNativeTimeout(
+      () => purchases.canMakePayments!(),
+      NATIVE_SETUP_TIMEOUT_MS,
+      "App Store purchase permission check",
+    );
+    purchaseDebugLog("App Store purchase permission check returned.", result);
+    return result.canMakePayments;
+  } catch (error) {
+    purchaseDebugLog("App Store purchase permission check failed.", {
+      error: summarizeErrorForDebug(error),
+    });
+    return undefined;
+  }
+}
+
 async function ensureConfigured(
   reportStep?: PurchaseStepReporter,
 ): Promise<PurchasesPlugin | null> {
   if (!isNativePlatform()) return null;
   if (configured) return purchasesPlugin;
+  if (configurationPromise) {
+    purchaseDebugLog("RevenueCat configuration already in progress; waiting for existing setup.");
+    return configurationPromise;
+  }
+
+  configurationPromise = configurePurchases(reportStep).finally(() => {
+    configurationPromise = null;
+  });
+  return configurationPromise;
+}
+
+async function configurePurchases(
+  reportStep?: PurchaseStepReporter,
+): Promise<PurchasesPlugin | null> {
   const Purchases = RevenueCatPurchases as unknown as PurchasesPlugin;
 
   const apiKey = getRevenueCatApiKey();
@@ -478,6 +517,7 @@ export async function warmUpPurchases(
       entitlementId,
       packageIdentifiers: [],
       storeProductIdentifiers: [],
+      canMakePayments: false,
       reason: "Native App Store purchases are only available in the iOS app.",
     };
   }
@@ -491,6 +531,7 @@ export async function warmUpPurchases(
       entitlementId,
       packageIdentifiers: [],
       storeProductIdentifiers: [],
+      canMakePayments: undefined,
       reason: lastConfigurationReason || "RevenueCat could not be initialized.",
     };
   }
@@ -498,7 +539,14 @@ export async function warmUpPurchases(
   let hasProPack = false;
   let packageIdentifiers: string[] = [];
   let storeProductIdentifiers: string[] = [];
+  let canMakePayments: boolean | undefined;
   let reason = "";
+
+  canMakePayments = await checkCanMakePayments(purchases, reportStep);
+  if (canMakePayments === false) {
+    reason =
+      "This device or sandbox account cannot make App Store purchases right now. Check Screen Time restrictions, App Store sandbox account, and Paid Apps Agreement status.";
+  }
 
   try {
     reportStep?.("Checking purchase status...");
@@ -562,6 +610,7 @@ export async function warmUpPurchases(
     entitlementId,
     packages: packageIdentifiers,
     products: storeProductIdentifiers,
+    canMakePayments,
     reason,
   });
 
@@ -572,6 +621,7 @@ export async function warmUpPurchases(
     entitlementId,
     packageIdentifiers,
     storeProductIdentifiers,
+    canMakePayments,
     reason: reason || undefined,
   };
 }
@@ -594,6 +644,7 @@ export async function debugNativePurchases(
   }
 
   snapshot.isConfigured = await checkSdkConfigured(purchases);
+  snapshot.canMakePayments = await checkCanMakePayments(purchases, reportStep);
 
   try {
     reportStep?.("Reading purchase entitlements...");
@@ -740,6 +791,14 @@ export async function purchaseProductWithResult(
       reason,
     });
     showPurchaseDebugAlert("RevenueCat not configured", reason);
+    return { purchased: false, reason };
+  }
+
+  const canMakePayments = await checkCanMakePayments(purchases, reportStep);
+  if (canMakePayments === false) {
+    const reason =
+      "This device or sandbox account cannot make App Store purchases right now. Check Screen Time restrictions, App Store sandbox account, and Paid Apps Agreement status.";
+    showPurchaseDebugAlert("Purchases unavailable", reason);
     return { purchased: false, reason };
   }
 
@@ -910,6 +969,14 @@ export async function purchaseGoldCoinPack(
       reason,
     };
   }
+  const canMakePayments = await checkCanMakePayments(purchases, reportStep);
+  if (canMakePayments === false) {
+    const reason =
+      "This device or sandbox account cannot make App Store purchases right now. Check Screen Time restrictions, App Store sandbox account, and Paid Apps Agreement status.";
+    showPurchaseDebugAlert("Purchases unavailable", reason);
+    return { coins: 0, reason };
+  }
+
   purchaseDebugLog("Resolving StoreKit coin purchase route.", { productId });
   const storeProduct = await findStoreProduct(productId, reportStep);
   let packageToPurchase: PurchasesPackage | null = null;
