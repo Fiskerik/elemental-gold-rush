@@ -43,9 +43,8 @@ export function normalizeLanguage(value: unknown): AppLanguage {
 }
 
 export function getLanguageDirection(language: AppLanguage): "ltr" | "rtl" {
-  return SUPPORTED_LANGUAGES.find((entry) => entry.code === language)?.dir === "rtl"
-    ? "rtl"
-    : "ltr";
+  const entry = SUPPORTED_LANGUAGES.find((candidate) => candidate.code === language);
+  return entry && "dir" in entry && entry.dir === "rtl" ? "rtl" : "ltr";
 }
 
 export function toIntlLocale(language: AppLanguage): string {
