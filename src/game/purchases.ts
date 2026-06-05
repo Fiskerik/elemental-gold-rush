@@ -52,7 +52,7 @@ const DEBUG_PURCHASE_TIMEOUT_MS = 15_000;
 
 let configured = false;
 let purchasesPlugin: PurchasesPlugin | null = null;
-let configurationPromise: Promise<PurchasesPlugin | null> | null = null;
+let configurationPromise: Promise<boolean> | null = null;
 let customerInfoListenerId: string | null = null;
 let missingConfigLogged = false;
 let lastConfigurationReason = "";
@@ -286,14 +286,12 @@ async function checkCanMakePayments(
   }
 }
 
-async function ensureConfigured(
-  reportStep?: PurchaseStepReporter,
-): Promise<PurchasesPlugin | null> {
-  if (!isNativePlatform()) return null;
+async function ensureConfigured(reportStep?: PurchaseStepReporter): Promise<boolean> {
+  if (!isNativePlatform()) return false;
 
   if (configured && purchasesPlugin) {
     purchaseDebugLog("RevenueCat already configured; reusing native purchases instance.");
-    return purchasesPlugin;
+    return true;
   }
 
   if (configured && !purchasesPlugin) {
@@ -321,18 +319,16 @@ async function ensureConfigured(
 
   if (configured && purchasesPlugin) {
     purchaseDebugLog("RevenueCat configuration promise resolved; native purchases ready.");
-    return purchasesPlugin;
+    return true;
   }
 
   purchaseDebugLog("RevenueCat configuration promise resolved without native purchases instance.", {
     reason: lastConfigurationReason,
   });
-  return null;
+  return false;
 }
 
-async function configurePurchases(
-  reportStep?: PurchaseStepReporter,
-): Promise<PurchasesPlugin | null> {
+async function configurePurchases(reportStep?: PurchaseStepReporter): Promise<boolean> {
   const Purchases = RevenueCatPurchases as unknown as PurchasesPlugin;
 
   const apiKey = getRevenueCatApiKey();
@@ -345,7 +341,7 @@ async function configurePurchases(
     }
     lastConfigurationReason =
       "RevenueCat is not configured in this build. Add VITE_REVENUECAT_IOS_API_KEY in Codemagic.";
-    return null;
+    return false;
   }
   lastConfigurationReason = "";
   try {
@@ -371,8 +367,8 @@ async function configurePurchases(
       entitlementId: getEntitlementId(),
       apiKeyPrefix: `${apiKey.slice(0, 8)}...`,
     });
-    purchaseDebugLog("RevenueCat configurePurchases returning native purchases instance.");
-    return Purchases;
+    purchaseDebugLog("RevenueCat configurePurchases returning configured status.");
+    return true;
   } catch (error) {
     lastConfigurationReason =
       describePurchaseError(error) || "RevenueCat could not be initialized in this build.";
@@ -380,8 +376,12 @@ async function configurePurchases(
       error,
       reason: lastConfigurationReason,
     });
-    return null;
+    return false;
   }
+}
+
+function getConfiguredPurchases(): PurchasesPlugin | null {
+  return configured ? purchasesPlugin : null;
 }
 
 async function findPackage(
@@ -389,8 +389,9 @@ async function findPackage(
   reportStep?: PurchaseStepReporter,
 ): Promise<PurchasesPackage | null> {
   lastPackageLookupReason = "";
-  const purchases = await ensureConfigured(reportStep);
-  if (!purchases) {
+  const configuredForPurchases = await ensureConfigured(reportStep);
+  const purchases = getConfiguredPurchases();
+  if (!configuredForPurchases || !purchases) {
     lastPackageLookupReason =
       lastConfigurationReason || "RevenueCat is not configured in this build.";
     return null;
@@ -492,8 +493,9 @@ async function findStoreProduct(
   reportStep?: PurchaseStepReporter,
 ): Promise<PurchasesStoreProduct | null> {
   lastStoreProductLookupReason = "";
-  const purchases = await ensureConfigured(reportStep);
-  if (!purchases) {
+  const configuredForPurchases = await ensureConfigured(reportStep);
+  const purchases = getConfiguredPurchases();
+  if (!configuredForPurchases || !purchases) {
     lastStoreProductLookupReason =
       lastConfigurationReason || "RevenueCat could not be initialized for App Store products.";
     return null;
@@ -527,8 +529,9 @@ async function findStoreProduct(
 }
 
 export async function initPurchases(): Promise<boolean> {
-  const purchases = await ensureConfigured();
-  if (!purchases) return false;
+  const configuredForPurchases = await ensureConfigured();
+  const purchases = getConfiguredPurchases();
+  if (!configuredForPurchases || !purchases) return false;
   const { customerInfo } = await withNativeTimeout(
     () => purchases.getCustomerInfo(),
     NATIVE_SETUP_TIMEOUT_MS,
@@ -556,8 +559,9 @@ export async function warmUpPurchases(
     };
   }
 
-  const purchases = await ensureConfigured(reportStep);
-  if (!purchases) {
+  const configuredForPurchases = await ensureConfigured(reportStep);
+  const purchases = getConfiguredPurchases();
+  if (!configuredForPurchases || !purchases) {
     return {
       configured: false,
       hasProPack: false,
@@ -664,15 +668,16 @@ export async function debugNativePurchases(
   reportStep?: PurchaseStepReporter,
 ): Promise<PurchaseDebugSnapshot> {
   const warmup = await warmUpPurchases(reportStep);
-  const purchases = await ensureConfigured(reportStep);
+  const configuredForPurchases = await ensureConfigured(reportStep);
+  const purchases = getConfiguredPurchases();
   const snapshot: PurchaseDebugSnapshot = {
     ...warmup,
     platform: Capacitor.getPlatform(),
-    isConfigured: Boolean(purchases),
+    isConfigured: Boolean(configuredForPurchases && purchases),
     activeEntitlements: [],
   };
 
-  if (!purchases) {
+  if (!configuredForPurchases || !purchases) {
     purchaseDebugLog("RevenueCat debug snapshot.", snapshot);
     return snapshot;
   }
@@ -700,8 +705,9 @@ export async function debugNativePurchases(
 }
 
 export async function syncCustomerInfoEntitlement(): Promise<boolean> {
-  const purchases = await ensureConfigured();
-  if (!purchases) return false;
+  const configuredForPurchases = await ensureConfigured();
+  const purchases = getConfiguredPurchases();
+  if (!configuredForPurchases || !purchases) return false;
   const { customerInfo } = await withNativeTimeout(
     () => purchases.getCustomerInfo(),
     NATIVE_SETUP_TIMEOUT_MS,
@@ -713,8 +719,9 @@ export async function syncCustomerInfoEntitlement(): Promise<boolean> {
 export async function setCustomerInfoListener(
   onEntitlementChanged: (hasEntitlement: boolean) => void,
 ): Promise<void> {
-  const purchases = await ensureConfigured();
-  if (!purchases) return;
+  const configuredForPurchases = await ensureConfigured();
+  const purchases = getConfiguredPurchases();
+  if (!configuredForPurchases || !purchases) return;
   if (customerInfoListenerId) return;
 
   customerInfoListenerId = await purchases.addCustomerInfoUpdateListener((customerInfo) => {
@@ -723,8 +730,9 @@ export async function setCustomerInfoListener(
 }
 
 export async function clearCustomerInfoListener(): Promise<void> {
-  const purchases = await ensureConfigured();
-  if (!purchases || !customerInfoListenerId) return;
+  const configuredForPurchases = await ensureConfigured();
+  const purchases = getConfiguredPurchases();
+  if (!configuredForPurchases || !purchases || !customerInfoListenerId) return;
   await purchases.removeCustomerInfoUpdateListener({
     listenerToRemove: customerInfoListenerId,
   });
@@ -737,8 +745,9 @@ export async function presentPaywallIfNeeded(): Promise<boolean> {
 }
 
 export async function presentCustomerCenter(): Promise<boolean> {
-  const purchases = await ensureConfigured();
-  if (!purchases) return false;
+  const configuredForPurchases = await ensureConfigured();
+  const purchases = getConfiguredPurchases();
+  if (!configuredForPurchases || !purchases) return false;
 
   try {
     const { customerInfo } = await withNativeTimeout(
@@ -840,8 +849,9 @@ export async function purchaseProductWithResult(
   }
 
   purchaseDebugLog("Ensuring RevenueCat configuration for product purchase.", { productId });
-  const purchases = await ensureConfigured(reportStep);
-  if (!purchases) {
+  const configuredForPurchases = await ensureConfigured(reportStep);
+  const purchases = getConfiguredPurchases();
+  if (!configuredForPurchases || !purchases) {
     const reason =
       lastConfigurationReason ||
       "Native App Store purchase support is not available in this build.";
@@ -1028,8 +1038,9 @@ export async function purchaseGoldCoinPack(
     return { coins: 0, reason: "App Store purchases are only available in the iPhone app." };
   }
   purchaseDebugLog("Ensuring RevenueCat configuration for coin purchase.", { productId });
-  const purchases = await ensureConfigured(reportStep);
-  if (!purchases) {
+  const configuredForPurchases = await ensureConfigured(reportStep);
+  const purchases = getConfiguredPurchases();
+  if (!configuredForPurchases || !purchases) {
     const reason =
       lastConfigurationReason ||
       "RevenueCat is not configured in this build. Add VITE_REVENUECAT_IOS_API_KEY in Codemagic.";
@@ -1165,8 +1176,9 @@ export async function purchaseGoldCoinPack(
 }
 
 export async function restorePurchases(): Promise<ProductId[]> {
-  const purchases = await ensureConfigured();
-  if (!purchases) {
+  const configuredForPurchases = await ensureConfigured();
+  const purchases = getConfiguredPurchases();
+  if (!configuredForPurchases || !purchases) {
     console.log("Purchase restore requested, but RevenueCat is not configured in this build.");
     return [];
   }
