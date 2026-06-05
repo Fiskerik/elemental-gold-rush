@@ -1,0 +1,504 @@
+{
+  "sourceLanguage": "en-US",
+  "defaultInAppLanguage": "en",
+  "localeCount": 15,
+  "selectedLocales": [
+    "en-US",
+    "zh-Hans",
+    "es-ES",
+    "hi",
+    "ar",
+    "pt-BR",
+    "fr-FR",
+    "de-DE",
+    "ja",
+    "ko",
+    "ru",
+    "id",
+    "tr",
+    "it",
+    "vi"
+  ],
+  "locales": {
+    "en-US": {
+      "languageCode": "en",
+      "displayName": "English",
+      "appName": "Atomic Fusion Rush",
+      "subtitle": "Periodic table merge puzzle",
+      "promotionalText": "Fuse atoms, unlock elements, and chase gold in a fast chemistry merge puzzle.",
+      "description": "Atomic Fusion Rush turns the periodic table into a quick, satisfying merge puzzle. Aim shots, fuse atoms into heavier elements, clear campaign stages, collect chemistry facts, and use lab tools when a board gets tricky. Build toward gold, master daily quests, and keep improving your best runs.",
+      "keywords": "chemistry,atoms,merge,puzzle,periodic,gold,science,fusion",
+      "reviewNotes": "Main purchase path: Main Menu -> Shop -> Unlock Pack. Coin packs are also shown in Shop.",
+      "inAppPurchases": {
+        "pro_lab_pack_lifetime": {
+          "displayName": "Pro Lab Pack - Lifetime",
+          "description": "Unlock Pro Lab forever, remove forced interstitial ads, get 50 starting gold coins, and boost daily gold claims."
+        },
+        "coins_5": {
+          "displayName": "5 Gold Coins",
+          "description": "A small gold coin pack for power-ups and level skips."
+        },
+        "coins_20": {
+          "displayName": "20 Gold Coins",
+          "description": "A useful gold coin pack for several future runs."
+        },
+        "coins_50": {
+          "displayName": "50 Gold Coins",
+          "description": "A larger gold coin pack for stocking lab tools."
+        },
+        "coins_100": {
+          "displayName": "100 Gold Coins",
+          "description": "The biggest gold coin pack for long progression."
+        }
+      }
+    },
+    "zh-Hans": {
+      "languageCode": "zh-Hans",
+      "displayName": "简体中文",
+      "appName": "Atomic Fusion Rush",
+      "subtitle": "元素合成益智游戏",
+      "promotionalText": "合成原子、解锁元素，在节奏明快的化学益智游戏中冲向黄金。",
+      "description": "Atomic Fusion Rush 将元素周期表变成轻快爽感的合成益智游戏。瞄准发射，把原子合成为更重的元素，通关战役关卡，收集化学知识，并在困难局面中使用实验室工具。一路合成到黄金，完成每日任务，不断刷新最佳表现。",
+      "keywords": "化学,原子,合成,益智,元素周期表,黄金,科学",
+      "reviewNotes": "主要购买路径：主菜单 -> 商店 -> 解锁礼包。金币包也显示在商店中。",
+      "inAppPurchases": {
+        "pro_lab_pack_lifetime": {
+          "displayName": "专业实验室包 - 终身",
+          "description": "永久解锁专业实验室，移除强制插屏广告，获得 50 枚初始金币，并提升每日金币奖励。"
+        },
+        "coins_5": {
+          "displayName": "5 枚金币",
+          "description": "适合购买强化道具和跳过关卡的小金币包。"
+        },
+        "coins_20": {
+          "displayName": "20 枚金币",
+          "description": "可支持多次后续挑战的实用金币包。"
+        },
+        "coins_50": {
+          "displayName": "50 枚金币",
+          "description": "用于储备实验室工具的更大金币包。"
+        },
+        "coins_100": {
+          "displayName": "100 枚金币",
+          "description": "适合长期进度的最大金币包。"
+        }
+      }
+    },
+    "es-ES": {
+      "languageCode": "es",
+      "displayName": "Español",
+      "appName": "Atomic Fusion Rush",
+      "subtitle": "Puzzle de fusión química",
+      "promotionalText": "Fusiona átomos, desbloquea elementos y persigue el oro en un puzzle químico rápido.",
+      "description": "Atomic Fusion Rush convierte la tabla periódica en un puzzle de fusión ágil y satisfactorio. Apunta, lanza y combina átomos para crear elementos más pesados, supera fases de campaña, descubre datos de química y usa herramientas de laboratorio cuando el tablero se complica. Avanza hacia el oro, completa misiones diarias y mejora tus mejores partidas.",
+      "keywords": "química,átomos,fusión,puzzle,elementos,oro,ciencia",
+      "reviewNotes": "Ruta principal de compra: Menú principal -> Tienda -> Desbloquear pack. Los packs de monedas también aparecen en Tienda.",
+      "inAppPurchases": {
+        "pro_lab_pack_lifetime": {
+          "displayName": "Pack Lab Pro - De por vida",
+          "description": "Desbloquea Lab Pro para siempre, elimina anuncios intersticiales obligatorios, recibe 50 monedas de oro iniciales y mejora las recompensas diarias."
+        },
+        "coins_5": {
+          "displayName": "5 monedas de oro",
+          "description": "Un pequeño pack de monedas para potenciadores y saltos de nivel."
+        },
+        "coins_20": {
+          "displayName": "20 monedas de oro",
+          "description": "Un pack útil para varias partidas futuras."
+        },
+        "coins_50": {
+          "displayName": "50 monedas de oro",
+          "description": "Un pack mayor para preparar herramientas de laboratorio."
+        },
+        "coins_100": {
+          "displayName": "100 monedas de oro",
+          "description": "El mayor pack de monedas para progresar a largo plazo."
+        }
+      }
+    },
+    "hi": {
+      "languageCode": "hi",
+      "displayName": "हिन्दी",
+      "appName": "Atomic Fusion Rush",
+      "subtitle": "तत्व मर्ज पहेली",
+      "promotionalText": "परमाणु मिलाएँ, तत्व खोलें, और तेज रसायन पहेली में सोने तक पहुँचें।",
+      "description": "Atomic Fusion Rush आवर्त सारणी को तेज और मजेदार मर्ज पहेली में बदल देता है। निशाना लगाएँ, परमाणुओं को भारी तत्वों में मिलाएँ, अभियान स्तर पार करें, रसायन तथ्य खोजें, और कठिन बोर्ड पर लैब टूल्स का उपयोग करें। सोने तक प्रगति करें, दैनिक क्वेस्ट पूरे करें, और अपनी सर्वश्रेष्ठ रन बेहतर बनाते रहें।",
+      "keywords": "रसायन,परमाणु,मर्ज,पहेली,तत्व,सोना,विज्ञान",
+      "reviewNotes": "मुख्य खरीद मार्ग: मुख्य मेनू -> दुकान -> पैक अनलॉक करें। कॉइन पैक भी दुकान में दिखते हैं।",
+      "inAppPurchases": {
+        "pro_lab_pack_lifetime": {
+          "displayName": "प्रो लैब पैक - आजीवन",
+          "description": "प्रो लैब हमेशा के लिए खोलें, अनिवार्य इंटरस्टिशियल विज्ञापन हटाएँ, 50 शुरुआती सोने के सिक्के पाएँ, और दैनिक दावे बढ़ाएँ।"
+        },
+        "coins_5": {
+          "displayName": "5 सोने के सिक्के",
+          "description": "पावर-अप और स्तर स्किप के लिए छोटा सिक्का पैक।"
+        },
+        "coins_20": {
+          "displayName": "20 सोने के सिक्के",
+          "description": "कई अगली रन के लिए उपयोगी सिक्का पैक।"
+        },
+        "coins_50": {
+          "displayName": "50 सोने के सिक्के",
+          "description": "लैब टूल्स जमा करने के लिए बड़ा सिक्का पैक।"
+        },
+        "coins_100": {
+          "displayName": "100 सोने के सिक्के",
+          "description": "लंबी प्रगति के लिए सबसे बड़ा सिक्का पैक।"
+        }
+      }
+    },
+    "ar": {
+      "languageCode": "ar",
+      "displayName": "العربية",
+      "appName": "Atomic Fusion Rush",
+      "subtitle": "لغز دمج العناصر",
+      "promotionalText": "ادمج الذرات وافتح العناصر واسعَ إلى الذهب في لغز كيميائي سريع.",
+      "description": "يحوّل Atomic Fusion Rush الجدول الدوري إلى لعبة ألغاز دمج سريعة وممتعة. صوّب الطلقات، وادمج الذرات لتكوين عناصر أثقل، وتجاوز مراحل الحملة، واجمع حقائق كيميائية، واستخدم أدوات المختبر عندما يصبح اللوح صعباً. تقدّم نحو الذهب، وأنجز المهام اليومية، وحسّن أفضل جولاتك.",
+      "keywords": "كيمياء,ذرات,دمج,ألغاز,عناصر,ذهب,علوم",
+      "reviewNotes": "مسار الشراء الرئيسي: القائمة الرئيسية -> المتجر -> فتح الحزمة. تظهر حزم العملات أيضاً في المتجر.",
+      "inAppPurchases": {
+        "pro_lab_pack_lifetime": {
+          "displayName": "حزمة مختبر Pro - مدى الحياة",
+          "description": "افتح مختبر Pro للأبد، وأزل الإعلانات البينية الإجبارية، واحصل على 50 عملة ذهبية أولية، وعزّز مكافآت الذهب اليومية."
+        },
+        "coins_5": {
+          "displayName": "5 عملات ذهبية",
+          "description": "حزمة صغيرة للقوى الخاصة وتخطي المستويات."
+        },
+        "coins_20": {
+          "displayName": "20 عملة ذهبية",
+          "description": "حزمة مفيدة لعدة جولات قادمة."
+        },
+        "coins_50": {
+          "displayName": "50 عملة ذهبية",
+          "description": "حزمة أكبر لتخزين أدوات المختبر."
+        },
+        "coins_100": {
+          "displayName": "100 عملة ذهبية",
+          "description": "أكبر حزمة عملات للتقدم الطويل."
+        }
+      }
+    },
+    "pt-BR": {
+      "languageCode": "pt-BR",
+      "displayName": "Português (Brasil)",
+      "appName": "Atomic Fusion Rush",
+      "subtitle": "Puzzle químico de fusão",
+      "promotionalText": "Funda átomos, desbloqueie elementos e busque ouro em um puzzle químico rápido.",
+      "description": "Atomic Fusion Rush transforma a tabela periódica em um puzzle de fusão rápido e recompensador. Mire, lance e funda átomos em elementos mais pesados, vença fases da campanha, descubra fatos de química e use ferramentas de laboratório quando o tabuleiro apertar. Progrida até o ouro, complete missões diárias e melhore suas melhores partidas.",
+      "keywords": "química,átomos,fusão,puzzle,elementos,ouro,ciência",
+      "reviewNotes": "Caminho principal de compra: Menu principal -> Loja -> Desbloquear pacote. Os pacotes de moedas também aparecem na Loja.",
+      "inAppPurchases": {
+        "pro_lab_pack_lifetime": {
+          "displayName": "Pacote Lab Pro - Vitalício",
+          "description": "Desbloqueie o Lab Pro para sempre, remova anúncios intersticiais obrigatórios, receba 50 moedas de ouro iniciais e melhore os resgates diários."
+        },
+        "coins_5": {
+          "displayName": "5 moedas de ouro",
+          "description": "Um pequeno pacote para poderes e pulos de nível."
+        },
+        "coins_20": {
+          "displayName": "20 moedas de ouro",
+          "description": "Um pacote útil para várias próximas partidas."
+        },
+        "coins_50": {
+          "displayName": "50 moedas de ouro",
+          "description": "Um pacote maior para guardar ferramentas de laboratório."
+        },
+        "coins_100": {
+          "displayName": "100 moedas de ouro",
+          "description": "O maior pacote de moedas para progresso longo."
+        }
+      }
+    },
+    "fr-FR": {
+      "languageCode": "fr",
+      "displayName": "Français",
+      "appName": "Atomic Fusion Rush",
+      "subtitle": "Puzzle fusion chimique",
+      "promotionalText": "Fusionnez des atomes, débloquez des éléments et visez l’or dans un puzzle chimique rapide.",
+      "description": "Atomic Fusion Rush transforme le tableau périodique en puzzle de fusion rapide et satisfaisant. Visez, lancez et fusionnez des atomes en éléments plus lourds, terminez les niveaux de campagne, découvrez des faits de chimie et utilisez des outils de laboratoire quand le plateau se complique. Progressez vers l’or, réussissez les quêtes quotidiennes et améliorez vos meilleures parties.",
+      "keywords": "chimie,atomes,fusion,puzzle,éléments,or,science",
+      "reviewNotes": "Chemin d’achat principal : Menu principal -> Boutique -> Débloquer le pack. Les packs de pièces sont aussi dans Boutique.",
+      "inAppPurchases": {
+        "pro_lab_pack_lifetime": {
+          "displayName": "Pack Labo Pro - À vie",
+          "description": "Débloquez le Labo Pro à vie, supprimez les interstitiels forcés, recevez 50 pièces d’or de départ et augmentez les gains quotidiens."
+        },
+        "coins_5": {
+          "displayName": "5 pièces d’or",
+          "description": "Un petit pack pour les bonus et les sauts de niveau."
+        },
+        "coins_20": {
+          "displayName": "20 pièces d’or",
+          "description": "Un pack utile pour plusieurs prochaines parties."
+        },
+        "coins_50": {
+          "displayName": "50 pièces d’or",
+          "description": "Un pack plus grand pour stocker des outils de labo."
+        },
+        "coins_100": {
+          "displayName": "100 pièces d’or",
+          "description": "Le plus grand pack de pièces pour progresser longtemps."
+        }
+      }
+    },
+    "de-DE": {
+      "languageCode": "de",
+      "displayName": "Deutsch",
+      "appName": "Atomic Fusion Rush",
+      "subtitle": "Chemie-Merge-Puzzle",
+      "promotionalText": "Verschmelze Atome, schalte Elemente frei und jage Gold in einem schnellen Chemie-Puzzle.",
+      "description": "Atomic Fusion Rush macht das Periodensystem zu einem schnellen, befriedigenden Merge-Puzzle. Ziele, schieße und verschmelze Atome zu schwereren Elementen, meistere Kampagnenstufen, sammle Chemiefakten und nutze Laborwerkzeuge, wenn das Feld knifflig wird. Arbeite dich bis zu Gold vor, erfülle tägliche Quests und verbessere deine besten Läufe.",
+      "keywords": "chemie,atome,merge,puzzle,elemente,gold,wissenschaft",
+      "reviewNotes": "Hauptkaufpfad: Hauptmenü -> Shop -> Paket freischalten. Münzpakete erscheinen ebenfalls im Shop.",
+      "inAppPurchases": {
+        "pro_lab_pack_lifetime": {
+          "displayName": "Pro-Labor-Paket - Lebenslang",
+          "description": "Schalte das Pro-Labor dauerhaft frei, entferne erzwungene Interstitial-Anzeigen, erhalte 50 Start-Goldmünzen und bessere Tagesbelohnungen."
+        },
+        "coins_5": {
+          "displayName": "5 Goldmünzen",
+          "description": "Ein kleines Münzpaket für Power-ups und Levelsprünge."
+        },
+        "coins_20": {
+          "displayName": "20 Goldmünzen",
+          "description": "Ein nützliches Paket für mehrere kommende Läufe."
+        },
+        "coins_50": {
+          "displayName": "50 Goldmünzen",
+          "description": "Ein größeres Paket zum Auffüllen von Laborwerkzeugen."
+        },
+        "coins_100": {
+          "displayName": "100 Goldmünzen",
+          "description": "Das größte Münzpaket für langfristigen Fortschritt."
+        }
+      }
+    },
+    "ja": {
+      "languageCode": "ja",
+      "displayName": "日本語",
+      "appName": "Atomic Fusion Rush",
+      "subtitle": "元素合成パズル",
+      "promotionalText": "原子を合成し、元素を解放し、テンポの良い化学パズルで金を目指そう。",
+      "description": "Atomic Fusion Rush は周期表をテンポの良い合成パズルに変えます。狙って撃ち、原子をより重い元素へ合成し、キャンペーンステージをクリアし、化学の豆知識を集め、難しい盤面ではラボツールを使いましょう。金を目指して進み、デイリークエストを達成し、ベストランを更新してください。",
+      "keywords": "化学,原子,合成,パズル,元素,金,科学",
+      "reviewNotes": "主な購入経路：メインメニュー -> ショップ -> パックを解除。コインパックもショップに表示されます。",
+      "inAppPurchases": {
+        "pro_lab_pack_lifetime": {
+          "displayName": "プロラボパック - 永久",
+          "description": "プロラボを永久に解放し、強制インタースティシャル広告を削除し、開始時に50ゴールドコインを獲得し、デイリー報酬を強化します。"
+        },
+        "coins_5": {
+          "displayName": "5 ゴールドコイン",
+          "description": "パワーアップやレベルスキップ用の小さなコインパックです。"
+        },
+        "coins_20": {
+          "displayName": "20 ゴールドコイン",
+          "description": "複数の次回プレイに役立つコインパックです。"
+        },
+        "coins_50": {
+          "displayName": "50 ゴールドコイン",
+          "description": "ラボツールを備えるための大きめのコインパックです。"
+        },
+        "coins_100": {
+          "displayName": "100 ゴールドコイン",
+          "description": "長期進行向けの最大コインパックです。"
+        }
+      }
+    },
+    "ko": {
+      "languageCode": "ko",
+      "displayName": "한국어",
+      "appName": "Atomic Fusion Rush",
+      "subtitle": "원소 합성 퍼즐",
+      "promotionalText": "원자를 합성하고 원소를 해제하며 빠른 화학 퍼즐에서 금을 향해 나아가세요.",
+      "description": "Atomic Fusion Rush는 주기율표를 빠르고 만족스러운 합성 퍼즐로 바꿉니다. 조준해 발사하고 원자를 더 무거운 원소로 합성하며, 캠페인 스테이지를 클리어하고 화학 정보를 수집하세요. 어려운 보드에서는 실험실 도구를 활용하고, 금을 향해 진행하며 일일 퀘스트와 최고 기록에 도전하세요.",
+      "keywords": "화학,원자,합성,퍼즐,원소,금,과학",
+      "reviewNotes": "주요 구매 경로: 메인 메뉴 -> 상점 -> 팩 잠금 해제. 코인 팩도 상점에 표시됩니다.",
+      "inAppPurchases": {
+        "pro_lab_pack_lifetime": {
+          "displayName": "프로 랩 팩 - 평생",
+          "description": "프로 랩을 영구 해제하고, 강제 전면 광고를 제거하며, 시작 골드 코인 50개와 일일 보상 증가를 받습니다."
+        },
+        "coins_5": {
+          "displayName": "골드 코인 5개",
+          "description": "파워업과 레벨 건너뛰기를 위한 작은 코인 팩입니다."
+        },
+        "coins_20": {
+          "displayName": "골드 코인 20개",
+          "description": "여러 번의 다음 플레이에 유용한 코인 팩입니다."
+        },
+        "coins_50": {
+          "displayName": "골드 코인 50개",
+          "description": "실험실 도구를 준비하기 위한 큰 코인 팩입니다."
+        },
+        "coins_100": {
+          "displayName": "골드 코인 100개",
+          "description": "장기 진행을 위한 가장 큰 코인 팩입니다."
+        }
+      }
+    },
+    "ru": {
+      "languageCode": "ru",
+      "displayName": "Русский",
+      "appName": "Atomic Fusion Rush",
+      "subtitle": "Пазл слияния атомов",
+      "promotionalText": "Сливайте атомы, открывайте элементы и идите к золоту в быстрой химической головоломке.",
+      "description": "Atomic Fusion Rush превращает периодическую таблицу в быструю и приятную головоломку со слиянием. Прицеливайтесь, запускайте атомы и объединяйте их в более тяжелые элементы, проходите этапы кампании, собирайте факты о химии и используйте лабораторные инструменты на сложных досках. Двигайтесь к золоту, выполняйте ежедневные задания и улучшайте лучшие забеги.",
+      "keywords": "химия,атомы,слияние,пазл,элементы,золото,наука",
+      "reviewNotes": "Основной путь покупки: Главное меню -> Магазин -> Разблокировать пакет. Наборы монет также отображаются в Магазине.",
+      "inAppPurchases": {
+        "pro_lab_pack_lifetime": {
+          "displayName": "Пакет Pro Lab - навсегда",
+          "description": "Навсегда откройте Pro Lab, уберите обязательную межстраничную рекламу, получите 50 стартовых золотых монет и усиленные ежедневные награды."
+        },
+        "coins_5": {
+          "displayName": "5 золотых монет",
+          "description": "Небольшой набор для усилений и пропуска уровней."
+        },
+        "coins_20": {
+          "displayName": "20 золотых монет",
+          "description": "Полезный набор для нескольких следующих забегов."
+        },
+        "coins_50": {
+          "displayName": "50 золотых монет",
+          "description": "Крупный набор для запаса лабораторных инструментов."
+        },
+        "coins_100": {
+          "displayName": "100 золотых монет",
+          "description": "Самый большой набор монет для долгого прогресса."
+        }
+      }
+    },
+    "id": {
+      "languageCode": "id",
+      "displayName": "Bahasa Indonesia",
+      "appName": "Atomic Fusion Rush",
+      "subtitle": "Puzzle gabung unsur",
+      "promotionalText": "Gabungkan atom, buka unsur, dan kejar emas dalam puzzle kimia cepat.",
+      "description": "Atomic Fusion Rush mengubah tabel periodik menjadi puzzle penggabungan yang cepat dan memuaskan. Bidik, tembak, dan gabungkan atom menjadi unsur yang lebih berat, selesaikan tahap kampanye, temukan fakta kimia, dan gunakan alat lab saat papan menjadi sulit. Maju menuju emas, selesaikan misi harian, dan tingkatkan rekor permainanmu.",
+      "keywords": "kimia,atom,gabung,puzzle,unsur,emas,sains",
+      "reviewNotes": "Jalur pembelian utama: Menu Utama -> Toko -> Buka paket. Paket koin juga tampil di Toko.",
+      "inAppPurchases": {
+        "pro_lab_pack_lifetime": {
+          "displayName": "Paket Lab Pro - Seumur hidup",
+          "description": "Buka Lab Pro selamanya, hapus iklan interstisial wajib, dapatkan 50 koin emas awal, dan tingkatkan klaim harian."
+        },
+        "coins_5": {
+          "displayName": "5 koin emas",
+          "description": "Paket kecil untuk power-up dan melewati level."
+        },
+        "coins_20": {
+          "displayName": "20 koin emas",
+          "description": "Paket berguna untuk beberapa run berikutnya."
+        },
+        "coins_50": {
+          "displayName": "50 koin emas",
+          "description": "Paket lebih besar untuk menyiapkan alat lab."
+        },
+        "coins_100": {
+          "displayName": "100 koin emas",
+          "description": "Paket koin terbesar untuk progres panjang."
+        }
+      }
+    },
+    "tr": {
+      "languageCode": "tr",
+      "displayName": "Türkçe",
+      "appName": "Atomic Fusion Rush",
+      "subtitle": "Element birleştirme bulmacası",
+      "promotionalText": "Atomları birleştir, elementleri aç ve hızlı kimya bulmacasında altına ulaş.",
+      "description": "Atomic Fusion Rush periyodik tabloyu hızlı ve tatmin edici bir birleştirme bulmacasına dönüştürür. Nişan al, atomları daha ağır elementlere dönüştür, sefer aşamalarını geç, kimya bilgileri topla ve zor tahtalarda laboratuvar araçlarını kullan. Altına doğru ilerle, günlük görevleri tamamla ve en iyi koşularını geliştir.",
+      "keywords": "kimya,atom,birleştir,bulmaca,element,altın,bilim",
+      "reviewNotes": "Ana satın alma yolu: Ana Menü -> Mağaza -> Paketi aç. Coin paketleri de Mağaza içinde görünür.",
+      "inAppPurchases": {
+        "pro_lab_pack_lifetime": {
+          "displayName": "Pro Lab Paketi - Ömür boyu",
+          "description": "Pro Lab'i kalıcı olarak aç, zorunlu geçiş reklamlarını kaldır, 50 başlangıç altın parası al ve günlük ödülleri artır."
+        },
+        "coins_5": {
+          "displayName": "5 altın para",
+          "description": "Güçlendirmeler ve seviye atlama için küçük paket."
+        },
+        "coins_20": {
+          "displayName": "20 altın para",
+          "description": "Birkaç sonraki koşu için kullanışlı paket."
+        },
+        "coins_50": {
+          "displayName": "50 altın para",
+          "description": "Laboratuvar araçları stoklamak için daha büyük paket."
+        },
+        "coins_100": {
+          "displayName": "100 altın para",
+          "description": "Uzun ilerleme için en büyük para paketi."
+        }
+      }
+    },
+    "it": {
+      "languageCode": "it",
+      "displayName": "Italiano",
+      "appName": "Atomic Fusion Rush",
+      "subtitle": "Puzzle chimico merge",
+      "promotionalText": "Fondi atomi, sblocca elementi e punta all’oro in un rapido puzzle di chimica.",
+      "description": "Atomic Fusion Rush trasforma la tavola periodica in un puzzle di fusione rapido e appagante. Mira, lancia e fondi atomi in elementi più pesanti, supera livelli campagna, scopri curiosità di chimica e usa strumenti da laboratorio quando il tabellone diventa difficile. Avanza verso l’oro, completa missioni giornaliere e migliora le tue run migliori.",
+      "keywords": "chimica,atomi,fusione,puzzle,elementi,oro,scienza",
+      "reviewNotes": "Percorso principale di acquisto: Menu principale -> Negozio -> Sblocca pacchetto. I pacchetti monete sono nel Negozio.",
+      "inAppPurchases": {
+        "pro_lab_pack_lifetime": {
+          "displayName": "Pacchetto Lab Pro - A vita",
+          "description": "Sblocca Lab Pro per sempre, rimuovi gli interstitial obbligatori, ricevi 50 monete d’oro iniziali e potenzia i premi giornalieri."
+        },
+        "coins_5": {
+          "displayName": "5 monete d’oro",
+          "description": "Un piccolo pacchetto per potenziamenti e salti di livello."
+        },
+        "coins_20": {
+          "displayName": "20 monete d’oro",
+          "description": "Un pacchetto utile per diverse prossime run."
+        },
+        "coins_50": {
+          "displayName": "50 monete d’oro",
+          "description": "Un pacchetto più grande per fare scorta di strumenti lab."
+        },
+        "coins_100": {
+          "displayName": "100 monete d’oro",
+          "description": "Il pacchetto monete più grande per progressi lunghi."
+        }
+      }
+    },
+    "vi": {
+      "languageCode": "vi",
+      "displayName": "Tiếng Việt",
+      "appName": "Atomic Fusion Rush",
+      "subtitle": "Ghép nguyên tố giải đố",
+      "promotionalText": "Ghép nguyên tử, mở khóa nguyên tố và chinh phục vàng trong game giải đố hóa học nhanh.",
+      "description": "Atomic Fusion Rush biến bảng tuần hoàn thành một game giải đố ghép nhanh và thỏa mãn. Ngắm bắn, ghép nguyên tử thành nguyên tố nặng hơn, vượt các màn chiến dịch, khám phá kiến thức hóa học và dùng công cụ phòng thí nghiệm khi bàn chơi trở nên khó. Tiến tới vàng, hoàn thành nhiệm vụ hằng ngày và cải thiện lượt chơi tốt nhất.",
+      "keywords": "hóa học,nguyên tử,ghép,giải đố,nguyên tố,vàng,khoa học",
+      "reviewNotes": "Đường dẫn mua chính: Menu chính -> Cửa hàng -> Mở khóa gói. Các gói xu cũng hiển thị trong Cửa hàng.",
+      "inAppPurchases": {
+        "pro_lab_pack_lifetime": {
+          "displayName": "Gói Lab Pro - Trọn đời",
+          "description": "Mở Lab Pro mãi mãi, bỏ quảng cáo xen kẽ bắt buộc, nhận 50 xu vàng ban đầu và tăng phần thưởng hằng ngày."
+        },
+        "coins_5": {
+          "displayName": "5 xu vàng",
+          "description": "Gói nhỏ cho vật phẩm hỗ trợ và bỏ qua cấp."
+        },
+        "coins_20": {
+          "displayName": "20 xu vàng",
+          "description": "Gói hữu ích cho nhiều lượt chơi tiếp theo."
+        },
+        "coins_50": {
+          "displayName": "50 xu vàng",
+          "description": "Gói lớn hơn để dự trữ công cụ phòng thí nghiệm."
+        },
+        "coins_100": {
+          "displayName": "100 xu vàng",
+          "description": "Gói xu lớn nhất cho tiến trình dài hạn."
+        }
+      }
+    }
+  }
+}
