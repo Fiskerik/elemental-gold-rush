@@ -1,5 +1,4 @@
 import { Capacitor } from "@capacitor/core";
-import { Purchases as RevenueCatPurchases } from "@revenuecat/purchases-capacitor";
 import { logDebug } from "../lib/debugLogger";
 import { APP_STORE_PURCHASE_PRODUCT_IDS, PRODUCT_IDS, ProductId, getProductById } from "./products";
 
