@@ -4,6 +4,8 @@ import {
   Link,
   createRootRouteWithContext,
   useRouter,
+  HeadContent,
+  Scripts,
 } from "@tanstack/react-router";
 import { useEffect } from "react";
 
