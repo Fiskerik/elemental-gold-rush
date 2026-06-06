@@ -372,8 +372,6 @@ async function ensureConfigured(reportStep?: PurchaseStepReporter): Promise<bool
 }
 
 async function configurePurchases(reportStep?: PurchaseStepReporter): Promise<boolean> {
-  const Purchases = RevenueCatPurchases as unknown as PurchasesPlugin;
-
   const apiKey = getRevenueCatApiKey();
   if (!apiKey) {
     if (!missingConfigLogged) {
@@ -388,6 +386,10 @@ async function configurePurchases(reportStep?: PurchaseStepReporter): Promise<bo
   }
   lastConfigurationReason = "";
   try {
+    const { Purchases: RevenueCatPurchases } = await import(
+      "@revenuecat/purchases-capacitor"
+    );
+    const Purchases = RevenueCatPurchases as unknown as PurchasesPlugin;
     if (shouldEnableRevenueCatDebugLogs()) {
       reportStep?.("Preparing purchase logs...");
       await withNativeTimeout(
