@@ -93,6 +93,106 @@ export function playWinSound() {
   });
 }
 
+export function playDropSound() {
+  runSound((c, now) => {
+    const osc = c.createOscillator();
+    const gain = c.createGain();
+    osc.type = "triangle";
+    osc.frequency.setValueAtTime(150, now);
+    osc.frequency.exponentialRampToValueAtTime(92, now + 0.06);
+    gain.gain.setValueAtTime(0.09, now);
+    gain.gain.exponentialRampToValueAtTime(MIN_EXP_VALUE, now + 0.09);
+    osc.connect(gain).connect(c.destination);
+    osc.start(now);
+    osc.stop(now + 0.1);
+  });
+}
+
+export function playComboSound(mergeCount: number) {
+  runSound((c, now) => {
+    const count = Math.max(2, Math.min(6, mergeCount));
+    const master = c.createGain();
+    master.gain.setValueAtTime(0.82, now);
+    master.connect(c.destination);
+
+    for (let i = 0; i < count; i++) {
+      const t = now + i * 0.055;
+      scheduleTone(c, master, {
+        type: i % 2 === 0 ? "triangle" : "sine",
+        frequency: 420 * Math.pow(1.18, i),
+        endFrequency: 520 * Math.pow(1.22, i),
+        start: t,
+        duration: 0.18,
+        peak: 0.055,
+        attack: 0.01,
+        decay: 0.16,
+      });
+    }
+    noiseBurst(c, master, {
+      start: now + 0.05,
+      duration: 0.18,
+      peak: 0.022,
+      filterType: "highpass",
+      frequency: 5200,
+    });
+    window.setTimeout(() => master.disconnect(), 700);
+  });
+}
+
+export function playMilestoneSound(atomicNumber: number) {
+  runSound((c, now) => {
+    const root = 392 + Math.min(24, Math.max(0, atomicNumber - 1)) * 4;
+    [root, root * 1.25, root * 1.5, root * 2].forEach((frequency, index) => {
+      const osc = c.createOscillator();
+      const gain = c.createGain();
+      osc.type = index === 3 ? "sine" : "triangle";
+      osc.frequency.setValueAtTime(finitePositive(frequency, root), now + index * 0.075);
+      gain.gain.setValueAtTime(MIN_EXP_VALUE, now + index * 0.075);
+      gain.gain.exponentialRampToValueAtTime(index === 3 ? 0.16 : 0.12, now + index * 0.075 + 0.02);
+      gain.gain.exponentialRampToValueAtTime(MIN_EXP_VALUE, now + index * 0.075 + 0.38);
+      osc.connect(gain).connect(c.destination);
+      osc.start(now + index * 0.075);
+      osc.stop(now + index * 0.075 + 0.42);
+    });
+  });
+}
+
+export function playDangerSound(severity: "low" | "high" = "low") {
+  runSound((c, now) => {
+    const repeats = severity === "high" ? 2 : 1;
+    for (let i = 0; i < repeats; i++) {
+      const t = now + i * 0.17;
+      const osc = c.createOscillator();
+      const gain = c.createGain();
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(severity === "high" ? 220 : 180, t);
+      osc.frequency.exponentialRampToValueAtTime(severity === "high" ? 150 : 132, t + 0.14);
+      gain.gain.setValueAtTime(MIN_EXP_VALUE, t);
+      gain.gain.exponentialRampToValueAtTime(severity === "high" ? 0.09 : 0.055, t + 0.02);
+      gain.gain.exponentialRampToValueAtTime(MIN_EXP_VALUE, t + 0.18);
+      osc.connect(gain).connect(c.destination);
+      osc.start(t);
+      osc.stop(t + 0.2);
+    }
+  });
+}
+
+export function playGameOverSound() {
+  runSound((c, now) => {
+    const osc = c.createOscillator();
+    const gain = c.createGain();
+    osc.type = "sawtooth";
+    osc.frequency.setValueAtTime(240, now);
+    osc.frequency.exponentialRampToValueAtTime(58, now + 0.54);
+    gain.gain.setValueAtTime(MIN_EXP_VALUE, now);
+    gain.gain.exponentialRampToValueAtTime(0.18, now + 0.03);
+    gain.gain.exponentialRampToValueAtTime(MIN_EXP_VALUE, now + 0.64);
+    osc.connect(gain).connect(c.destination);
+    osc.start(now);
+    osc.stop(now + 0.68);
+  });
+}
+
 // ====================== POLYPHONIC AMBIENT ======================
 function scheduleTone(
   c: AudioContext,

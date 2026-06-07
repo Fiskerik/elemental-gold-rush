@@ -1,12 +1,18 @@
 type HapticsModule = {
   Haptics: {
     impact: (options: { style: string }) => Promise<void>;
+    notification?: (options: { type: string }) => Promise<void>;
     vibrate: (options?: { duration?: number }) => Promise<void>;
   };
   ImpactStyle?: {
     Light?: string;
     Medium?: string;
     Heavy?: string;
+  };
+  NotificationType?: {
+    Success?: string;
+    Warning?: string;
+    Error?: string;
   };
 };
 
@@ -42,4 +48,30 @@ export async function triggerNativeHaptic(ms: number | number[]): Promise<boolea
       return false;
     }
   }
+}
+
+export async function triggerNativeNotificationHaptic(
+  type: "success" | "warning" | "error",
+  fallbackMs: number | number[] = 45,
+): Promise<boolean> {
+  const haptics = await loadHaptics();
+  if (!haptics) return false;
+
+  const notificationType =
+    type === "success"
+      ? (haptics.NotificationType?.Success ?? "SUCCESS")
+      : type === "warning"
+        ? (haptics.NotificationType?.Warning ?? "WARNING")
+        : (haptics.NotificationType?.Error ?? "ERROR");
+
+  try {
+    if (haptics.Haptics.notification) {
+      await haptics.Haptics.notification({ type: notificationType });
+      return true;
+    }
+  } catch {
+    // Fall through to an impact/vibrate fallback below.
+  }
+
+  return triggerNativeHaptic(fallbackMs);
 }

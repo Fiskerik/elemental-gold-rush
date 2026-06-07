@@ -402,41 +402,82 @@ function makePowerUpLevel(
   };
 }
 
+const NITROGEN_LEVEL_SEED: LevelSeed = {
+  name: "Nitrogen Climb",
+  description: "Reach Nitrogen.",
+  lore: "Nitrogen fills most of the air and anchors amino acids, proteins, and fertilizers.",
+  targetElement: 7,
+};
+
+const SULFUR_LEVEL_SEED: LevelSeed = {
+  name: "Sulfur Spark",
+  description: "Reach Sulfur.",
+  lore: "Sulfur colors hot springs, strengthens proteins, and gives fireworks and minerals their bite.",
+  targetElement: 16,
+};
+
+const IODINE_LEVEL_SEED: LevelSeed = {
+  name: "Iodine Signal",
+  description: "Reach Iodine.",
+  lore: "Iodine disinfects wounds, supports thyroid hormones, and stains starch a deep blue-black.",
+  targetElement: 53,
+};
+
+const MERCURY_LEVEL_SEED: LevelSeed = {
+  name: "Mercury Mirror",
+  description: "Reach Mercury.",
+  lore: "Mercury is the only metal liquid at room temperature, once used in thermometers and mirrors.",
+  targetElement: 80,
+};
+
 const EARLY_LEVELS: Level[] = [
   makeAtomLevel(LEVEL_SEEDS[0], 1, 1),
-  makeAtomLevel(LEVEL_SEEDS[1], 2, 2),
+  makeAtomLevel(LEVEL_SEEDS[3], 2, 2),
   makePowerUpLevel(3, "shimmer", "Shimmer Practice", "Merge the shimmering queued atom to clear the stage.", 3, 3),
-  makeAtomLevel(LEVEL_SEEDS[2], 4, 3),
-  makeAtomLevel(LEVEL_SEEDS[3], 7, 4),
+  makeAtomLevel(NITROGEN_LEVEL_SEED, 4, 3),
+  makeAtomLevel(LEVEL_SEEDS[5], 7, 4),
   makePowerUpLevel(6, "unstable", "Unstable Isotope", "Merge an unstable atom before its shell depletes.", 10, 10),
   makePowerUpLevel(8, "grab", "Grab Training", "Use Grab to reposition an atom and create a merge.", 5, 5),
-  makeAtomLevel(LEVEL_SEEDS[4], 9, 5),
+  makeAtomLevel(LEVEL_SEEDS[6], 9, 5),
   makePowerUpLevel(11, "egun", "E-Gun Calibration", "Fire the E-Gun through a molecule to upgrade it.", 6, 6),
-  makeAtomLevel({ ...LEVEL_SEEDS[5], targetElement: 7, name: "Nitrogen Climb", description: "Reach Nitrogen.", lore: "Nitrogen fills most of the air and anchors amino acids, proteins, and fertilizers." }, 12, 6),
+  makeAtomLevel(LEVEL_SEEDS[7], 12, 6),
   makePowerUpLevel(13, "gravity", "Gravity Well", "Gravity is earned every 30 successful merges. Use it to pull scattered atoms together.", 7, 7),
-  makeAtomLevel(LEVEL_SEEDS[5], 14, 7),
-  makeAtomLevel(LEVEL_SEEDS[6], 16, 8),
+  makeAtomLevel(LEVEL_SEEDS[8], 14, 7),
+  makeAtomLevel(SULFUR_LEVEL_SEED, 16, 8),
   makePowerUpLevel(17, "stone", "Stone Impact", "Miss three opening shots, then place the loaded Stone.", 10, 10),
-  makeAtomLevel({ ...LEVEL_SEEDS[7], targetElement: 13, name: "Aluminum Foil", description: "Reach Aluminum.", lore: "Aluminum is light, conductive, and protected by a thin oxide skin." }, 18, 9),
+  makeAtomLevel(LEVEL_SEEDS[9], 18, 9),
   makePowerUpLevel(19, "transmute", "Transmute Shot", "Transmute your queued atom, then merge it into the board.", 13, 13),
   makePowerUpLevel(22, "fusion-jump", "Fusion Jump", "Arm Fusion Jump and merge Chlorine into Potassium.", 19, 17),
-  makeAtomLevel(LEVEL_SEEDS[11], 23, 11),
+  makeAtomLevel(LEVEL_SEEDS[10], 23, 11),
   makePowerUpLevel(24, "catalyst", "Catalyst Chain", "Activate Catalyst and trigger a chain reaction.", 24, 6),
-  makeAtomLevel(LEVEL_SEEDS[13], 26, 12),
+  makeAtomLevel(LEVEL_SEEDS[12], 26, 12),
   makePowerUpLevel(27, "emission", "Emission Burst", "Use Emission to raise the waiting queue.", 29, 29),
-  makeAtomLevel({ ...LEVEL_SEEDS[14], targetElement: 33, name: "Arsenic Trace", description: "Reach Arsenic.", lore: "Arsenic is infamous as a poison, yet its compounds also shaped semiconductors and pigments." }, 28, 13),
+  makeAtomLevel(LEVEL_SEEDS[13], 28, 13),
   makePowerUpLevel(29, "gamma", "Gamma Bomb", "Use Gamma Bomb to clear a dense board.", 33, 6),
-  makeAtomLevel(LEVEL_SEEDS[15], 31, 14),
+  makeAtomLevel(LEVEL_SEEDS[18], 31, 14),
   makePowerUpLevel(32, "blank", "Blank Breakthrough", "Use a Blank Atom to reach Krypton through the stone wall.", 36, 35),
-  makeAtomLevel(LEVEL_SEEDS[17], 33, 15),
+  makeAtomLevel(LEVEL_SEEDS[19], 33, 15),
   makePowerUpLevel(34, "queue-shuffle", "Queue Shuffle", "Shuffle the queue, then fire one of the new atoms.", 42, 42),
 ];
 
 const EARLY_LEVEL_IDS = new Set(EARLY_LEVELS.map((level) => level.id));
 let nextPostTutorialLevelId = 36;
+const POST_TUTORIAL_ATOM_SEEDS: LevelSeed[] = [
+  IODINE_LEVEL_SEED,
+  LEVEL_SEEDS[20],
+  LEVEL_SEEDS[21],
+  LEVEL_SEEDS[26],
+  LEVEL_SEEDS[27],
+  LEVEL_SEEDS[28],
+  MERCURY_LEVEL_SEED,
+  LEVEL_SEEDS[29],
+  LEVEL_SEEDS[32],
+  LEVEL_SEEDS[33],
+  LEVEL_SEEDS[39],
+];
 const ATOM_LEVELS: Level[] = [
   ...EARLY_LEVELS,
-  ...[LEVEL_SEEDS[9], ...LEVEL_SEEDS.slice(18)].map((seed, index) => {
+  ...POST_TUTORIAL_ATOM_SEEDS.map((seed, index) => {
     const atomStage = 16 + index;
     while (nextPostTutorialLevelId % 5 === 0 || SPECIAL_LEVEL_IDS.has(nextPostTutorialLevelId)) nextPostTutorialLevelId += 1;
     const id = nextPostTutorialLevelId;
