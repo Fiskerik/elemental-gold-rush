@@ -155,7 +155,7 @@ export function MainMenu({
           </button>
           <div style={{ textAlign: "center", minWidth: 0 }}>
             <div className="gold-text" style={brandTitle}>Atomic Fusion Rush</div>
-            <div style={brandSubline}>Level {unlockedLevel} of {MAX_LEVEL}</div>
+            <div style={brandSubline}>{`Level ${unlockedLevel} of ${MAX_LEVEL}`}</div>
             {hasProPack && <div style={proActiveChip}>PRO LAB ACTIVE</div>}
           </div>
           <button
@@ -180,7 +180,7 @@ export function MainMenu({
                 Level {unlockedLevel}
               </div>
               <div style={{ fontSize: 13, color: "var(--muted-foreground)", marginTop: 4 }}>
-                {nextLevel?.name} - target {targetEl?.symbol ?? "H"}
+                {`${nextLevel?.name ?? ""} - target ${targetEl?.symbol ?? "H"}`}
               </div>
             </div>
             <button
@@ -211,9 +211,9 @@ export function MainMenu({
             <div style={{ ...progressFill, width: `${campaignProgress}%` }} />
           </div>
           <div style={compactStatRow}>
-            <span>Highest {highestEl?.symbol ?? "H"} #{highestElement}</span>
-            <span>{formatScore(totalScore)} score</span>
-            <span>{campaignProgress}% campaign</span>
+            <span>{`Highest ${highestEl?.symbol ?? "H"} #${highestElement}`}</span>
+            <span>{`${formatScore(totalScore)} score`}</span>
+            <span>{`${campaignProgress}% campaign`}</span>
           </div>
         </section>
 
@@ -273,14 +273,13 @@ export function MainMenu({
             <div>
               <div style={sectionLabel}>DAILY LAB</div>
               <div style={{ fontSize: 12, color: "var(--muted-foreground)" }}>
-                Streak {dailyStreak} - {completedDailyQuests}/{dailyQuests.length} quests
+                {`Streak ${dailyStreak} - ${completedDailyQuests}/${dailyQuests.length} quests`}
               </div>
               <div style={{ fontSize: 11, color: "var(--muted-foreground)", marginTop: 2 }}>
-                Complete 4 of 6 quests to claim {dailyRewardAmount} gold coins.
-                {hasProPack ? " (includes +2 Pro bonus)" : ""}
+                {`Complete 4 of 6 quests to claim ${dailyRewardAmount} gold coins.${hasProPack ? " (includes +2 Pro bonus)" : ""}`}
               </div>
               <div style={{ fontSize: 10, color: "var(--accent)", marginTop: 4, fontWeight: 800, letterSpacing: 0.6 }}>
-                Resets in {resetCountdown}
+                {`Resets in ${resetCountdown}`}
               </div>
             </div>
             <div style={{ display: "grid", justifyItems: "end", gap: 8 }}>
@@ -312,7 +311,7 @@ export function MainMenu({
               <div>
                 <div style={sectionLabel}>PLAY A GAME A DAY</div>
                 <div style={{ fontSize: 12, color: "var(--muted-foreground)", marginTop: 2 }}>
-                  Streak {weeklyBonus.currentStreak} - {weeklyBonus.cycleProgress}/7 toward +5
+                  {`Streak ${weeklyBonus.currentStreak} - ${weeklyBonus.cycleProgress}/7 toward +5`}
                 </div>
               </div>
               <div style={weeklyBonusPill}>
@@ -374,7 +373,7 @@ export function MainMenu({
               ))}
             </div>
             <div style={{ fontSize: 10, color: "var(--muted-foreground)", lineHeight: 1.35 }}>
-              1 coin each day you play. {weeklyBonus.nextRewardText}.
+              {`1 coin each day you play. ${weeklyBonus.nextRewardText}.`}
             </div>
           </div>
           <div style={questGrid}>

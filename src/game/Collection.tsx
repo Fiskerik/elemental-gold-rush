@@ -38,7 +38,7 @@ export function Collection({ onBack }: { onBack: () => void }) {
           <div style={{ flex: 1 }}>
             <h1 style={{ fontSize: 22, margin: 0, fontWeight: 800 }}>Collection</h1>
             <div style={{ fontSize: 12, color: "var(--muted-foreground)" }}>
-              {discoveredElements.length} / 118 elements discovered
+              {`${discoveredElements.length} / 118 elements discovered`}
             </div>
           </div>
         </div>
@@ -185,7 +185,7 @@ export function Collection({ onBack }: { onBack: () => void }) {
                     </span>
                     {unlocked && (
                       <span style={{ display: "block", fontSize: 10, color: "var(--accent)", marginTop: 2 }}>
-                        Found x{foundCount}
+                        {`Found x${foundCount}`}
                       </span>
                     )}
                   </span>
@@ -430,8 +430,9 @@ export function Collection({ onBack }: { onBack: () => void }) {
             </div>
             {foundCompounds.has(selectedCompound.id) && (
               <div style={{ fontSize: 12, color: "var(--accent)", textAlign: "center", marginBottom: 10 }}>
-                Found {compoundCounts[selectedCompound.id] ?? 1} time
-                {(compoundCounts[selectedCompound.id] ?? 1) === 1 ? "" : "s"}
+                {`Found ${compoundCounts[selectedCompound.id] ?? 1} time${
+                  (compoundCounts[selectedCompound.id] ?? 1) === 1 ? "" : "s"
+                }`}
               </div>
             )}
             <p style={{ fontSize: 13, lineHeight: 1.55, margin: 0, color: "var(--foreground)" }}>

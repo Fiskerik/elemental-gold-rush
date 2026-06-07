@@ -49,6 +49,10 @@ type Screen =
   | { name: "settings" };
 
 function Index() {
+  return <GameApp />;
+}
+
+export function GameApp() {
   const unlockedLevel = useProgress((s) => s.unlockedLevel);
   const hasProPack = useProgress((s) => s.hasProPack);
   const appTheme = useProgress((s) => s.appTheme);

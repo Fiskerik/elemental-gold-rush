@@ -110,12 +110,25 @@ const staticPageChrome = (title, body) => `<!doctype html>
         background: #0a0a1a;
         color: #e8edf8;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif;
+        overflow-y: auto;
+        user-select: text;
       }
       .shell {
         min-height: 100dvh;
         max-width: 880px;
         margin: 0 auto;
-        padding: 24px;
+        padding: 0 24px 40px;
+      }
+      .topbar {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        padding: calc(env(safe-area-inset-top, 0px) + 14px) 0 14px;
+        background: linear-gradient(180deg, #0a0a1a 0%, rgba(10, 10, 26, 0.92) 72%, rgba(10, 10, 26, 0) 100%);
+        backdrop-filter: blur(12px);
       }
       .card {
         background: rgba(24, 28, 62, 0.95);
@@ -130,9 +143,11 @@ const staticPageChrome = (title, body) => `<!doctype html>
       a { color: #79d6ff; }
       .muted { color: #a9b4cc; margin-top: 8px; }
       .links { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
+      .navlinks { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
       .btn {
         display: inline-flex;
         align-items: center;
+        justify-content: center;
         text-decoration: none;
         border-radius: 10px;
         border: 1px solid rgba(109, 134, 214, 0.44);
@@ -141,13 +156,26 @@ const staticPageChrome = (title, body) => `<!doctype html>
         font-weight: 700;
         padding: 8px 12px;
       }
+      @media (max-width: 560px) {
+        .shell { padding-left: 16px; padding-right: 16px; }
+        .topbar { flex-direction: column; }
+        .navlinks .btn { flex: 1 1 0; }
+      }
     </style>
   </head>
   <body>
     <main class="shell">
+      <nav class="topbar" aria-label="Page navigation">
+        <a class="btn" href="/game">Back to game</a>
+        <div class="navlinks">
+          <a class="btn" href="/support">Support</a>
+          <a class="btn" href="/terms">Terms</a>
+          <a class="btn" href="/privacy">Privacy</a>
+        </div>
+      </nav>
       ${body}
       <div class="links">
-        <a class="btn" href="/">Back to game</a>
+        <a class="btn" href="/game">Back to game</a>
         <a class="btn" href="/support">Support</a>
         <a class="btn" href="/terms">Terms</a>
         <a class="btn" href="/privacy">Privacy</a>

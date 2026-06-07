@@ -104,7 +104,7 @@ export function GameLibrary({ onBack }: Props) {
                   </div>
                   <p style={{ ...description, marginBottom: 0 }}>{powerUp.description}</p>
                   <div style={{ color: "var(--accent)", fontSize: 11, fontWeight: 900 }}>
-                    Obtained: {powerUp.unlock}
+                    {`Obtained: ${powerUp.unlock}`}
                   </div>
                 </div>
               </article>

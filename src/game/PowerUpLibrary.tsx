@@ -122,7 +122,7 @@ export function PowerUpLibrary({ onBack }: Props) {
                   {powerUp.effect}
                 </p>
                 <div style={{ marginTop: 6, color: "var(--accent)", fontSize: 11, fontWeight: 800 }}>
-                  Obtained: {powerUp.unlock}
+                  {`Obtained: ${powerUp.unlock}`}
                 </div>
               </div>
             </article>

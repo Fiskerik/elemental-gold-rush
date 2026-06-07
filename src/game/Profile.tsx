@@ -60,13 +60,13 @@ export function Profile({ onBack }: Props) {
       setUnlockedLevel(1);
       return;
     }
-    const entered = window.prompt("Enter unlock password");
+    const entered = window.prompt(tr("Enter unlock password"));
     if (entered == null) return;
     if (entered === "MussePigg14!") {
       setUnlockedLevel(MAX_LEVEL);
       return;
     }
-    window.alert("Wrong password.");
+    window.alert(tr("Wrong password."));
   }
 
   return (
@@ -102,7 +102,7 @@ export function Profile({ onBack }: Props) {
               Fusion Rush Chemist
             </h1>
             <p style={{ margin: 0, color: "var(--muted-foreground)", fontSize: 13 }}>
-              {hasProPack ? "Pro Lab active" : "Free Lab"} • Level {unlockedLevel} / {MAX_LEVEL}
+              {`${tr(hasProPack ? "Pro Lab active" : "Free Lab")} • ${tr("Level")} ${unlockedLevel} / ${MAX_LEVEL}`}
             </p>
             {hasProPack && <div style={proBadge}>PRO LAB PACK ACTIVE</div>}
           </div>
@@ -116,15 +116,15 @@ export function Profile({ onBack }: Props) {
               : grid.gridTemplateColumns,
           }}
         >
-          <ProfileStat label="Total Score" value={formatScore(totalScore)} sub="career" />
-          <ProfileStat label="Gold Coins" value={`${goldCoins}`} sub="shop currency" />
+          <ProfileStat label={tr("Total Score")} value={formatScore(totalScore)} sub={tr("career")} />
+          <ProfileStat label={tr("Gold Coins")} value={`${goldCoins}`} sub={tr("shop currency")} />
           <ProfileStat
-            label="Daily Streak"
+            label={tr("Daily Streak")}
             value={`${dailyStreak}`}
-            sub={claimedDailyReward ? "claimed" : "active"}
+            sub={tr(claimedDailyReward ? "claimed" : "active")}
           />
           <ProfileStat
-            label="Best Combo"
+            label={tr("Best Combo")}
             value={`${bestCombo}×`}
             sub={
               bestComboDate
@@ -133,26 +133,26 @@ export function Profile({ onBack }: Props) {
                     month: "short",
                     day: "numeric",
                   })
-                : "no record yet"
+                : tr("no record yet")
             }
           />
           <ProfileStat
-            label="Highest Atom"
-            value={highestEl?.name ?? "Hydrogen"}
+            label={tr("Highest Atom")}
+            value={tr(highestEl?.name ?? "Hydrogen")}
             sub={`${highestEl?.symbol ?? "H"} • #${highestElement}`}
           />
           <ProfileStat
-            label="Elements"
+            label={tr("Elements")}
             value={`${discoveredElements.length}`}
-            sub={`${completionPercent}% found`}
+            sub={tr(`${completionPercent}% found`)}
           />
-          <ProfileStat label="Stars" value={`${totalStars}`} sub={`${perfectLevels} perfect`} />
+          <ProfileStat label={tr("Stars")} value={`${totalStars}`} sub={tr(`${perfectLevels} perfect`)} />
         </section>
 
         <section style={card}>
-          <div style={sectionHeading}>Display</div>
+          <div style={sectionHeading}>{tr("Display")}</div>
           <div style={preferenceRow}>
-            <span style={{ fontSize: 13, fontWeight: 850 }}>Theme</span>
+            <span style={{ fontSize: 13, fontWeight: 850 }}>{tr("Theme")}</span>
             <div style={{ display: "inline-grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
               {(["dark", "light"] as const).map((theme) => (
                 <button
@@ -190,12 +190,13 @@ export function Profile({ onBack }: Props) {
         </section>
 
         <section style={card}>
-          <div style={sectionHeading}>Daily Lab</div>
+          <div style={sectionHeading}>{tr("Daily Lab")}</div>
           <div style={{ color: "var(--muted-foreground)", fontSize: 13, marginBottom: 12 }}>
-            {completedDailyQuests}/{dailyQuests.length} quests complete today.
+            {tr(`${completedDailyQuests}/${dailyQuests.length} quests complete today.`)}
             <div style={{ fontSize: 12, marginTop: 4 }}>
-              Complete 4 of 6 quests to claim the daily prize of {dailyRewardAmount} gold coins.
-              {hasProPack ? " (includes +2 Pro bonus)" : ""}
+              {tr(
+                `Complete 4 of 6 quests to claim the daily prize of ${dailyRewardAmount} gold coins.${hasProPack ? " (includes +2 Pro bonus)" : ""}`,
+              )}
             </div>
           </div>
           <div style={{ display: "grid", gap: 8 }}>
@@ -209,7 +210,7 @@ export function Profile({ onBack }: Props) {
                 >
                   <QuestIcon type={quest.type} completed={quest.completed} />
                 </span>
-                <span>{quest.title}</span>
+                <span>{tr(quest.title)}</span>
                 <span style={questProgressWrap} aria-label={`${quest.progress} of ${quest.target}`}>
                   {quest.completed ? (
                     <CheckCircle2 size={16} aria-hidden="true" />
@@ -230,17 +231,17 @@ export function Profile({ onBack }: Props) {
         </section>
 
         <section style={card}>
-          <div style={sectionHeading}>Records</div>
+          <div style={sectionHeading}>{tr("Records")}</div>
           <div style={{ display: "grid", gap: 10 }}>
-            <RecordRow label="Best challenge score" value={formatScore(bestChallengeScore)} />
-            <RecordRow label="Badges earned" value={`${earnedBadges.length}`} />
-            <RecordRow label="Campaign levels unlocked" value={`${unlockedLevel}/${MAX_LEVEL}`} />
+            <RecordRow label={tr("Best challenge score")} value={formatScore(bestChallengeScore)} />
+            <RecordRow label={tr("Badges earned")} value={`${earnedBadges.length}`} />
+            <RecordRow label={tr("Campaign levels unlocked")} value={`${unlockedLevel}/${MAX_LEVEL}`} />
             <RecordRow
-              label="Periodic table progress"
+              label={tr("Periodic table progress")}
               value={`${discoveredElements.length}/${ELEMENTS.length}`}
             />
             <button type="button" onClick={handleUnlockAllStages} style={profileActionButton}>
-              {unlockedLevel >= MAX_LEVEL ? "Lock stages" : "Unlock all stages"}
+              {tr(unlockedLevel >= MAX_LEVEL ? "Lock stages" : "Unlock all stages")}
             </button>
           </div>
         </section>
