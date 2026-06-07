@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { GameApp } from "./index";
+import { GameApp } from "@/game/GameApp";
 
 export const Route = createFileRoute("/game")({
   head: () => ({

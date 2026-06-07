@@ -1,332 +1,231 @@
-import { createFileRoute } from "@tanstack/react-router";
-import type { CSSProperties } from "react";
-import { useEffect, useState } from "react";
-import { Capacitor } from "@capacitor/core";
-import { StatusBar, Style } from "@capacitor/status-bar";
-import { MainMenu } from "@/game/MainMenu";
-import { clearSavedRun, GameBoard, getSavedRunSummary } from "@/game/GameBoard";
-import { LevelSelect } from "@/game/LevelSelect";
-import { Collection } from "@/game/Collection";
-import { Settings } from "@/game/Settings";
-import { Shop } from "@/game/Shop";
-import { LabModes } from "@/game/LabModes";
-import { GameLibrary } from "@/game/GameLibrary";
-import { Profile } from "@/game/Profile";
-import { GameModeId } from "@/game/challenges";
-import { getLevelById } from "@/game/levels";
-import { useProgress } from "@/game/store";
-import { useDomLocalization } from "@/game/useDomLocalization";
+import { Link, createFileRoute } from "@tanstack/react-router";
+import { Atom, ChevronRight, Sparkles, Target, Trophy } from "lucide-react";
+import type { ReactNode } from "react";
+
+import { COMPOUNDS, type CompoundDefinition } from "@/game/compounds";
+import { GameApp } from "@/game/GameApp";
+import { MoleculeVisual } from "@/game/MoleculeVisual";
+import { PowerUpBadge } from "@/game/PowerUpLibrary";
+import { POWER_UPS } from "@/game/powerUps";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Atomic Fusion Rush — Periodic Table Merge Puzzle" },
+      { title: "Atomic Fusion Rush - Periodic Table Merge Puzzle" },
       {
         name: "description",
         content:
-          "Fuse atoms, climb the periodic table, and chase Gold in this addictive merge puzzle game. 118 elements with real chemistry facts.",
+          "Fuse atoms, climb the periodic table, discover compounds, and chase Gold in Atomic Fusion Rush.",
       },
       { property: "og:title", content: "Atomic Fusion Rush" },
       {
         property: "og:description",
         content:
-          "Merge hydrogen into helium, helium into lithium... all the way to gold and beyond.",
+          "Merge hydrogen into helium, unlock power-ups, form compounds, and master the periodic table.",
       },
     ],
   }),
   component: Index,
 });
 
-type Screen =
-  | { name: "menu" }
-  | { name: "levels" }
-  | { name: "game"; levelId: number; mode?: GameModeId; resumeSavedRun?: boolean }
-  | { name: "collection" }
-  | { name: "shop" }
-  | { name: "lab" }
-  | { name: "library" }
-  | { name: "profile" }
-  | { name: "settings" };
+const previewPowerUps = ["shimmer", "grab", "gravity", "molecule"];
+
+const compoundExamples = [
+  {
+    id: "water",
+    formula: "H2O",
+    merge: "2 Hydrogen + Oxygen",
+    reward: "Early-game bonus",
+  },
+  {
+    id: "carbon-dioxide",
+    formula: "CO2",
+    merge: "Carbon + 2 Oxygen",
+    reward: "Compound chain setup",
+  },
+];
 
 function Index() {
-  return <GameApp />;
-}
-
-export function GameApp() {
-  const unlockedLevel = useProgress((s) => s.unlockedLevel);
-  const hasProPack = useProgress((s) => s.hasProPack);
-  const appTheme = useProgress((s) => s.appTheme);
-  const appLanguage = useProgress((s) => s.appLanguage);
-  const [screen, setScreen] = useState<Screen>({ name: "menu" });
-  const [showLaunchScreen, setShowLaunchScreen] = useState(true);
-  const [resumePrompt, setResumePrompt] = useState<ReturnType<typeof getSavedRunSummary>>(null);
-
-  useDomLocalization(appLanguage);
-
-  useEffect(() => {
-    const root = document.documentElement;
-    root.classList.toggle("theme-light", appTheme === "light");
-    root.classList.toggle("theme-dark", appTheme === "dark");
-    root.style.colorScheme = appTheme;
-    if (Capacitor.getPlatform() === "ios") {
-      void StatusBar.setStyle({ style: appTheme === "light" ? Style.Dark : Style.Light }).catch(
-        () => {},
-      );
-      void StatusBar.setBackgroundColor({
-        color: appTheme === "light" ? "#f7f5ef" : "#0A0A1A",
-      }).catch(() => {});
-    }
-  }, [appTheme]);
-
-  useEffect(() => {
-    if (!showLaunchScreen) return;
-    const timeoutId = window.setTimeout(() => setShowLaunchScreen(false), 1100);
-    return () => window.clearTimeout(timeoutId);
-  }, [showLaunchScreen]);
-
-  if (showLaunchScreen) return <LaunchScreen />;
-
-  function startCampaign() {
-    const saved = getSavedRunSummary();
-    if (saved) {
-      setResumePrompt(saved);
-      return;
-    }
-    setScreen({ name: "game", levelId: getLevelById(unlockedLevel)?.id ?? 1, mode: "campaign" });
+  if (isNativeShell()) {
+    return <GameApp />;
   }
 
-  switch (screen.name) {
-    case "menu":
-      return (
-        <>
-          <MainMenu
-            onPlay={startCampaign}
-            onLevels={() => setScreen({ name: "levels" })}
-            onCollection={() => setScreen({ name: "collection" })}
-            onSettings={() => setScreen({ name: "settings" })}
-            onShop={() => setScreen({ name: "shop" })}
-            onLab={() => setScreen({ name: "lab" })}
-            onLibrary={() => setScreen({ name: "library" })}
-            onProfile={() => setScreen({ name: "profile" })}
-          />
-          {resumePrompt && (
-            <ResumeRunPrompt
-              saved={resumePrompt}
-              onContinue={() => {
-                setScreen({
-                  name: "game",
-                  levelId: resumePrompt.levelId,
-                  mode: resumePrompt.mode,
-                  resumeSavedRun: true,
-                });
-                setResumePrompt(null);
-              }}
-              onStartOver={() => {
-                clearSavedRun();
-                setScreen({
-                  name: "game",
-                  levelId: getLevelById(unlockedLevel)?.id ?? 1,
-                  mode: "campaign",
-                });
-                setResumePrompt(null);
-              }}
-              onCancel={() => setResumePrompt(null)}
-            />
-          )}
-        </>
-      );
-    case "levels":
-      return (
-        <LevelSelect
-          onPick={(id) => setScreen({ name: "game", levelId: id, mode: "campaign" })}
-          onBack={() => setScreen({ name: "menu" })}
-        />
-      );
-    case "game":
-      return (
-        <GameBoard
-          key={`${screen.mode ?? "campaign"}-${screen.levelId}-${screen.resumeSavedRun ? "resume" : "new"}`}
-          levelId={screen.levelId}
-          mode={screen.mode}
-          resumeSavedRun={screen.resumeSavedRun}
-          onExit={() => setScreen({ name: "menu" })}
-          onMap={() => setScreen({ name: "levels" })}
-          onWin={(nextId) => {
-            if (nextId)
-              setScreen({ name: "game", levelId: nextId, mode: screen.mode ?? "campaign" });
-            else setScreen({ name: "menu" });
-          }}
-        />
-      );
-    case "collection":
-      return <Collection onBack={() => setScreen({ name: "menu" })} />;
-    case "shop":
-      return <Shop onBack={() => setScreen({ name: "menu" })} />;
-    case "lab":
-      return (
-        <LabModes
-          onBack={() => setScreen({ name: "menu" })}
-          onStart={(mode, levelId) => setScreen({ name: "game", levelId, mode })}
-        />
-      );
-    case "library":
-      return <GameLibrary onBack={() => setScreen({ name: "menu" })} />;
-    case "profile":
-      return <Profile onBack={() => setScreen({ name: "menu" })} />;
-    case "settings":
-      return <Settings onBack={() => setScreen({ name: "menu" })} />;
-  }
+  return <LandingPage />;
 }
 
-function LaunchScreen() {
+function isNativeShell() {
   return (
-    <div
-      style={{
-        minHeight: "100dvh",
-        display: "grid",
-        placeItems: "center",
-        background:
-          "radial-gradient(circle at 25% 18%, oklch(0.36 0.07 250 / 0.28), transparent 45%), radial-gradient(circle at 75% 82%, oklch(0.48 0.08 55 / 0.2), transparent 50%), oklch(0.16 0.02 255)",
-      }}
-    >
-      <div style={{ display: "grid", justifyItems: "center", gap: 14 }}>
-        <img
-          src="/game-icon.png"
-          alt="Atomic Fusion Rush"
-          style={{
-            width: 110,
-            height: 110,
-            borderRadius: 28,
-            boxShadow: "0 18px 46px rgba(0,0,0,0.46), 0 0 24px rgba(255, 205, 80, 0.18)",
-          }}
-        />
-        <div className="gold-text" style={{ fontSize: 24, fontWeight: 900 }}>
-          Atomic Fusion Rush
+    typeof document !== "undefined" &&
+    document.documentElement.classList.contains("platform-native")
+  );
+}
+
+function LandingPage() {
+  return (
+    <main className="landing-shell">
+      <nav className="landing-nav" aria-label="Main navigation">
+        <a className="landing-brand" href="/">
+          <img src="/game-icon.png" alt="" />
+          <span>Atomic Fusion Rush</span>
+        </a>
+        <div className="landing-nav-links">
+          <Link to="/support">Support</Link>
+          <Link to="/terms">Terms</Link>
+          <Link to="/privacy">Privacy</Link>
         </div>
-        <div
-          style={{
-            fontSize: 12,
-            color: "var(--muted-foreground)",
-            letterSpacing: 0.4,
-            textTransform: "uppercase",
-          }}
-        >
-          Loading compounds...
+      </nav>
+
+      <section className="landing-hero">
+        <div className="landing-hero-copy">
+          <p className="landing-eyebrow">Periodic table merge puzzle</p>
+          <h1>Fuse atoms. Unlock reactions. Chase Gold.</h1>
+          <p className="landing-lede">
+            Build your way from Hydrogen through the elements, use lab power-ups at the right
+            moment, and turn board atoms into real compound bonuses.
+          </p>
+          <div className="landing-actions">
+            <Link to="/game" className="landing-primary-action">
+              Play Web Game
+              <ChevronRight size={18} aria-hidden="true" />
+            </Link>
+            <a className="landing-secondary-action" href="#preview">
+              See Preview
+            </a>
+          </div>
         </div>
-        <div
-          aria-hidden="true"
-          style={{
-            width: 120,
-            height: 6,
-            borderRadius: 999,
-            overflow: "hidden",
-            background: "rgba(255,255,255,0.12)",
-          }}
-        >
-          <div
-            style={{
-              width: "55%",
-              height: "100%",
-              borderRadius: 999,
-              background: "linear-gradient(90deg, var(--accent), var(--primary))",
-              boxShadow: "0 0 16px rgba(255, 214, 84, 0.35)",
-              animation: "shimmer-wave 1.3s ease-in-out infinite",
-            }}
-          />
+
+        <GamePreview />
+      </section>
+
+      <section className="landing-feature-strip" aria-label="Game highlights">
+        <FeatureStat icon={<Atom size={20} />} value="118" label="elements to discover" />
+        <FeatureStat icon={<Sparkles size={20} />} value="14" label="power-ups and lab tools" />
+        <FeatureStat icon={<Trophy size={20} />} value="Gold" label="campaign target" />
+      </section>
+
+      <section id="preview" className="landing-section">
+        <div className="landing-section-heading">
+          <p className="landing-eyebrow">Preview</p>
+          <h2>Power-ups and compound merges</h2>
+        </div>
+
+        <div className="landing-powerup-grid" aria-label="Power-up preview">
+          {previewPowerUps.map((icon) => {
+            const powerUp = POWER_UPS.find((item) => item.icon === icon);
+            if (!powerUp) return null;
+            return (
+              <article key={powerUp.icon} className="landing-powerup-card">
+                <PowerUpBadge icon={powerUp.icon} size={54} />
+                <h3>{powerUp.name}</h3>
+                <p>{powerUp.effect}</p>
+              </article>
+            );
+          })}
+        </div>
+
+        <div className="landing-compound-grid" aria-label="Example compound merges">
+          {compoundExamples.map((example) => {
+            const compound = COMPOUNDS.find((item) => item.id === example.id);
+            if (!compound) return null;
+            return (
+              <CompoundMergeCard
+                key={example.id}
+                compound={compound}
+                formula={example.formula}
+                merge={example.merge}
+                reward={example.reward}
+              />
+            );
+          })}
+        </div>
+      </section>
+    </main>
+  );
+}
+
+function GamePreview() {
+  return (
+    <div className="landing-preview-card" aria-label="Gameplay preview">
+      <div className="landing-preview-top">
+        <span>Level 12</span>
+        <span>Target: Mg</span>
+      </div>
+      <div className="landing-board-preview">
+        {[
+          "H",
+          "He",
+          "Li",
+          "Be",
+          "B",
+          "C",
+          "N",
+          "O",
+          "F",
+          "Ne",
+          "Na",
+          "Mg",
+        ].map((symbol, index) => (
+          <span key={`${symbol}-${index}`} className="landing-atom-token">
+            {symbol}
+          </span>
+        ))}
+      </div>
+      <div className="landing-preview-footer">
+        <span>Queue</span>
+        <div className="landing-preview-queue">
+          <span>H</span>
+          <span>Li</span>
+          <span>O</span>
+          <span>C</span>
         </div>
       </div>
     </div>
   );
 }
 
-function ResumeRunPrompt({
-  saved,
-  onContinue,
-  onStartOver,
-  onCancel,
+function FeatureStat({
+  icon,
+  label,
+  value,
 }: {
-  saved: NonNullable<ReturnType<typeof getSavedRunSummary>>;
-  onContinue: () => void;
-  onStartOver: () => void;
-  onCancel: () => void;
+  icon: ReactNode;
+  label: string;
+  value: string;
 }) {
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="Resume saved run"
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 2000,
-        display: "grid",
-        placeItems: "center",
-        padding: 20,
-        background: "rgba(0,0,0,0.72)",
-        backdropFilter: "blur(6px)",
-      }}
-    >
-      <div
-        style={{
-          width: "100%",
-          maxWidth: 340,
-          padding: 20,
-          borderRadius: 16,
-          border: "1px solid var(--border)",
-          background: "var(--surface-elevated)",
-          boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
-          textAlign: "center",
-        }}
-      >
-        <div style={{ fontSize: 11, letterSpacing: 3, color: "var(--accent)", fontWeight: 800 }}>
-          SAVED RUN
-        </div>
-        <h2 style={{ margin: "6px 0 4px", fontSize: 23 }}>Continue previous run?</h2>
-        <p style={{ margin: "0 0 16px", color: "var(--muted-foreground)", fontSize: 13 }}>
-          Level {saved.levelId} · {saved.shots} shots · {saved.score.toLocaleString()} score
-        </p>
-        <div style={{ display: "grid", gap: 8 }}>
-          <button type="button" onClick={onContinue} style={promptPrimaryBtn}>
-            Continue Run
-          </button>
-          <button type="button" onClick={onStartOver} style={promptSecondaryBtn}>
-            Start Over
-          </button>
-          <button type="button" onClick={onCancel} style={promptGhostBtn}>
-            Cancel
-          </button>
-        </div>
-      </div>
-    </div>
+    <article className="landing-feature-stat">
+      <span>{icon}</span>
+      <strong>{value}</strong>
+      <p>{label}</p>
+    </article>
   );
 }
 
-const promptPrimaryBtn: CSSProperties = {
-  border: "none",
-  borderRadius: 12,
-  padding: "12px 14px",
-  background: "linear-gradient(135deg, var(--accent), var(--primary))",
-  color: "var(--primary-foreground)",
-  fontWeight: 800,
-  cursor: "pointer",
-};
-
-const promptSecondaryBtn: CSSProperties = {
-  border: "1px solid var(--border)",
-  borderRadius: 12,
-  padding: "10px 14px",
-  background: "var(--surface)",
-  color: "var(--foreground)",
-  fontWeight: 750,
-  cursor: "pointer",
-};
-
-const promptGhostBtn: CSSProperties = {
-  border: "none",
-  borderRadius: 12,
-  padding: "8px 14px",
-  background: "transparent",
-  color: "var(--muted-foreground)",
-  fontWeight: 700,
-  cursor: "pointer",
-};
+function CompoundMergeCard({
+  compound,
+  formula,
+  merge,
+  reward,
+}: {
+  compound: CompoundDefinition;
+  formula: string;
+  merge: string;
+  reward: string;
+}) {
+  return (
+    <article className="landing-compound-card">
+      <div className="landing-compound-visual">
+        <MoleculeVisual compound={compound} size={78} />
+      </div>
+      <div>
+        <h3>{compound.name}</h3>
+        <p className="landing-formula">{formula}</p>
+        <p>{merge}</p>
+        <span>
+          <Target size={14} aria-hidden="true" />
+          {reward}
+        </span>
+      </div>
+    </article>
+  );
+}
