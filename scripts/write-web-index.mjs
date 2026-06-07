@@ -1,4 +1,4 @@
-import { mkdir, readdir, stat, writeFile } from "node:fs/promises";
+import { readdir, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 const webDir = join(process.cwd(), "dist");
@@ -249,8 +249,8 @@ const supportBody = `
 
 async function writeStaticLegalPage(slug, title, body) {
   const html = staticPageChrome(title, body);
-  await mkdir(join(webDir, slug), { recursive: true });
-  await writeFile(join(webDir, slug, "index.html"), html);
+  await rm(join(webDir, slug), { recursive: true, force: true });
+  await writeFile(join(webDir, slug), html);
   await writeFile(join(webDir, `${slug}.html`), html);
 }
 

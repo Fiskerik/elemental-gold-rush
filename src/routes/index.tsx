@@ -45,6 +45,8 @@ const compoundExamples = [
   },
 ];
 
+const appStoreUrl = "https://apps.apple.com/se/app/atomic-fusion-rush/id6771701538";
+
 function Index() {
   if (isNativeShell()) {
     return <GameApp />;
@@ -83,8 +85,17 @@ function LandingPage() {
             Build your way from Hydrogen through the elements, use lab power-ups at the right
             moment, and turn board atoms into real compound bonuses.
           </p>
-          <div className="landing-actions">
-            <Link to="/game" className="landing-primary-action">
+        <div className="landing-actions">
+            <a
+              href={appStoreUrl}
+              className="landing-primary-action"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Download on App Store
+              <ChevronRight size={18} aria-hidden="true" />
+            </a>
+            <Link to="/game" className="landing-secondary-action">
               Play Web Game
               <ChevronRight size={18} aria-hidden="true" />
             </Link>
@@ -94,7 +105,7 @@ function LandingPage() {
           </div>
         </div>
 
-        <GamePreview />
+        <LandingScreenshot />
       </section>
 
       <section className="landing-feature-strip" aria-label="Game highlights">
@@ -143,43 +154,11 @@ function LandingPage() {
   );
 }
 
-function GamePreview() {
+function LandingScreenshot() {
   return (
-    <div className="landing-preview-card" aria-label="Gameplay preview">
-      <div className="landing-preview-top">
-        <span>Level 12</span>
-        <span>Target: Mg</span>
-      </div>
-      <div className="landing-board-preview">
-        {[
-          "H",
-          "He",
-          "Li",
-          "Be",
-          "B",
-          "C",
-          "N",
-          "O",
-          "F",
-          "Ne",
-          "Na",
-          "Mg",
-        ].map((symbol, index) => (
-          <span key={`${symbol}-${index}`} className="landing-atom-token">
-            {symbol}
-          </span>
-        ))}
-      </div>
-      <div className="landing-preview-footer">
-        <span>Queue</span>
-        <div className="landing-preview-queue">
-          <span>H</span>
-          <span>Li</span>
-          <span>O</span>
-          <span>C</span>
-        </div>
-      </div>
-    </div>
+    <figure className="landing-screenshot-card" aria-label="Atomic Fusion Rush gameplay screenshot">
+      <img src="/landing-gameplay.png" alt="Atomic Fusion Rush gameplay with atoms on the board" />
+    </figure>
   );
 }
 
