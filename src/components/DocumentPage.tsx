@@ -1,4 +1,3 @@
-import { Link } from "@tanstack/react-router";
 import { useEffect, type CSSProperties, type ReactNode } from "react";
 
 type DocumentPageProps = {
@@ -18,19 +17,19 @@ export function DocumentPage({ children, intro, lastUpdated, title }: DocumentPa
     <main id="document-page-root" className="document-page-shell">
       <div className="document-page-content">
         <nav className="document-page-nav" aria-label="Page navigation">
-          <Link to="/game" resetScroll className="document-page-back-link">
+          <a href="/game" className="document-page-back-link">
             Back to game
-          </Link>
+          </a>
           <div className="document-page-link-row">
-            <Link to="/support" resetScroll className="document-page-nav-link">
+            <a href="/support.html" className="document-page-nav-link">
               Support
-            </Link>
-            <Link to="/terms" resetScroll className="document-page-nav-link">
+            </a>
+            <a href="/terms.html" className="document-page-nav-link">
               Terms
-            </Link>
-            <Link to="/privacy" resetScroll className="document-page-nav-link">
+            </a>
+            <a href="/privacy.html" className="document-page-nav-link">
               Privacy
-            </Link>
+            </a>
           </div>
         </nav>
 

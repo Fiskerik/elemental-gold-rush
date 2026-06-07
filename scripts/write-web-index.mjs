@@ -168,17 +168,17 @@ const staticPageChrome = (title, body) => `<!doctype html>
       <nav class="topbar" aria-label="Page navigation">
         <a class="btn" href="/game">Back to game</a>
         <div class="navlinks">
-          <a class="btn" href="/support">Support</a>
-          <a class="btn" href="/terms">Terms</a>
-          <a class="btn" href="/privacy">Privacy</a>
+          <a class="btn" href="/support.html">Support</a>
+          <a class="btn" href="/terms.html">Terms</a>
+          <a class="btn" href="/privacy.html">Privacy</a>
         </div>
       </nav>
       ${body}
       <div class="links">
         <a class="btn" href="/game">Back to game</a>
-        <a class="btn" href="/support">Support</a>
-        <a class="btn" href="/terms">Terms</a>
-        <a class="btn" href="/privacy">Privacy</a>
+        <a class="btn" href="/support.html">Support</a>
+        <a class="btn" href="/terms.html">Terms</a>
+        <a class="btn" href="/privacy.html">Privacy</a>
       </div>
     </main>
   </body>

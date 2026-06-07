@@ -71,9 +71,9 @@ function LandingPage() {
           <span>Atomic Fusion Rush</span>
         </a>
         <div className="landing-nav-links">
-          <Link to="/support">Support</Link>
-          <Link to="/terms">Terms</Link>
-          <Link to="/privacy">Privacy</Link>
+          <a href="/support.html">Support</a>
+          <a href="/terms.html">Terms</a>
+          <a href="/privacy.html">Privacy</a>
         </div>
       </nav>
 

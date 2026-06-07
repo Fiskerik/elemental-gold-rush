@@ -1,0 +1,44 @@
+/privacy
+  Content-Type: text/html; charset=utf-8
+  Content-Disposition: inline
+  Cache-Control: no-store
+
+/privacy/
+  Content-Type: text/html; charset=utf-8
+  Content-Disposition: inline
+  Cache-Control: no-store
+
+/privacy.html
+  Content-Type: text/html; charset=utf-8
+  Content-Disposition: inline
+  Cache-Control: no-store
+
+/terms
+  Content-Type: text/html; charset=utf-8
+  Content-Disposition: inline
+  Cache-Control: no-store
+
+/terms/
+  Content-Type: text/html; charset=utf-8
+  Content-Disposition: inline
+  Cache-Control: no-store
+
+/terms.html
+  Content-Type: text/html; charset=utf-8
+  Content-Disposition: inline
+  Cache-Control: no-store
+
+/support
+  Content-Type: text/html; charset=utf-8
+  Content-Disposition: inline
+  Cache-Control: no-store
+
+/support/
+  Content-Type: text/html; charset=utf-8
+  Content-Disposition: inline
+  Cache-Control: no-store
+
+/support.html
+  Content-Type: text/html; charset=utf-8
+  Content-Disposition: inline
+  Cache-Control: no-store
