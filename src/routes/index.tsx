@@ -1,328 +1,278 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import type { CSSProperties } from "react";
-import { useEffect, useState } from "react";
 import { Capacitor } from "@capacitor/core";
-import { StatusBar, Style } from "@capacitor/status-bar";
-import { MainMenu } from "@/game/MainMenu";
-import { clearSavedRun, GameBoard, getSavedRunSummary } from "@/game/GameBoard";
-import { LevelSelect } from "@/game/LevelSelect";
-import { Collection } from "@/game/Collection";
-import { Settings } from "@/game/Settings";
-import { Shop } from "@/game/Shop";
-import { LabModes } from "@/game/LabModes";
-import { GameLibrary } from "@/game/GameLibrary";
-import { Profile } from "@/game/Profile";
-import { GameModeId } from "@/game/challenges";
-import { getLevelById } from "@/game/levels";
-import { useProgress } from "@/game/store";
-import { useDomLocalization } from "@/game/useDomLocalization";
+import { Atom, FlaskConical, Sparkles, Trophy, Play } from "lucide-react";
+import { GameApp } from "@/game/GameApp";
+import { POWER_UPS } from "@/game/powerUps";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Atomic Fusion Rush — Periodic Table Merge Puzzle" },
+      { title: "Atomic Fusion Rush — Merge the Periodic Table" },
       {
         name: "description",
         content:
-          "Fuse atoms, climb the periodic table, and chase Gold in this addictive merge puzzle game. 118 elements with real chemistry facts.",
+          "A free merge puzzle game: fuse atoms, climb all 118 elements of the periodic table, and chase Gold. Learn the mechanics, powerups, and play in your browser.",
       },
       { property: "og:title", content: "Atomic Fusion Rush" },
       {
         property: "og:description",
         content:
-          "Merge hydrogen into helium, helium into lithium... all the way to gold and beyond.",
+          "Merge hydrogen into helium, helium into lithium... all the way to gold and beyond. Play free in your browser.",
       },
+      { property: "og:url", content: "https://atomic-fusion.lovable.app/" },
     ],
+    links: [{ rel: "canonical", href: "https://atomic-fusion.lovable.app/" }],
   }),
   component: Index,
 });
 
-type Screen =
-  | { name: "menu" }
-  | { name: "levels" }
-  | { name: "game"; levelId: number; mode?: GameModeId; resumeSavedRun?: boolean }
-  | { name: "collection" }
-  | { name: "shop" }
-  | { name: "lab" }
-  | { name: "library" }
-  | { name: "profile" }
-  | { name: "settings" };
-
 function Index() {
-  const unlockedLevel = useProgress((s) => s.unlockedLevel);
-  const hasProPack = useProgress((s) => s.hasProPack);
-  const appTheme = useProgress((s) => s.appTheme);
-  const appLanguage = useProgress((s) => s.appLanguage);
-  const [screen, setScreen] = useState<Screen>({ name: "menu" });
-  const [showLaunchScreen, setShowLaunchScreen] = useState(true);
-  const [resumePrompt, setResumePrompt] = useState<ReturnType<typeof getSavedRunSummary>>(null);
-
-  useDomLocalization(appLanguage);
-
-  useEffect(() => {
-    const root = document.documentElement;
-    root.classList.toggle("theme-light", appTheme === "light");
-    root.classList.toggle("theme-dark", appTheme === "dark");
-    root.style.colorScheme = appTheme;
-    if (Capacitor.getPlatform() === "ios") {
-      void StatusBar.setStyle({ style: appTheme === "light" ? Style.Dark : Style.Light }).catch(
-        () => {},
-      );
-      void StatusBar.setBackgroundColor({
-        color: appTheme === "light" ? "#f7f5ef" : "#0A0A1A",
-      }).catch(() => {});
-    }
-  }, [appTheme]);
-
-  useEffect(() => {
-    if (!showLaunchScreen) return;
-    const timeoutId = window.setTimeout(() => setShowLaunchScreen(false), 1100);
-    return () => window.clearTimeout(timeoutId);
-  }, [showLaunchScreen]);
-
-  if (showLaunchScreen) return <LaunchScreen />;
-
-  function startCampaign() {
-    const saved = getSavedRunSummary();
-    if (saved) {
-      setResumePrompt(saved);
-      return;
-    }
-    setScreen({ name: "game", levelId: getLevelById(unlockedLevel)?.id ?? 1, mode: "campaign" });
+  // Native (Capacitor) builds boot at "/" and must go straight into the game.
+  if (Capacitor.isNativePlatform()) {
+    return <GameApp />;
   }
-
-  switch (screen.name) {
-    case "menu":
-      return (
-        <>
-          <MainMenu
-            onPlay={startCampaign}
-            onLevels={() => setScreen({ name: "levels" })}
-            onCollection={() => setScreen({ name: "collection" })}
-            onSettings={() => setScreen({ name: "settings" })}
-            onShop={() => setScreen({ name: "shop" })}
-            onLab={() => setScreen({ name: "lab" })}
-            onLibrary={() => setScreen({ name: "library" })}
-            onProfile={() => setScreen({ name: "profile" })}
-          />
-          {resumePrompt && (
-            <ResumeRunPrompt
-              saved={resumePrompt}
-              onContinue={() => {
-                setScreen({
-                  name: "game",
-                  levelId: resumePrompt.levelId,
-                  mode: resumePrompt.mode,
-                  resumeSavedRun: true,
-                });
-                setResumePrompt(null);
-              }}
-              onStartOver={() => {
-                clearSavedRun();
-                setScreen({
-                  name: "game",
-                  levelId: getLevelById(unlockedLevel)?.id ?? 1,
-                  mode: "campaign",
-                });
-                setResumePrompt(null);
-              }}
-              onCancel={() => setResumePrompt(null)}
-            />
-          )}
-        </>
-      );
-    case "levels":
-      return (
-        <LevelSelect
-          onPick={(id) => setScreen({ name: "game", levelId: id, mode: "campaign" })}
-          onBack={() => setScreen({ name: "menu" })}
-        />
-      );
-    case "game":
-      return (
-        <GameBoard
-          key={`${screen.mode ?? "campaign"}-${screen.levelId}-${screen.resumeSavedRun ? "resume" : "new"}`}
-          levelId={screen.levelId}
-          mode={screen.mode}
-          resumeSavedRun={screen.resumeSavedRun}
-          onExit={() => setScreen({ name: "menu" })}
-          onMap={() => setScreen({ name: "levels" })}
-          onWin={(nextId) => {
-            if (nextId)
-              setScreen({ name: "game", levelId: nextId, mode: screen.mode ?? "campaign" });
-            else setScreen({ name: "menu" });
-          }}
-        />
-      );
-    case "collection":
-      return <Collection onBack={() => setScreen({ name: "menu" })} />;
-    case "shop":
-      return <Shop onBack={() => setScreen({ name: "menu" })} />;
-    case "lab":
-      return (
-        <LabModes
-          onBack={() => setScreen({ name: "menu" })}
-          onStart={(mode, levelId) => setScreen({ name: "game", levelId, mode })}
-        />
-      );
-    case "library":
-      return <GameLibrary onBack={() => setScreen({ name: "menu" })} />;
-    case "profile":
-      return <Profile onBack={() => setScreen({ name: "menu" })} />;
-    case "settings":
-      return <Settings onBack={() => setScreen({ name: "menu" })} />;
-  }
+  return <LandingPage />;
 }
 
-function LaunchScreen() {
+const MECHANICS = [
+  {
+    icon: Atom,
+    title: "Drop & merge atoms",
+    body: "Launch atoms onto the board. When two identical elements touch, they fuse into the next one up the periodic table.",
+  },
+  {
+    icon: Trophy,
+    title: "Climb to Gold",
+    body: "Chain reactions and combos to race from Hydrogen all the way to Gold (Au) and beyond across 118 real elements.",
+  },
+  {
+    icon: FlaskConical,
+    title: "Real chemistry",
+    body: "Every element carries a real-world fact, plus discoverable compounds you can build for big bonus points.",
+  },
+  {
+    icon: Sparkles,
+    title: "Campaign & lab modes",
+    body: "Progress through campaign levels, then take on boss labs and challenge modes as new powerups unlock.",
+  },
+] as const;
+
+const FEATURED_POWERUPS = ["shimmer", "grab", "egun", "gravity", "molecule", "gamma"] as const;
+
+function LandingPage() {
+  const powerups = FEATURED_POWERUPS.map((icon) =>
+    POWER_UPS.find((p) => p.icon === icon),
+  ).filter((p): p is (typeof POWER_UPS)[number] => Boolean(p));
+
   return (
-    <div
+    <main
       style={{
         minHeight: "100dvh",
-        display: "grid",
-        placeItems: "center",
         background:
-          "radial-gradient(circle at 25% 18%, oklch(0.36 0.07 250 / 0.28), transparent 45%), radial-gradient(circle at 75% 82%, oklch(0.48 0.08 55 / 0.2), transparent 50%), oklch(0.16 0.02 255)",
+          "radial-gradient(circle at 20% 12%, oklch(0.36 0.07 250 / 0.3), transparent 45%), radial-gradient(circle at 82% 78%, oklch(0.48 0.08 55 / 0.22), transparent 50%), oklch(0.16 0.02 255)",
+        color: "var(--foreground)",
       }}
     >
-      <div style={{ display: "grid", justifyItems: "center", gap: 14 }}>
+      {/* Hero */}
+      <section
+        style={{
+          maxWidth: 980,
+          margin: "0 auto",
+          padding: "64px 24px 40px",
+          display: "grid",
+          justifyItems: "center",
+          textAlign: "center",
+          gap: 18,
+        }}
+      >
         <img
           src="/game-icon.png"
-          alt="Atomic Fusion Rush"
+          alt="Atomic Fusion Rush app icon"
+          width={108}
+          height={108}
           style={{
-            width: 110,
-            height: 110,
-            borderRadius: 28,
+            width: 108,
+            height: 108,
+            borderRadius: 26,
             boxShadow: "0 18px 46px rgba(0,0,0,0.46), 0 0 24px rgba(255, 205, 80, 0.18)",
           }}
         />
-        <div className="gold-text" style={{ fontSize: 24, fontWeight: 900 }}>
+        <h1 className="gold-text" style={{ fontSize: 44, fontWeight: 900, margin: 0, lineHeight: 1.05 }}>
           Atomic Fusion Rush
-        </div>
-        <div
+        </h1>
+        <p
           style={{
-            fontSize: 12,
+            fontSize: 18,
             color: "var(--muted-foreground)",
-            letterSpacing: 0.4,
-            textTransform: "uppercase",
+            maxWidth: 560,
+            margin: 0,
+            lineHeight: 1.5,
           }}
         >
-          Loading compounds...
+          A relaxing-yet-addictive merge puzzle. Fuse atoms, climb the entire periodic table, and
+          chase Gold — all in your browser, free.
+        </p>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "center", marginTop: 6 }}>
+          <Link to="/game" style={heroPrimaryBtn}>
+            <Play size={20} strokeWidth={2.5} />
+            Play Now
+          </Link>
+          <a href="#how-it-works" style={heroSecondaryBtn}>
+            Learn more
+          </a>
         </div>
-        <div
-          aria-hidden="true"
-          style={{
-            width: 120,
-            height: 6,
-            borderRadius: 999,
-            overflow: "hidden",
-            background: "rgba(255,255,255,0.12)",
-          }}
-        >
-          <div
-            style={{
-              width: "55%",
-              height: "100%",
-              borderRadius: 999,
-              background: "linear-gradient(90deg, var(--accent), var(--primary))",
-              boxShadow: "0 0 16px rgba(255, 214, 84, 0.35)",
-              animation: "shimmer-wave 1.3s ease-in-out infinite",
-            }}
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
+      </section>
 
-function ResumeRunPrompt({
-  saved,
-  onContinue,
-  onStartOver,
-  onCancel,
-}: {
-  saved: NonNullable<ReturnType<typeof getSavedRunSummary>>;
-  onContinue: () => void;
-  onStartOver: () => void;
-  onCancel: () => void;
-}) {
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="Resume saved run"
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 2000,
-        display: "grid",
-        placeItems: "center",
-        padding: 20,
-        background: "rgba(0,0,0,0.72)",
-        backdropFilter: "blur(6px)",
-      }}
-    >
-      <div
+      {/* Mechanics */}
+      <section
+        id="how-it-works"
+        style={{ maxWidth: 980, margin: "0 auto", padding: "28px 24px", scrollMarginTop: 24 }}
+      >
+        <h2 style={sectionHeading}>How it works</h2>
+        <div
+          style={{
+            display: "grid",
+            gap: 14,
+            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+          }}
+        >
+          {MECHANICS.map(({ icon: Icon, title, body }) => (
+            <div key={title} style={cardStyle}>
+              <div style={iconBadge}>
+                <Icon size={22} />
+              </div>
+              <h3 style={{ margin: "12px 0 6px", fontSize: 17 }}>{title}</h3>
+              <p style={{ margin: 0, fontSize: 14, color: "var(--muted-foreground)", lineHeight: 1.55 }}>
+                {body}
+              </p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Powerups */}
+      <section style={{ maxWidth: 980, margin: "0 auto", padding: "28px 24px 40px" }}>
+        <h2 style={sectionHeading}>Powerups to master</h2>
+        <div
+          style={{
+            display: "grid",
+            gap: 14,
+            gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+          }}
+        >
+          {powerups.map((p) => (
+            <div key={p.name} style={cardStyle}>
+              <h3 style={{ margin: "0 0 6px", fontSize: 16, color: "var(--accent)" }}>{p.name}</h3>
+              <p style={{ margin: 0, fontSize: 14, color: "var(--muted-foreground)", lineHeight: 1.55 }}>
+                {p.effect}
+              </p>
+            </div>
+          ))}
+        </div>
+        <div style={{ display: "flex", justifyContent: "center", marginTop: 32 }}>
+          <Link to="/game" style={heroPrimaryBtn}>
+            <Play size={20} strokeWidth={2.5} />
+            Start Playing
+          </Link>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer
         style={{
-          width: "100%",
-          maxWidth: 340,
-          padding: 20,
-          borderRadius: 16,
-          border: "1px solid var(--border)",
-          background: "var(--surface-elevated)",
-          boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
-          textAlign: "center",
+          borderTop: "1px solid var(--border)",
+          background: "color-mix(in oklab, var(--surface) 60%, transparent)",
         }}
       >
-        <div style={{ fontSize: 11, letterSpacing: 3, color: "var(--accent)", fontWeight: 800 }}>
-          SAVED RUN
+        <div
+          style={{
+            maxWidth: 980,
+            margin: "0 auto",
+            padding: "24px",
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 16,
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <nav style={{ display: "flex", gap: 18, flexWrap: "wrap" }}>
+            <Link to="/terms" style={footerLink}>
+              Terms
+            </Link>
+            <Link to="/privacy" style={footerLink}>
+              Privacy Policy
+            </Link>
+            <Link to="/support" style={footerLink}>
+              Support
+            </Link>
+          </nav>
+          <p style={{ margin: 0, fontSize: 13, color: "var(--muted-foreground)" }}>
+            © EA Consulting 2026. All rights reserved.
+          </p>
         </div>
-        <h2 style={{ margin: "6px 0 4px", fontSize: 23 }}>Continue previous run?</h2>
-        <p style={{ margin: "0 0 16px", color: "var(--muted-foreground)", fontSize: 13 }}>
-          Level {saved.levelId} · {saved.shots} shots · {saved.score.toLocaleString()} score
-        </p>
-        <div style={{ display: "grid", gap: 8 }}>
-          <button type="button" onClick={onContinue} style={promptPrimaryBtn}>
-            Continue Run
-          </button>
-          <button type="button" onClick={onStartOver} style={promptSecondaryBtn}>
-            Start Over
-          </button>
-          <button type="button" onClick={onCancel} style={promptGhostBtn}>
-            Cancel
-          </button>
-        </div>
-      </div>
-    </div>
+      </footer>
+    </main>
   );
 }
 
-const promptPrimaryBtn: CSSProperties = {
+const heroPrimaryBtn: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 8,
+  textDecoration: "none",
   border: "none",
-  borderRadius: 12,
-  padding: "12px 14px",
+  borderRadius: 14,
+  padding: "14px 26px",
+  fontSize: 17,
+  fontWeight: 800,
   background: "linear-gradient(135deg, var(--accent), var(--primary))",
   color: "var(--primary-foreground)",
-  fontWeight: 800,
+  boxShadow: "0 12px 30px -8px color-mix(in oklab, var(--accent) 60%, transparent)",
   cursor: "pointer",
 };
 
-const promptSecondaryBtn: CSSProperties = {
+const heroSecondaryBtn: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  textDecoration: "none",
+  borderRadius: 14,
+  padding: "14px 22px",
+  fontSize: 16,
+  fontWeight: 700,
   border: "1px solid var(--border)",
-  borderRadius: 12,
-  padding: "10px 14px",
   background: "var(--surface)",
   color: "var(--foreground)",
-  fontWeight: 750,
-  cursor: "pointer",
 };
 
-const promptGhostBtn: CSSProperties = {
-  border: "none",
+const sectionHeading: CSSProperties = {
+  fontSize: 24,
+  fontWeight: 800,
+  textAlign: "center",
+  margin: "0 0 22px",
+};
+
+const cardStyle: CSSProperties = {
+  borderRadius: 16,
+  border: "1px solid var(--border)",
+  background: "var(--surface-elevated)",
+  padding: 18,
+};
+
+const iconBadge: CSSProperties = {
+  width: 42,
+  height: 42,
+  display: "grid",
+  placeItems: "center",
   borderRadius: 12,
-  padding: "8px 14px",
-  background: "transparent",
+  background: "color-mix(in oklab, var(--accent) 20%, transparent)",
+  color: "var(--accent)",
+};
+
+const footerLink: CSSProperties = {
   color: "var(--muted-foreground)",
-  fontWeight: 700,
-  cursor: "pointer",
+  textDecoration: "none",
+  fontSize: 14,
+  fontWeight: 600,
 };
