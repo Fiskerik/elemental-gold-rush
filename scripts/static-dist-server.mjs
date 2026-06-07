@@ -26,12 +26,12 @@ const routeFiles = {
   "/": "index.html",
   "/game": "index.html",
   "/game/": "index.html",
-  "/privacy": "privacy",
-  "/privacy/": "privacy",
-  "/support": "support",
-  "/support/": "support",
-  "/terms": "terms",
-  "/terms/": "terms",
+  "/privacy": "privacy/index.html",
+  "/privacy/": "privacy/index.html",
+  "/support": "support/index.html",
+  "/support/": "support/index.html",
+  "/terms": "terms/index.html",
+  "/terms/": "terms/index.html",
 };
 
 const server = createServer(async (req, res) => {
@@ -53,11 +53,7 @@ const server = createServer(async (req, res) => {
     }
 
     const ext = extname(resolvedPath).toLowerCase();
-    const mimeType =
-      mimeTypes[ext] ||
-      (["privacy", "support", "terms"].includes(resolvedPath.split(/[\\/]/).pop() ?? "")
-        ? "text/html; charset=utf-8"
-        : "application/octet-stream");
+    const mimeType = mimeTypes[ext] || "application/octet-stream";
     res.writeHead(200, {
       "Cache-Control": "no-store",
       "Content-Length": String(fileStat.size),
