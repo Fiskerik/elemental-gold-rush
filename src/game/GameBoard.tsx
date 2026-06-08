@@ -4094,6 +4094,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     });
     result.merges.forEach((m) => newAtoms.add(m.resultAtomicNumber));
     const undiscovered = Array.from(newAtoms).filter((n) => !discoveredElements.includes(n));
+    const firstDiscovery = undiscovered.sort((a, b) => b - a)[0];
     if (undiscovered.length > 0) registerDiscoveries(undiscovered);
 
     setBalls(result.balls.map((b) => (b.stoneHp != null ? b : { ...b, r: radiusFor(b.atom) })));
