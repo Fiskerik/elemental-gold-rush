@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "@capacitor-community/admob": "^7.0.3",
+    "@capacitor-firebase/analytics": "^7.1.0",
     "@capacitor/cli": "^7.4.4",
     "@capacitor/core": "^7.4.4",
     "@capacitor/haptics": "^7.0.2",

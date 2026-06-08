@@ -1,8 +1,36 @@
+import { FirebaseAnalytics } from '@capacitor-firebase/analytics';
+import { Capacitor } from '@capacitor/core';
+
 export type AnalyticsPayload = Record<string, string | number | boolean | null | undefined>;
 
-function track(event: string, payload: AnalyticsPayload = {}): void {
+// Safe internal tracking function that bridges Web/Dev environments with Native Firebase
+async function track(event: string, payload: AnalyticsPayload = {}): Promise<void> {
+  // 1. Log to console during development testing
   if (import.meta.env.DEV) {
     console.log(`[analytics] ${event}`, payload);
+  }
+
+  // 2. Send to native Firebase SDK only if running as a compiled app (iOS/Android)
+  if (Capacitor.isNativePlatform()) {
+    try {
+      // Firebase analytics demands explicit filtering of null/undefined attributes
+      const cleanParams: Record<string, string | number | boolean> = {};
+      
+      for (const [key, value] of Object.entries(payload)) {
+        if (value !== null && value !== undefined) {
+          cleanParams[key] = value;
+        }
+      }
+
+      await FirebaseAnalytics.logEvent({
+        name: event,
+        params: cleanParams,
+      });
+    } catch (error) {
+      if (import.meta.env.DEV) {
+        console.error('[analytics] Failed to log event to Firebase:', error);
+      }
+    }
   }
 }
 

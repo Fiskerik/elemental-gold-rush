@@ -11,11 +11,20 @@ export default defineConfig({
     sourcemap: true,
     rollupOptions: {
       input: resolve(__dirname, "src/web-entry.tsx"),
+      // Prevent Vite/Rollup from crashing over missing optional firebase web modules
+      external: [
+        'firebase/app',
+        'firebase/analytics'
+      ],
       output: {
         format: "es",
         entryFileNames: "assets/web-entry.js",
         chunkFileNames: "assets/web-[name]-[hash].js",
         assetFileNames: "assets/web-[name]-[hash][extname]",
+        globals: {
+          'firebase/app': 'firebase',
+          'firebase/analytics': 'firebase.analytics'
+        }
       },
     },
   },
