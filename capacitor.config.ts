@@ -1,8 +1,9 @@
-const config = {
+import type { CapacitorConfig } from '@capacitor/cli';
+
+const config: CapacitorConfig = {
   appId: "com.eaconsulting.atomicfusion",
   appName: "Atomic Fusion Rush",
-  webDir: "dist/client",
-  bundledWebRuntime: false,
+  webDir: "dist",
   server: {
     iosScheme: "https",
   },
