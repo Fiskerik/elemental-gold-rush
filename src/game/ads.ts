@@ -11,8 +11,8 @@ export type RewardedAdResult = {
   reason?: string;
 };
 
-const TEST_INTERSTITIAL_ID = "ca-app-pub-3940256099942544/4411468910";
-const TEST_REWARDED_ID = "ca-app-pub-3940256099942544/1712485313";
+const TEST_INTERSTITIAL_ID = "ca-app-pub-8854735603167656/6238016576";
+const TEST_REWARDED_ID = "ca-app-pub-8854735603167656/8761449585";
 
 let initialized = false;
 let initFailed = false;
