@@ -1,15 +1,13 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { Capacitor } from "@capacitor/core";
-import { Atom, ChevronRight, Clapperboard, Sparkles, Target, Trophy } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
+import { Atom, ChevronRight, Sparkles, Target, Trophy } from "lucide-react";
+import { type ReactNode } from "react";
 
 import { COMPOUNDS, type CompoundDefinition } from "@/game/compounds";
 import { GameApp } from "@/game/GameApp";
 import { MoleculeVisual } from "@/game/MoleculeVisual";
 import { PowerUpBadge } from "@/game/PowerUpLibrary";
 import { POWER_UPS } from "@/game/powerUps";
-import { initAds, showRewardedForCoin } from "@/game/ads";
-import { useProgress } from "@/game/store";
 
 export const Route = createFileRoute("/")({
   head: () => ({
