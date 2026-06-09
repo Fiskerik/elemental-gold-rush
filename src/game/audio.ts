@@ -728,7 +728,7 @@ export function startAmbientMusic(theme: MusicTheme = "default") {
   currentMusicTheme = theme;
 
   musicMaster = c.createGain();
-  musicMaster.gain.setValueAtTime(0.072, c.currentTime);
+  musicMaster.gain.setValueAtTime(BASE_MUSIC_GAIN * musicVolume, c.currentTime);
   musicMaster.connect(c.destination);
 
   musicStep = 0;
