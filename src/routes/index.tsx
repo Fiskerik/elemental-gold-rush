@@ -164,58 +164,6 @@ function LandingScreenshot() {
   );
 }
 
-function RewardedProgressBanner() {
-  const grantGoldCoins = useProgress((s) => s.grantGoldCoins);
-  const hasProPack = useProgress((s) => s.hasProPack);
-  const [message, setMessage] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    if (hasProPack) return;
-    void initAds(false);
-  }, [hasProPack]);
-
-  async function handleRewardedCoin() {
-    setBusy(true);
-    setMessage("Loading rewarded ad...");
-    try {
-      const result = await showRewardedForCoin(hasProPack);
-      if (result.rewarded) {
-        grantGoldCoins(1);
-        setMessage("Reward complete: +1 gold coin.");
-        return;
-      }
-      setMessage(
-        result.reason ?? "Rewarded ad not completed or not available yet. Try again shortly.",
-      );
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Rewarded ad could not be started.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <section className="landing-rewarded" aria-label="Continue your progress">
-      <div className="landing-rewarded-copy">
-        <p className="landing-eyebrow">Continue your progress</p>
-        <h2>Watch an ad to earn a gold coin</h2>
-        <p>Stock up on power-ups and keep your run going — grab a free gold coin.</p>
-      </div>
-      <button
-        type="button"
-        className="landing-primary-action"
-        onClick={handleRewardedCoin}
-        disabled={busy || hasProPack}
-      >
-        <Clapperboard size={18} aria-hidden="true" />
-        {busy ? "Loading ad..." : "Watch rewarded ad for +1 coin"}
-      </button>
-      {message && <p className="landing-rewarded-status">{message}</p>}
-    </section>
-  );
-}
-
 function FeatureStat({
   icon,
   label,
