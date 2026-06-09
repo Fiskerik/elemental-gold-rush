@@ -116,6 +116,8 @@ interface ProgressState {
   soundEnabled: boolean;
   musicEnabled: boolean;
   hapticsEnabled: boolean;
+  soundVolume: number; // 0-100
+  musicVolume: number; // 0-100
   appTheme: AppTheme;
   appLanguage: AppLanguage;
   shootingStyle: "hold" | "press";
@@ -169,6 +171,8 @@ interface ProgressState {
   toggleSound: () => void;
   toggleMusic: () => void;
   toggleHaptics: () => void;
+  setSoundVolume: (volume: number) => void;
+  setMusicVolume: (volume: number) => void;
   setAppTheme: (theme: AppTheme) => void;
   setAppLanguage: (language: AppLanguage) => void;
   toggleAppTheme: () => void;
@@ -193,6 +197,8 @@ export const useProgress = create<ProgressState>()(
       soundEnabled: true,
       musicEnabled: true,
       hapticsEnabled: true,
+      soundVolume: 100,
+      musicVolume: 100,
       appTheme: "dark",
       appLanguage: DEFAULT_LANGUAGE,
       shootingStyle: "hold",
@@ -468,6 +474,10 @@ export const useProgress = create<ProgressState>()(
       toggleSound: () => set((s) => ({ soundEnabled: !s.soundEnabled })),
       toggleMusic: () => set((s) => ({ musicEnabled: !s.musicEnabled })),
       toggleHaptics: () => set((s) => ({ hapticsEnabled: !s.hapticsEnabled })),
+      setSoundVolume: (volume) =>
+        set(() => ({ soundVolume: Math.max(0, Math.min(100, Math.round(volume))) })),
+      setMusicVolume: (volume) =>
+        set(() => ({ musicVolume: Math.max(0, Math.min(100, Math.round(volume))) })),
       setAppTheme: (theme) => set({ appTheme: theme }),
       setAppLanguage: (language) => set({ appLanguage: normalizeLanguage(language) }),
       toggleAppTheme: () => set((s) => ({ appTheme: s.appTheme === "dark" ? "light" : "dark" })),
@@ -484,6 +494,8 @@ export const useProgress = create<ProgressState>()(
           soundEnabled: true,
           musicEnabled: true,
           hapticsEnabled: true,
+          soundVolume: 100,
+          musicVolume: 100,
           appTheme: "dark",
           appLanguage: DEFAULT_LANGUAGE,
           shootingStyle: "hold",
@@ -528,6 +540,8 @@ export const useProgress = create<ProgressState>()(
           soundEnabled: persistedState?.soundEnabled ?? current.soundEnabled,
           musicEnabled: persistedState?.musicEnabled ?? current.musicEnabled,
           hapticsEnabled: persistedState?.hapticsEnabled ?? current.hapticsEnabled,
+          soundVolume: persistedState?.soundVolume ?? current.soundVolume,
+          musicVolume: persistedState?.musicVolume ?? current.musicVolume,
           appTheme: persistedState?.appTheme === "light" ? "light" : "dark",
           appLanguage: normalizeLanguage(persistedState?.appLanguage),
           shootingStyle: persistedState?.shootingStyle ?? current.shootingStyle,

@@ -7,7 +7,6 @@ import { PRODUCT_IDS, getProductById, type ProductId } from "./products";
 import {
   debugNativePurchases,
   isPurchaseDebugUiEnabled,
-  presentCustomerCenter,
   purchaseGoldCoinPack,
   purchaseProductWithResult,
   restorePurchases,
@@ -26,56 +25,56 @@ const SHOP_POWER_UPS: Array<{
   {
     id: "transmute",
     name: "Transmute Shot",
-    coinCost: 4,
+    coinCost: 6,
     unlockLevel: POWER_UP_UNLOCK_LEVELS.transmute,
     description: "Reroll the loaded atom into a higher tier at the start of a run.",
   },
   {
     id: "fusion-jump",
     name: "Fusion Jump",
-    coinCost: 4,
+    coinCost: 6,
     unlockLevel: POWER_UP_UNLOCK_LEVELS["fusion-jump"],
     description: "Save a tier-skipping merge for a future level opening.",
   },
   {
     id: "catalyst",
     name: "Catalyst Aura",
-    coinCost: 8,
+    coinCost: 12,
     unlockLevel: POWER_UP_UNLOCK_LEVELS.catalyst,
     description: "Start a level with 5 shots of wider fusion radius available.",
   },
   {
     id: "emission",
     name: "Emission",
-    coinCost: 10,
+    coinCost: 15,
     unlockLevel: POWER_UP_UNLOCK_LEVELS.emission,
     description: "Raise your starting queue when a level needs a quick push.",
   },
   {
     id: "gravity",
     name: "Gravity",
-    coinCost: 8,
+    coinCost: 12,
     unlockLevel: POWER_UP_UNLOCK_LEVELS.gravity,
     description: "Bank a board-lifting move for a difficult future board.",
   },
   {
     id: "grab",
     name: "Grab",
-    coinCost: 8,
+    coinCost: 12,
     unlockLevel: POWER_UP_UNLOCK_LEVELS.grab,
     description: "Bring a saved reposition move into your next level.",
   },
   {
     id: "gamma",
     name: "Gamma Bomb",
-    coinCost: 8,
+    coinCost: 12,
     unlockLevel: POWER_UP_UNLOCK_LEVELS.gamma,
     description: "Stock a wide-radius blast that clears surrounding non-stone atoms.",
   },
   {
     id: "molecule",
     name: "Compound",
-    coinCost: 10,
+    coinCost: 15,
     unlockLevel: 1,
     description: "Compound is available at the start of every campaign run.",
   },
@@ -126,7 +125,7 @@ export function Shop({ onBack }: { onBack: () => void }) {
   const [message, setMessage] = useState("");
   const [pendingProductId, setPendingProductId] = useState<ProductId | "rewarded" | null>(null);
   const [proPackMessage, setProPackMessage] = useState("");
-  const [proPackBusy, setProPackBusy] = useState<"purchase" | "restore" | "manage" | "">("");
+  const [proPackBusy, setProPackBusy] = useState<"purchase" | "restore" | "">("");
   const [purchaseDebugBusy, setPurchaseDebugBusy] = useState(false);
   const [purchaseDebugOpen, setPurchaseDebugOpen] = useState(false);
   const [purchaseDebugLogs, setPurchaseDebugLogs] = useState<string[]>([]);
@@ -215,27 +214,6 @@ export function Shop({ onBack }: { onBack: () => void }) {
     } catch (error) {
       setProPackMessage(
         error instanceof Error ? error.message : "Purchases could not be restored.",
-      );
-    } finally {
-      setProPackBusy("");
-      if (purchaseDebugEnabled) refreshPurchaseDebugLogs();
-    }
-  }
-
-  async function handleManagePurchases() {
-    if (appStorePurchaseBusy) return;
-    setProPackBusy("manage");
-    setProPackMessage("Opening App Store purchase management...");
-    try {
-      const opened = await presentCustomerCenter();
-      setProPackMessage(
-        opened
-          ? "Purchase management opened."
-          : "No App Store management page is available yet. Use Restore to refresh purchases.",
-      );
-    } catch (error) {
-      setProPackMessage(
-        error instanceof Error ? error.message : "Purchase management could not be opened.",
       );
     } finally {
       setProPackBusy("");
@@ -585,22 +563,6 @@ export function Shop({ onBack }: { onBack: () => void }) {
                 </button>
               </div>
             )}
-            <button
-              type="button"
-              onClick={handleManagePurchases}
-              disabled={appStorePurchaseBusy || purchaseDebugLocked}
-              style={{
-                ...secondaryShopButton,
-                width: "100%",
-                marginTop: 10,
-                opacity:
-                  purchaseDebugLocked || (appStorePurchaseBusy && proPackBusy !== "manage")
-                    ? 0.55
-                    : 1,
-              }}
-            >
-              {proPackBusy === "manage" ? "Opening..." : "Manage Purchases"}
-            </button>
             {proPackMessage && (
               <p style={{ margin: "12px 0 0", color: "var(--muted-foreground)", fontSize: 12 }}>
                 {proPackMessage}

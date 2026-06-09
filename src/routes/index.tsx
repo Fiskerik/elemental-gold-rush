@@ -1,13 +1,15 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { Capacitor } from "@capacitor/core";
-import { Atom, ChevronRight, Sparkles, Target, Trophy } from "lucide-react";
-import type { ReactNode } from "react";
+import { Atom, ChevronRight, Clapperboard, Sparkles, Target, Trophy } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import { COMPOUNDS, type CompoundDefinition } from "@/game/compounds";
 import { GameApp } from "@/game/GameApp";
 import { MoleculeVisual } from "@/game/MoleculeVisual";
 import { PowerUpBadge } from "@/game/PowerUpLibrary";
 import { POWER_UPS } from "@/game/powerUps";
+import { initAds, showRewardedForCoin } from "@/game/ads";
+import { useProgress } from "@/game/store";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -110,6 +112,8 @@ function LandingPage() {
         <LandingScreenshot />
       </section>
 
+      <RewardedProgressBanner />
+
       <section className="landing-feature-strip" aria-label="Game highlights">
         <FeatureStat icon={<Atom size={20} />} value="118" label="elements to discover" />
         <FeatureStat icon={<Sparkles size={20} />} value="14" label="power-ups and lab tools" />
@@ -161,6 +165,58 @@ function LandingScreenshot() {
     <figure className="landing-screenshot-card" aria-label="Atomic Fusion Rush gameplay screenshot">
       <img src="/landing-gameplay.png" alt="Atomic Fusion Rush gameplay with atoms on the board" />
     </figure>
+  );
+}
+
+function RewardedProgressBanner() {
+  const grantGoldCoins = useProgress((s) => s.grantGoldCoins);
+  const hasProPack = useProgress((s) => s.hasProPack);
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (hasProPack) return;
+    void initAds(false);
+  }, [hasProPack]);
+
+  async function handleRewardedCoin() {
+    setBusy(true);
+    setMessage("Loading rewarded ad...");
+    try {
+      const result = await showRewardedForCoin(hasProPack);
+      if (result.rewarded) {
+        grantGoldCoins(1);
+        setMessage("Reward complete: +1 gold coin.");
+        return;
+      }
+      setMessage(
+        result.reason ?? "Rewarded ad not completed or not available yet. Try again shortly.",
+      );
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Rewarded ad could not be started.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="landing-rewarded" aria-label="Continue your progress">
+      <div className="landing-rewarded-copy">
+        <p className="landing-eyebrow">Continue your progress</p>
+        <h2>Watch an ad to earn a gold coin</h2>
+        <p>Stock up on power-ups and keep your run going — grab a free gold coin.</p>
+      </div>
+      <button
+        type="button"
+        className="landing-primary-action"
+        onClick={handleRewardedCoin}
+        disabled={busy || hasProPack}
+      >
+        <Clapperboard size={18} aria-hidden="true" />
+        {busy ? "Loading ad..." : "Watch rewarded ad for +1 coin"}
+      </button>
+      {message && <p className="landing-rewarded-status">{message}</p>}
+    </section>
   );
 }
 

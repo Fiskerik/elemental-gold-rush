@@ -1,15 +1,38 @@
 import { useProgress } from "./store";
-import { startAmbientMusic, stopAmbientMusic } from "./audio";
+import { setMusicVolume, setSfxVolume, startAmbientMusic, stopAmbientMusic } from "./audio";
 import { useIsTabletLayout } from "./responsive";
 
 export function Settings({ onBack }: { onBack: () => void }) {
   const isTabletLayout = useIsTabletLayout();
-  const { soundEnabled, musicEnabled, hapticsEnabled, appTheme, shootingStyle, toggleSound, toggleMusic, toggleHaptics, toggleAppTheme, setShootingStyle, reset } =
-    useProgress();
+  const {
+    soundEnabled,
+    musicEnabled,
+    hapticsEnabled,
+    soundVolume,
+    musicVolume,
+    appTheme,
+    shootingStyle,
+    toggleSound,
+    toggleMusic,
+    toggleHaptics,
+    setSoundVolume,
+    setMusicVolume: setMusicVolumeStore,
+    toggleAppTheme,
+    setShootingStyle,
+    reset,
+  } = useProgress();
   const handleMusicToggle = () => {
     if (!musicEnabled) startAmbientMusic();
     else stopAmbientMusic();
     toggleMusic();
+  };
+  const handleMusicVolumeChange = (value: number) => {
+    setMusicVolumeStore(value);
+    setMusicVolume(value / 100);
+  };
+  const handleSoundVolumeChange = (value: number) => {
+    setSoundVolume(value);
+    setSfxVolume(value / 100);
   };
   return (
     <div className="app-shell" style={{ padding: isTabletLayout ? 24 : 16 }}>
@@ -20,7 +43,13 @@ export function Settings({ onBack }: { onBack: () => void }) {
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <Row label="Music" value={musicEnabled} onToggle={handleMusicToggle} />
+          {musicEnabled && (
+            <VolumeRow label="Music volume" value={musicVolume} onChange={handleMusicVolumeChange} />
+          )}
           <Row label="Sound effects" value={soundEnabled} onToggle={toggleSound} />
+          {soundEnabled && (
+            <VolumeRow label="Sound volume" value={soundVolume} onChange={handleSoundVolumeChange} />
+          )}
           <Row label="Haptics" value={hapticsEnabled} onToggle={toggleHaptics} />
           <Row
             label={`Theme: ${appTheme === "dark" ? "Dark" : "Light"}`}
@@ -74,5 +103,47 @@ function Row({ label, value, onToggle }: { label: string; value: boolean; onTogg
         }} />
       </span>
     </button>
+  );
+}
+
+function VolumeRow({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 14,
+        padding: "14px 16px",
+        background: "var(--surface)",
+        border: "1px solid var(--border)",
+        borderRadius: 12,
+        color: "var(--foreground)",
+        fontSize: 14,
+        fontWeight: 600,
+      }}
+    >
+      <span style={{ minWidth: 110 }}>{label}</span>
+      <input
+        type="range"
+        min={0}
+        max={100}
+        step={1}
+        value={value}
+        onChange={(event) => onChange(Number(event.target.value))}
+        aria-label={label}
+        style={{ flex: 1, accentColor: "var(--primary)", cursor: "pointer" }}
+      />
+      <span style={{ minWidth: 42, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+        {value}%
+      </span>
+    </div>
   );
 }
