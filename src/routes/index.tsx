@@ -110,8 +110,6 @@ function LandingPage() {
         <LandingScreenshot />
       </section>
 
-      <RewardedProgressBanner />
-
       <section className="landing-feature-strip" aria-label="Game highlights">
         <FeatureStat icon={<Atom size={20} />} value="118" label="elements to discover" />
         <FeatureStat icon={<Sparkles size={20} />} value="14" label="power-ups and lab tools" />
