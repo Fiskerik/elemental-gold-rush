@@ -61,6 +61,31 @@ workflows:
         script: |
           sed -i '' 's/platform :ios, '\''[0-9.]*'\''/platform :ios, '\''15.0'\''/g' ios/App/Podfile
           sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = [0-9.]\\+;/IPHONEOS_DEPLOYMENT_TARGET = 15.0;/g' ios/App/App.xcodeproj/project.pbxproj
+      - name: Inject GoogleService-Info.plist into Build Bundle
+        script: |
+          PLIST_PATH="ios/App/App/GoogleService-Info.plist"
+          if [ -f "$PLIST_PATH" ]; then
+            echo "GoogleService-Info.plist hittades. Injekterar byggsteg i Xcode via Ruby..."
+            cat << 'EOF' > fix_plist.rb
+            require 'xcodeproj'
+            project = Xcodeproj::Project.open('ios/App/App.xcodeproj')
+            target = project.targets.find { |t| t.name == 'App' }
+            phase_name = 'Force Firebase Plist'
+            unless target.build_phases.any? { |p| p.name == phase_name }
+              phase = project.new(Xcodeproj::Project::Object::PBXShellScriptBuildPhase)
+              phase.name = phase_name
+              phase.shell_script = 'cp -f "${SRCROOT}/App/GoogleService-Info.plist" "${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/GoogleService-Info.plist"'
+              target.build_phases << phase
+              project.save
+              puts 'Skriptfas tillagd i Xcode-projektet!'
+            end
+          EOF
+            ruby fix_plist.rb
+            rm fix_plist.rb
+          else
+            echo "ERROR: ios/App/App/GoogleService-Info.plist saknas i ditt kodarkiv!"
+            exit 1
+          fi
       - name: Inject iOS runtime keys
         script: |
           APP_ID="${VITE_ADMOB_IOS_APP_ID:-ca-app-pub-8854735603167656~9228353443}"
