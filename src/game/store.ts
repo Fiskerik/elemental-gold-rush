@@ -474,6 +474,10 @@ export const useProgress = create<ProgressState>()(
       toggleSound: () => set((s) => ({ soundEnabled: !s.soundEnabled })),
       toggleMusic: () => set((s) => ({ musicEnabled: !s.musicEnabled })),
       toggleHaptics: () => set((s) => ({ hapticsEnabled: !s.hapticsEnabled })),
+      setSoundVolume: (volume) =>
+        set(() => ({ soundVolume: Math.max(0, Math.min(100, Math.round(volume))) })),
+      setMusicVolume: (volume) =>
+        set(() => ({ musicVolume: Math.max(0, Math.min(100, Math.round(volume))) })),
       setAppTheme: (theme) => set({ appTheme: theme }),
       setAppLanguage: (language) => set({ appLanguage: normalizeLanguage(language) }),
       toggleAppTheme: () => set((s) => ({ appTheme: s.appTheme === "dark" ? "light" : "dark" })),
