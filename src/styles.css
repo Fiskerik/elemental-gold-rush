@@ -452,7 +452,8 @@
 .landing-nav,
 .landing-hero,
 .landing-feature-strip,
-.landing-section {
+.landing-section,
+.landing-rewarded {
   position: relative;
   z-index: 1;
   margin-left: auto;
