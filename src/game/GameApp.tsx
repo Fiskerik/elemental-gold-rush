@@ -4,6 +4,7 @@ import { Capacitor } from "@capacitor/core";
 import { StatusBar, Style } from "@capacitor/status-bar";
 import { MainMenu } from "@/game/MainMenu";
 import { clearSavedRun, GameBoard, getSavedRunSummary } from "@/game/GameBoard";
+import { setMusicVolume, setSfxVolume } from "@/game/audio";
 import { LevelSelect } from "@/game/LevelSelect";
 import { Collection } from "@/game/Collection";
 import { Settings } from "@/game/Settings";
@@ -31,11 +32,21 @@ export function GameApp() {
   const unlockedLevel = useProgress((s) => s.unlockedLevel);
   const appTheme = useProgress((s) => s.appTheme);
   const appLanguage = useProgress((s) => s.appLanguage);
+  const soundVolume = useProgress((s) => s.soundVolume);
+  const musicVolume = useProgress((s) => s.musicVolume);
   const [screen, setScreen] = useState<Screen>({ name: "menu" });
   const [showLaunchScreen, setShowLaunchScreen] = useState(true);
   const [resumePrompt, setResumePrompt] = useState<ReturnType<typeof getSavedRunSummary>>(null);
 
   useDomLocalization(appLanguage);
+
+  useEffect(() => {
+    setSfxVolume(soundVolume / 100);
+  }, [soundVolume]);
+
+  useEffect(() => {
+    setMusicVolume(musicVolume / 100);
+  }, [musicVolume]);
 
   useEffect(() => {
     const root = document.documentElement;
