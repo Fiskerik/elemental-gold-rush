@@ -240,9 +240,11 @@ export function Profile({ onBack }: Props) {
               label={tr("Periodic table progress")}
               value={`${discoveredElements.length}/${ELEMENTS.length}`}
             />
-            <button type="button" onClick={handleUnlockAllStages} style={profileActionButton}>
-              {tr(unlockedLevel >= MAX_LEVEL ? "Lock stages" : "Unlock all stages")}
-            </button>
+            {unlockedLevel < MAX_LEVEL && (
+              <button type="button" onClick={handleUnlockAllStages} style={profileActionButton}>
+                {tr("Unlock all stages")}
+              </button>
+            )}
           </div>
         </section>
       </div>
