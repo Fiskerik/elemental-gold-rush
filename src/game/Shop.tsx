@@ -585,22 +585,6 @@ export function Shop({ onBack }: { onBack: () => void }) {
                 </button>
               </div>
             )}
-            <button
-              type="button"
-              onClick={handleManagePurchases}
-              disabled={appStorePurchaseBusy || purchaseDebugLocked}
-              style={{
-                ...secondaryShopButton,
-                width: "100%",
-                marginTop: 10,
-                opacity:
-                  purchaseDebugLocked || (appStorePurchaseBusy && proPackBusy !== "manage")
-                    ? 0.55
-                    : 1,
-              }}
-            >
-              {proPackBusy === "manage" ? "Opening..." : "Manage Purchases"}
-            </button>
             {proPackMessage && (
               <p style={{ margin: "12px 0 0", color: "var(--muted-foreground)", fontSize: 12 }}>
                 {proPackMessage}
