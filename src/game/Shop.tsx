@@ -126,7 +126,7 @@ export function Shop({ onBack }: { onBack: () => void }) {
   const [message, setMessage] = useState("");
   const [pendingProductId, setPendingProductId] = useState<ProductId | "rewarded" | null>(null);
   const [proPackMessage, setProPackMessage] = useState("");
-  const [proPackBusy, setProPackBusy] = useState<"purchase" | "restore" | "manage" | "">("");
+  const [proPackBusy, setProPackBusy] = useState<"purchase" | "restore" | "">("");
   const [purchaseDebugBusy, setPurchaseDebugBusy] = useState(false);
   const [purchaseDebugOpen, setPurchaseDebugOpen] = useState(false);
   const [purchaseDebugLogs, setPurchaseDebugLogs] = useState<string[]>([]);
@@ -215,27 +215,6 @@ export function Shop({ onBack }: { onBack: () => void }) {
     } catch (error) {
       setProPackMessage(
         error instanceof Error ? error.message : "Purchases could not be restored.",
-      );
-    } finally {
-      setProPackBusy("");
-      if (purchaseDebugEnabled) refreshPurchaseDebugLogs();
-    }
-  }
-
-  async function handleManagePurchases() {
-    if (appStorePurchaseBusy) return;
-    setProPackBusy("manage");
-    setProPackMessage("Opening App Store purchase management...");
-    try {
-      const opened = await presentCustomerCenter();
-      setProPackMessage(
-        opened
-          ? "Purchase management opened."
-          : "No App Store management page is available yet. Use Restore to refresh purchases.",
-      );
-    } catch (error) {
-      setProPackMessage(
-        error instanceof Error ? error.message : "Purchase management could not be opened.",
       );
     } finally {
       setProPackBusy("");
