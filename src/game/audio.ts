@@ -10,6 +10,31 @@ let musicStep = 0;
 export type MusicTheme = "default" | "boss" | "powerup" | "compound";
 let currentMusicTheme: MusicTheme = "default";
 const MIN_EXP_VALUE = 0.0001;
+const BASE_MUSIC_GAIN = 0.072;
+let sfxMaster: GainNode | null = null;
+let sfxVolume = 1; // 0..1
+let musicVolume = 1; // 0..1
+
+function getSfxMaster(c: AudioContext): GainNode {
+  if (!sfxMaster || sfxMaster.context !== c) {
+    sfxMaster = c.createGain();
+    sfxMaster.gain.setValueAtTime(sfxVolume, c.currentTime);
+    sfxMaster.connect(c.destination);
+  }
+  return sfxMaster;
+}
+
+export function setSfxVolume(volume: number) {
+  sfxVolume = Math.max(0, Math.min(1, volume));
+  if (sfxMaster) sfxMaster.gain.setValueAtTime(sfxVolume, sfxMaster.context.currentTime);
+}
+
+export function setMusicVolume(volume: number) {
+  musicVolume = Math.max(0, Math.min(1, volume));
+  if (musicMaster) {
+    musicMaster.gain.setValueAtTime(BASE_MUSIC_GAIN * musicVolume, musicMaster.context.currentTime);
+  }
+}
 
 function finitePositive(value: number, fallback: number): number {
   return Number.isFinite(value) && value > 0 ? value : fallback;
@@ -34,11 +59,11 @@ function getCtx(): AudioContext | null {
   return ctx;
 }
 
-function runSound(play: (c: AudioContext, now: number) => void) {
+function runSound(play: (c: AudioContext, now: number, dest: GainNode) => void) {
   const c = getCtx();
   if (!c) return;
   const playNow = () => {
-    try { play(c, c.currentTime); } catch (error) { console.log("Sound playback failed", error); }
+    try { play(c, c.currentTime, getSfxMaster(c)); } catch (error) { console.log("Sound playback failed", error); }
   };
   if (c.state === "suspended") {
     void c.resume().then(playNow).catch((error) => console.log("Audio context resume failed", error));
