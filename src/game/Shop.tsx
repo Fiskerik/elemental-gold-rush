@@ -7,7 +7,6 @@ import { PRODUCT_IDS, getProductById, type ProductId } from "./products";
 import {
   debugNativePurchases,
   isPurchaseDebugUiEnabled,
-  presentCustomerCenter,
   purchaseGoldCoinPack,
   purchaseProductWithResult,
   restorePurchases,
