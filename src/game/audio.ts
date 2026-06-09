@@ -74,7 +74,7 @@ function runSound(play: (c: AudioContext, now: number, dest: GainNode) => void) 
 
 // ====================== LJUD ======================
 export function playMergeSound(chainDepth: number) {
-  runSound((c, now) => {
+  runSound((c, now, dest) => {
     const osc = c.createOscillator();
     const gain = c.createGain();
     osc.type = "sine";
@@ -84,27 +84,27 @@ export function playMergeSound(chainDepth: number) {
     gain.gain.setValueAtTime(MIN_EXP_VALUE, now);
     gain.gain.exponentialRampToValueAtTime(0.25, now + 0.01);
     gain.gain.exponentialRampToValueAtTime(MIN_EXP_VALUE, now + 0.25);
-    osc.connect(gain).connect(c.destination);
+    osc.connect(gain).connect(dest);
     osc.start(now);
     osc.stop(now + 0.3);
   });
 }
 
 export function playShootSound() {
-  runSound((c, now) => {
+  runSound((c, now, dest) => {
     const osc = c.createOscillator(); const gain = c.createGain();
     osc.type = "triangle";
     osc.frequency.setValueAtTime(180, now);
     osc.frequency.exponentialRampToValueAtTime(90, now + 0.08);
     gain.gain.setValueAtTime(0.15, now);
     gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.1);
-    osc.connect(gain).connect(c.destination);
+    osc.connect(gain).connect(dest);
     osc.start(now); osc.stop(now + 0.12);
   });
 }
 
 export function playWinSound() {
-  runSound((c, now) => {
+  runSound((c, now, dest) => {
     [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => {
       const osc = c.createOscillator(); const gain = c.createGain();
       osc.type = "sine";
@@ -112,14 +112,14 @@ export function playWinSound() {
       gain.gain.setValueAtTime(0.0001, now + i * 0.1);
       gain.gain.exponentialRampToValueAtTime(0.2, now + i * 0.1 + 0.02);
       gain.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.1 + 0.4);
-      osc.connect(gain).connect(c.destination);
+      osc.connect(gain).connect(dest);
       osc.start(now + i * 0.1); osc.stop(now + i * 0.1 + 0.5);
     });
   });
 }
 
 export function playDropSound() {
-  runSound((c, now) => {
+  runSound((c, now, dest) => {
     const osc = c.createOscillator();
     const gain = c.createGain();
     osc.type = "triangle";
@@ -127,18 +127,18 @@ export function playDropSound() {
     osc.frequency.exponentialRampToValueAtTime(92, now + 0.06);
     gain.gain.setValueAtTime(0.09, now);
     gain.gain.exponentialRampToValueAtTime(MIN_EXP_VALUE, now + 0.09);
-    osc.connect(gain).connect(c.destination);
+    osc.connect(gain).connect(dest);
     osc.start(now);
     osc.stop(now + 0.1);
   });
 }
 
 export function playComboSound(mergeCount: number) {
-  runSound((c, now) => {
+  runSound((c, now, dest) => {
     const count = Math.max(2, Math.min(6, mergeCount));
     const master = c.createGain();
     master.gain.setValueAtTime(0.82, now);
-    master.connect(c.destination);
+    master.connect(dest);
 
     for (let i = 0; i < count; i++) {
       const t = now + i * 0.055;
@@ -165,7 +165,7 @@ export function playComboSound(mergeCount: number) {
 }
 
 export function playMilestoneSound(atomicNumber: number) {
-  runSound((c, now) => {
+  runSound((c, now, dest) => {
     const root = 392 + Math.min(24, Math.max(0, atomicNumber - 1)) * 4;
     [root, root * 1.25, root * 1.5, root * 2].forEach((frequency, index) => {
       const osc = c.createOscillator();
@@ -175,7 +175,7 @@ export function playMilestoneSound(atomicNumber: number) {
       gain.gain.setValueAtTime(MIN_EXP_VALUE, now + index * 0.075);
       gain.gain.exponentialRampToValueAtTime(index === 3 ? 0.16 : 0.12, now + index * 0.075 + 0.02);
       gain.gain.exponentialRampToValueAtTime(MIN_EXP_VALUE, now + index * 0.075 + 0.38);
-      osc.connect(gain).connect(c.destination);
+      osc.connect(gain).connect(dest);
       osc.start(now + index * 0.075);
       osc.stop(now + index * 0.075 + 0.42);
     });
@@ -183,7 +183,7 @@ export function playMilestoneSound(atomicNumber: number) {
 }
 
 export function playDangerSound(severity: "low" | "high" = "low") {
-  runSound((c, now) => {
+  runSound((c, now, dest) => {
     const repeats = severity === "high" ? 2 : 1;
     for (let i = 0; i < repeats; i++) {
       const t = now + i * 0.17;
@@ -195,7 +195,7 @@ export function playDangerSound(severity: "low" | "high" = "low") {
       gain.gain.setValueAtTime(MIN_EXP_VALUE, t);
       gain.gain.exponentialRampToValueAtTime(severity === "high" ? 0.09 : 0.055, t + 0.02);
       gain.gain.exponentialRampToValueAtTime(MIN_EXP_VALUE, t + 0.18);
-      osc.connect(gain).connect(c.destination);
+      osc.connect(gain).connect(dest);
       osc.start(t);
       osc.stop(t + 0.2);
     }
@@ -203,7 +203,7 @@ export function playDangerSound(severity: "low" | "high" = "low") {
 }
 
 export function playGameOverSound() {
-  runSound((c, now) => {
+  runSound((c, now, dest) => {
     const osc = c.createOscillator();
     const gain = c.createGain();
     osc.type = "sawtooth";
@@ -212,7 +212,7 @@ export function playGameOverSound() {
     gain.gain.setValueAtTime(MIN_EXP_VALUE, now);
     gain.gain.exponentialRampToValueAtTime(0.18, now + 0.03);
     gain.gain.exponentialRampToValueAtTime(MIN_EXP_VALUE, now + 0.64);
-    osc.connect(gain).connect(c.destination);
+    osc.connect(gain).connect(dest);
     osc.start(now);
     osc.stop(now + 0.68);
   });
