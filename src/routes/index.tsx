@@ -1,4 +1,5 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
+import { Capacitor } from "@capacitor/core";
 import { Atom, ChevronRight, Sparkles, Target, Trophy } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -57,8 +58,9 @@ function Index() {
 
 function isNativeShell() {
   return (
-    typeof document !== "undefined" &&
-    document.documentElement.classList.contains("platform-native")
+    Capacitor.isNativePlatform() ||
+    (typeof document !== "undefined" &&
+      document.documentElement.classList.contains("platform-native"))
   );
 }
 
