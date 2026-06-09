@@ -1,15 +1,38 @@
 import { useProgress } from "./store";
-import { startAmbientMusic, stopAmbientMusic } from "./audio";
+import { setMusicVolume, setSfxVolume, startAmbientMusic, stopAmbientMusic } from "./audio";
 import { useIsTabletLayout } from "./responsive";
 
 export function Settings({ onBack }: { onBack: () => void }) {
   const isTabletLayout = useIsTabletLayout();
-  const { soundEnabled, musicEnabled, hapticsEnabled, appTheme, shootingStyle, toggleSound, toggleMusic, toggleHaptics, toggleAppTheme, setShootingStyle, reset } =
-    useProgress();
+  const {
+    soundEnabled,
+    musicEnabled,
+    hapticsEnabled,
+    soundVolume,
+    musicVolume,
+    appTheme,
+    shootingStyle,
+    toggleSound,
+    toggleMusic,
+    toggleHaptics,
+    setSoundVolume,
+    setMusicVolume: setMusicVolumeStore,
+    toggleAppTheme,
+    setShootingStyle,
+    reset,
+  } = useProgress();
   const handleMusicToggle = () => {
     if (!musicEnabled) startAmbientMusic();
     else stopAmbientMusic();
     toggleMusic();
+  };
+  const handleMusicVolumeChange = (value: number) => {
+    setMusicVolumeStore(value);
+    setMusicVolume(value / 100);
+  };
+  const handleSoundVolumeChange = (value: number) => {
+    setSoundVolume(value);
+    setSfxVolume(value / 100);
   };
   return (
     <div className="app-shell" style={{ padding: isTabletLayout ? 24 : 16 }}>
@@ -20,7 +43,13 @@ export function Settings({ onBack }: { onBack: () => void }) {
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <Row label="Music" value={musicEnabled} onToggle={handleMusicToggle} />
+          {musicEnabled && (
+            <VolumeRow label="Music volume" value={musicVolume} onChange={handleMusicVolumeChange} />
+          )}
           <Row label="Sound effects" value={soundEnabled} onToggle={toggleSound} />
+          {soundEnabled && (
+            <VolumeRow label="Sound volume" value={soundVolume} onChange={handleSoundVolumeChange} />
+          )}
           <Row label="Haptics" value={hapticsEnabled} onToggle={toggleHaptics} />
           <Row
             label={`Theme: ${appTheme === "dark" ? "Dark" : "Light"}`}
