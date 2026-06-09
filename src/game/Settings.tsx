@@ -105,3 +105,45 @@ function Row({ label, value, onToggle }: { label: string; value: boolean; onTogg
     </button>
   );
 }
+
+function VolumeRow({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 14,
+        padding: "14px 16px",
+        background: "var(--surface)",
+        border: "1px solid var(--border)",
+        borderRadius: 12,
+        color: "var(--foreground)",
+        fontSize: 14,
+        fontWeight: 600,
+      }}
+    >
+      <span style={{ minWidth: 110 }}>{label}</span>
+      <input
+        type="range"
+        min={0}
+        max={100}
+        step={1}
+        value={value}
+        onChange={(event) => onChange(Number(event.target.value))}
+        aria-label={label}
+        style={{ flex: 1, accentColor: "var(--primary)", cursor: "pointer" }}
+      />
+      <span style={{ minWidth: 42, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+        {value}%
+      </span>
+    </div>
+  );
+}
