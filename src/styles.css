@@ -638,6 +638,48 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   padding: 10px 0 34px;
 }
+.landing-rewarded {
+  align-items: center;
+  background:
+    linear-gradient(135deg, color-mix(in oklch, var(--accent) 16%, transparent), color-mix(in oklch, var(--primary) 14%, transparent));
+  border: 1px solid color-mix(in oklch, var(--accent) 40%, var(--border));
+  border-radius: 18px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  justify-content: space-between;
+  margin-top: 8px;
+  padding: 20px 22px;
+}
+.landing-rewarded-copy {
+  display: grid;
+  gap: 4px;
+  max-width: 560px;
+}
+.landing-rewarded-copy h2 {
+  font-size: clamp(20px, 3vw, 28px);
+  line-height: 1.1;
+  margin: 0;
+}
+.landing-rewarded-copy p:last-child {
+  color: var(--muted-foreground);
+  font-size: 14px;
+  margin: 0;
+}
+.landing-rewarded button {
+  border: none;
+  cursor: pointer;
+}
+.landing-rewarded button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+.landing-rewarded-status {
+  color: var(--muted-foreground);
+  font-size: 13px;
+  margin: 0;
+  width: 100%;
+}
 .landing-feature-stat {
   align-items: center;
   background: color-mix(in oklch, var(--surface) 78%, transparent);
