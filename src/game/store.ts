@@ -116,6 +116,8 @@ interface ProgressState {
   soundEnabled: boolean;
   musicEnabled: boolean;
   hapticsEnabled: boolean;
+  soundVolume: number; // 0-100
+  musicVolume: number; // 0-100
   appTheme: AppTheme;
   appLanguage: AppLanguage;
   shootingStyle: "hold" | "press";
@@ -169,6 +171,8 @@ interface ProgressState {
   toggleSound: () => void;
   toggleMusic: () => void;
   toggleHaptics: () => void;
+  setSoundVolume: (volume: number) => void;
+  setMusicVolume: (volume: number) => void;
   setAppTheme: (theme: AppTheme) => void;
   setAppLanguage: (language: AppLanguage) => void;
   toggleAppTheme: () => void;
