@@ -197,6 +197,8 @@ export const useProgress = create<ProgressState>()(
       soundEnabled: true,
       musicEnabled: true,
       hapticsEnabled: true,
+      soundVolume: 100,
+      musicVolume: 100,
       appTheme: "dark",
       appLanguage: DEFAULT_LANGUAGE,
       shootingStyle: "hold",
