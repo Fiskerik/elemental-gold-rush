@@ -792,6 +792,15 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
         : Math.random;
   }
   const dailyRandom = useCallback(() => (mode === "daily-challenge" ? dailyRngRef.current?.() ?? Math.random() : Math.random()), [mode]);
+  const shuffleDailyAtoms = useCallback((atoms: number[], salt: string): number[] => {
+    const rng = createSeededRng(hashDailySeed(`${getTodayQuestDate()}-${level.id}-${salt}`));
+    const next = atoms.slice();
+    for (let i = next.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [next[i], next[j]] = [next[j], next[i]];
+    }
+    return next;
+  }, [level.id]);
   const [balls, setBalls] = useState<Board>(() => createEmptyBoard());
   const [queue, setQueue] = useState<number[]>(() =>
     generateInitialQueue(level.maxQueueElement, QUEUE_SIZE, level.queueDecay, dailyRandom),
@@ -2548,11 +2557,14 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       ...buildRange,
       ...recipeAtoms.filter((atom) => !buildRange.includes(atom)),
     ]);
+    const queueAtoms = isSecretCompoundChallenge || isDailyMoleculeChallenge
+      ? shuffleDailyAtoms(boardAtoms, `compound-${compound.id}`)
+      : boardAtoms;
     return {
       highestRecipeAtom,
       highestBuildAtom: Math.max(1, highestRecipeAtom - 1),
       boardAtoms,
-      queueAtoms: boardAtoms,
+      queueAtoms,
     };
   }
 
@@ -2561,12 +2573,13 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     boardAtoms: number[];
     queueAtoms: number[];
   } {
-    const highestBuildAtom = Math.max(1, target - 1);
-    const atoms = Array.from({ length: 9 }, (_, index) => highestBuildAtom - index).filter((atom) => atom >= 1);
+    const highestBuildAtom = Math.max(1, target - 3);
+    const atoms = Array.from({ length: 10 }, (_, index) => highestBuildAtom - index).filter((atom) => atom >= 1);
+    const shuffledAtoms = shuffleDailyAtoms(atoms, `daily-target-${target}`);
     return {
       highestBuildAtom,
-      boardAtoms: atoms,
-      queueAtoms: atoms,
+      boardAtoms: shuffledAtoms,
+      queueAtoms: shuffledAtoms,
     };
   }
 
@@ -6205,7 +6218,6 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
                   <PowerUpBadge icon="molecule" size={32} />
                 </span>
                 <span style={powerUpCount}>{compoundMode ? "×" : compoundCharges}</span>
-                {renderPowerUpLevel("molecule")}
               </button>
             )}
             {(gammaCharges > 0 || pendingGamma) && (
@@ -6520,13 +6532,13 @@ const powerUpCount: React.CSSProperties = {
 const powerUpLevelPill: React.CSSProperties = {
   position: "absolute",
   left: "50%",
-  top: -15,
+  top: 1,
   transform: "translateX(-50%)",
   whiteSpace: "nowrap",
   borderRadius: 999,
-  padding: "1px 5px",
-  fontSize: 8,
-  lineHeight: 1.35,
+  padding: "0 4px",
+  fontSize: 7,
+  lineHeight: 1.25,
   fontWeight: 900,
   letterSpacing: 0,
   color: "var(--primary-foreground)",

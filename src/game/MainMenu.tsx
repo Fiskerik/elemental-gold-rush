@@ -261,7 +261,9 @@ export function MainMenu({
                 <strong>Daily Challenge</strong>
                 <small>{dailyChallenge.completed ? "Cleared today" : `Reward +${DAILY_FEATURE_REWARD_COINS}`}</small>
               </span>
-              <span style={dailyFeatureReward}>{dailyChallenge.completed ? "Done" : `+${DAILY_FEATURE_REWARD_COINS}`}</span>
+              <span style={dailyFeatureReward}>
+                {dailyChallenge.completed ? <CheckCircle2 size={18} aria-label="Completed" /> : `+${DAILY_FEATURE_REWARD_COINS}`}
+              </span>
             </button>
             <button type="button" onClick={handleSecretCompoundPress} style={dailyFeatureBtn}>
               <span style={dailyFeatureIcon}><LockKeyhole size={18} aria-hidden="true" /></span>
@@ -275,7 +277,9 @@ export function MainMenu({
                       : `Reveal clue +${DAILY_FEATURE_REWARD_COINS}`}
                 </small>
               </span>
-              <span style={dailyFeatureReward}>{secretCompound.completed ? "Done" : "+5"}</span>
+              <span style={dailyFeatureReward}>
+                {secretCompound.completed ? <CheckCircle2 size={18} aria-label="Completed" /> : "+5"}
+              </span>
             </button>
           </div>
           <button
