@@ -1,20 +1,10 @@
-import {
-  Atom,
-  CheckCircle2,
-  FlaskConical,
-  Layers,
-  ShoppingBag,
-  Sparkles,
-  Star,
-  Trophy,
-  type LucideIcon,
-} from "lucide-react";
 import { ELEMENTS } from "./elements";
-import { MAX_LEVEL } from "./levels";
-import { formatScore } from "./logic";
+import { getLevelById, MAX_LEVEL } from "./levels";
 import { useProgress } from "./store";
 import { useIsTabletLayout } from "./responsive";
 import { SUPPORTED_LANGUAGES, t, toIntlLocale, type AppLanguage } from "./localization";
+import { COMPOUNDS } from "./compounds";
+import { BOSSES, type BossId } from "./bosses";
 
 interface Props {
   onBack: () => void;
@@ -28,13 +18,14 @@ export function Profile({ onBack }: Props) {
     totalScore,
     goldCoins,
     discoveredElements,
-    dailyQuests,
     dailyStreak,
     claimedDailyReward,
+    discoveredCompounds,
     bestCombo,
     bestComboDate,
     earnedBadges,
     levelStars,
+    levelStats,
     challengeBestScores,
     hasProPack,
     appTheme,
@@ -44,16 +35,33 @@ export function Profile({ onBack }: Props) {
     setAppLanguage,
   } = useProgress();
   const tr = (text: string) => t(text, appLanguage);
+  const intlLocale = toIntlLocale(appLanguage);
+  const numberFormatter = new Intl.NumberFormat(intlLocale);
   const highestEl = ELEMENTS[highestElement - 1];
-  const completedDailyQuests = dailyQuests.filter((quest) => quest.completed).length;
-  const dailyRewardAmount = hasProPack ? 4 : 2;
   const totalStars = Object.values(levelStars).reduce((sum, stars) => sum + stars, 0);
   const perfectLevels = Object.values(levelStars).filter((stars) => stars >= 3).length;
-  const bestChallengeScore = Math.max(
-    0,
-    ...Object.values(challengeBestScores).map((score) => score ?? 0),
+  const bestChallengeEntry = Object.entries(challengeBestScores).reduce<{ mode: string; score: number } | null>(
+    (best, [mode, score]) => {
+      const safeScore = score ?? 0;
+      if (!best || safeScore > best.score) return { mode, score: safeScore };
+      return best;
+    },
+    null,
   );
+  const bestLevelScoreEntry = Object.entries(levelStats).reduce<{ levelId: number; score: number } | null>(
+    (best, [levelId, stats]) => {
+      if (!best || stats.maxScore > best.score) return { levelId: Number(levelId), score: stats.maxScore };
+      return best;
+    },
+    null,
+  );
+  const bestLevelScoreLevel = bestLevelScoreEntry ? getLevelById(bestLevelScoreEntry.levelId) : null;
   const completionPercent = Math.round((discoveredElements.length / ELEMENTS.length) * 100);
+  const compoundPercent = Math.round((discoveredCompounds.length / Math.max(1, COMPOUNDS.length)) * 100);
+  const bossIds = Object.keys(BOSSES) as BossId[];
+  const unlockedBossCount = bossIds.filter((id) => unlockedLevel >= BOSSES[id].levelId).length;
+  const defeatedBossCount = bossIds.filter((id) => (levelStats[BOSSES[id].levelId]?.bestShots ?? null) != null).length;
+  const exactScore = (score: number) => numberFormatter.format(Math.max(0, Math.floor(score)));
 
   function handleUnlockAllStages() {
     if (unlockedLevel >= MAX_LEVEL) {
@@ -107,6 +115,63 @@ export function Profile({ onBack }: Props) {
             {hasProPack && <div style={proBadge}>PRO LAB PACK ACTIVE</div>}
           </div>
         </header>
+        <section style={card}>
+          <div style={sectionHeading}>{tr("Records")}</div>
+          <div style={{ display: "grid", gap: 10 }}>
+            <RecordRow
+              label={tr("Best level score")}
+              value={bestLevelScoreEntry ? exactScore(bestLevelScoreEntry.score) : "0"}
+              sub={
+                bestLevelScoreEntry
+                  ? `${tr("Level")} ${bestLevelScoreEntry.levelId}${bestLevelScoreLevel ? ` - ${bestLevelScoreLevel.name}` : ""}`
+                  : tr("no record yet")
+              }
+            />
+            <RecordRow
+              label={tr("Best challenge score")}
+              value={bestChallengeEntry ? exactScore(bestChallengeEntry.score) : "0"}
+              sub={bestChallengeEntry ? bestChallengeEntry.mode.replaceAll("-", " ") : tr("no record yet")}
+            />
+            <RecordRow label={tr("Atoms unlocked")} value={`${discoveredElements.length}/${ELEMENTS.length}`} sub={`${completionPercent}%`} />
+            <RecordRow label={tr("Compounds unlocked")} value={`${discoveredCompounds.length}/${COMPOUNDS.length}`} sub={`${compoundPercent}%`} />
+            <RecordRow label={tr("Bosses unlocked")} value={`${unlockedBossCount}/${bossIds.length}`} sub={`${defeatedBossCount} defeated`} />
+            <RecordRow label={tr("Badges earned")} value={`${earnedBadges.length}`} />
+            <RecordRow label={tr("Campaign levels unlocked")} value={`${unlockedLevel}/${MAX_LEVEL}`} />
+            {unlockedLevel < MAX_LEVEL && (
+              <button type="button" onClick={handleUnlockAllStages} style={profileActionButton}>
+                {tr("Unlock all stages")}
+              </button>
+            )}
+          </div>
+        </section>
+
+        <section style={card}>
+          <div style={sectionHeading}>{tr("Boss Stats")}</div>
+          <div style={{ display: "grid", gap: 10 }}>
+            {bossIds.map((id) => {
+              const boss = BOSSES[id];
+              const stats = levelStats[boss.levelId];
+              const unlocked = unlockedLevel >= boss.levelId;
+              const defeated = (stats?.bestShots ?? null) != null;
+              return (
+                <div key={id} style={bossRow}>
+                  <div>
+                    <strong>{boss.name}</strong>
+                    <div style={{ color: "var(--muted-foreground)", fontSize: 11 }}>
+                      {unlocked ? (defeated ? tr("Defeated") : tr("Unlocked")) : `${tr("Unlocks at level")} ${boss.levelId}`}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: "right", fontSize: 12 }}>
+                    <div>{`${tr("Best")}: ${exactScore(stats?.maxScore ?? 0)}`}</div>
+                    <div style={{ color: "var(--muted-foreground)" }}>
+                      {`${tr("Shots")}: ${stats?.bestShots ?? "-"} / ${tr("Attempts")}: ${stats?.attempts ?? 0}`}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
 
         <section
           style={{
@@ -116,7 +181,7 @@ export function Profile({ onBack }: Props) {
               : grid.gridTemplateColumns,
           }}
         >
-          <ProfileStat label={tr("Total Score")} value={formatScore(totalScore)} sub={tr("career")} />
+          <ProfileStat label={tr("Total Score")} value={exactScore(totalScore)} sub={tr("career")} />
           <ProfileStat label={tr("Gold Coins")} value={`${goldCoins}`} sub={tr("shop currency")} />
           <ProfileStat
             label={tr("Daily Streak")}
@@ -128,7 +193,7 @@ export function Profile({ onBack }: Props) {
             value={`${bestCombo}×`}
             sub={
               bestComboDate
-                ? new Date(bestComboDate).toLocaleDateString(toIntlLocale(appLanguage), {
+                ? new Date(bestComboDate).toLocaleDateString(intlLocale, {
                     year: "numeric",
                     month: "short",
                     day: "numeric",
@@ -189,80 +254,9 @@ export function Profile({ onBack }: Props) {
           </label>
         </section>
 
-        <section style={card}>
-          <div style={sectionHeading}>{tr("Daily Lab")}</div>
-          <div style={{ color: "var(--muted-foreground)", fontSize: 13, marginBottom: 12 }}>
-            {tr(`${completedDailyQuests}/${dailyQuests.length} quests complete today.`)}
-            <div style={{ fontSize: 12, marginTop: 4 }}>
-              {tr(
-                `Complete 4 of 6 quests to claim the daily prize of ${dailyRewardAmount} gold coins.${hasProPack ? " (includes +2 Pro bonus)" : ""}`,
-              )}
-            </div>
-          </div>
-          <div style={{ display: "grid", gap: 8 }}>
-            {dailyQuests.map((quest) => (
-              <div key={quest.id} style={questRow}>
-                <span
-                  style={{
-                    ...questIconWrap,
-                    color: quest.completed ? "var(--accent)" : "var(--muted-foreground)",
-                  }}
-                >
-                  <QuestIcon type={quest.type} completed={quest.completed} />
-                </span>
-                <span>{tr(quest.title)}</span>
-                <span style={questProgressWrap} aria-label={`${quest.progress} of ${quest.target}`}>
-                  {quest.completed ? (
-                    <CheckCircle2 size={16} aria-hidden="true" />
-                  ) : (
-                    <span style={questProgressTrack}>
-                      <span
-                        style={{
-                          ...questProgressFill,
-                          width: `${Math.max(8, Math.min(100, (quest.progress / quest.target) * 100))}%`,
-                        }}
-                      />
-                    </span>
-                  )}
-                </span>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section style={card}>
-          <div style={sectionHeading}>{tr("Records")}</div>
-          <div style={{ display: "grid", gap: 10 }}>
-            <RecordRow label={tr("Best challenge score")} value={formatScore(bestChallengeScore)} />
-            <RecordRow label={tr("Badges earned")} value={`${earnedBadges.length}`} />
-            <RecordRow label={tr("Campaign levels unlocked")} value={`${unlockedLevel}/${MAX_LEVEL}`} />
-            <RecordRow
-              label={tr("Periodic table progress")}
-              value={`${discoveredElements.length}/${ELEMENTS.length}`}
-            />
-            {unlockedLevel < MAX_LEVEL && (
-              <button type="button" onClick={handleUnlockAllStages} style={profileActionButton}>
-                {tr("Unlock all stages")}
-              </button>
-            )}
-          </div>
-        </section>
       </div>
     </div>
   );
-}
-
-function QuestIcon({ type, completed }: { type: string; completed: boolean }) {
-  const iconMap: Record<string, LucideIcon> = {
-    clear_level: Trophy,
-    discover_elements: Sparkles,
-    earn_stars: Star,
-    chain_merge: Layers,
-    merge_atoms: Atom,
-    purchase_item: ShoppingBag,
-  };
-  const Icon = completed ? CheckCircle2 : (iconMap[type] ?? FlaskConical);
-  return <Icon size={15} strokeWidth={2.4} aria-hidden="true" />;
 }
 
 function ProfileStat({ label, value, sub }: { label: string; value: string; sub: string }) {
@@ -295,11 +289,14 @@ function ProfileStat({ label, value, sub }: { label: string; value: string; sub:
   );
 }
 
-function RecordRow({ label, value }: { label: string; value: string }) {
+function RecordRow({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 13 }}>
+    <div style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 13, alignItems: "flex-start" }}>
       <span style={{ color: "var(--muted-foreground)" }}>{label}</span>
-      <strong>{value}</strong>
+      <span style={{ textAlign: "right" }}>
+        <strong>{value}</strong>
+        {sub && <span style={{ display: "block", color: "var(--muted-foreground)", fontSize: 11, marginTop: 2 }}>{sub}</span>}
+      </span>
     </div>
   );
 }
@@ -426,43 +423,13 @@ const sectionHeading: React.CSSProperties = {
   marginBottom: 8,
 };
 
-const questRow: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "24px 1fr 48px",
-  alignItems: "center",
-  gap: 8,
-  fontSize: 13,
-};
-
-const questIconWrap: React.CSSProperties = {
-  width: 22,
-  height: 22,
-  borderRadius: 999,
-  display: "grid",
-  placeItems: "center",
-  background: "var(--surface-high)",
-  border: "1px solid var(--border)",
-};
-
-const questProgressWrap: React.CSSProperties = {
-  width: 48,
+const bossRow: React.CSSProperties = {
   display: "flex",
-  justifyContent: "flex-end",
-  color: "var(--accent)",
-};
-
-const questProgressTrack: React.CSSProperties = {
-  width: 40,
-  height: 7,
-  borderRadius: 999,
-  overflow: "hidden",
-  background: "var(--surface-high)",
+  justifyContent: "space-between",
+  gap: 12,
+  alignItems: "center",
+  padding: 10,
+  borderRadius: 12,
+  background: "var(--surface)",
   border: "1px solid var(--border)",
-};
-
-const questProgressFill: React.CSSProperties = {
-  display: "block",
-  height: "100%",
-  borderRadius: 999,
-  background: "linear-gradient(90deg, var(--primary), var(--accent))",
 };

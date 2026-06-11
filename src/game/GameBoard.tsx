@@ -1050,7 +1050,8 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     [level.id, secretCompoundObjective],
   );
   const isSecretCompoundChallenge = secretCompoundObjective != null;
-  const isMoleculeChallenge = moleculeObjective != null && (mode === "campaign" || isSecretCompoundChallenge);
+  const isDailyMoleculeChallenge = moleculeObjective != null && mode === "daily-challenge";
+  const isMoleculeChallenge = moleculeObjective != null && (mode === "campaign" || isSecretCompoundChallenge || isDailyMoleculeChallenge);
   const canIntroducePowerUps = mode === "campaign" && !isMoleculeChallenge && !isPowerUpStage;
   const unstableEnabled = level.id >= UNSTABLE_UNLOCK_LEVEL;
   const current = queue[0];
@@ -1463,7 +1464,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     const initialBalls = isPowerUpStage
       ? createPowerUpStageBoard(powerUpStage)
       : isMoleculeChallenge
-      ? createMoleculeChallengeBoard(moleculeObjective, { startBelowHighest: isSecretCompoundChallenge })
+      ? createMoleculeChallengeBoard(moleculeObjective, { useHelpfulAtomPlan: isSecretCompoundChallenge || isDailyMoleculeChallenge })
       : mode === "pure-hydrogen"
         ? createEmptyBoard()
       : level.id >= SHUFFLE_MIN_LEVEL
@@ -1478,7 +1479,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     if (initialDiscoveries.length > 0) registerDiscoveries(initialDiscoveries);
     const powerUpQueuePrefix = isPowerUpStage ? powerUpStageQueuePrefix(powerUpStage) : [];
     const challengeQueuePrefix = isMoleculeChallenge
-      ? moleculeChallengeQueuePrefix(moleculeObjective, { startBelowHighest: isSecretCompoundChallenge })
+      ? moleculeChallengeQueuePrefix(moleculeObjective, { useHelpfulAtomPlan: isSecretCompoundChallenge || isDailyMoleculeChallenge })
       : [];
     challengeQueuePlanRef.current = challengeQueuePrefix.slice(QUEUE_SIZE);
     const initialQueue = [
@@ -1646,7 +1647,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [levelId, level.gridRows, level.gridCols, level.maxQueueElement, mode, resumeSavedRun, isMoleculeChallenge, isSecretCompoundChallenge, isPowerUpStage, powerUpStage, moleculeObjective, restartNonce]);
+  }, [levelId, level.gridRows, level.gridCols, level.maxQueueElement, mode, resumeSavedRun, isMoleculeChallenge, isSecretCompoundChallenge, isDailyMoleculeChallenge, isPowerUpStage, powerUpStage, moleculeObjective, restartNonce]);
 
   // Show a one-time tooltip the first time a shimmer atom appears in the queue.
   useEffect(() => {
@@ -2313,12 +2314,14 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     return { ...ball, unstableShots: unstableChargeCapacity(ball.atom) };
   }
 
-  function createMoleculeChallengeBoard(compound: CompoundDefinition | null, options: { startBelowHighest?: boolean } = {}): Board {
+  function createMoleculeChallengeBoard(compound: CompoundDefinition | null, options: { useHelpfulAtomPlan?: boolean } = {}): Board {
     if (!compound) return createSeededBoard();
-    const recipeAtoms = atomsForCompound(compound);
-    const highestRecipeAtom = Math.max(...recipeAtoms, 1);
-    const startingAtom = options.startBelowHighest || level.id >= 15 ? Math.max(1, highestRecipeAtom - 1) : highestRecipeAtom;
-    const atoms = compound.id === "water" && !options.startBelowHighest ? [7, 7, 1, 1] : [startingAtom];
+    const atomPlan = challengeAtomPlanForCompound(compound);
+    const atoms = options.useHelpfulAtomPlan
+      ? atomPlan.boardAtoms
+      : compound.id === "water"
+        ? [7, 7, 1, 1]
+        : [level.id >= 15 ? atomPlan.highestBuildAtom : atomPlan.highestRecipeAtom];
     const count = atoms.length;
     const maxR = Math.max(...atoms.map((atom) => radiusFor(atom)), radiusFor(1));
     const cols = Math.min(4, Math.max(2, Math.ceil(Math.sqrt(count))));
@@ -2341,21 +2344,12 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     });
   }
 
-  function moleculeChallengeQueuePrefix(compound: CompoundDefinition | null, options: { startBelowHighest?: boolean } = {}): number[] {
+  function moleculeChallengeQueuePrefix(compound: CompoundDefinition | null, options: { useHelpfulAtomPlan?: boolean } = {}): number[] {
     if (!compound) return [];
-    if (compound.id === "water" && !options.startBelowHighest) return [];
+    if (options.useHelpfulAtomPlan) return challengeAtomPlanForCompound(compound).queueAtoms;
+    if (compound.id === "water") return [];
     const recipeAtoms = atomsForCompound(compound);
     const highestRecipeAtom = Math.max(...recipeAtoms, 1);
-    let skippedSecretHighest = false;
-    const atomsAfterSkippingHighest = recipeAtoms.filter((atom) => {
-      if (atom === highestRecipeAtom) {
-        if (skippedSecretHighest) return true;
-        skippedSecretHighest = true;
-        return false;
-      }
-      return true;
-    });
-    if (options.startBelowHighest) return [Math.max(1, highestRecipeAtom - 1), ...atomsAfterSkippingHighest];
     let skippedHighest = false;
     return recipeAtoms.filter((atom) => {
       if (atom === highestRecipeAtom && !skippedHighest) {
@@ -2506,6 +2500,31 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
         r,
       });
     });
+  }
+
+  function challengeAtomPlanForCompound(compound: CompoundDefinition): {
+    highestRecipeAtom: number;
+    highestBuildAtom: number;
+    boardAtoms: number[];
+    queueAtoms: number[];
+  } {
+    const recipeAtoms = atomsForCompound(compound);
+    const highestRecipeAtom = Math.max(...recipeAtoms, 1);
+    const buildRange = Array.from({ length: 9 }, (_, index) => highestRecipeAtom - index - 1).filter((atom) => atom >= 1);
+    const boardAtoms = uniqueAtomList([
+      ...buildRange,
+      ...recipeAtoms.filter((atom) => !buildRange.includes(atom)),
+    ]);
+    return {
+      highestRecipeAtom,
+      highestBuildAtom: Math.max(1, highestRecipeAtom - 1),
+      boardAtoms,
+      queueAtoms: boardAtoms,
+    };
+  }
+
+  function uniqueAtomList(atoms: number[]): number[] {
+    return atoms.filter((atom, index) => atoms.indexOf(atom) === index);
   }
 
   function unstableChargeCapacity(atom: number): number {
@@ -4158,10 +4177,11 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       if (isMoleculeChallenge && moleculeObjective && matchingCompound.id === moleculeObjective.id) {
         const stars = 3;
         setEarnedStars(stars);
-        if (!isSecretCompoundChallenge) {
+        if (!isSecretCompoundChallenge && mode === "campaign") {
           setLevelStars(levelId, stars);
           unlockLevel(getNextLevel(levelId)?.id ?? levelId + 1);
         }
+        if (mode !== "campaign") setChallengeBestScore(mode, score + bonusScore);
         reportQuestProgress({ levelCleared: true, starsEarned: stars });
         trackLevelWin(levelId, score + bonusScore, shots, Math.max(highest, getHighestOnBoard(balls)), mode);
         beginStageClear({
