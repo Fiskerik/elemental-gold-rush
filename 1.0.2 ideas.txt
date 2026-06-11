@@ -1,0 +1,123 @@
+Phase 2: Hooking the Player (Retention)
+While the daily quests and weekly streak are a fragment of a retention strategy, modern mobile players need long-term meta-progression.
+
+1. FEATURE: The "Lab Upgrade" Meta-Game
+Currently, discovering new elements only triggers a modal and a small score bump. Give those discoveries a purpose. Let players use coins  to upgrade them permanently in the "Lab."
+
+Example: Once the user has locked up a certain power-up, it should be visible in the Library as usual. The user can UPGRADE these by spending coins. Level 1: 10 coins, Level 2: 25 coins, Level 3: 50 coins, Level 4: 100 coins and Level 5: 200 coins (I.e to complete level 2 of a powerup, you first need to complete level 1 (10 coins + 25 coins). 
+You can upgrade all currently unlocked powerups to level 1 if you have reached campaign level 5. 
+You can upgrade all currently unlocked powerups to level 2 if you have reached campaign level 10. 
+You can upgrade all currently unlocked powerups to level 3 if you have reached campaign level 20.
+You can upgrade all currently unlocked powerups to level 4 if you have reached campaign level 35.
+You can upgrade all currently unlocked powerups to level 5 if you have reached campaign level 50.
+
+* Compound: L1: Double the points you get for a successful compound. L2: Get 1 extra charge after your first successful compound In a game. L3: Triple the points you get for a successful compound. L4: Reduce compound timer with 1 minute. L5: Reduce cost of Hint/Super Hint by 50%
+* Shimmer atom:L1: Base spawn rate increased from 5% to 7%.L2: Shimmer merges now score 3x points (up from 2x).L3: Shimmer merges fill the Grab combo bar by +3 per merge (up from +2).L4: Base spawn rate increased to 10%.L5: Chain Shimmer: If a Shimmer atom triggers a chain reaction combo (x2 or higher), the final merged atom becomes a permanent Shimmer atom on the board until it is merged again.
+* Unstable Atom. L1: Stabilizing an unstable atom before it decays scores 3x points (up from 2x).L2: Unstable atoms spawn with +2 extra electron shell shields, giving you more time/shots to reach them before they decay.L3: Base spawn rate of Unstable Atoms increased by 5%.L4: Stabilizing an unstable atom instantly grants +1 step of progress to your Grab bar.L5: Nuclear Yield: Successfully stabilizing an unstable atom releases a shockwave that deals 1 damage to every Stone currently on the board.
+* Grab. L1: Start every run with 1 free Grab charge.L2: Reduce the required combo streak to unlock Grab from 8 merges to 7.L3: Atoms dropped via Grab gain a temporary 2x point multiplier for their resulting merge.L4: Reduce the required combo streak to unlock Grab from 7 merges to 6.L5: Frictionless Drop: Dropping an atom with Grab generates a 50% larger shockwave, easily pushing dense clusters of atoms out of the way to squeeze into tight gaps.
+* E-gun. L1: Increase base E-Gun spawn chance from 1% to 2%.L2: E-Gun beam width increased by 25%, allowing it to clip and upgrade more atoms in a single shot.L3: Reduce the internal cooldown between E-Gun spawns from 10 shots to 7 shots.L4: Atoms upgraded by the E-Gun score 2x points on their next merge.L5: Overcharge: The E-Gun beam is now a physical projectile. It deals 2 damage to any Stones it passes through while still upgrading the atoms around them.
+* Gravity. L1: Reduce the requirement to earn Gravity from 30 merges to 25.L2: All merges caused by a Gravity shift gain a 1.5x score multiplier.L3: Start every run with 1 free Gravity charge.L4: Reduce the requirement to earn Gravity from 25 merges to 20.L5: Crushing Force: Activating Gravity instantly deals 1 damage to all Stones on the board as they are crushed against the ceiling.
+* Stone. L1: Score bonus for successfully destroying a Stone increased by 50%.L2: Hitting a Stone generates a 20% larger kinetic shockwave, helping clear the board faster.L3: Increase the early-game grace period before Stones can spawn from 15 shots to 25 shots.L4: Score bonus for destroying a Stone increased to 100%.L5: Shatter Yield: Destroying a Stone now drops 2 Fusion Jump charges instead of 1.
+* Transmute shot. L1: Reduce the requirement to earn Transmute from 30 shots to 25.L2: Transmuted atoms have a 25% chance to skip a tier (upgrading by +2 tiers instead of rolling a random slightly higher element).L3: Start every run with 1 free Transmute charge.L4: Reduce the requirement to earn Transmute from 25 shots to 20.L5: Alchemist's Touch: Any atom created by using a Transmute shot is guaranteed to spawn as a Shimmering atom.
+* Fusion Jump. L1: Start every run with 1 free Fusion Jump charge.L2: Any merge created using a Fusion Jump scores 2x points.L3: Arming a Fusion Jump automatically applies a Catalyst Aura to that specific shot, making it much easier to land.L4: Any merge created using a Fusion Jump scores 3x points.L5: Quantum Leap: Fusion Jump now skips TWO element tiers instead of one (e.g., merging two Chlorines skips past Argon straight to Potassium).
+* Catalyst aura. L1: Increase Aura duration from 5 shots to 7 shots.L2: Start every run with 1 free Catalyst charge.L3: The physical merge radius during Catalyst is expanded by an additional 20%.L4: Increase Aura duration from 7 shots to 10 shots.L5: Chain Reaction: Catalyst Aura is now unlocked by a 3x chain combo instead of a 4x chain combo.
+* Emission. L1: Reduce the Emission cooldown timer from 5 minutes to 4.5 minutes.L2: Start every run with 1 free Emission charge.L3: The first 5 shots fired after using Emission receive a 2x point multiplier.L4: Reduce the Emission cooldown timer from 4.5 minutes to 4 minutes.L5: Deep Emission: Emission now raises the waiting queue and the future spawn floor by TWO tiers instead of one.
+* Gamma bomb. L1: Reduce the requirement to earn a Gamma Bomb from 40 shots to 35.L2: Gamma Bomb explosion radius increased by 15%.L3: Start every run with 1 free Gamma Bomb charge.L4: Reduce the requirement to earn a Gamma Bomb from 35 shots to 30.L5: Gamma Radiation: Gamma Bombs now deal 3 structural damage to any Stones caught in the blast radius (previously, they only affected non-stone atoms).
+* Blank atom. L1: Increase Blank Atom base spawn chance from 1% to 2%.L2: Merging a Blank Atom scores 2x points.L3: Hitting a Stone with a Blank Atom grants +1 Fusion Jump (in addition to instantly erasing the stone).L4: Increase Blank Atom base spawn chance from 2% to 3%.L5: Blank Slate: Blank atoms now always act as Shimmering atoms, granting double points and double Grab progress on whatever they merge with.
+* Queue shuffle. L1: Reduce the requirement to earn a Shuffle from 15 stone hits to 12.L2: Start every run with 1 free Queue Shuffle charge.L3: The first atom you fire immediately after using a Queue Shuffle is guaranteed to be a Shimmer atom.L4: Reduce the requirement to earn a Shuffle from 12 stone hits to 10.L5: Tactical Reroll: Using Queue Shuffle completely resets your "No Merge Streak" back to zero, saving you if you are about to trigger a Stone spawn penalty.
+
+The user should be able to see what level, and coin progress on current level they have on each powerup. When expanding the lower section, they can see what bonuses are unlocked (green) for that powerup and what bonuses are not unlocked (gray) for that specific powerup. 
+
+They should also be able to inactivate the bonus effects by toggling a setting on each powerup. 
+
+2. FEATURE: Seeded Daily Challenges
+Add a game mode where the initial board and the RNG of the generateQueueElement function are globally seeded for the day. Every player around the world gets the exact same atoms in the exact same order. Create a global leaderboard for this specific daily run. (Do I need "GameCenter" for this?.
+
+This should be visible in the main-window when you start the game, just below the "Continue-->" Modal.
+When passed, the user get 5 coins, and a "Green checkmark" on the button. It should show the reward for clearing the stage on the icon. 
+
+3. UPDATE: Daily tasks (the 6 tasks in which 4 are required for the daily bonus. Add like 12 different tasks, in which 6 are selected but 4 need to be completed to claim the +2 coins. 
+- Clear 1 stage
+- Discover 1 new element or compound
+- Earn 3 stars
+- Trigger a 4-step chain
+- Merge 50 atoms
+- Purchase an item from the shop
+New:
+- Watch 1 ad
+- Use 5 different power-ups in a single game
+- Destroy a stone
+- Merge 5 unstable isotopes In a single game
+- Accumulate 50 000 points or more in a single game
+- Trigger 10 combo-reactions in a single game
+
+
+4. UPDATE: Add animation of "Receiving 1 coin" after an add has been successfully watched, so the user can see that they gained a coin
+
+5. UPDATE: I wanted to add a wide "Watch ad for bonus coin" under the CTA button to "Continue game" on the main screen. But it's not visible. It should work exacly as the one present in the shop, but just located on the main page.
+
+6. UPDATE: Rebuild the Star-system:
+Since my game is a mix of a Bubble Shooter (which values shot efficiency) and Suika (which values huge combos and scores), my star system should reward both playstyles.
+
+Replace my current calculateStars function entirely. Here is the full replacement function to drop into src/game/GameBoard.tsx (or adjust accordingly)
+
+function calculateStars(
+  level: (typeof LEVELS)[0],
+  score: number,
+  shots: number,
+  bestCombo: number,
+  timeSec: number,
+): number {
+  let stars = 1; // Star 1: Survival. You reached the target element and beat the level.
+
+  // Star 2: Efficiency (Bubble Shooter skill). 
+  // Did you clear the board cleanly without wasting ammo?
+  // We use the dynamic starShotsTwo you already calculate in levels.ts
+  const efficiencyTarget = level.starShotsTwo ?? (level.parShots ? level.parShots + 5 : 50);
+  if (shots <= efficiencyTarget) {
+    stars += 1;
+  }
+
+  // Star 3: Mastery (Suika skill). 
+  // Did you build big chain reactions to multiply your score?
+  // We use the dynamic scoreGoal you already calculate in levels.ts
+  const masteryTarget = level.scoreGoal ?? (level.targetElement * 1000 * (level.scoreMultiplier ?? 1));
+  if (score >= masteryTarget) {
+    stars += 1;
+  }
+
+  return Math.min(3, stars);
+}
+
+---
+
+UX Follow-up
+If you implement this, you must show the player what these goals are! Right now, players have no idea why they are getting 2 stars instead of 3.
+
+In your ResultModal component, update the UI to show the dynamic goals right next to the player's performance. Display:
+
+Score: 45,000 / 40,000 (★)
+
+Shots: 28 / 30 (★)
+
+7. BUG: Fix missing levels between 60 and 65 (there is a gap now). Add some atom levels inbetween accordingly. 
+
+8. BUG: Remove "Score goal"-text in the bottom of the "Level complete"-modal. 
+
+9. UPDATE: If the user press "Skip 5 coins" on a level where the button is "grey" (i.e user have not tried the level), show a message that states that they need to attempt it first before skipping. Also, raise the cost to 10 coins for skipping level. 
+
+10. BUG: Remove the mechanic that gives points to just shoot an atom into the board. Only merges/combos/stones etc should give points. 
+
+11. UPDATE: If the user discovers a new atom during the game, instead of interrupting the user with a popup modal, add that new atom In the progress bar line in top (shimmer it), so the user can press it if he feels like and then read it. Once the user has read it, stop the shimmering. If the target molecule is Neon (10) and they discover Oxygen (8) for the first time, an Oxygen atom should shimmer on the top progress bar that shows the level progress, and it should be located 8/10 of the bar. 
+
+12. BUG: When selecting powerups before a level, they are not all applied when game is started (Grab works sometimes, but not the other). 
+
+13. BUG: Shop-menu: Remove top line saying that "Convert points into gold..."
+
+14. UPDATE: LabProPackage: Double initial gold from 50 to 100 and daily claim from +2 to +5. Also, mention that Daily quests give 2x the claimed gold. Auto-unlock L1 for all discovered and unlocked Power-ups.
+
+15. UPDATE: Daily Lab: Instead of writing "4/6 quests to claim +2 gold coins", have a progress bar that spans from 0 to 4. Each of the 6 random daily tasks that are completed progress that bar by 1 step. 
+
+16. UPDATE: Daily Lab: Move the modal "Play a game a day" to outside of the "Daily lab modal" and place it above it. 
+
+17. UPDATE: Like point 2 (Daily challenge), add "Secret Compound" as a daily quest. It should be a button with a proper secret compound icon, when pressed it should Reveal the flavour-text of a compound. If the user synthesize this during a game and clear the stage - the quest is completed.  The button should be next to the "Daily Challenge"-button (both take 1/2 of screen width each). When passed, the user get 5 coins, and a "Green checkmark" on the button.It should show the reward for clearing the stage on the icon. 
