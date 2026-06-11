@@ -81,6 +81,12 @@ export function GameApp() {
     setScreen({ name: "game", levelId: getLevelById(unlockedLevel)?.id ?? 1, mode: "campaign" });
   }
 
+  function startDailyChallenge() {
+    refreshDailyFeatures();
+    const dailyChallenge = useProgress.getState().dailyChallenge;
+    setScreen({ name: "game", levelId: dailyChallenge.levelId, mode: "daily-challenge" });
+  }
+
   switch (screen.name) {
     case "menu":
       return (
@@ -94,11 +100,7 @@ export function GameApp() {
             onLab={() => setScreen({ name: "lab" })}
             onLibrary={() => setScreen({ name: "library" })}
             onProfile={() => setScreen({ name: "profile" })}
-            onDailyChallenge={() => {
-              refreshDailyFeatures();
-              const nextDailyChallenge = useProgress.getState().dailyChallenge;
-              setScreen({ name: "game", levelId: nextDailyChallenge.levelId, mode: "daily-challenge" });
-            }}
+            onDailyChallenge={startDailyChallenge}
           />
           {resumePrompt && (
             <ResumeRunPrompt

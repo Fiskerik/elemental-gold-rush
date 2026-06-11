@@ -622,10 +622,9 @@ export async function warmUpPurchases(
   let hasProPack = false;
   let packageIdentifiers: string[] = [];
   let storeProductIdentifiers: string[] = [];
-  let canMakePayments: boolean | undefined;
+  const canMakePayments = await checkCanMakePayments(purchases, reportStep);
   let reason = "";
 
-  canMakePayments = await checkCanMakePayments(purchases, reportStep);
   if (canMakePayments === false) {
     reason =
       "This device or sandbox account cannot make App Store purchases right now. Check Screen Time restrictions, App Store sandbox account, and Paid Apps Agreement status.";
@@ -918,7 +917,7 @@ export async function purchaseProductWithResult(
   }
 
   purchaseDebugLog("Resolving RevenueCat package purchase route.", { productId });
-  let packageToPurchase = await findPackage(productId, reportStep);
+  const packageToPurchase = await findPackage(productId, reportStep);
   let storeProduct: PurchasesStoreProduct | null = null;
   if (!packageToPurchase) {
     purchaseDebugLog("RevenueCat package route unavailable; resolving StoreKit product route.", {
@@ -1130,7 +1129,7 @@ export async function purchaseGoldCoinPack(
   }
 
   purchaseDebugLog("Resolving RevenueCat coin package purchase route.", { productId });
-  let packageToPurchase = await findPackage(productId, reportStep);
+  const packageToPurchase = await findPackage(productId, reportStep);
   let storeProduct: PurchasesStoreProduct | null = null;
   if (!packageToPurchase) {
     purchaseDebugLog(

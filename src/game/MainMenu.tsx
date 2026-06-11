@@ -12,8 +12,8 @@ import {
   Sparkles,
   Star,
   Settings as SettingsIcon,
-  Trophy,
   LockKeyhole,
+  Trophy,
   User,
   type LucideIcon,
 } from "lucide-react";
@@ -257,9 +257,9 @@ export function MainMenu({
               <span style={dailyFeatureIcon}><Trophy size={18} aria-hidden="true" /></span>
               <span style={dailyFeatureText}>
                 <strong>Daily Challenge</strong>
-                <small>{dailyChallenge.completed ? "Cleared" : `Reward +${DAILY_FEATURE_REWARD_COINS}`}</small>
+                <small>{dailyChallenge.completed ? "Cleared today" : `Reward +${DAILY_FEATURE_REWARD_COINS}`}</small>
               </span>
-              <span style={dailyFeatureReward}>{dailyChallenge.completed ? "Done" : "+5"}</span>
+              <span style={dailyFeatureReward}>{dailyChallenge.completed ? "Done" : `+${DAILY_FEATURE_REWARD_COINS}`}</span>
             </button>
             <button type="button" onClick={handleSecretCompoundPress} style={dailyFeatureBtn}>
               <span style={dailyFeatureIcon}><LockKeyhole size={18} aria-hidden="true" /></span>

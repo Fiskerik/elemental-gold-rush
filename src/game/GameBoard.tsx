@@ -159,6 +159,7 @@ interface SavedRunSnapshot {
   emissionCharges: number;
   emissionUnlockIndex: number;
   emissionQueueBoost?: number;
+  emissionBoostShotsRemaining?: number;
   transmuteCharges: number;
   fusionJumpCharges: number;
   fusionJumpArmed: boolean;
@@ -358,7 +359,7 @@ function hasPowerUps(inventory: Partial<Record<InventoryPowerUpId, number>>): bo
   return countPowerUps(inventory) > 0;
 }
 
-function loadCompoundChargeState(): { charges: number; spentAt: number | null } {
+function loadCompoundChargeState(regenMs = COMPOUND_REGEN_MS): { charges: number; spentAt: number | null } {
   if (typeof window === "undefined") return { charges: 0, spentAt: null };
   try {
     const raw = window.localStorage.getItem(COMPOUND_STORAGE_KEY);
@@ -366,7 +367,7 @@ function loadCompoundChargeState(): { charges: number; spentAt: number | null } 
     const parsed = JSON.parse(raw) as { charges?: number; spentAt?: number | null };
     const spentAt = typeof parsed.spentAt === "number" ? parsed.spentAt : null;
     const charges = Math.min(1, Math.max(0, Math.floor(parsed.charges ?? 0)));
-    if (charges <= 0 && spentAt != null && Date.now() - spentAt >= COMPOUND_REGEN_MS) {
+    if (charges <= 0 && spentAt != null && Date.now() - spentAt >= regenMs) {
       return { charges: 1, spentAt: null };
     }
     return { charges, spentAt };
@@ -766,10 +767,21 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
   const unstableSpawnChance = UNSTABLE_SPAWN_CHANCE + (labUpgradeLevel("unstable") >= 3 ? 0.05 : 0);
   const eGunBaseChance = labUpgradeLevel("egun") >= 1 ? 0.02 : EGUN_CHANCE;
   const eGunShotGap = labUpgradeLevel("egun") >= 3 ? 7 : EGUN_MIN_SHOT_GAP;
+  const eGunBeamFactor = labUpgradeLevel("egun") >= 2 ? 0.95 : 0.7;
   const gammaRadiusMult = labUpgradeLevel("gamma") >= 2 ? GAMMA_RADIUS_MULT * 1.15 : GAMMA_RADIUS_MULT;
   const catalystAdjFactor = labUpgradeLevel("catalyst") >= 3 ? CATALYST_ADJ_FACTOR * 1.2 : CATALYST_ADJ_FACTOR;
   const stoneGraceShots = labUpgradeLevel("stone") >= 3 ? 25 : STONE_GRACE_SHOTS;
   const queueShuffleRequirement = labUpgradeLevel("queue-shuffle") >= 4 ? 10 : labUpgradeLevel("queue-shuffle") >= 1 ? 12 : 15;
+  const emissionTierRaise = labUpgradeLevel("emission") >= 5 ? 2 : 1;
+  const stoneDestroyBonusMultiplier = labUpgradeLevel("stone") >= 4 ? 2 : labUpgradeLevel("stone") >= 1 ? 1.5 : 1;
+  const stoneHitShockwaveMultiplier = labUpgradeLevel("stone") >= 2 ? 1.2 : 1;
+  const fusionJumpStep = labUpgradeLevel("fusion-jump") >= 5 ? 3 : 2;
+  const fusionJumpScoreMultiplier = labUpgradeLevel("fusion-jump") >= 4 ? 3 : labUpgradeLevel("fusion-jump") >= 2 ? 2 : 1;
+  const unstableScoreMultiplier = labUpgradeLevel("unstable") >= 1 ? 3 : 2;
+  const activeShimmerScoreMultiplier = labUpgradeLevel("shimmer") >= 2 ? 3 : 2;
+  const activeShimmerGrabSteps = labUpgradeLevel("shimmer") >= 3 ? 3 : 2;
+  const emissionShotScoreMultiplier = labUpgradeLevel("emission") >= 3 ? 2 : 1;
+  const compoundRegenMs = labUpgradeLevel("molecule") >= 4 ? 4 * 60 * 1000 : COMPOUND_REGEN_MS;
   const dailyRngRef = useRef<(() => number) | null>(null);
   if (dailyRngRef.current === null) {
     dailyRngRef.current =
@@ -885,6 +897,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
   const [emissionCharges, setEmissionCharges] = useState(() => (powerUpStage === "emission" ? 1 : 0) + initialLabCharge("emission", 2));
   const [emissionUnlockIndex, setEmissionUnlockIndex] = useState(0);
   const [emissionQueueBoost, setEmissionQueueBoost] = useState(0);
+  const [emissionBoostShotsRemaining, setEmissionBoostShotsRemaining] = useState(0);
   const [transmuteCharges, setTransmuteCharges] = useState(() => (powerUpStage === "transmute" ? 1 : 0) + initialLabCharge("transmute", 3));
   const [fusionJumpCharges, setFusionJumpCharges] = useState(() => (powerUpStage === "fusion-jump" ? 1 : 0) + initialLabCharge("fusion-jump", 1));
   const [fusionJumpArmed, setFusionJumpArmed] = useState(false);
@@ -900,6 +913,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     blankQueue: boolean[];
     unstableQueue: boolean[];
     emissionQueueBoost?: number;
+    emissionBoostShotsRemaining?: number;
     powerUp: "transmute" | "emission";
   }>(null);
   const longPressTimerRef = useRef<number | null>(null);
@@ -925,6 +939,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
   const [queueShuffleStagePending, setQueueShuffleStagePending] = useState(false);
   const runRecordedRef = useRef(false);
   const inventoryCompoundChargesRef = useRef(0);
+  const compoundBonusChargeGrantedRef = useRef(false);
   const [inventoryPickerOpen, setInventoryPickerOpen] = useState(false);
   const [confirmAction, setConfirmAction] = useState<null | "restart" | "leave">(null);
   const [restartNonce, setRestartNonce] = useState(0);
@@ -1031,9 +1046,9 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
   const canIntroducePowerUps = mode === "campaign" && !isMoleculeChallenge && !isPowerUpStage;
   const unstableEnabled = level.id >= UNSTABLE_UNLOCK_LEVEL;
   const current = queue[0];
-  const currentIsShimmer = shimmerQueue[0] ?? false;
   const currentIsEGun = eGunQueue[0] ?? false;
   const currentIsBlank = blankQueue[0] ?? false;
+  const currentIsShimmer = (shimmerQueue[0] ?? false) || (currentIsBlank && labUpgradeLevel("blank") >= 5);
   const currentIsUnstable = (unstableQueue[0] ?? false) && canBeUnstableAtom(current);
   const selectedCompoundAtoms = useMemo(
     () => balls.filter((b) => selectedCompoundIds.has(b.id) && b.stoneHp == null),
@@ -1281,6 +1296,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       emissionCharges,
       emissionUnlockIndex,
       emissionQueueBoost,
+      emissionBoostShotsRemaining,
       transmuteCharges,
       fusionJumpCharges,
       fusionJumpArmed,
@@ -1334,14 +1350,14 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     if (isMoleculeChallenge || !compoundEnabled) return;
     if (paused || settingsOpen || inventoryPickerOpen || playStylePromptOpen || confirmAction) return;
     const refresh = () => {
-      const state = loadCompoundChargeState();
+      const state = loadCompoundChargeState(compoundRegenMs);
       setCompoundCharges(Math.max(state.charges, inventoryCompoundChargesRef.current));
       if (state.charges > 0 && state.spentAt == null) saveCompoundChargeState(1, null);
     };
     refresh();
     const timer = window.setInterval(refresh, 15_000);
     return () => window.clearInterval(timer);
-  }, [compoundEnabled, isMoleculeChallenge, paused, settingsOpen, inventoryPickerOpen, playStylePromptOpen, confirmAction]);
+  }, [compoundEnabled, isMoleculeChallenge, paused, settingsOpen, inventoryPickerOpen, playStylePromptOpen, confirmAction, compoundRegenMs]);
 
   useEffect(() => {
     if (resumeSavedRun) {
@@ -1398,6 +1414,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
         setEmissionCharges(saved.emissionCharges);
         setEmissionUnlockIndex(saved.emissionUnlockIndex);
         setEmissionQueueBoost(saved.emissionQueueBoost ?? 0);
+        setEmissionBoostShotsRemaining(saved.emissionBoostShotsRemaining ?? 0);
         setTransmuteCharges(saved.transmuteCharges);
         setFusionJumpCharges(saved.fusionJumpCharges);
         setFusionJumpArmed(saved.fusionJumpArmed);
@@ -1521,6 +1538,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     setGrabMode(false);
     setGrabbing(null);
     inventoryCompoundChargesRef.current = 0;
+    compoundBonusChargeGrantedRef.current = false;
     if (isMoleculeChallenge) {
       setCompoundCharges(1);
     } else if (isPowerUpStage) {
@@ -1560,6 +1578,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     setEmissionCharges((powerUpStage === "emission" ? 1 : 0) + initialLabCharge("emission", 2));
     setEmissionUnlockIndex(0);
     setEmissionQueueBoost(0);
+    setEmissionBoostShotsRemaining(0);
     setTransmuteCharges((powerUpStage === "transmute" ? 1 : 0) + initialLabCharge("transmute", 3));
     setFusionJumpCharges((powerUpStage === "fusion-jump" ? 1 : 0) + initialLabCharge("fusion-jump", 1));
     setFusionJumpArmed(false);
@@ -1719,11 +1738,11 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     return Math.min(0.9, (level.queueDecay ?? 0.65) + discoveredBonus * DISCOVERY_DECAY_BOOST);
   }
 
-  function raiseAtomForEmission(atom: number): number {
+  function raiseAtomForEmission(atom: number, tiers = 1): number {
     if (atom < 1) return atom;
     const cap = queueSpawnCap();
     if (atom >= cap) return atom;
-    return atom + 1;
+    return Math.min(cap, atom + tiers);
   }
 
   function canEmissionBoostFutureQueue(): boolean {
@@ -1731,7 +1750,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
   }
 
   function canEmissionRaiseQueuedAtoms(): boolean {
-    return queue.some((atom, i) => !(eGunQueue[i] || blankQueue[i]) && raiseAtomForEmission(atom) !== atom);
+    return queue.some((atom, i) => !(eGunQueue[i] || blankQueue[i]) && raiseAtomForEmission(atom, emissionTierRaise) !== atom);
   }
 
   function canUseEmissionEffect(): boolean {
@@ -1795,7 +1814,8 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
         return total % gravityMergeRequirement;
       });
     }
-    if (mergeCount < 4) return;
+    const catalystRequirement = labUpgradeLevel("catalyst") >= 5 ? 3 : 4;
+    if (mergeCount < catalystRequirement) return;
     if (catalystEnabled) {
       setCatalystCharges((g) => g + 1);
       spawnPopup("CATALYST READY");
@@ -2140,7 +2160,10 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       : currentIsEGun
         ? eGunSize
         : sizeFor(current);
-  const showCatalystShotRadius = catalystShotsRemaining > 0 && !pendingStone && !currentIsEGun;
+  const showCatalystShotRadius =
+    (catalystShotsRemaining > 0 || (fusionJumpArmed && labUpgradeLevel("fusion-jump") >= 3)) &&
+    !pendingStone &&
+    !currentIsEGun;
   // Visual ring now matches the ACTUAL catalyst merge reach: any atom whose
   // center is within (projR + otherR) * CATALYST_ADJ_FACTOR will merge.
   // Approximate otherR ≈ projShotR for the preview ring.
@@ -2276,7 +2299,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       "An unstable atom is shielded like electron shells — row 1 takes 2 hits, row 2 takes 8, the rest 16. Merge it before the shells decay for 2× points.",
       "danger",
     );
-    return { ...ball, unstableShots: isotopeChargeCapacity(ball.atom) };
+    return { ...ball, unstableShots: unstableChargeCapacity(ball.atom) };
   }
 
   function createMoleculeChallengeBoard(compound: CompoundDefinition | null): Board {
@@ -2329,7 +2352,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       y,
       atom,
       r: radiusFor(atom),
-      unstableShots: unstable && canBeUnstableAtom(atom) ? isotopeChargeCapacity(atom) : undefined,
+      unstableShots: unstable && canBeUnstableAtom(atom) ? unstableChargeCapacity(atom) : undefined,
     };
   }
 
@@ -2462,6 +2485,25 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
         r,
       });
     });
+  }
+
+  function unstableChargeCapacity(atom: number): number {
+    return isotopeChargeCapacity(atom) + (labUpgradeLevel("unstable") >= 2 ? 2 : 0);
+  }
+
+  function activeShotScoreMultiplier(): number {
+    return Math.max(
+      1,
+      currentIsShimmer ? activeShimmerScoreMultiplier : 1,
+      currentIsBlank && labUpgradeLevel("blank") >= 2 ? 2 : 1,
+      emissionBoostShotsRemaining > 0 ? emissionShotScoreMultiplier : 1,
+    );
+  }
+
+  function consumeEmissionBoostShot() {
+    if (emissionBoostShotsRemaining > 0) {
+      setEmissionBoostShotsRemaining((remaining) => Math.max(0, remaining - 1));
+    }
   }
 
   function reshuffle() {
@@ -2740,13 +2782,21 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
         const newHp = b.stoneHp - dmg;
         if (newHp <= 0) {
           destroyedCount += 1;
-          bonus += Math.floor(maxHp * 250 * level.scoreMultiplier);
+          bonus += stoneDestroyBonus(maxHp);
           return null;
         }
         return { ...b, stoneHp: newHp, r: Math.max(initialR * 0.35, initialR * (newHp / maxHp)) };
       })
       .filter((b): b is Ball => b !== null);
     return { balls: ballsAfterDamage, bonus, hitIds, destroyedCount };
+  }
+
+  function stoneDestroyBonus(maxHp: number): number {
+    return Math.floor(maxHp * 250 * level.scoreMultiplier * stoneDestroyBonusMultiplier);
+  }
+
+  function fusionJumpRewardForStoneDestroy(count: number): number {
+    return count * (labUpgradeLevel("stone") >= 5 ? 2 : 1);
   }
 
   function stoneDamageFromMergeVicinity(
@@ -2831,18 +2881,41 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     const end = path[path.length - 1];
     const hitIds = new Set<number>();
     const upgradedAtoms = new Set<number>();
-    const updated = balls.map((b) => {
+    const stoneDamage = new Map<number, number>();
+    let updated = balls.map((b) => {
+      if (b.stoneHp != null) {
+        if (
+          labUpgradeLevel("egun") >= 5 &&
+          distanceToSegment(b.x, b.y, start.x, start.y, end.x, end.y) <= b.r + eGunR * eGunBeamFactor
+        ) {
+          stoneDamage.set(b.id, 2);
+          hitIds.add(b.id);
+        }
+        return b;
+      }
       if (b.stoneHp != null || b.atom >= 118) return b;
-      if (distanceToSegment(b.x, b.y, start.x, start.y, end.x, end.y) > b.r + eGunR * 0.7)
+      if (distanceToSegment(b.x, b.y, start.x, start.y, end.x, end.y) > b.r + eGunR * eGunBeamFactor)
         return b;
       hitIds.add(b.id);
       const atom = Math.min(118, b.atom + 1);
       upgradedAtoms.add(atom);
-      return { ...b, atom, r: radiusFor(atom) };
+      return { ...b, atom, r: radiusFor(atom), scoreMultiplier: labUpgradeLevel("egun") >= 4 ? 2 : b.scoreMultiplier };
     });
+    let stoneBonus = 0;
+    if (stoneDamage.size > 0) {
+      const damaged = damageStones(updated, stoneDamage);
+      updated = damaged.balls;
+      stoneBonus = damaged.bonus;
+      if (damaged.bonus > 0) grantFusionJump(fusionJumpRewardForStoneDestroy(damaged.destroyedCount));
+      if (damaged.hitIds.size > 0) {
+        setStoneHitIds(damaged.hitIds);
+        setTimeout(() => setStoneHitIds(new Set()), 380);
+      }
+    }
     const nextShots = shots + 1;
     setShots(nextShots);
     applyShotMilestones(nextShots);
+    consumeEmissionBoostShot();
     feedback({ type: "drop" });
     const updatedWithEffects = applyShotModeEffects(updated, nextShots);
     setBalls(updatedWithEffects);
@@ -2867,9 +2940,14 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     pushShotHistory({
       shot: nextShots,
       action: hitIds.size > 0 ? `E-Gun upgraded ${hitIds.size} atom${hitIds.size === 1 ? "" : "s"}` : "E-Gun fired",
-      points: 0,
-      powerUp: "E-Gun",
+      points: stoneBonus,
+      powerUp: stoneBonus > 0 ? "E-Gun, Overcharge" : "E-Gun",
     });
+    if (stoneBonus > 0 && !isPowerUpStage) {
+      setScore((currentScore) => currentScore + stoneBonus);
+      addScore(stoneBonus);
+      spawnPopup(`⛰ +${formatScore(stoneBonus)}`);
+    }
     if (powerUpStage === "egun" && hitIds.size > 0) {
       completePowerUpStageAfterDelay("egun", score);
       return;
@@ -2908,17 +2986,32 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     const radius = gammaR * gammaRadiusMult;
     const hitIds = new Set<number>();
     const clearedAtoms: { atom: number; isotope: boolean }[] = [];
-    const remaining: Board = balls.filter((b) => {
-      if (b.stoneHp != null) return true;
+    const gammaStoneDamage = new Map<number, number>();
+    let remaining: Board = balls.filter((b) => {
+      if (b.stoneHp != null) {
+        if (labUpgradeLevel("gamma") >= 5 && Math.hypot(b.x - ix, b.y - iy) <= radius + b.r) {
+          gammaStoneDamage.set(b.id, 3);
+          hitIds.add(b.id);
+        }
+        return true;
+      }
       if (Math.hypot(b.x - ix, b.y - iy) > radius + b.r) return true;
       hitIds.add(b.id);
       clearedAtoms.push({ atom: b.atom, isotope: isActiveIsotope(b) });
       return false;
     });
+    let stoneBonus = 0;
+    if (gammaStoneDamage.size > 0) {
+      const damaged = damageStones(remaining, gammaStoneDamage);
+      remaining = damaged.balls;
+      stoneBonus = damaged.bonus;
+      if (damaged.bonus > 0) grantFusionJump(fusionJumpRewardForStoneDestroy(damaged.destroyedCount));
+    }
     const nextShots = shots + 1;
     setShots(nextShots);
     applyShotMilestones(nextShots);
     setPendingGamma(false);
+    consumeEmissionBoostShot();
     const updated = applyShotModeEffects(relaxBoard(remaining), nextShots);
     setBalls(updated);
     setWiggleIds(hitIds);
@@ -2927,23 +3020,29 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
 
     const gained = Math.floor(
       clearedAtoms.reduce((sum, atom) => sum + atom.atom * 12 * (atom.isotope ? 2 : 1), 0) *
+        (emissionBoostShotsRemaining > 0 ? emissionShotScoreMultiplier : 1) *
         level.scoreMultiplier,
     );
-    const nextScore = isPowerUpStage ? score : score + gained;
+    const nextScore = isPowerUpStage ? score : score + gained + stoneBonus;
     if (!isPowerUpStage) {
       setScore(nextScore);
-      addScore(gained);
+      addScore(gained + stoneBonus);
     }
 
     spawnPopup(hitIds.size > 0 ? `☢ GAMMA -${hitIds.size}` : "☢ GAMMA");
     if (clearedAtoms.some((atom) => atom.isotope)) spawnPopup("ISOTOPE x2");
+    if (stoneBonus > 0) spawnPopup(`⛰ +${formatScore(stoneBonus)}`);
     haptic([30, 50, 30, 50, 60]);
 
     pushShotHistory({
       shot: nextShots,
       action: hitIds.size > 0 ? `Gamma cleared ${hitIds.size} atom${hitIds.size === 1 ? "" : "s"}` : "Gamma fired",
-      points: gained,
-      powerUp: clearedAtoms.some((atom) => atom.isotope) ? "Gamma Bomb, Isotope x2" : "Gamma Bomb",
+      points: gained + stoneBonus,
+      powerUp: [
+        "Gamma Bomb",
+        clearedAtoms.some((atom) => atom.isotope) ? "Isotope x2" : null,
+        stoneBonus > 0 ? "Stone break" : null,
+      ].filter(Boolean).join(", "),
     });
 
     if (powerUpStage === "gamma" && hitIds.size > 0) {
@@ -2998,7 +3097,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       updated = updated.map((b) => {
         if (remaining <= 0 || b.stoneHp != null || b.atom <= 1 || b.unstableShots != null || Math.random() > 0.45) return b;
         remaining -= 1;
-        return { ...b, unstableShots: isotopeChargeCapacity(b.atom) };
+        return { ...b, unstableShots: unstableChargeCapacity(b.atom) };
       });
       spawnPopup("☢ UNSTABLE DECAY");
     }
@@ -3033,7 +3132,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
         // Shockwave: stone shoves nearby atoms with 5× reach and force,
         // and those primary-pushed atoms cascade into secondary collisions.
         const SHOCK_REACH = sR * 1.6 * STONE_NUDGE_MULT;
-        const SHOCK_FORCE = sR * 0.25 * STONE_NUDGE_MULT;
+        const SHOCK_FORCE = sR * 0.25 * STONE_NUDGE_MULT * stoneHitShockwaveMultiplier;
         const primaryIds = new Set<number>();
         for (const o of others) {
           if (o.stoneHp != null) continue;
@@ -3168,7 +3267,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       }
       if (damaged.bonus > 0) {
         impactStoneBonus = damaged.bonus;
-        grantFusionJump(damaged.destroyedCount);
+        grantFusionJump(fusionJumpRewardForStoneDestroy(damaged.destroyedCount));
         spawnPopup(`⛰ +${formatScore(damaged.bonus)}`);
       } else {
         spawnPopup("🪨 bounce hit");
@@ -3182,10 +3281,15 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
         const nextShots = shots + 1;
         setShots(nextShots);
         applyShotMilestones(nextShots);
+        consumeEmissionBoostShot();
         setBalls(updated);
         setStoneHitIds(new Set([blankStone.id]));
         setTimeout(() => setStoneHitIds(new Set()), 380);
         setNoMergeStreak(0);
+        if (labUpgradeLevel("blank") >= 3) {
+          grantFusionJump(1);
+          spawnPopup("Blank + Fusion Jump");
+        }
         spawnPopup("✦ STONE ERASED");
         haptic([30, 60, 30, 90]);
         setBusy(false);
@@ -3201,7 +3305,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       if (stone) {
         const projR = radiusFor(current);
         const projPeriod = Math.max(1, Math.min(8, ELEMENTS[current - 1]?.period ?? 4));
-        const NUDGE = projR * (0.15 + projPeriod * 0.12) * STONE_NUDGE_MULT;
+        const NUDGE = projR * (0.15 + projPeriod * 0.12) * STONE_NUDGE_MULT * stoneHitShockwaveMultiplier;
         const moved = new Map<number, { x: number; y: number }>();
         for (const o of impactBalls) {
           if (o.id === stone.id) continue;
@@ -3244,8 +3348,8 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
         sfx(playShootSound);
         let directStoneBonus = 0;
         if (newHp <= 0) {
-          directStoneBonus = Math.floor(maxHp * 250 * level.scoreMultiplier);
-          grantFusionJump();
+          directStoneBonus = stoneDestroyBonus(maxHp);
+          grantFusionJump(fusionJumpRewardForStoneDestroy(1));
           spawnPopup(`⛰ +${formatScore(directStoneBonus)}`);
           haptic([40, 60, 40, 60, 100]);
         } else {
@@ -3359,7 +3463,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
                 const maxHp = b.stoneMaxHp ?? STONE_MAX_HP;
                 if (newHp <= 0) {
                   destroyedCount += 1;
-                  totalBonus += Math.floor(maxHp * 250 * level.scoreMultiplier);
+                  totalBonus += stoneDestroyBonus(maxHp);
                   return null;
                 }
                 const newR = Math.max(initialR * 0.35, initialR * (newHp / maxHp));
@@ -3372,7 +3476,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
               haptic([20, 30, 30]);
             }
             if (totalBonus > 0) {
-              grantFusionJump(destroyedCount);
+              grantFusionJump(fusionJumpRewardForStoneDestroy(destroyedCount));
               if (!isPowerUpStage) {
                 setScore((s) => s + totalBonus);
                 addScore(totalBonus);
@@ -3436,7 +3540,9 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       y,
       atom: atomOverride,
       r: radiusFor(atomOverride),
-      unstableShots: currentIsUnstable ? isotopeChargeCapacity(atomOverride) : undefined,
+      unstableShots: currentIsUnstable ? unstableChargeCapacity(atomOverride) : undefined,
+      shimmer: currentIsShimmer,
+      scoreMultiplier: activeShotScoreMultiplier(),
     };
     const newBall: Ball = baseNewBall;
     if (currentBalls !== balls) setBalls(currentBalls);
@@ -3446,10 +3552,17 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       geo,
       target,
       isNobleGasLocked(atomOverride) ? atomOverride : 118,
-      catalystShotsRemaining > 0 ? catalystAdjFactor : undefined,
+      catalystShotsRemaining > 0 || (fusionJumpArmed && labUpgradeLevel("fusion-jump") >= 3) ? catalystAdjFactor : undefined,
       fusionJumpArmed,
       newBall.r * SHOT_MERGE_RADIUS_BONUS_FACTOR,
+      {
+        fusionJumpStep,
+        unstableScoreMultiplier,
+        chainShimmer: labUpgradeLevel("shimmer") >= 5,
+        mergeScoreMultiplier: fusionJumpArmed ? fusionJumpScoreMultiplier : 1,
+      },
     );
+    consumeEmissionBoostShot();
     if (fusionJumpArmed && result.merges.length > 0) {
       setFusionJumpArmed(false);
       if (pendingReversiblePowerUp === "fusion-jump") setPendingReversiblePowerUp(null);
@@ -3485,11 +3598,31 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
         mergeStoneDamage.bonus > 0 ? `⛰ +${formatScore(mergeStoneDamage.bonus)}` : "💥 stone hit",
       );
       if (mergeStoneDamage.bonus > 0) {
-        grantFusionJump(mergeStoneDamage.destroyedCount);
+        grantFusionJump(fusionJumpRewardForStoneDestroy(mergeStoneDamage.destroyedCount));
         mergeStoneBonus = mergeStoneDamage.bonus;
         if (!isPowerUpStage) addScore(mergeStoneDamage.bonus);
       }
       haptic([20, 30, 30]);
+    }
+    const stabilizedCount = result.merges.filter((merge) => merge.stabilizedIsotope).length;
+    if (stabilizedCount > 0 && labUpgradeLevel("unstable") >= 5) {
+      const stones = result.balls.filter((ball) => ball.stoneHp != null);
+      if (stones.length > 0) {
+        const unstableDamage = damageStones(result.balls, new Map(stones.map((stone) => [stone.id, stabilizedCount])));
+        result = { ...result, balls: unstableDamage.balls };
+        if (unstableDamage.hitIds.size > 0) {
+          setStoneHitIds(unstableDamage.hitIds);
+          setTimeout(() => setStoneHitIds(new Set()), 380);
+        }
+        if (unstableDamage.bonus > 0) {
+          grantFusionJump(fusionJumpRewardForStoneDestroy(unstableDamage.destroyedCount));
+          mergeStoneBonus += unstableDamage.bonus;
+          if (!isPowerUpStage) addScore(unstableDamage.bonus);
+          spawnPopup(`☢ shockwave +${formatScore(unstableDamage.bonus)}`);
+        } else {
+          spawnPopup("☢ shockwave");
+        }
+      }
     }
 
     result = { ...result, balls: applyShotModeEffects(result.balls, nextShots, new Set([newBall.id])) };
@@ -3497,8 +3630,8 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     // Refresh radii on any merged survivors (their atom changed).
     setBalls(result.balls.map((b) => (b.stoneHp != null ? b : { ...b, r: radiusFor(b.atom) })));
     setHighlightId(result.finalBallId);
-    const shimmerHit = !currentIsBlank && currentIsShimmer && result.merges.length > 0;
-    const grabAdd = result.merges.length * (shimmerHit ? 2 : 1);
+    const shimmerHit = currentIsShimmer && result.merges.length > 0;
+    const grabAdd = result.merges.length * (shimmerHit ? activeShimmerGrabSteps : 1);
     if (result.merges.length > 0) {
       const comboLabel = getComboLabel(result.merges.length);
       if (comboLabel) spawnPopup(comboLabel);
@@ -3506,7 +3639,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
         result.merges,
         result.balls,
         result.finalBallId,
-        level.scoreMultiplier * (shimmerHit ? 2 : 1),
+        level.scoreMultiplier,
       );
       grantPowerUpsForMerges(result.merges.length);
       setRunBestCombo((best) => Math.max(best, result.merges.length));
@@ -3533,9 +3666,10 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
         );
       });
     }
-    if (shimmerHit) spawnPopup("✦ SHIMMER ×2 ✦");
+    if (shimmerHit) spawnPopup(`✦ SHIMMER ×${activeShimmerScoreMultiplier} ✦`);
     if (grabAdd > 0) {
       addGrabProgressSteps(grabAdd);
+      if (stabilizedCount > 0 && labUpgradeLevel("unstable") >= 4) addGrabProgressSteps(stabilizedCount);
     } else if (grabEnabled) {
       // Missed shot — atom didn't merge with anything, so the streak resets.
       setGrabProgress(0);
@@ -3564,7 +3698,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     const nextHighest = Math.max(highest, result.highestElement);
     setHighest(nextHighest);
     setHighestElement(nextHighest);
-    const gained = Math.floor(result.scoreGained * level.scoreMultiplier * (shimmerHit ? 2 : 1));
+    const gained = Math.floor(result.scoreGained * level.scoreMultiplier);
     const nextScore = isPowerUpStage ? score : score + gained + mergeStoneBonus + impactStoneBonus;
     const nextBestCombo = Math.max(runBestCombo, result.merges.length);
     const shotPowerUps = [
@@ -3740,6 +3874,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       if (powerUp === "emission") {
         setEmissionCharges((g) => g + 1);
         setEmissionQueueBoost(undo.emissionQueueBoost ?? 0);
+        setEmissionBoostShotsRemaining(undo.emissionBoostShotsRemaining ?? 0);
       }
       queueUndoRef.current = null;
     }
@@ -3796,11 +3931,20 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       spawnPopup("🔀 NO HIGHER DISCOVERED");
       return;
     }
-    const atom = powerUpStage === "transmute" ? Math.min(maxTier, current + 1) : candidates[Math.floor(Math.random() * candidates.length)];
+    const skipTier = labUpgradeLevel("transmute") >= 2 && Math.random() < 0.25;
+    const transmuteStep = skipTier ? 2 : 1;
+    const preferredMinTier = Math.min(maxTier, current + transmuteStep);
+    const preferredCandidates = candidates.filter((n) => n >= preferredMinTier);
+    const atom =
+      powerUpStage === "transmute"
+        ? preferredMinTier
+        : (preferredCandidates.length > 0 ? preferredCandidates : candidates)[
+            Math.floor(Math.random() * (preferredCandidates.length > 0 ? preferredCandidates : candidates).length)
+          ];
     setTransmuteCharges((g) => Math.max(0, g - 1));
     runPowerUpsUsedRef.current += 1;
     setQueue((q) => [atom, ...q.slice(1)]);
-    setShimmerQueue((q) => [false, ...q.slice(1)]);
+    setShimmerQueue((q) => [labUpgradeLevel("transmute") >= 5, ...q.slice(1)]);
     setEGunQueue((q) => [false, ...q.slice(1)]);
     setBlankQueue((q) => [false, ...q.slice(1)]);
     setUnstableQueue((q) => [false, ...q.slice(1)]);
@@ -3824,13 +3968,14 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     if (!shuffleEnabled || busy || gameOver || won || queueShuffleCharges <= 0 || pendingGamma) return;
     const slots = Array.from({ length: QUEUE_SIZE }, () => makeNextQueueSlot(dynamicMaxQueue(balls.length), balls));
     setQueue(slots.map((slot) => slot.atom));
-    setShimmerQueue(slots.map((slot) => slot.shimmer));
+    setShimmerQueue(slots.map((slot, i) => (i === 0 && labUpgradeLevel("queue-shuffle") >= 3) || slot.shimmer));
     setEGunQueue(slots.map((slot) => slot.eGun));
     setBlankQueue(slots.map((slot) => slot.blank));
     setUnstableQueue(slots.map((slot) => slot.unstable && canBeUnstableAtom(slot.atom)));
     setQueueShuffleCharges((g) => Math.max(0, g - 1));
     runPowerUpsUsedRef.current += 1;
     if (powerUpStage === "queue-shuffle") setQueueShuffleStagePending(true);
+    if (labUpgradeLevel("queue-shuffle") >= 5) setNoMergeStreak(0);
     spawnPopup("♻ QUEUE REROLLED");
     haptic([15, 20, 15]);
   }
@@ -3936,7 +4081,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       haptic(12);
       return;
     }
-    const bonusScore = isMoleculeChallenge ? CHALLENGE_CLEAR_SCORE : compoundFormationScore(matchingCompound, selectedAtoms);
+    const bonusScore = isMoleculeChallenge ? CHALLENGE_CLEAR_SCORE : Math.floor(compoundFormationScore(matchingCompound, selectedAtoms) * compoundScoreMultiplier);
 
     if (!isMoleculeChallenge) {
       const spentAt = Date.now();
@@ -3965,6 +4110,12 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       setCompoundFx(null);
       recordCompoundDiscovery(matchingCompound.id);
       setFormedCompoundsThisRun((current) => [...current, matchingCompound.id]);
+      if (!isMoleculeChallenge && labUpgradeLevel("molecule") >= 2 && !compoundBonusChargeGrantedRef.current) {
+        compoundBonusChargeGrantedRef.current = true;
+        setCompoundCharges(1);
+        saveCompoundChargeState(1, null);
+        spawnPopup("Compound charge +1");
+      }
       setScore((currentScore) => currentScore + bonusScore);
       addScore(bonusScore);
       pushShotHistory({
@@ -4048,7 +4199,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     if (busy || gameOver || won || emissionCharges <= 0 || pendingReversiblePowerUp) return;
 
     const raisedQueue = queue.map((atom, i) =>
-      eGunQueue[i] || blankQueue[i] ? atom : raiseAtomForEmission(atom),
+      eGunQueue[i] || blankQueue[i] ? atom : raiseAtomForEmission(atom, emissionTierRaise),
     );
     const boostsFutureQueue = canEmissionBoostFutureQueue();
     if (raisedQueue.every((atom, i) => atom === queue[i]) && !boostsFutureQueue) return;
@@ -4060,13 +4211,15 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       blankQueue,
       unstableQueue,
       emissionQueueBoost,
+      emissionBoostShotsRemaining,
       powerUp: "emission",
     };
     setPendingReversiblePowerUp("emission");
     setEmissionCharges((g) => Math.max(0, g - 1));
     if (boostsFutureQueue) {
-      setEmissionQueueBoost((boost) => Math.min(queueSpawnCap() - 1, boost + 1));
+      setEmissionQueueBoost((boost) => Math.min(queueSpawnCap() - 1, boost + emissionTierRaise));
     }
+    if (labUpgradeLevel("emission") >= 3) setEmissionBoostShotsRemaining(5);
     runPowerUpsUsedRef.current += 1;
     setQueue(raisedQueue);
 
@@ -4074,7 +4227,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     const discoveries = reachedAtomicNumbers.filter((n) => !discoveredElements.includes(n));
     if (discoveries.length > 0) registerDiscoveries(discoveries);
 
-    spawnPopup(boostsFutureQueue ? "EMISSION FLOOR +1" : "EMISSION QUEUE +1");
+    spawnPopup(boostsFutureQueue ? `EMISSION FLOOR +${emissionTierRaise}` : `EMISSION QUEUE +${emissionTierRaise}`);
     reportQuestProgress({ discoveries, reachedAtomicNumbers });
     haptic([25, 45, 25]);
     if (powerUpStage === "emission") completePowerUpStageAfterDelay("emission", score);
@@ -4109,7 +4262,32 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       });
     }
 
-    let result = mergeSettledBoard([...stones, ...settled], geo, target, 118);
+    let gravityBoard: Board = [...stones, ...settled];
+    let crushStoneBonus = 0;
+    if (labUpgradeLevel("gravity") >= 5 && stones.length > 0) {
+      const crushed = damageStones(gravityBoard, new Map(stones.map((stone) => [stone.id, 1])));
+      gravityBoard = crushed.balls;
+      crushStoneBonus = crushed.bonus;
+      if (crushed.bonus > 0) grantFusionJump(fusionJumpRewardForStoneDestroy(crushed.destroyedCount));
+      if (crushed.hitIds.size > 0) {
+        setStoneHitIds(crushed.hitIds);
+        setTimeout(() => setStoneHitIds(new Set()), 380);
+      }
+    }
+    let result = mergeSettledBoard(
+      gravityBoard,
+      geo,
+      target,
+      118,
+      undefined,
+      false,
+      0,
+      {
+        unstableScoreMultiplier,
+        chainShimmer: labUpgradeLevel("shimmer") >= 5,
+        mergeScoreMultiplier: labUpgradeLevel("gravity") >= 2 ? 1.5 : 1,
+      },
+    );
     let mergeStoneBonus = 0;
     const mergeStoneDamage = damageStones(
       result.balls,
@@ -4118,9 +4296,31 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     if (mergeStoneDamage.hitIds.size > 0) {
       result = { ...result, balls: mergeStoneDamage.balls };
       mergeStoneBonus = mergeStoneDamage.bonus;
-      if (mergeStoneDamage.bonus > 0) grantFusionJump(mergeStoneDamage.destroyedCount);
+      if (mergeStoneDamage.bonus > 0) grantFusionJump(fusionJumpRewardForStoneDestroy(mergeStoneDamage.destroyedCount));
       setStoneHitIds(mergeStoneDamage.hitIds);
       setTimeout(() => setStoneHitIds(new Set()), 380);
+    }
+    const gravityStabilizedCount = result.merges.filter((merge) => merge.stabilizedIsotope).length;
+    if (gravityStabilizedCount > 0 && labUpgradeLevel("unstable") >= 4) {
+      addGrabProgressSteps(gravityStabilizedCount);
+    }
+    if (gravityStabilizedCount > 0 && labUpgradeLevel("unstable") >= 5) {
+      const stonesAfterGravity = result.balls.filter((ball) => ball.stoneHp != null);
+      if (stonesAfterGravity.length > 0) {
+        const unstableDamage = damageStones(
+          result.balls,
+          new Map(stonesAfterGravity.map((stone) => [stone.id, gravityStabilizedCount])),
+        );
+        result = { ...result, balls: unstableDamage.balls };
+        if (unstableDamage.hitIds.size > 0) {
+          setStoneHitIds(unstableDamage.hitIds);
+          setTimeout(() => setStoneHitIds(new Set()), 380);
+        }
+        if (unstableDamage.bonus > 0) {
+          grantFusionJump(fusionJumpRewardForStoneDestroy(unstableDamage.destroyedCount));
+          mergeStoneBonus += unstableDamage.bonus;
+        }
+      }
     }
 
     const newAtoms = new Set<number>();
@@ -4134,7 +4334,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
 
     setBalls(result.balls.map((b) => (b.stoneHp != null ? b : { ...b, r: radiusFor(b.atom) })));
     setHighlightId(result.finalBallId);
-    const gained = Math.floor(result.scoreGained * level.scoreMultiplier) + mergeStoneBonus;
+    const gained = Math.floor(result.scoreGained * level.scoreMultiplier) + mergeStoneBonus + crushStoneBonus;
     if (!isPowerUpStage) {
       setScore((s) => s + gained);
       addScore(gained);
@@ -4178,7 +4378,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     } else {
       spawnPopup("🌀 Gravity shift");
     }
-    if (mergeStoneBonus > 0) spawnPopup(`⛰ +${formatScore(mergeStoneBonus)}`);
+    if (mergeStoneBonus + crushStoneBonus > 0) spawnPopup(`⛰ +${formatScore(mergeStoneBonus + crushStoneBonus)}`);
     reportQuestProgress({
       merges: result.merges.length,
       discoveries: undiscovered,
@@ -4253,7 +4453,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
         const d = Math.hypot(dx, dy) || 0.001;
         const min = grabbed.r + o.r;
         if (d < min) {
-          const push = min - d + 0.5;
+          const push = (min - d + 0.5) * (labUpgradeLevel("grab") >= 5 ? 1.5 : 1);
           o.x += (dx / d) * push;
           o.y += (dy / d) * push;
           moved = true;
@@ -4285,13 +4485,28 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       if (!moved) break;
     }
     // Re-add grabbed at drop position (new id so placeAndMerge treats it as new)
-    const placed: Ball = { id: nextBallId(), x: nx, y: ny, atom: grabbed.atom, r: grabbed.r };
+    const placed: Ball = {
+      id: nextBallId(),
+      x: nx,
+      y: ny,
+      atom: grabbed.atom,
+      r: grabbed.r,
+      shimmer: grabbed.shimmer,
+      scoreMultiplier: Math.max(grabbed.scoreMultiplier ?? 1, labUpgradeLevel("grab") >= 3 ? 2 : 1),
+    };
     let result = placeAndMerge(
       others,
       placed,
       geo,
       target,
       isNobleGasLocked(grabbed.atom) ? grabbed.atom : 118,
+      undefined,
+      false,
+      0,
+      {
+        unstableScoreMultiplier,
+        chainShimmer: labUpgradeLevel("shimmer") >= 5,
+      },
     );
 
     const newAtoms = new Set<number>([grabbed.atom]);
@@ -4313,11 +4528,33 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
         mergeStoneDamage.bonus > 0 ? `⛰ +${formatScore(mergeStoneDamage.bonus)}` : "💥 stone hit",
       );
       if (mergeStoneDamage.bonus > 0) {
-        grantFusionJump(mergeStoneDamage.destroyedCount);
+        grantFusionJump(fusionJumpRewardForStoneDestroy(mergeStoneDamage.destroyedCount));
         mergeStoneBonus = mergeStoneDamage.bonus;
         if (!isPowerUpStage) addScore(mergeStoneDamage.bonus);
       }
       haptic([20, 30, 30]);
+    }
+    const grabStabilizedCount = result.merges.filter((merge) => merge.stabilizedIsotope).length;
+    if (grabStabilizedCount > 0 && labUpgradeLevel("unstable") >= 4) {
+      addGrabProgressSteps(grabStabilizedCount);
+    }
+    if (grabStabilizedCount > 0 && labUpgradeLevel("unstable") >= 5) {
+      const stonesAfterGrab = result.balls.filter((ball) => ball.stoneHp != null);
+      if (stonesAfterGrab.length > 0) {
+        const unstableDamage = damageStones(
+          result.balls,
+          new Map(stonesAfterGrab.map((stone) => [stone.id, grabStabilizedCount])),
+        );
+        result = { ...result, balls: unstableDamage.balls };
+        if (unstableDamage.hitIds.size > 0) {
+          setStoneHitIds(unstableDamage.hitIds);
+          setTimeout(() => setStoneHitIds(new Set()), 380);
+        }
+        if (unstableDamage.bonus > 0) {
+          grantFusionJump(fusionJumpRewardForStoneDestroy(unstableDamage.destroyedCount));
+          mergeStoneBonus += unstableDamage.bonus;
+        }
+      }
     }
 
     setBalls(result.balls.map((b) => (b.stoneHp != null ? b : { ...b, r: radiusFor(b.atom) })));
@@ -4541,7 +4778,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
           (b) =>
             b.stoneHp == null &&
             b.atom < 118 &&
-            distanceToSegment(b.x, b.y, start.x, start.y, end.x, end.y) <= b.r + eGunR * 0.7,
+            distanceToSegment(b.x, b.y, start.x, start.y, end.x, end.y) <= b.r + eGunR * eGunBeamFactor,
         )
         .map((b) => b.id),
     );
@@ -4582,6 +4819,12 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
   async function handleGameOverRetry() {
     await runAttemptAdIfDue();
     onWin(levelId);
+  }
+
+  function renderPowerUpLevel(id: LabUpgradeId) {
+    const upgradeLevel = labUpgradeLevel(id);
+    if (upgradeLevel <= 0) return null;
+    return <span style={powerUpLevelPill}>Lvl. {upgradeLevel}</span>;
   }
 
   return (
@@ -5021,12 +5264,12 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
               objective={isMoleculeChallenge ? moleculeObjective : null}
               discoveredHint={availableDiscoveredCompoundHint}
               newHint={availableNewCompoundHint}
-              hintCost={COMPOUND_HINT_COST}
-              superHintCost={COMPOUND_SUPER_HINT_COST}
-              canAffordHint={goldCoins >= COMPOUND_HINT_COST}
-              canAffordSuperHint={goldCoins >= COMPOUND_SUPER_HINT_COST}
-              onHint={(compound) => revealCompoundHint(compound, COMPOUND_HINT_COST)}
-              onSuperHint={(compound) => revealCompoundHint(compound, COMPOUND_SUPER_HINT_COST)}
+              hintCost={compoundHintCost}
+              superHintCost={compoundSuperHintCost}
+              canAffordHint={goldCoins >= compoundHintCost}
+              canAffordSuperHint={goldCoins >= compoundSuperHintCost}
+              onHint={(compound) => revealCompoundHint(compound, compoundHintCost)}
+              onSuperHint={(compound) => revealCompoundHint(compound, compoundSuperHintCost)}
               onForm={formSelectedCompound}
               onCancel={() => {
                 setCompoundMode(false);
@@ -5125,6 +5368,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
                     highlight={highlightId === b.id || eGunPreviewHitIds.has(b.id)}
                     wiggle={wiggleIds.has(b.id) || isCompoundSelected}
                     glow={isDrag || isCompoundSelected}
+                    shimmer={b.shimmer}
                     unstableShots={b.unstableShots}
                   />
                 </div>
@@ -5465,7 +5709,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
                   size={ballSize}
                   glow
                   shimmer={currentIsShimmer}
-                  unstableShots={currentIsUnstable ? isotopeChargeCapacity(current) : undefined}
+                  unstableShots={currentIsUnstable ? unstableChargeCapacity(current) : undefined}
                 />
               )}
             </div>
@@ -5520,7 +5764,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
                   size={ballSize}
                   glow
                   shimmer={currentIsShimmer}
-                  unstableShots={currentIsUnstable ? isotopeChargeCapacity(current) : undefined}
+                  unstableShots={currentIsUnstable ? unstableChargeCapacity(current) : undefined}
                 />
               ))}
           </div>
@@ -5580,7 +5824,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
                     shimmer={shimmerQueue[queueIndex]}
                     unstableShots={
                       unstableQueue[queueIndex] && canBeUnstableAtom(atom)
-                        ? isotopeChargeCapacity(atom)
+                        ? unstableChargeCapacity(atom)
                         : undefined
                     }
                   />
@@ -5642,6 +5886,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
                   <PowerUpBadge icon="transmute" size={32} />
                 </span>
                 <span style={powerUpCount}>{transmuteCharges}</span>
+                {renderPowerUpLevel("transmute")}
               </button>
             )}
             {(fusionJumpCharges > 0 || fusionJumpArmed) && (
@@ -5676,6 +5921,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
                   <PowerUpBadge icon="fusion-jump" size={32} />
                 </span>
                 <span style={powerUpCount}>{fusionJumpArmed ? "↩" : fusionJumpCharges}</span>
+                {renderPowerUpLevel("fusion-jump")}
               </button>
             )}
             {(catalystCharges > 0 || catalystShotsRemaining > 0) && (
@@ -5718,6 +5964,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
                       ? catalystShotsRemaining
                       : catalystCharges}
                 </span>
+                {renderPowerUpLevel("catalyst")}
               </button>
             )}
             {(emissionCharges > 0 || pendingReversiblePowerUp === "emission") && (
@@ -5754,6 +6001,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
                 <span style={powerUpCount}>
                   {pendingReversiblePowerUp === "emission" ? "↩" : emissionCharges}
                 </span>
+                {renderPowerUpLevel("emission")}
               </button>
             )}
             {gravityCharges > 0 && (
@@ -5782,6 +6030,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
                   <PowerUpBadge icon="gravity" size={32} />
                 </span>
                 <span style={powerUpCount}>{gravityCharges}</span>
+                {renderPowerUpLevel("gravity")}
               </button>
             )}
             {grabs > 0 && (
@@ -5809,6 +6058,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
                   <PowerUpBadge icon="grab" size={32} />
                 </span>
                 <span style={powerUpCount}>{grabs}</span>
+                {renderPowerUpLevel("grab")}
               </button>
             )}
             {(compoundEnabled || isMoleculeChallenge) && (compoundCharges > 0 || compoundMode || isMoleculeChallenge) && (
@@ -5852,6 +6102,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
                   <PowerUpBadge icon="molecule" size={32} />
                 </span>
                 <span style={powerUpCount}>{compoundMode ? "×" : compoundCharges}</span>
+                {renderPowerUpLevel("molecule")}
               </button>
             )}
             {(gammaCharges > 0 || pendingGamma) && (
@@ -5883,6 +6134,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
                   <PowerUpBadge icon="gamma" size={32} />
                 </span>
                 <span style={powerUpCount}>{pendingGamma ? "↩" : gammaCharges}</span>
+                {renderPowerUpLevel("gamma")}
               </button>
             )}
             {shuffleEnabled && queueShuffleCharges > 0 && (
@@ -5911,6 +6163,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
                   <PowerUpBadge icon="queue-shuffle" size={32} />
                 </span>
                 <span style={powerUpCount}>{queueShuffleCharges}</span>
+                {renderPowerUpLevel("queue-shuffle")}
               </button>
             )}
           </div>
@@ -6159,6 +6412,25 @@ const powerUpCount: React.CSSProperties = {
   lineHeight: "14px",
   fontWeight: 900,
   fontVariantNumeric: "tabular-nums",
+};
+
+const powerUpLevelPill: React.CSSProperties = {
+  position: "absolute",
+  left: "50%",
+  top: -15,
+  transform: "translateX(-50%)",
+  whiteSpace: "nowrap",
+  borderRadius: 999,
+  padding: "1px 5px",
+  fontSize: 8,
+  lineHeight: 1.35,
+  fontWeight: 900,
+  letterSpacing: 0,
+  color: "var(--primary-foreground)",
+  background: "linear-gradient(135deg, var(--accent), var(--primary))",
+  border: "1px solid rgba(255,255,255,0.38)",
+  boxShadow: "0 0 8px var(--accent-glow)",
+  pointerEvents: "none",
 };
 
 const iconBtn: React.CSSProperties = {

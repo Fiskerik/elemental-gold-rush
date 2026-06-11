@@ -45,7 +45,7 @@ export const GAME_MODES: GameModeConfig[] = [
     rules: [
       "One daily reward clear",
       "Local best score is saved",
-      "Global leaderboard requires Game Center or backend sync",
+      "Daily seed resets at midnight",
     ],
   },
   {

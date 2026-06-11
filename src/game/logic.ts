@@ -15,6 +15,10 @@ export interface Ball {
   stoneMaxHp?: number;
   /** Unstable isotope countdown. It stabilizes when merged, or decays at 0. */
   unstableShots?: number;
+  /** Permanent shimmer marker that survives on-board until this atom is merged. */
+  shimmer?: boolean;
+  /** One-shot score multiplier consumed the next time this atom participates in a merge. */
+  scoreMultiplier?: number;
 }
 export type Board = Ball[];
 
@@ -51,6 +55,7 @@ export interface MergeEvent {
   x: number;
   y: number;
   stabilizedIsotope?: boolean;
+  shimmerFusion?: boolean;
   scoreGained: number;
 }
 
@@ -74,6 +79,12 @@ function resolveAdjacentMerges(
   adjacencyFactor = ADJ_FACTOR,
   fusionJump = false,
   survivorRadiusBonus = 0,
+  options: {
+    fusionJumpStep?: number;
+    unstableScoreMultiplier?: number;
+    chainShimmer?: boolean;
+    mergeScoreMultiplier?: number;
+  } = {},
 ): MergeResult {
   const list: Ball[] = source.map((b) => ({ ...b }));
   const merges: MergeEvent[] = [];
@@ -117,18 +128,29 @@ function resolveAdjacentMerges(
     }
     if (best) {
       const { s, a } = best;
-      const mergeStep = jumpAvailable ? 2 : 1;
+      const mergeStep = jumpAvailable ? Math.max(2, Math.floor(options.fusionJumpStep ?? 2)) : 1;
       const sourceAtomicNumber = list[s].atom;
+      const participantMultiplier = Math.max(1, list[s].scoreMultiplier ?? 1, list[a].scoreMultiplier ?? 1);
       const stabilizedIsotope =
         (list[s].unstableShots ?? 0) > 0 || (list[a].unstableShots ?? 0) > 0;
       const next = Math.min(maxElement, sourceAtomicNumber + mergeStep);
       jumpAvailable = false;
-      const survivor = { ...list[s], atom: next, unstableShots: undefined };
+      const shimmerFusion = Boolean(list[s].shimmer || list[a].shimmer);
+      const survivor = {
+        ...list[s],
+        atom: next,
+        unstableShots: undefined,
+        shimmer: options.chainShimmer && shimmerFusion && chainDepth >= 1 ? true : undefined,
+        scoreMultiplier: undefined,
+      };
       list[s] = survivor;
       list.splice(a, 1);
       const newS = a < s ? s - 1 : s;
       const baseScore = next * 10 * Math.pow(2, chainDepth);
-      const mergeScore = stabilizedIsotope ? baseScore * 2 : baseScore;
+      const isotopeMultiplier = stabilizedIsotope ? (options.unstableScoreMultiplier ?? 2) : 1;
+      const mergeScore = Math.floor(
+        baseScore * isotopeMultiplier * participantMultiplier * (options.mergeScoreMultiplier ?? 1),
+      );
       merges.push({
         resultAtomicNumber: next,
         sourceAtomicNumber,
@@ -136,6 +158,7 @@ function resolveAdjacentMerges(
         x: list[newS].x,
         y: list[newS].y,
         stabilizedIsotope,
+        shimmerFusion,
         scoreGained: mergeScore,
       });
       score += mergeScore;
@@ -170,6 +193,7 @@ export function placeAndMerge(
   adjacencyFactor = ADJ_FACTOR,
   fusionJump = false,
   survivorRadiusBonus = 0,
+  options?: Parameters<typeof resolveAdjacentMerges>[9],
 ): MergeResult {
   return resolveAdjacentMerges(
     [...balls, { ...newBall }],
@@ -182,6 +206,7 @@ export function placeAndMerge(
     adjacencyFactor,
     fusionJump,
     survivorRadiusBonus,
+    options,
   );
 }
 
@@ -194,6 +219,7 @@ export function mergeSettledBoard(
   adjacencyFactor = ADJ_FACTOR,
   fusionJump = false,
   survivorRadiusBonus = 0,
+  options?: Parameters<typeof resolveAdjacentMerges>[9],
 ): MergeResult {
   void geo;
   return resolveAdjacentMerges(
@@ -207,6 +233,7 @@ export function mergeSettledBoard(
     adjacencyFactor,
     fusionJump,
     survivorRadiusBonus,
+    options,
   );
 }
 
