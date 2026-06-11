@@ -51,7 +51,8 @@ export function MoleculeVisual({ compound, size = 86, locked = false }: Molecule
     );
   }
 
-  const structure = getCompoundStructure(compound);
+  const structure = getSafeCompoundStructure(compound);
+  if (!structure) return <MoleculeFormulaFallback compound={compound} size={size} />;
   const center = size / 2;
   const scale = size * 0.42;
   const atomSize = Math.max(15, size * 0.24);
@@ -125,6 +126,46 @@ export function MoleculeVisual({ compound, size = 86, locked = false }: Molecule
           </span>
         );
       })}
+    </span>
+  );
+}
+
+function getSafeCompoundStructure(compound: CompoundDefinition) {
+  try {
+    const structure = getCompoundStructure(compound);
+    if (!structure.atoms.length) return null;
+    const validBonds = structure.bonds.filter(
+      (bond) =>
+        bond.from >= 0 &&
+        bond.to >= 0 &&
+        bond.from < structure.atoms.length &&
+        bond.to < structure.atoms.length,
+    );
+    return { ...structure, bonds: validBonds };
+  } catch {
+    return null;
+  }
+}
+
+function MoleculeFormulaFallback({ compound, size }: { compound: CompoundDefinition; size: number }) {
+  return (
+    <span
+      style={{
+        width: size,
+        height: size,
+        display: "grid",
+        placeItems: "center",
+        borderRadius: "50%",
+        border: "1px solid var(--accent)",
+        background: "var(--surface-high)",
+        color: "var(--accent)",
+        fontSize: Math.max(10, size * 0.18),
+        fontWeight: 900,
+        flex: "0 0 auto",
+      }}
+      aria-hidden="true"
+    >
+      {compound.formula}
     </span>
   );
 }

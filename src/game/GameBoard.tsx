@@ -1051,6 +1051,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
   );
   const isSecretCompoundChallenge = secretCompoundObjective != null;
   const isDailyMoleculeChallenge = moleculeObjective != null && mode === "daily-challenge";
+  const isDailyAtomChallenge = moleculeObjective == null && mode === "daily-challenge";
   const isMoleculeChallenge = moleculeObjective != null && (mode === "campaign" || isSecretCompoundChallenge || isDailyMoleculeChallenge);
   const canIntroducePowerUps = mode === "campaign" && !isMoleculeChallenge && !isPowerUpStage;
   const unstableEnabled = level.id >= UNSTABLE_UNLOCK_LEVEL;
@@ -1465,6 +1466,8 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       ? createPowerUpStageBoard(powerUpStage)
       : isMoleculeChallenge
       ? createMoleculeChallengeBoard(moleculeObjective, { useHelpfulAtomPlan: isSecretCompoundChallenge || isDailyMoleculeChallenge })
+      : isDailyAtomChallenge
+        ? createDailyChallengeBoard()
       : mode === "pure-hydrogen"
         ? createEmptyBoard()
       : level.id >= SHUFFLE_MIN_LEVEL
@@ -1480,6 +1483,8 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     const powerUpQueuePrefix = isPowerUpStage ? powerUpStageQueuePrefix(powerUpStage) : [];
     const challengeQueuePrefix = isMoleculeChallenge
       ? moleculeChallengeQueuePrefix(moleculeObjective, { useHelpfulAtomPlan: isSecretCompoundChallenge || isDailyMoleculeChallenge })
+      : isDailyAtomChallenge
+        ? dailyTargetAtomPlan().queueAtoms
       : [];
     challengeQueuePlanRef.current = challengeQueuePrefix.slice(QUEUE_SIZE);
     const initialQueue = [
@@ -1487,24 +1492,30 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       ...challengeQueuePrefix,
       ...generateInitialQueue(level.maxQueueElement, QUEUE_SIZE, currentQueueDecay(), dailyRandom),
     ].slice(0, QUEUE_SIZE);
+    const initialPlannedCount = Math.min(QUEUE_SIZE, challengeQueuePrefix.length);
     const initialEGun = Array.from({ length: QUEUE_SIZE }, (_, i) => powerUpStage === "egun" && i === 0);
     const initialBlank = initialEGun.map(
-      (isEGun) => powerUpStage === "blank" || (!isEGun && blankEnabled && dailyRandom() < blankChance),
+      (isEGun, i) =>
+        i >= initialPlannedCount &&
+        (powerUpStage === "blank" || (!isEGun && blankEnabled && dailyRandom() < blankChance)),
     );
     const initialShimmer = initialEGun.map(
       (isEGun, i) =>
-        (powerUpStage === "shimmer" && i === 0) ||
-        (!isEGun && !initialBlank[i] && shimmerEnabled && dailyRandom() < shimmerChance),
+        i >= initialPlannedCount &&
+        ((powerUpStage === "shimmer" && i === 0) ||
+          (!isEGun && !initialBlank[i] && shimmerEnabled && dailyRandom() < shimmerChance)),
     );
-    const resolvedInitialQueue = initialQueue.map((atom, i) =>
-        isPowerUpStage
+    const resolvedInitialQueue = initialQueue.map((atom, i) => {
+        if (i < initialPlannedCount) return atom;
+        return isPowerUpStage
           ? atom
           : initialShimmer[i]
           ? generateQueueAtom(dynamicMaxQueue(initialBalls.length), initialBalls, true)
-          : Math.min(queueSpawnCap(), Math.max(atom, queueFloorFromBoard(initialBalls))),
-    );
+          : Math.min(queueSpawnCap(), Math.max(atom, queueFloorFromBoard(initialBalls)));
+    });
     const initialUnstable = resolvedInitialQueue.map(
       (atom, i) =>
+        i >= initialPlannedCount &&
         !isPowerUpStage &&
         !initialEGun[i] &&
         !initialBlank[i] &&
@@ -1647,7 +1658,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [levelId, level.gridRows, level.gridCols, level.maxQueueElement, mode, resumeSavedRun, isMoleculeChallenge, isSecretCompoundChallenge, isDailyMoleculeChallenge, isPowerUpStage, powerUpStage, moleculeObjective, restartNonce]);
+  }, [levelId, level.gridRows, level.gridCols, level.maxQueueElement, mode, resumeSavedRun, isMoleculeChallenge, isSecretCompoundChallenge, isDailyMoleculeChallenge, isDailyAtomChallenge, isPowerUpStage, powerUpStage, moleculeObjective, restartNonce]);
 
   // Show a one-time tooltip the first time a shimmer atom appears in the queue.
   useEffect(() => {
@@ -1896,7 +1907,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     if (powerUpStage === "blank") {
       return { atom: 1, shimmer: false, eGun: false, blank: true, unstable: false };
     }
-    const plannedChallengeAtom = isMoleculeChallenge ? challengeQueuePlanRef.current.shift() : undefined;
+    const plannedChallengeAtom = isMoleculeChallenge || isDailyAtomChallenge ? challengeQueuePlanRef.current.shift() : undefined;
     if (plannedChallengeAtom != null) {
       return {
         atom: plannedChallengeAtom,
@@ -2303,6 +2314,17 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     return seeded;
   }
 
+  function createDailyChallengeBoard(): Board {
+    const plan = dailyTargetAtomPlan();
+    const count =
+      SEEDED_BOARD_MIN_ATOMS +
+      Math.floor(dailyRandom() * (SEEDED_BOARD_MAX_ATOMS - SEEDED_BOARD_MIN_ATOMS + 1));
+    return createPlannedAtomBoard(
+      Array.from({ length: count }, () => plan.boardAtoms[Math.floor(dailyRandom() * plan.boardAtoms.length)] ?? plan.highestBuildAtom),
+      true,
+    );
+  }
+
   function maybeMakeUnstable(ball: Ball, chance = UNSTABLE_SPAWN_CHANCE): Ball {
     if (!unstableEnabled || ball.stoneHp != null || ball.atom <= 1 || Math.random() >= chance) return ball;
     showTip(
@@ -2318,10 +2340,14 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     if (!compound) return createSeededBoard();
     const atomPlan = challengeAtomPlanForCompound(compound);
     const atoms = options.useHelpfulAtomPlan
-      ? atomPlan.boardAtoms
+      ? [atomPlan.highestBuildAtom]
       : compound.id === "water"
         ? [7, 7, 1, 1]
         : [level.id >= 15 ? atomPlan.highestBuildAtom : atomPlan.highestRecipeAtom];
+    return createPlannedAtomBoard(atoms);
+  }
+
+  function createPlannedAtomBoard(atoms: number[], randomize = false): Board {
     const count = atoms.length;
     const maxR = Math.max(...atoms.map((atom) => radiusFor(atom)), radiusFor(1));
     const cols = Math.min(4, Math.max(2, Math.ceil(Math.sqrt(count))));
@@ -2330,18 +2356,25 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     const spacingY = Math.max(maxR * 2.25, maxR * 2.7);
     const startX = boardW / 2 - ((cols - 1) * spacingX) / 2;
     const startY = TOP_PAD + maxR + Math.max(8, maxR * 0.5);
-    return atoms.map((atom, index) => {
+    const board = atoms.map((atom, index) => {
       const col = index % cols;
       const row = Math.floor(index / cols);
       const r = radiusFor(atom);
+      const randomX = SIDE_PAD + r + dailyRandom() * Math.max(1, boardW - SIDE_PAD * 2 - r * 2);
+      const randomY = TOP_PAD + r + dailyRandom() * Math.max(8, maxR * 3.4);
       return {
         id: nextBallId(),
-        x: Math.max(SIDE_PAD + r, Math.min(boardW - SIDE_PAD - r, startX + col * spacingX)),
-        y: startY + row * spacingY + (rows > 1 && col % 2 === 1 ? maxR * 0.18 : 0),
+        x: randomize
+          ? Math.max(SIDE_PAD + r, Math.min(boardW - SIDE_PAD - r, randomX))
+          : Math.max(SIDE_PAD + r, Math.min(boardW - SIDE_PAD - r, startX + col * spacingX)),
+        y: randomize
+          ? randomY
+          : startY + row * spacingY + (rows > 1 && col % 2 === 1 ? maxR * 0.18 : 0),
         atom,
         r,
       };
     });
+    return randomize ? relaxBoard(board) : board;
   }
 
   function moleculeChallengeQueuePrefix(compound: CompoundDefinition | null, options: { useHelpfulAtomPlan?: boolean } = {}): number[] {
@@ -2520,6 +2553,20 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       highestBuildAtom: Math.max(1, highestRecipeAtom - 1),
       boardAtoms,
       queueAtoms: boardAtoms,
+    };
+  }
+
+  function dailyTargetAtomPlan(): {
+    highestBuildAtom: number;
+    boardAtoms: number[];
+    queueAtoms: number[];
+  } {
+    const highestBuildAtom = Math.max(1, target - 1);
+    const atoms = Array.from({ length: 9 }, (_, index) => highestBuildAtom - index).filter((atom) => atom >= 1);
+    return {
+      highestBuildAtom,
+      boardAtoms: atoms,
+      queueAtoms: atoms,
     };
   }
 
