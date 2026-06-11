@@ -119,6 +119,7 @@ export function Shop({ onBack }: { onBack: () => void }) {
     powerUpInventory,
     grantGoldCoins,
     grantProPack,
+    reportQuestProgress,
     purchaseInventoryPowerUp,
     hasProPack,
   } = useProgress();
@@ -258,6 +259,7 @@ export function Shop({ onBack }: { onBack: () => void }) {
       const result = await showRewardedForCoin(hasProPack);
       if (result.rewarded) {
         grantGoldCoins(1);
+        reportQuestProgress({ adsWatched: 1 });
         setMessage("Reward complete: +1 gold coin.");
         return;
       }
@@ -368,9 +370,6 @@ export function Shop({ onBack }: { onBack: () => void }) {
           </button>
           <div>
             <h1 style={{ fontSize: 22, margin: 0, fontWeight: 800 }}>Shop</h1>
-            <div style={{ fontSize: 12, color: "var(--muted-foreground)" }}>
-              Convert points into gold coins and stock your next run
-            </div>
           </div>
         </div>
         {message && (
@@ -526,8 +525,8 @@ export function Shop({ onBack }: { onBack: () => void }) {
             <div style={{ display: "grid", gap: 7, marginBottom: 14 }}>
               <Benefit text="Remove forced interstitial ads." />
               <Benefit text="Unlock the Pro Lab profile badge." />
-              <Benefit text="Get 50 starting gold coins." />
-              <Benefit text="Get +2 extra gold coins on each daily gold claim." />
+              <Benefit text="Get 100 starting gold coins." />
+              <Benefit text="Daily quest claims pay 5 gold coins instead of 2." />
             </div>
             {hasProPack ? (
               <div style={proPackActive}>Pro Lab Pack Active</div>

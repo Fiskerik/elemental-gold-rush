@@ -13,6 +13,15 @@ import {
   refreshDailyQuests,
 } from "./quests";
 import { WeeklyPlayBonusState, claimWeeklyPlayBonus, createWeeklyPlayBonus } from "./weeklyBonus";
+import {
+  DAILY_FEATURE_REWARD_COINS,
+  type DailyChallengeState,
+  type SecretCompoundState,
+  createDailyChallenge,
+  createSecretCompound,
+  refreshDailyChallengeState,
+  refreshSecretCompoundState,
+} from "./dailyFeatures";
 
 export const INVENTORY_POWER_UPS = [
   "transmute",
@@ -28,6 +37,57 @@ export const INVENTORY_POWER_UPS = [
 export type InventoryPowerUpId = (typeof INVENTORY_POWER_UPS)[number];
 
 export type PowerUpInventory = Record<InventoryPowerUpId, number>;
+export const LAB_UPGRADE_IDS = [
+  "molecule",
+  "shimmer",
+  "unstable",
+  "grab",
+  "egun",
+  "gravity",
+  "stone",
+  "transmute",
+  "fusion-jump",
+  "catalyst",
+  "emission",
+  "gamma",
+  "blank",
+  "queue-shuffle",
+] as const;
+
+export type LabUpgradeId = (typeof LAB_UPGRADE_IDS)[number];
+export type LabUpgradeLevels = Record<LabUpgradeId, number>;
+export type LabUpgradeEnabled = Record<LabUpgradeId, boolean>;
+
+export const LAB_UPGRADE_COSTS = [10, 25, 50, 100, 200] as const;
+
+export function getLabUpgradeLevelCap(unlockedLevel: number): number {
+  if (unlockedLevel >= 50) return 5;
+  if (unlockedLevel >= 35) return 4;
+  if (unlockedLevel >= 20) return 3;
+  if (unlockedLevel >= 10) return 2;
+  if (unlockedLevel >= 5) return 1;
+  return 0;
+}
+
+export const emptyLabUpgradeLevels = (): LabUpgradeLevels =>
+  Object.fromEntries(LAB_UPGRADE_IDS.map((id) => [id, 0])) as LabUpgradeLevels;
+
+export const emptyLabUpgradeEnabled = (): LabUpgradeEnabled =>
+  Object.fromEntries(LAB_UPGRADE_IDS.map((id) => [id, true])) as LabUpgradeEnabled;
+
+function normalizeLabUpgradeLevels(levels: Partial<Record<LabUpgradeId, number>> | undefined): LabUpgradeLevels {
+  const next = emptyLabUpgradeLevels();
+  for (const id of LAB_UPGRADE_IDS) {
+    next[id] = Math.max(0, Math.min(5, Math.floor(levels?.[id] ?? 0)));
+  }
+  return next;
+}
+
+function normalizeLabUpgradeEnabled(enabled: Partial<Record<LabUpgradeId, boolean>> | undefined): LabUpgradeEnabled {
+  const next = emptyLabUpgradeEnabled();
+  for (const id of LAB_UPGRADE_IDS) next[id] = enabled?.[id] ?? true;
+  return next;
+}
 
 export type AppTheme = "dark" | "light";
 
@@ -139,7 +199,17 @@ interface ProgressState {
   clearedStagesSinceAd: number;
   powerUpInventory: PowerUpInventory;
   seenTips: string[];
+  labUpgradeLevels: LabUpgradeLevels;
+  labUpgradeEnabled: LabUpgradeEnabled;
+  dailyChallenge: DailyChallengeState;
+  secretCompound: SecretCompoundState;
   markTipSeen: (id: string) => void;
+  refreshDailyFeatures: () => void;
+  completeDailyChallenge: (score: number) => boolean;
+  revealSecretCompound: () => void;
+  completeSecretCompound: (compoundIds: string[]) => boolean;
+  upgradeLabPowerUp: (id: LabUpgradeId) => boolean;
+  toggleLabUpgrade: (id: LabUpgradeId) => void;
   unlockLevel: (id: number) => void;
   setUnlockedLevel: (id: number) => void;
   recordDiscovery: (atomicNumbers: number[]) => void;
@@ -183,6 +253,8 @@ interface ProgressState {
 const initialQuestDate = getTodayQuestDate();
 const initialDailyQuests = createDailyQuests(initialQuestDate);
 const initialWeeklyPlayBonus = createWeeklyPlayBonus();
+const initialDailyChallenge = createDailyChallenge(initialQuestDate);
+const initialSecretCompound = createSecretCompound(initialQuestDate);
 
 export const useProgress = create<ProgressState>()(
   persist(
@@ -220,9 +292,84 @@ export const useProgress = create<ProgressState>()(
       clearedStagesSinceAd: 0,
       powerUpInventory: emptyPowerUpInventory(),
       seenTips: [],
+      labUpgradeLevels: emptyLabUpgradeLevels(),
+      labUpgradeEnabled: emptyLabUpgradeEnabled(),
+      dailyChallenge: initialDailyChallenge,
+      secretCompound: initialSecretCompound,
       markTipSeen: (id) =>
         set((s) => (s.seenTips.includes(id) ? s : { seenTips: [...s.seenTips, id] })),
-      unlockLevel: (id) => set((s) => ({ unlockedLevel: Math.max(s.unlockedLevel, id) })),
+      refreshDailyFeatures: () =>
+        set((s) => ({
+          dailyChallenge: refreshDailyChallengeState(s.dailyChallenge),
+          secretCompound: refreshSecretCompoundState(s.secretCompound),
+        })),
+      completeDailyChallenge: (score) => {
+        let awarded = false;
+        set((s) => {
+          const dailyChallenge = refreshDailyChallengeState(s.dailyChallenge);
+          const nextChallenge = {
+            ...dailyChallenge,
+            completed: true,
+            rewardClaimed: true,
+            bestScore: Math.max(dailyChallenge.bestScore, Math.max(0, Math.floor(score))),
+          };
+          awarded = !dailyChallenge.rewardClaimed;
+          return {
+            dailyChallenge: nextChallenge,
+            goldCoins: s.goldCoins + (awarded ? DAILY_FEATURE_REWARD_COINS : 0),
+          };
+        });
+        return awarded;
+      },
+      revealSecretCompound: () =>
+        set((s) => {
+          const secretCompound = refreshSecretCompoundState(s.secretCompound);
+          return { secretCompound: { ...secretCompound, revealed: true } };
+        }),
+      completeSecretCompound: (compoundIds) => {
+        let awarded = false;
+        set((s) => {
+          const secretCompound = refreshSecretCompoundState(s.secretCompound);
+          const completed = compoundIds.includes(secretCompound.compoundId);
+          if (!completed) return { secretCompound };
+          awarded = !secretCompound.rewardClaimed;
+          return {
+            secretCompound: {
+              ...secretCompound,
+              revealed: true,
+              completed: true,
+              rewardClaimed: true,
+            },
+            goldCoins: s.goldCoins + (awarded ? DAILY_FEATURE_REWARD_COINS : 0),
+            dailyQuests: applyQuestProgress(s.dailyQuests, { secretCompoundCleared: true }),
+          };
+        });
+        return awarded;
+      },
+      upgradeLabPowerUp: (id) => {
+        let upgraded = false;
+        set((s) => {
+          const levels = normalizeLabUpgradeLevels(s.labUpgradeLevels);
+          const current = levels[id] ?? 0;
+          const cap = getLabUpgradeLevelCap(s.unlockedLevel);
+          if (current >= cap || current >= LAB_UPGRADE_COSTS.length) return s;
+          const cost = LAB_UPGRADE_COSTS[current];
+          if (s.goldCoins < cost) return s;
+          upgraded = true;
+          return {
+            goldCoins: s.goldCoins - cost,
+            labUpgradeLevels: { ...levels, [id]: current + 1 },
+          };
+        });
+        return upgraded;
+      },
+      toggleLabUpgrade: (id) =>
+        set((s) => ({
+          labUpgradeEnabled: {
+            ...normalizeLabUpgradeEnabled(s.labUpgradeEnabled),
+            [id]: !(s.labUpgradeEnabled[id] ?? true),
+          },
+        })),      unlockLevel: (id) => set((s) => ({ unlockedLevel: Math.max(s.unlockedLevel, id) })),
       setUnlockedLevel: (id) => set(() => ({ unlockedLevel: Math.max(1, Math.floor(id)) })),
       recordDiscovery: (nums) =>
         set((s) => {
@@ -349,7 +496,7 @@ export const useProgress = create<ProgressState>()(
           );
           if (refreshed.claimedDailyReward || !areDailyQuestsComplete(refreshed.dailyQuests))
             return refreshed;
-          const bonusCoins = s.hasProPack ? 4 : 2;
+          const bonusCoins = s.hasProPack ? 5 : 2;
           return {
             ...refreshed,
             claimedDailyReward: true,
@@ -420,12 +567,20 @@ export const useProgress = create<ProgressState>()(
         })),
       grantProPack: () =>
         set((s) => {
-          if (s.hasProPack && s.proStarterCoinsGranted) return s;
           const shouldGrantStarter = !s.proStarterCoinsGranted;
+          const labUpgradeLevels = normalizeLabUpgradeLevels(s.labUpgradeLevels);
+          let grantedUpgrade = false;
+          for (const id of LAB_UPGRADE_IDS) {
+            const nextLevel = Math.max(labUpgradeLevels[id] ?? 0, 1);
+            grantedUpgrade ||= nextLevel !== labUpgradeLevels[id];
+            labUpgradeLevels[id] = nextLevel;
+          }
+          if (s.hasProPack && s.proStarterCoinsGranted && !grantedUpgrade) return s;
           return {
             hasProPack: true,
             proStarterCoinsGranted: true,
-            goldCoins: s.goldCoins + (shouldGrantStarter ? 50 : 0),
+            goldCoins: s.goldCoins + (shouldGrantStarter ? 100 : 0),
+            labUpgradeLevels,
           };
         }),
       markInterstitialShown: () => set({ clearedStagesSinceAd: 0 }),
@@ -517,6 +672,10 @@ export const useProgress = create<ProgressState>()(
           clearedStagesSinceAd: 0,
           powerUpInventory: emptyPowerUpInventory(),
           seenTips: [],
+          labUpgradeLevels: emptyLabUpgradeLevels(),
+          labUpgradeEnabled: emptyLabUpgradeEnabled(),
+          dailyChallenge: createDailyChallenge(),
+          secretCompound: createSecretCompound(),
         }),
     }),
     {
@@ -563,6 +722,10 @@ export const useProgress = create<ProgressState>()(
           powerUpInventory: normalizePowerUpInventory(persistedState?.powerUpInventory),
           levelStats: normalizeLevelStatsRecord(persistedState?.levelStats),
           seenTips: persistedState?.seenTips ?? current.seenTips,
+          labUpgradeLevels: normalizeLabUpgradeLevels(persistedState?.labUpgradeLevels),
+          labUpgradeEnabled: normalizeLabUpgradeEnabled(persistedState?.labUpgradeEnabled),
+          dailyChallenge: refreshDailyChallengeState(persistedState?.dailyChallenge ?? current.dailyChallenge),
+          secretCompound: refreshSecretCompoundState(persistedState?.secretCompound ?? current.secretCompound),
         } as ProgressState;
       },
     },

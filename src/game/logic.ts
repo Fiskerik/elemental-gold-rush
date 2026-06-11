@@ -151,7 +151,7 @@ function resolveAdjacentMerges(
     balls: list,
     merges,
     highestElement: highest,
-    scoreGained: score,
+    scoreGained: score - initialScore,
     levelComplete,
     finalBallId: survivorId,
   };
@@ -219,7 +219,7 @@ export function checkGameOver(balls: Board, geo: Geo): boolean {
   return false;
 }
 
-export function generateQueueElement(maxElement: number, decay: number = 0.65): number {
+export function generateQueueElement(maxElement: number, decay: number = 0.65, rng: () => number = Math.random): number {
   const weights: number[] = [];
   let totalWeight = 0;
   for (let n = 1; n <= maxElement; n++) {
@@ -227,7 +227,7 @@ export function generateQueueElement(maxElement: number, decay: number = 0.65): 
     weights.push(w);
     totalWeight += w;
   }
-  let rand = Math.random() * totalWeight;
+  let rand = rng() * totalWeight;
   for (let i = 0; i < weights.length; i++) {
     rand -= weights[i];
     if (rand <= 0) return i + 1;
@@ -239,8 +239,9 @@ export function generateInitialQueue(
   maxElement: number,
   count = 3,
   decay: number = 0.65,
+  rng: () => number = Math.random,
 ): number[] {
-  return Array.from({ length: count }, () => generateQueueElement(maxElement, decay));
+  return Array.from({ length: count }, () => generateQueueElement(maxElement, decay, rng));
 }
 
 export function formatScore(score: number): string {

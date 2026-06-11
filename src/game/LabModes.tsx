@@ -1,8 +1,14 @@
-import { Atom, Clock, Eye, FlaskConical, LockKeyhole, Map, Orbit, RotateCcw, Shield, Sparkles, type LucideIcon } from "lucide-react";
+import { Atom, CalendarDays, Clock, Eye, FlaskConical, LockKeyhole, Map, Orbit, RotateCcw, Shield, Sparkles, type LucideIcon } from "lucide-react";
 import { MAX_LEVEL } from "./levels";
 import { GAME_MODES, GameModeId, getUnlockedGameModes } from "./challenges";
 import { BOSSES, type BossId } from "./bosses";
-import { useProgress } from "./store";
+import {
+  LAB_UPGRADE_COSTS,
+  LAB_UPGRADE_IDS,
+  type LabUpgradeId,
+  getLabUpgradeLevelCap,
+  useProgress,
+} from "./store";
 import { useIsTabletLayout } from "./responsive";
 
 interface Props {
@@ -14,6 +20,12 @@ export function LabModes({ onBack, onStart }: Props) {
   const isTabletLayout = useIsTabletLayout();
   const unlockedLevel = useProgress((s) => s.unlockedLevel);
   const levelStats = useProgress((s) => s.levelStats);
+  const goldCoins = useProgress((s) => s.goldCoins);
+  const labUpgradeLevels = useProgress((s) => s.labUpgradeLevels);
+  const labUpgradeEnabled = useProgress((s) => s.labUpgradeEnabled);
+  const upgradeLabPowerUp = useProgress((s) => s.upgradeLabPowerUp);
+  const toggleLabUpgrade = useProgress((s) => s.toggleLabUpgrade);
+  const labLevelCap = getLabUpgradeLevelCap(unlockedLevel);
   const unlockedModes = new Set(getUnlockedGameModes(unlockedLevel).map((mode) => mode.id));
   const levelId = Math.min(unlockedLevel, MAX_LEVEL);
   const defeatedBosses = new Set(
@@ -39,6 +51,55 @@ export function LabModes({ onBack, onStart }: Props) {
             Try campaign variants, challenge rules, and Survival.
           </p>
         </header>
+        <section style={upgradePanel}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "baseline", marginBottom: 12 }}>
+            <div>
+              <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--accent)", fontWeight: 900 }}>LAB UPGRADES</div>
+              <h2 style={{ margin: "4px 0 0", fontSize: 22 }}>Permanent Power-Up Research</h2>
+            </div>
+            <div style={{ color: "var(--accent)", fontWeight: 900, fontSize: 12 }}>{goldCoins} coins</div>
+          </div>
+          <p style={{ margin: "0 0 12px", color: "var(--muted-foreground)", fontSize: 12, lineHeight: 1.45 }}>
+            Upgrade levels unlock at campaign levels 5, 10, 20, 35, and 50. Toggle a researched power-up off to disable its bonus effects.
+          </p>
+          <div style={{ display: "grid", gridTemplateColumns: isTabletLayout ? "1fr 1fr" : "1fr", gap: 10 }}>
+            {LAB_UPGRADE_IDS.map((id) => {
+              const meta = LAB_UPGRADE_META[id];
+              const level = labUpgradeLevels[id] ?? 0;
+              const active = labUpgradeEnabled[id] ?? true;
+              const nextCost = LAB_UPGRADE_COSTS[level];
+              const canUpgrade = labLevelCap > level && nextCost != null && goldCoins >= nextCost;
+              return (
+                <article key={id} style={upgradeCard}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
+                    <div>
+                      <h3 style={{ margin: 0, fontSize: 15 }}>{meta.name}</h3>
+                      <div style={{ marginTop: 3, color: "var(--muted-foreground)", fontSize: 11 }}>
+                        Level {level}/5 {labLevelCap <= level && level < 5 ? `- unlock next tier at campaign milestone` : ""}
+                      </div>
+                    </div>
+                    <button type="button" onClick={() => toggleLabUpgrade(id)} style={{ ...toggleBtn, color: active ? "var(--accent)" : "var(--muted-foreground)" }}>
+                      {active ? "Active" : "Off"}
+                    </button>
+                  </div>
+                  <div style={upgradeProgressTrack}>
+                    <span style={{ ...upgradeProgressFill, width: `${(level / 5) * 100}%` }} />
+                  </div>
+                  <div style={{ display: "grid", gap: 4, marginTop: 8 }}>
+                    {meta.bonuses.map((bonus, index) => (
+                      <div key={bonus} style={{ color: index < level ? "var(--success, var(--accent))" : "var(--muted-foreground)", fontSize: 11, lineHeight: 1.25 }}>
+                        L{index + 1}: {bonus}
+                      </div>
+                    ))}
+                  </div>
+                  <button type="button" disabled={!canUpgrade} onClick={() => upgradeLabPowerUp(id)} style={{ ...startBtn, marginTop: 10, opacity: canUpgrade ? 1 : 0.55 }}>
+                    {level >= 5 ? "Maxed" : nextCost == null ? "Locked" : `Upgrade - ${nextCost} coins`}
+                  </button>
+                </article>
+              );
+            })}
+          </div>
+        </section>
         <div style={{ display: "grid", gridTemplateColumns: isTabletLayout ? "1fr 1fr" : "1fr", gap: isTabletLayout ? 16 : 12 }}>
           {GAME_MODES.map((mode) => {
             const bossId = isBossMode(mode.id) ? mode.id : null;
@@ -99,6 +160,23 @@ export function LabModes({ onBack, onStart }: Props) {
   );
 }
 
+
+const LAB_UPGRADE_META: Record<LabUpgradeId, { name: string; bonuses: string[] }> = {
+  molecule: { name: "Compound", bonuses: ["Double compound score", "First compound grants +1 charge", "Triple compound score", "Compound timer -1 minute", "Hints cost 50% less"] },
+  shimmer: { name: "Shimmer Atom", bonuses: ["Spawn 7%", "Shimmer score 3x", "Grab progress +3", "Spawn 10%", "Chain shimmer persists"] },
+  unstable: { name: "Unstable Atom", bonuses: ["Stabilize score 3x", "+2 decay shields", "Spawn +5%", "Stabilize adds Grab progress", "Shockwave damages Stones"] },
+  grab: { name: "Grab", bonuses: ["Start with 1 charge", "Requirement 7 merges", "Grab drop scores 2x", "Requirement 6 merges", "Larger drop shockwave"] },
+  egun: { name: "E-Gun", bonuses: ["Spawn 2%", "Beam width +25%", "Cooldown 7 shots", "Upgraded atoms score 2x", "Overcharge damages Stones"] },
+  gravity: { name: "Gravity", bonuses: ["Requirement 25 merges", "Gravity merges score 1.5x", "Start with 1 charge", "Requirement 20 merges", "Crush Stones on activate"] },
+  stone: { name: "Stone", bonuses: ["Destroy bonus +50%", "Hit shockwave +20%", "Grace period 25 shots", "Destroy bonus +100%", "Drops 2 Fusion Jump"] },
+  transmute: { name: "Transmute Shot", bonuses: ["Requirement 25 shots", "25% skip tier", "Start with 1 charge", "Requirement 20 shots", "Transmuted atom shimmers"] },
+  "fusion-jump": { name: "Fusion Jump", bonuses: ["Start with 1 charge", "Fusion score 2x", "Arming applies Catalyst", "Fusion score 3x", "Skips two tiers"] },
+  catalyst: { name: "Catalyst Aura", bonuses: ["Duration 7 shots", "Start with 1 charge", "Radius +20%", "Duration 10 shots", "Unlocks on 3x chain"] },
+  emission: { name: "Emission", bonuses: ["Cooldown 4.5 minutes", "Start with 1 charge", "Next 5 shots score 2x", "Cooldown 4 minutes", "Raises queue by two tiers"] },
+  gamma: { name: "Gamma Bomb", bonuses: ["Requirement 35 shots", "Radius +15%", "Start with 1 charge", "Requirement 30 shots", "Damages Stones"] },
+  blank: { name: "Blank Atom", bonuses: ["Spawn 2%", "Blank merge scores 2x", "Stone hit grants Fusion Jump", "Spawn 3%", "Always shimmers"] },
+  "queue-shuffle": { name: "Queue Shuffle", bonuses: ["Requirement 12 stone hits", "Start with 1 charge", "Next shot shimmers", "Requirement 10 stone hits", "Resets no-merge streak"] },
+};
 function isBossMode(id: GameModeId): id is BossId {
   return id === "elemental-boss" || id === "periodic-guardian" || id === "nucleus-core";
 }
@@ -115,6 +193,7 @@ const CHALLENGE_ICONS: Record<string, LucideIcon> = {
   "noble-gas-lock": LockKeyhole,
   "gold-rush-timer": Clock,
   "isotope-decay": Atom,
+  "daily-challenge": CalendarDays,
 };
 
 const CHALLENGE_ICON_STYLES: Record<string, { color: string; background: string; glow: string }> = {
@@ -122,6 +201,11 @@ const CHALLENGE_ICON_STYLES: Record<string, { color: string; background: string;
     color: "oklch(0.88 0.18 90)",
     background: "radial-gradient(circle at 28% 24%, oklch(0.95 0.16 95), transparent 36%), linear-gradient(135deg, oklch(0.62 0.18 78), oklch(0.38 0.13 42))",
     glow: "oklch(0.78 0.16 80 / 0.5)",
+  },
+  "daily-challenge": {
+    color: "oklch(0.9 0.18 90)",
+    background: "radial-gradient(circle at 30% 24%, oklch(0.96 0.16 95), transparent 34%), linear-gradient(135deg, oklch(0.54 0.16 82), oklch(0.32 0.12 230))",
+    glow: "oklch(0.78 0.16 90 / 0.5)",
   },
   survival: {
     color: "oklch(0.88 0.18 150)",
@@ -199,6 +283,45 @@ function ChallengeIcon({ id }: { id: string }) {
   );
 }
 
+
+const upgradePanel: React.CSSProperties = {
+  marginBottom: 18,
+  padding: 14,
+  borderRadius: 16,
+  background: "var(--surface-elevated)",
+  border: "1px solid var(--border)",
+};
+
+const upgradeCard: React.CSSProperties = {
+  padding: 12,
+  borderRadius: 14,
+  background: "var(--surface)",
+  border: "1px solid var(--border)",
+};
+
+const toggleBtn: React.CSSProperties = {
+  border: "1px solid var(--border)",
+  borderRadius: 999,
+  background: "var(--surface-high)",
+  padding: "5px 8px",
+  fontSize: 10,
+  fontWeight: 900,
+  cursor: "pointer",
+};
+
+const upgradeProgressTrack: React.CSSProperties = {
+  height: 7,
+  borderRadius: 999,
+  background: "var(--surface-high)",
+  overflow: "hidden",
+  marginTop: 9,
+};
+
+const upgradeProgressFill: React.CSSProperties = {
+  display: "block",
+  height: "100%",
+  background: "linear-gradient(90deg, var(--primary), var(--accent))",
+};
 const backBtn: React.CSSProperties = {
   background: "var(--surface)",
   border: "1px solid var(--border)",

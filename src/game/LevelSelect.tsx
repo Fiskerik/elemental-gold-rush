@@ -10,6 +10,8 @@ import { MoleculeVisual } from "./MoleculeVisual";
 import { PowerUpBadge } from "./PowerUpLibrary";
 import { useIsTabletLayout } from "./responsive";
 
+const SKIP_LEVEL_COIN_COST = 10;
+
 function getMoleculeChallenge(levelId: number): CompoundDefinition | null {
   const id = MOLECULE_CHALLENGE_BY_LEVEL[levelId];
   return id ? (COMPOUNDS.find((compound) => compound.id === id) ?? null) : null;
@@ -79,12 +81,12 @@ export function LevelSelect({
   function handleSkipLevel() {
     if (!selected) return;
     if (!canSkipLevel) {
-      setModalMessage("Skip unlocks after at least one failed attempt on this current stage.");
+      setModalMessage("You need to attempt this level before skipping it.");
       return;
     }
-    const skipped = skipLevelForCoins(selected.id, 5);
+    const skipped = skipLevelForCoins(selected.id, SKIP_LEVEL_COIN_COST);
     if (!skipped) {
-      setModalMessage("You need 5 gold coins to skip this stage.");
+      setModalMessage(`You need ${SKIP_LEVEL_COIN_COST} gold coins to skip this stage.`);
       return;
     }
     closeModal();
@@ -476,26 +478,26 @@ export function LevelSelect({
                 <button
                   type="button"
                   onClick={handleSkipLevel}
-                  disabled={!canSkipLevel || goldCoins < 5}
+                  aria-disabled={!canSkipLevel || goldCoins < SKIP_LEVEL_COIN_COST}
                   style={{
                     flex: 1,
                     background:
-                      canSkipLevel && goldCoins >= 5
+                      canSkipLevel && goldCoins >= SKIP_LEVEL_COIN_COST
                         ? "linear-gradient(135deg, var(--accent), var(--primary))"
                         : "var(--surface-high)",
                     color:
-                      canSkipLevel && goldCoins >= 5
+                      canSkipLevel && goldCoins >= SKIP_LEVEL_COIN_COST
                         ? "var(--primary-foreground)"
                         : "var(--muted-foreground)",
                     border: "1px solid var(--border)",
                     borderRadius: 12,
                     padding: "12px 10px",
                     fontWeight: 900,
-                    cursor: canSkipLevel && goldCoins >= 5 ? "pointer" : "not-allowed",
+                    cursor: "pointer",
                   }}
                   title="Skip this stage with 0 stars"
                 >
-                  Skip 5 coins
+                  Skip {SKIP_LEVEL_COIN_COST} coins
                 </button>
               </div>
             </div>

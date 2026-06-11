@@ -422,6 +422,12 @@ const IODINE_LEVEL_SEED: LevelSeed = {
   lore: "Iodine disinfects wounds, supports thyroid hormones, and stains starch a deep blue-black.",
   targetElement: 53,
 };
+const ANTIMONY_LEVEL_SEED: LevelSeed = {
+  name: "Antimony Edge",
+  description: "Reach Antimony.",
+  lore: "Antimony hardens alloys, sharpens flame retardants, and has appeared in cosmetics and medicines since antiquity.",
+  targetElement: 51,
+};
 
 const MERCURY_LEVEL_SEED: LevelSeed = {
   name: "Mercury Mirror",
@@ -463,16 +469,28 @@ const EARLY_LEVELS: Level[] = [
 const EARLY_LEVEL_IDS = new Set(EARLY_LEVELS.map((level) => level.id));
 let nextPostTutorialLevelId = 36;
 const POST_TUTORIAL_ATOM_SEEDS: LevelSeed[] = [
+  ANTIMONY_LEVEL_SEED,
   IODINE_LEVEL_SEED,
   LEVEL_SEEDS[20],
   LEVEL_SEEDS[21],
+  LEVEL_SEEDS[22],
+  LEVEL_SEEDS[23],
+  LEVEL_SEEDS[24],
+  LEVEL_SEEDS[25],
   LEVEL_SEEDS[26],
   LEVEL_SEEDS[27],
   LEVEL_SEEDS[28],
   MERCURY_LEVEL_SEED,
   LEVEL_SEEDS[29],
+  LEVEL_SEEDS[30],
+  LEVEL_SEEDS[31],
   LEVEL_SEEDS[32],
   LEVEL_SEEDS[33],
+  LEVEL_SEEDS[34],
+  LEVEL_SEEDS[35],
+  LEVEL_SEEDS[36],
+  LEVEL_SEEDS[37],
+  LEVEL_SEEDS[38],
   LEVEL_SEEDS[39],
 ];
 const ATOM_LEVELS: Level[] = [

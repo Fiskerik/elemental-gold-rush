@@ -3,6 +3,7 @@ import {
   Atom,
   BookOpen,
   CheckCircle2,
+  Clapperboard,
   FlaskConical,
   Layers,
   Library,
@@ -12,6 +13,7 @@ import {
   Star,
   Settings as SettingsIcon,
   Trophy,
+  LockKeyhole,
   User,
   type LucideIcon,
 } from "lucide-react";
@@ -21,9 +23,11 @@ import { formatScore } from "./logic";
 import { ELEMENTS } from "./elements";
 import { ElementBall } from "./ElementBall";
 import { trackMenuAction } from "./analytics";
-import { initAds } from "./ads";
+import { initAds, showRewardedForCoin } from "./ads";
 import { getWeeklyPlayBonusView } from "./weeklyBonus";
 import { useIsTabletLayout } from "./responsive";
+import { COMPOUNDS } from "./compounds";
+import { DAILY_FEATURE_REWARD_COINS } from "./dailyFeatures";
 
 interface Props {
   onPlay: () => void;
@@ -34,6 +38,7 @@ interface Props {
   onLab: () => void;
   onLibrary: () => void;
   onProfile: () => void;
+  onDailyChallenge: () => void;
 }
 
 export function MainMenu({
@@ -45,6 +50,7 @@ export function MainMenu({
   onLab,
   onLibrary,
   onProfile,
+  onDailyChallenge,
 }: Props) {
   const isTabletLayout = useIsTabletLayout();
   const {
@@ -56,25 +62,33 @@ export function MainMenu({
     dailyStreak,
     claimedDailyReward,
     weeklyPlayBonus,
+    dailyChallenge,
+    secretCompound,
     bestCombo,
     hasProPack,
     refreshDailyLab,
+    refreshDailyFeatures,
     claimDailyReward,
     claimWeeklyPlayBonus,
+    grantGoldCoins,
+    reportQuestProgress,
+    revealSecretCompound,
   } = useProgress();
   const highestEl = ELEMENTS[highestElement - 1];
   const nextLevel = getLevelById(unlockedLevel) ?? LEVELS[LEVELS.length - 1];
   const targetEl = ELEMENTS[(nextLevel?.targetElement ?? 1) - 1];
   const completedDailyQuests = dailyQuests.filter((quest) => quest.completed).length;
   const dailyComplete = dailyQuests.length > 0 && completedDailyQuests >= 4;
-  const dailyRewardAmount = hasProPack ? 4 : 2;
+  const dailyRewardAmount = hasProPack ? 5 : 2;
   const campaignProgress = Math.round((Math.min(unlockedLevel, MAX_LEVEL) / MAX_LEVEL) * 100);
   const weeklyBonus = getWeeklyPlayBonusView(weeklyPlayBonus);
+  const secretCompoundDefinition = COMPOUNDS.find((compound) => compound.id === secretCompound.compoundId);
   const [dailyRewardToast, setDailyRewardToast] = useState<{ id: number; text: string } | null>(
     null,
   );
   const dailyRewardToastTimeoutRef = useRef<number | null>(null);
   const [resetCountdown, setResetCountdown] = useState<string>(() => formatResetCountdown());
+  const [rewardedAdBusy, setRewardedAdBusy] = useState(false);
 
   useEffect(() => {
     const id = window.setInterval(() => {
@@ -85,7 +99,8 @@ export function MainMenu({
 
   useEffect(() => {
     refreshDailyLab();
-  }, [refreshDailyLab]);
+    refreshDailyFeatures();
+  }, [refreshDailyFeatures, refreshDailyLab]);
 
   useEffect(() => {
     if (hasProPack) return;
@@ -117,6 +132,36 @@ export function MainMenu({
     if (!dailyComplete || claimedDailyReward) return;
     claimDailyReward();
     showDailyRewardToast(`+${dailyRewardAmount} gold coins claimed`);
+  }
+
+
+
+  function handleSecretCompoundPress() {
+    revealSecretCompound();
+    if (secretCompound.completed) {
+      showDailyRewardToast("Secret Compound complete");
+      return;
+    }
+    showDailyRewardToast(secretCompoundDefinition ? `Clue: ${secretCompoundDefinition.fact}` : "Secret compound revealed");
+  }
+  async function handleRewardedCoin() {
+    if (rewardedAdBusy || hasProPack) return;
+    setRewardedAdBusy(true);
+    showDailyRewardToast("Loading rewarded ad...");
+    try {
+      const result = await showRewardedForCoin(hasProPack);
+      if (result.rewarded) {
+        grantGoldCoins(1);
+        reportQuestProgress({ adsWatched: 1 });
+        showDailyRewardToast("+1 gold coin");
+        return;
+      }
+      showDailyRewardToast(result.reason ?? "Rewarded ad unavailable");
+    } catch (error) {
+      showDailyRewardToast(error instanceof Error ? error.message : "Rewarded ad could not be started");
+    } finally {
+      setRewardedAdBusy(false);
+    }
   }
 
   function handleWeeklyDayClaim() {
@@ -207,6 +252,48 @@ export function MainMenu({
             </span>
             <ElementBall atomicNumber={nextLevel?.targetElement ?? 1} size={54} glow />
           </button>
+          <div style={dailyFeatureGrid}>
+            <button type="button" onClick={onDailyChallenge} style={dailyFeatureBtn}>
+              <span style={dailyFeatureIcon}><Trophy size={18} aria-hidden="true" /></span>
+              <span style={dailyFeatureText}>
+                <strong>Daily Challenge</strong>
+                <small>{dailyChallenge.completed ? "Cleared" : `Reward +${DAILY_FEATURE_REWARD_COINS}`}</small>
+              </span>
+              <span style={dailyFeatureReward}>{dailyChallenge.completed ? "Done" : "+5"}</span>
+            </button>
+            <button type="button" onClick={handleSecretCompoundPress} style={dailyFeatureBtn}>
+              <span style={dailyFeatureIcon}><LockKeyhole size={18} aria-hidden="true" /></span>
+              <span style={dailyFeatureText}>
+                <strong>Secret Compound</strong>
+                <small>
+                  {secretCompound.completed
+                    ? "Synthesized"
+                    : secretCompound.revealed
+                      ? secretCompoundDefinition?.formula ?? "Revealed"
+                      : `Reveal clue +${DAILY_FEATURE_REWARD_COINS}`}
+                </small>
+              </span>
+              <span style={dailyFeatureReward}>{secretCompound.completed ? "Done" : "+5"}</span>
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={handleRewardedCoin}
+            disabled={hasProPack || rewardedAdBusy}
+            style={{
+              ...rewardedAdBtn,
+              opacity: hasProPack || rewardedAdBusy ? 0.58 : 1,
+              cursor: hasProPack || rewardedAdBusy ? "not-allowed" : "pointer",
+            }}
+          >
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+              <Clapperboard size={17} aria-hidden="true" />
+              {rewardedAdBusy ? "Loading ad..." : "Watch ad for bonus coin"}
+            </span>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+              <GoldCoinIcon size={14} />+1
+            </span>
+          </button>
           <div style={progressTrack}>
             <div style={{ ...progressFill, width: `${campaignProgress}%` }} />
           </div>
@@ -276,7 +363,7 @@ export function MainMenu({
                 {`Streak ${dailyStreak} - ${completedDailyQuests}/${dailyQuests.length} quests`}
               </div>
               <div style={{ fontSize: 11, color: "var(--muted-foreground)", marginTop: 2 }}>
-                {`Complete 4 of 6 quests to claim ${dailyRewardAmount} gold coins.${hasProPack ? " (includes +2 Pro bonus)" : ""}`}
+                {hasProPack ? "Pro daily quests pay 2x+ gold." : "Complete 4 daily tasks to claim."}
               </div>
               <div style={{ fontSize: 10, color: "var(--accent)", marginTop: 4, fontWeight: 800, letterSpacing: 0.6 }}>
                 {`Resets in ${resetCountdown}`}
@@ -306,7 +393,9 @@ export function MainMenu({
               </div>
             </div>
           </div>
-          <div style={weeklyBonusCard}>
+        </section>
+
+        <section style={weeklyBonusCard}>
             <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
               <div>
                 <div style={sectionLabel}>PLAY A GAME A DAY</div>
@@ -375,6 +464,22 @@ export function MainMenu({
             <div style={{ fontSize: 10, color: "var(--muted-foreground)", lineHeight: 1.35 }}>
               {`1 coin each day you play. ${weeklyBonus.nextRewardText}.`}
             </div>
+        </section>
+
+        <section style={{ ...dailyPanel, padding: isTabletLayout ? 18 : dailyPanel.padding }}>
+          <div style={dailyQuestClaimTrack} aria-label={`${Math.min(completedDailyQuests, 4)} of 4 daily quest completions`}>
+            {Array.from({ length: 4 }, (_, index) => (
+              <span
+                key={index}
+                style={{
+                  ...dailyQuestClaimStep,
+                  background:
+                    index < Math.min(completedDailyQuests, 4)
+                      ? "linear-gradient(90deg, var(--primary), var(--accent))"
+                      : "var(--surface-high)",
+                }}
+              />
+            ))}
           </div>
           <div style={questGrid}>
             {dailyQuests.map((quest) => (
@@ -422,6 +527,12 @@ function QuestIcon({ type, completed }: { type: string; completed: boolean }) {
     chain_merge: Layers,
     merge_atoms: Atom,
     purchase_item: ShoppingBag,
+    watch_ad: Clapperboard,
+    use_unique_powerups: Sparkles,
+    destroy_stone: Layers,
+    merge_unstable: FlaskConical,
+    single_game_score: Trophy,
+    combo_reactions: Layers,
   };
   const Icon = completed ? CheckCircle2 : iconMap[type] ?? FlaskConical;
   return <Icon size={15} strokeWidth={2.4} aria-hidden="true" />;
@@ -565,6 +676,82 @@ const progressFill: CSSProperties = {
   background: "linear-gradient(90deg, var(--primary), var(--accent))",
 };
 
+
+
+const dailyFeatureGrid: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+  gap: 10,
+  marginTop: 10,
+};
+
+const dailyFeatureBtn: CSSProperties = {
+  minWidth: 0,
+  display: "grid",
+  gridTemplateColumns: "28px minmax(0, 1fr) auto",
+  alignItems: "center",
+  gap: 8,
+  border: "1px solid color-mix(in oklch, var(--primary) 45%, var(--border))",
+  borderRadius: 13,
+  padding: "10px 9px",
+  background: "linear-gradient(135deg, color-mix(in oklch, var(--primary) 24%, var(--surface)), var(--surface))",
+  color: "var(--foreground)",
+  cursor: "pointer",
+  textAlign: "left",
+};
+
+const dailyFeatureIcon: CSSProperties = {
+  width: 28,
+  height: 28,
+  borderRadius: 999,
+  display: "grid",
+  placeItems: "center",
+  background: "var(--surface-high)",
+  color: "var(--accent)",
+};
+
+const dailyFeatureText: CSSProperties = {
+  minWidth: 0,
+  display: "grid",
+  gap: 2,
+  fontSize: 11,
+  lineHeight: 1.1,
+};
+
+const dailyFeatureReward: CSSProperties = {
+  color: "var(--accent)",
+  fontWeight: 1000,
+  fontSize: 13,
+};
+const rewardedAdBtn: CSSProperties = {
+  width: "100%",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 10,
+  border: "1px solid color-mix(in oklch, var(--accent) 55%, var(--border))",
+  borderRadius: 13,
+  padding: "10px 12px",
+  marginTop: 10,
+  background: "linear-gradient(135deg, color-mix(in oklch, var(--accent) 22%, var(--surface)), var(--surface))",
+  color: "var(--foreground)",
+  fontWeight: 900,
+  fontSize: 12,
+};
+
+const dailyQuestClaimTrack: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+  gap: 6,
+  marginBottom: 12,
+};
+
+const dailyQuestClaimStep: CSSProperties = {
+  height: 8,
+  borderRadius: 999,
+  border: "1px solid var(--border)",
+  transition: "background 180ms ease",
+};
 const compactStatRow: CSSProperties = {
   display: "flex",
   justifyContent: "space-between",

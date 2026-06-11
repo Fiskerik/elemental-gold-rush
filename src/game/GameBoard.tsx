@@ -28,6 +28,7 @@ import { ElementBall } from "./ElementBall";
 import {
   emptyPowerUpInventory,
   type InventoryPowerUpId,
+  type LabUpgradeId,
   type PowerUpInventory,
   useProgress,
 } from "./store";
@@ -50,6 +51,8 @@ import {
 import { MoleculeVisual } from "./MoleculeVisual";
 import { PowerUpBadge } from "./PowerUpLibrary";
 import { POWER_UP_UNLOCK_LEVELS } from "./powerUps";
+import { hashDailySeed } from "./dailyFeatures";
+import { getTodayQuestDate } from "./quests";
 import { showInterstitialIfReady } from "./ads";
 import { useIsTabletLayout } from "./responsive";
 import { ElementalBossBoard } from "./ElementalBossBoard";
@@ -651,25 +654,27 @@ function getStarParShots(level: (typeof LEVELS)[0]): number {
   return Math.max(configuredPar, realisticPar);
 }
 
+function createSeededRng(seed: number): () => number {
+  let state = seed >>> 0;
+  return () => {
+    state = (state * 1664525 + 1013904223) >>> 0;
+    return state / 0x100000000;
+  };
+}
+
 function calculateStars(
   level: (typeof LEVELS)[0],
   score: number,
   shots: number,
-  bestCombo: number,
-  timeSec: number,
+  _bestCombo: number,
+  _timeSec: number,
 ): number {
-  const scoreTarget =
-    level.id <= 2
-      ? 40
-      : level.id <= 8
-        ? 3_000
-        : level.id <= 15
-          ? 80_000
-          : level.id <= 30
-            ? 120_000
-            : 170_000;
-  return 1 + (timeSec <= 10 * 60 ? 1 : 0) + (score > scoreTarget ? 1 : 0);
-
+  let stars = 1;
+  const efficiencyTarget = level.starShotsTwo ?? (level.parShots ? level.parShots + 5 : 50);
+  if (shots <= efficiencyTarget) stars += 1;
+  const masteryTarget = level.scoreGoal ?? (level.targetElement * 1000 * (level.scoreMultiplier ?? 1));
+  if (score >= masteryTarget) stars += 1;
+  return Math.min(3, stars);
 }
 
 export function GameBoard(props: Props) {
@@ -723,6 +728,10 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     incrementLevelAttempt,
     recordLevelRun,
     setChallengeBestScore,
+    completeDailyChallenge,
+    completeSecretCompound,
+    labUpgradeLevels,
+    labUpgradeEnabled,
     powerUpInventory,
     addInventoryPowerUps,
     consumeInventoryPowerUps,
@@ -738,14 +747,45 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     markInterstitialShown,
   } = useProgress();
 
+  const labUpgradeLevel = useCallback(
+    (id: LabUpgradeId) => (labUpgradeEnabled[id] ? labUpgradeLevels[id] ?? 0 : 0),
+    [labUpgradeEnabled, labUpgradeLevels],
+  );
+  const initialLabCharge = useCallback(
+    (id: LabUpgradeId, minLevel: number) => (labUpgradeLevel(id) >= minLevel ? 1 : 0),
+    [labUpgradeLevel],
+  );
+  const grabThreshold = labUpgradeLevel("grab") >= 4 ? 6 : labUpgradeLevel("grab") >= 2 ? 7 : 8;
+  const gravityMergeRequirement = labUpgradeLevel("gravity") >= 4 ? 20 : labUpgradeLevel("gravity") >= 1 ? 25 : 30;
+  const transmuteShotInterval = labUpgradeLevel("transmute") >= 4 ? 20 : labUpgradeLevel("transmute") >= 1 ? 25 : TRANSMUTE_SHOT_INTERVAL;
+  const gammaShotInterval = labUpgradeLevel("gamma") >= 4 ? 30 : labUpgradeLevel("gamma") >= 1 ? 35 : GAMMA_SHOT_INTERVAL;
+  const emissionUnlockIntervalMs = labUpgradeLevel("emission") >= 4 ? 4 * 60 * 1000 : labUpgradeLevel("emission") >= 1 ? 4.5 * 60 * 1000 : EMISSION_UNLOCK_INTERVAL_MS;
+  const catalystAuraShots = labUpgradeLevel("catalyst") >= 4 ? 10 : labUpgradeLevel("catalyst") >= 1 ? 7 : CATALYST_AURA_SHOTS;
+  const shimmerChance = labUpgradeLevel("shimmer") >= 4 ? 0.1 : labUpgradeLevel("shimmer") >= 1 ? 0.07 : POWER_UP_CHANCE;
+  const blankChance = labUpgradeLevel("blank") >= 4 ? 0.03 : labUpgradeLevel("blank") >= 1 ? 0.02 : BLANK_ATOM_CHANCE;
+  const unstableSpawnChance = UNSTABLE_SPAWN_CHANCE + (labUpgradeLevel("unstable") >= 3 ? 0.05 : 0);
+  const eGunBaseChance = labUpgradeLevel("egun") >= 1 ? 0.02 : EGUN_CHANCE;
+  const eGunShotGap = labUpgradeLevel("egun") >= 3 ? 7 : EGUN_MIN_SHOT_GAP;
+  const gammaRadiusMult = labUpgradeLevel("gamma") >= 2 ? GAMMA_RADIUS_MULT * 1.15 : GAMMA_RADIUS_MULT;
+  const catalystAdjFactor = labUpgradeLevel("catalyst") >= 3 ? CATALYST_ADJ_FACTOR * 1.2 : CATALYST_ADJ_FACTOR;
+  const stoneGraceShots = labUpgradeLevel("stone") >= 3 ? 25 : STONE_GRACE_SHOTS;
+  const queueShuffleRequirement = labUpgradeLevel("queue-shuffle") >= 4 ? 10 : labUpgradeLevel("queue-shuffle") >= 1 ? 12 : 15;
+  const dailyRngRef = useRef<(() => number) | null>(null);
+  if (dailyRngRef.current === null) {
+    dailyRngRef.current =
+      mode === "daily-challenge"
+        ? createSeededRng(hashDailySeed(`daily-challenge-${getTodayQuestDate()}-${level.id}`))
+        : Math.random;
+  }
+  const dailyRandom = useCallback(() => (mode === "daily-challenge" ? dailyRngRef.current?.() ?? Math.random() : Math.random()), [mode]);
   const [balls, setBalls] = useState<Board>(() => createEmptyBoard());
   const [queue, setQueue] = useState<number[]>(() =>
-    generateInitialQueue(level.maxQueueElement, QUEUE_SIZE, level.queueDecay),
+    generateInitialQueue(level.maxQueueElement, QUEUE_SIZE, level.queueDecay, dailyRandom),
   );
   // Parallel array — true means that queued atom is "shimmering" and will give
   // 2× score and 2× grab-combo progress on a successful merge.
   const [shimmerQueue, setShimmerQueue] = useState<boolean[]>(() =>
-    Array.from({ length: QUEUE_SIZE }, () => shimmerEnabled && Math.random() < POWER_UP_CHANCE),
+    Array.from({ length: QUEUE_SIZE }, () => shimmerEnabled && dailyRandom() < shimmerChance),
   );
   // Parallel array — true means this queue slot fires the E-gun instead of an atom.
   const [eGunQueue, setEGunQueue] = useState<boolean[]>(() =>
@@ -753,12 +793,12 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
   );
   // Parallel array — true means this queue slot is a Blank atom wildcard.
   const [blankQueue, setBlankQueue] = useState<boolean[]>(() =>
-    Array.from({ length: QUEUE_SIZE }, () => blankEnabled && Math.random() < BLANK_ATOM_CHANCE),
+    Array.from({ length: QUEUE_SIZE }, () => blankEnabled && dailyRandom() < blankChance),
   );
   const [unstableQueue, setUnstableQueue] = useState<boolean[]>(() =>
     Array.from(
       { length: QUEUE_SIZE },
-      () => level.id >= UNSTABLE_UNLOCK_LEVEL && Math.random() < UNSTABLE_SPAWN_CHANCE,
+      () => level.id >= UNSTABLE_UNLOCK_LEVEL && dailyRandom() < unstableSpawnChance,
     ),
   );
   const [score, setScore] = useState(0);
@@ -781,6 +821,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     bonusScore: number;
   } | null>(null);
   const [newlyDiscoveredThisRun, setNewlyDiscoveredThisRun] = useState<number[]>([]);
+  const [readDiscoveryAtoms, setReadDiscoveryAtoms] = useState<number[]>([]);
   const [formedCompoundsThisRun, setFormedCompoundsThisRun] = useState<string[]>([]);
   const [highlightId, setHighlightId] = useState<number | null>(null);
   const [wiggleIds, setWiggleIds] = useState<Set<number>>(new Set());
@@ -796,7 +837,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
 
   // === Grab power-up ===
   // Earned by making 8 merge progress in a row.
-  const [grabs, setGrabs] = useState(0);
+  const [grabs, setGrabs] = useState(() => initialLabCharge("grab", 1));
   const [grabMode, setGrabMode] = useState(false);
   const [grabbing, setGrabbing] = useState<{ id: number; x: number; y: number } | null>(null);
 
@@ -833,21 +874,21 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
   // Every successful merge counts toward the current streak (shimmer atoms
   // count +2). A missed shot resets progress, so Grab requires 8 merge progress
   // in a row.
-  const GRAB_THRESHOLD = 8;
+  const GRAB_THRESHOLD = grabThreshold;
   const [grabProgress, setGrabProgress] = useState(0);
 
   // === Gravity and Emission power-ups ===
   // Gravity is awarded by 4× combos. Emission is awarded every 5 minutes and
   // raises both the visible queue and the future spawn floor.
-  const [gravityCharges, setGravityCharges] = useState(0);
+  const [gravityCharges, setGravityCharges] = useState(() => (powerUpStage === "gravity" ? 1 : 0) + initialLabCharge("gravity", 3));
   const [gravityMergeProgress, setGravityMergeProgress] = useState(0);
-  const [emissionCharges, setEmissionCharges] = useState(0);
+  const [emissionCharges, setEmissionCharges] = useState(() => (powerUpStage === "emission" ? 1 : 0) + initialLabCharge("emission", 2));
   const [emissionUnlockIndex, setEmissionUnlockIndex] = useState(0);
   const [emissionQueueBoost, setEmissionQueueBoost] = useState(0);
-  const [transmuteCharges, setTransmuteCharges] = useState(0);
-  const [fusionJumpCharges, setFusionJumpCharges] = useState(0);
+  const [transmuteCharges, setTransmuteCharges] = useState(() => (powerUpStage === "transmute" ? 1 : 0) + initialLabCharge("transmute", 3));
+  const [fusionJumpCharges, setFusionJumpCharges] = useState(() => (powerUpStage === "fusion-jump" ? 1 : 0) + initialLabCharge("fusion-jump", 1));
   const [fusionJumpArmed, setFusionJumpArmed] = useState(false);
-  const [catalystCharges, setCatalystCharges] = useState(0);
+  const [catalystCharges, setCatalystCharges] = useState(() => (powerUpStage === "catalyst" ? 1 : 0) + initialLabCharge("catalyst", 2));
   const [catalystShotsRemaining, setCatalystShotsRemaining] = useState(0);
   const [pendingReversiblePowerUp, setPendingReversiblePowerUp] = useState<
     null | "transmute" | "emission" | "fusion-jump" | "catalyst"
@@ -898,7 +939,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
 
   // === Queue Shuffle power-up ===
   // Earned every QUEUE_SHUFFLE_PER_STONE_HITS atom-on-stone hits this run.
-  const [queueShuffleCharges, setQueueShuffleCharges] = useState(0);
+  const [queueShuffleCharges, setQueueShuffleCharges] = useState(() => initialLabCharge("queue-shuffle", 2));
   const [stoneHitTally, setStoneHitTally] = useState(0);
 
   // === Shot history log ===
@@ -966,7 +1007,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
   const [shuffleAtoms, setShuffleAtoms] = useState<number[]>([]);
 
   // === Gamma bomb (lvl 12+) ===
-  const [gammaCharges, setGammaCharges] = useState(0);
+  const [gammaCharges, setGammaCharges] = useState(() => (powerUpStage === "gamma" ? 1 : 0) + initialLabCharge("gamma", 3));
   const [pendingGamma, setPendingGamma] = useState(false);
 
   // === Spawn-floor tier (lvl 10+) — every 2 min raise lowest spawnable tier
@@ -1307,6 +1348,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       const saved = loadSavedRunSnapshot();
       if (saved) {
         setNewlyDiscoveredThisRun(saved.newlyDiscoveredThisRun ?? []);
+        setReadDiscoveryAtoms([]);
         setBalls(saved.balls.map((b) => (b.stoneHp != null ? b : { ...b, r: radiusFor(b.atom) })));
         setQueue(saved.queue);
         setShimmerQueue(saved.shimmerQueue);
@@ -1392,6 +1434,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       }
     }
     setNewlyDiscoveredThisRun([]);
+    setReadDiscoveryAtoms([]);
     const initialBalls = isPowerUpStage
       ? createPowerUpStageBoard(powerUpStage)
       : isMoleculeChallenge
@@ -1416,16 +1459,16 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     const initialQueue = [
       ...powerUpQueuePrefix,
       ...challengeQueuePrefix,
-      ...generateInitialQueue(level.maxQueueElement, QUEUE_SIZE, currentQueueDecay()),
+      ...generateInitialQueue(level.maxQueueElement, QUEUE_SIZE, currentQueueDecay(), dailyRandom),
     ].slice(0, QUEUE_SIZE);
     const initialEGun = Array.from({ length: QUEUE_SIZE }, (_, i) => powerUpStage === "egun" && i === 0);
     const initialBlank = initialEGun.map(
-      (isEGun) => powerUpStage === "blank" || (!isEGun && blankEnabled && Math.random() < BLANK_ATOM_CHANCE),
+      (isEGun) => powerUpStage === "blank" || (!isEGun && blankEnabled && dailyRandom() < blankChance),
     );
     const initialShimmer = initialEGun.map(
       (isEGun, i) =>
         (powerUpStage === "shimmer" && i === 0) ||
-        (!isEGun && !initialBlank[i] && shimmerEnabled && Math.random() < POWER_UP_CHANCE),
+        (!isEGun && !initialBlank[i] && shimmerEnabled && dailyRandom() < shimmerChance),
     );
     const resolvedInitialQueue = initialQueue.map((atom, i) =>
         isPowerUpStage
@@ -1441,7 +1484,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
         !initialBlank[i] &&
         canBeUnstableAtom(atom) &&
         level.id >= UNSTABLE_UNLOCK_LEVEL &&
-        Math.random() < UNSTABLE_SPAWN_CHANCE,
+        dailyRandom() < unstableSpawnChance,
     );
     setQueue(resolvedInitialQueue);
     setShimmerQueue(initialShimmer);
@@ -1512,15 +1555,15 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     setStoneHitIds(new Set());
     setPendingStone(false);
     setStoneSpawnCount(0);
-    setGravityCharges(powerUpStage === "gravity" ? 1 : 0);
+    setGravityCharges((powerUpStage === "gravity" ? 1 : 0) + initialLabCharge("gravity", 3));
     setGravityMergeProgress(0);
-    setEmissionCharges(powerUpStage === "emission" ? 1 : 0);
+    setEmissionCharges((powerUpStage === "emission" ? 1 : 0) + initialLabCharge("emission", 2));
     setEmissionUnlockIndex(0);
     setEmissionQueueBoost(0);
-    setTransmuteCharges(powerUpStage === "transmute" ? 1 : 0);
-    setFusionJumpCharges(powerUpStage === "fusion-jump" ? 1 : 0);
+    setTransmuteCharges((powerUpStage === "transmute" ? 1 : 0) + initialLabCharge("transmute", 3));
+    setFusionJumpCharges((powerUpStage === "fusion-jump" ? 1 : 0) + initialLabCharge("fusion-jump", 1));
     setFusionJumpArmed(false);
-    setCatalystCharges(powerUpStage === "catalyst" ? 1 : 0);
+    setCatalystCharges((powerUpStage === "catalyst" ? 1 : 0) + initialLabCharge("catalyst", 2));
     setCatalystShotsRemaining(0);
     setPendingReversiblePowerUp(null);
     hasClaimedUnusedInventoryRef.current = false;
@@ -1535,13 +1578,13 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     setInventoryPickerOpen(!isPowerUpStage && hasPowerUps(powerUpInventory));
     setShotHistory([]);
     setHistoryOpen(false);
-    setGammaCharges(powerUpStage === "gamma" ? 1 : 0);
+    setGammaCharges((powerUpStage === "gamma" ? 1 : 0) + initialLabCharge("gamma", 3));
     setPendingGamma(false);
     setSpawnFloorIndex(0);
     setShufflesLeft(SHUFFLE_LIMIT);
     setShuffleAtoms([]);
     setShuffleStartOpen(false);
-    setQueueShuffleCharges(powerUpStage === "queue-shuffle" ? 1 : 0);
+    setQueueShuffleCharges((powerUpStage === "queue-shuffle" ? 1 : 0) + initialLabCharge("queue-shuffle", 2));
     queueUndoRef.current = null;
     challengeQueuePlanRef.current = [];
     eGunCooldownSlots.current = 0;
@@ -1627,7 +1670,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
   useEffect(() => {
     if (!emissionEnabled) return;
     if (gameOver || won) return;
-    const nextUnlockMs = (emissionUnlockIndex + 1) * EMISSION_UNLOCK_INTERVAL_MS;
+    const nextUnlockMs = (emissionUnlockIndex + 1) * emissionUnlockIntervalMs;
     if (elapsedMs < nextUnlockMs) return;
     setEmissionCharges((g) => g + 1);
     setEmissionUnlockIndex((i) => i + 1);
@@ -1636,11 +1679,11 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       showTip(
         "feature-emission-powerup",
         "☢ Emission power-up ready!",
-        "Emission unlocks every 5 minutes. Tap it to raise the current queue by 1 tier and make all future queue spawns start 1 tier higher.",
+        "Emission unlocks on a timed cooldown. Lab upgrades shorten the wait. Tap it to raise the current queue by 1 tier and make future queue spawns start 1 tier higher.",
       );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [elapsedMs, gameOver, won, emissionUnlockIndex, emissionEnabled, canIntroducePowerUps]);
+  }, [elapsedMs, gameOver, won, emissionUnlockIndex, emissionEnabled, emissionUnlockIntervalMs, canIntroducePowerUps]);
 
   // Spawn-floor scaling: every minute raises the lowest future spawn by one
   // tier, capped below the target. Emission adds its own run-wide boost.
@@ -1665,7 +1708,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
   function randomAvailableElement(maxElement: number, minElement = 1): number {
     const min = Math.max(1, Math.min(118, Math.floor(minElement)));
     const max = Math.max(min, Math.min(118, Math.floor(maxElement)));
-    return min + Math.floor(Math.random() * (max - min + 1));
+    return min + Math.floor(dailyRandom() * (max - min + 1));
   }
 
   function currentQueueDecay(): number {
@@ -1712,7 +1755,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
           showTip(
             "feature-grab-first-contact",
             "Grab is ready!",
-            "You earned Grab by chaining 8 merge progress in a row. Tap the Grab button, then drag any atom to reposition it and set up your next big reaction chain.",
+            "You earned Grab by chaining enough merge progress in a row. Tap the Grab button, then drag any atom to reposition it and set up your next big reaction chain.",
           );
         }
       }
@@ -1725,7 +1768,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     const effectiveMax = Math.max(minElement, maxElement);
     if (forceUniform) return randomAvailableElement(effectiveMax, minElement);
     const shiftedMax = effectiveMax - minElement + 1;
-    return generateQueueElement(shiftedMax, currentQueueDecay()) + minElement - 1;
+    return generateQueueElement(shiftedMax, currentQueueDecay(), dailyRandom) + minElement - 1;
   }
 
   function discoveredSeedAtoms(maxSeedAtom: number): number[] {
@@ -1737,7 +1780,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     if (gravityEnabled && mergeCount > 0) {
       setGravityMergeProgress((progress) => {
         const total = progress + mergeCount;
-        const earned = Math.floor(total / 30);
+        const earned = Math.floor(total / gravityMergeRequirement);
         if (earned > 0) {
           setGravityCharges((g) => g + earned);
           spawnPopup(earned > 1 ? `GRAVITY READY x${earned}` : "GRAVITY READY");
@@ -1745,11 +1788,11 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
             showTip(
               "feature-gravity-powerup",
               "Gravity power-up ready!",
-              "Every 30 successful merges earns Gravity. Tap the Gravity button to pull atoms upward; any combinations formed still count toward Grab progress and quest progress.",
+              "Successful merges earn Gravity. Lab upgrades lower the requirement. Tap Gravity to pull atoms upward; any combinations formed still count toward Grab progress and quest progress.",
             );
           }
         }
-        return total % 30;
+        return total % gravityMergeRequirement;
       });
     }
     if (mergeCount < 4) return;
@@ -1760,7 +1803,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
         showTip(
           "feature-catalyst-powerup",
           "Catalyst Aura ready!",
-          "A 4x combo unlocked Catalyst Aura. Activate it to double fusion range for your next 5 shots.",
+          "A 4x combo unlocked Catalyst Aura. Activate it to double fusion range for your next shots. Lab upgrades can extend the duration.",
         );
       }
     }
@@ -1780,25 +1823,25 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
   }
 
   function applyShotMilestones(nextShots: number) {
-    if (transmuteEnabled && nextShots > 0 && nextShots % TRANSMUTE_SHOT_INTERVAL === 0) {
+    if (transmuteEnabled && nextShots > 0 && nextShots % transmuteShotInterval === 0) {
       setTransmuteCharges((g) => g + 1);
       spawnPopup("🔀 TRANSMUTE READY");
       if (canIntroducePowerUps) {
         showTip(
           "feature-transmute-powerup",
           "🔀 Transmute Shot ready!",
-          "Every 30 shots earns Transmute. Activate it to reroll your queued atom into a higher-tier atom.",
+          "Shots earn Transmute, and Lab upgrades lower the interval. Activate it to reroll your queued atom into a higher-tier atom.",
         );
       }
     }
-    if (gammaEnabled && nextShots > 0 && nextShots % GAMMA_SHOT_INTERVAL === 0) {
+    if (gammaEnabled && nextShots > 0 && nextShots % gammaShotInterval === 0) {
       setGammaCharges((g) => g + 1);
       spawnPopup("☢ GAMMA READY");
       if (canIntroducePowerUps) {
         showTip(
           "feature-gamma-powerup",
           "☢ Gamma Bomb ready!",
-          `Every 40 shots after level ${GAMMA_MIN_LEVEL} earns a Gamma Bomb. Activate it, aim, and fire: a slow heavy projectile clears every non-stone atom in a wide radius.`,
+          `Shots after level ${GAMMA_MIN_LEVEL} earn Gamma Bombs, and Lab upgrades lower the interval. Activate it, aim, and fire: a slow heavy projectile clears every non-stone atom in a wide radius.`,
         );
       }
     }
@@ -1835,15 +1878,15 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       };
     }
     const eGunEligible = eGunEnabled && eGunCooldownSlots.current <= 0;
-    const eGunChance = EGUN_CHANCE + Math.floor(elapsedMs / EMISSION_UNLOCK_INTERVAL_MS) * EGUN_CHANCE_STEP;
-    const eGun = eGunEligible && Math.random() < eGunChance;
-    if (eGun) eGunCooldownSlots.current = EGUN_MIN_SHOT_GAP;
+    const eGunChance = eGunBaseChance + Math.floor(elapsedMs / emissionUnlockIntervalMs) * EGUN_CHANCE_STEP;
+    const eGun = eGunEligible && dailyRandom() < eGunChance;
+    if (eGun) eGunCooldownSlots.current = eGunShotGap;
     else if (eGunCooldownSlots.current > 0) eGunCooldownSlots.current -= 1;
-    const blank = !eGun && blankEnabled && Math.random() < BLANK_ATOM_CHANCE;
-    const shimmer = !eGun && !blank && shimmerEnabled && Math.random() < POWER_UP_CHANCE;
+    const blank = !eGun && blankEnabled && dailyRandom() < blankChance;
+    const shimmer = !eGun && !blank && shimmerEnabled && dailyRandom() < shimmerChance;
     const atom = generateQueueAtom(maxElement, board, shimmer);
     const unstable =
-      !eGun && !blank && unstableEnabled && atom > 1 && Math.random() < UNSTABLE_SPAWN_CHANCE;
+      !eGun && !blank && unstableEnabled && atom > 1 && dailyRandom() < unstableSpawnChance;
     if (canIntroducePowerUps && unstable) {
       showTip(
         "feature-unstable-isotope-first-spawn",
@@ -1910,6 +1953,12 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
         won: true,
       });
     }
+    if (mode === "daily-challenge") {
+      const awarded = completeDailyChallenge(stats.score);
+      if (awarded) spawnPopup("Daily reward +5 coins");
+    }
+    const secretAwarded = completeSecretCompound(formedCompoundsThisRun);
+    if (secretAwarded) spawnPopup("Secret compound +5 coins");
     // Clear any in-flight score/merge popups so they don't bleed into the
     // win animation or appear behind the result modal.
     setPopups([]);
@@ -1931,12 +1980,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     }, STAGE_CLEAR_ANIMATION_MS + 400);
   }
 
-  function beginStageClear(stats: StageClearStats, discoveryAtomicNumber?: number) {
-    if (discoveryAtomicNumber === target) {
-      setPendingStageClearAfterDiscovery({ atomicNumber: discoveryAtomicNumber, stats });
-      setDiscoveryEl(discoveryAtomicNumber);
-      return;
-    }
+  function beginStageClear(stats: StageClearStats, _discoveryAtomicNumber?: number) {
     feedback({ type: "win" });
     showStageClearAnimation(stats);
   }
@@ -2100,7 +2144,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
   // Visual ring now matches the ACTUAL catalyst merge reach: any atom whose
   // center is within (projR + otherR) * CATALYST_ADJ_FACTOR will merge.
   // Approximate otherR ≈ projShotR for the preview ring.
-  const catalystShotRadius = projShotR * 2 * CATALYST_ADJ_FACTOR;
+  const catalystShotRadius = projShotR * 2 * catalystAdjFactor;
   const launcherX = boardW / 2;
   const launcherY = boardH - 8; // near bottom of board
   const TOP_PAD = 6;
@@ -2812,7 +2856,6 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
         registerDiscoveries(discoveries);
         if (firstDiscovery > 1 && !discoveries.includes(target)) {
           feedback({ type: "milestone", atomicNumber: firstDiscovery });
-          setDiscoveryEl(firstDiscovery);
         }
       }
       reportQuestProgress({ discoveries, reachedAtomicNumbers: Array.from(upgradedAtoms) });
@@ -2862,7 +2905,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
 
   function fireGamma(ix: number, iy: number) {
     // Clear every non-stone atom within the gamma radius.
-    const radius = gammaR * GAMMA_RADIUS_MULT;
+    const radius = gammaR * gammaRadiusMult;
     const hitIds = new Set<number>();
     const clearedAtoms: { atom: number; isotope: boolean }[] = [];
     const remaining: Board = balls.filter((b) => {
@@ -3108,7 +3151,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       if (shuffleEnabled) {
         setStoneHitTally((prev) => {
           const next = prev + totalHits;
-          const earned = Math.floor(next / 15) - Math.floor(prev / 15);
+          const earned = Math.floor(next / queueShuffleRequirement) - Math.floor(prev / queueShuffleRequirement);
           if (earned > 0) {
             setQueueShuffleCharges((q) => q + earned);
             spawnPopup("QUEUE SHUFFLE");
@@ -3403,7 +3446,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       geo,
       target,
       isNobleGasLocked(atomOverride) ? atomOverride : 118,
-      catalystShotsRemaining > 0 ? CATALYST_ADJ_FACTOR : undefined,
+      catalystShotsRemaining > 0 ? catalystAdjFactor : undefined,
       fusionJumpArmed,
       newBall.r * SHOT_MERGE_RADIUS_BONUS_FACTOR,
     );
@@ -3502,7 +3545,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     // Track shots that produce zero merges. Stones are delayed for the first
     // 15 shots of a new run; after that, 3 no-merge shots in a row loads one.
     if (stoneEnabled && result.merges.length === 0) {
-      if (powerUpStage !== "stone" && nextShots <= STONE_GRACE_SHOTS) {
+      if (powerUpStage !== "stone" && nextShots <= stoneGraceShots) {
         setNoMergeStreak(0);
       } else {
         setNoMergeStreak((s) => {
@@ -3604,7 +3647,6 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
         }
         if (firstDiscovery && firstDiscovery > 1) {
           feedback({ type: "milestone", atomicNumber: firstDiscovery });
-          setDiscoveryEl(firstDiscovery);
         }
         if (checkGameOver(result.balls, geo)) {
           trackGameOver(levelId, nextScore, nextShots, nextHighest, mode);
@@ -3664,11 +3706,8 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     setGrabs((count) => count + selected.grab);
     setGammaCharges((count) => count + selected.gamma);
     if (selected.molecule > 0) {
-      inventoryCompoundChargesRef.current = Math.min(
-        1,
-        inventoryCompoundChargesRef.current + selected.molecule,
-      );
-      setCompoundCharges((count) => Math.min(1, count + selected.molecule));
+      inventoryCompoundChargesRef.current += selected.molecule;
+      setCompoundCharges((count) => count + selected.molecule);
     }
     if (selectedCount > 0) {
       spawnPopup(`🎒 LOADED ×${selectedCount}`);
@@ -3743,7 +3782,6 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       busy ||
       gameOver ||
       won ||
-      !transmuteEnabled ||
       transmuteCharges <= 0 ||
       pendingReversiblePowerUp
     )
@@ -3773,7 +3811,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
 
   function triggerFusionJumpPowerUp() {
     if (cancelPendingPowerUp("fusion-jump")) return;
-    if (!fusionJumpEnabled || busy || gameOver || won || fusionJumpCharges <= 0 || pendingReversiblePowerUp) return;
+    if (busy || gameOver || won || fusionJumpCharges <= 0 || pendingReversiblePowerUp) return;
     setPendingReversiblePowerUp("fusion-jump");
     setFusionJumpCharges((g) => Math.max(0, g - 1));
     runPowerUpsUsedRef.current += 1;
@@ -3798,7 +3836,6 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
   }
 
   function triggerGammaPowerUp() {
-    if (!gammaEnabled) return;
     if (busy || gameOver || won) return;
     if (pendingGamma) {
       // Cancel & refund.
@@ -3993,7 +4030,6 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       busy ||
       gameOver ||
       won ||
-      !catalystEnabled ||
       catalystCharges <= 0 ||
       catalystShotsRemaining > 0 ||
       pendingReversiblePowerUp
@@ -4002,15 +4038,14 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     setPendingReversiblePowerUp("catalyst");
     setCatalystCharges((g) => Math.max(0, g - 1));
     runPowerUpsUsedRef.current += 1;
-    setCatalystShotsRemaining(CATALYST_AURA_SHOTS);
-    spawnPopup("🧪 AURA ×5");
+    setCatalystShotsRemaining(catalystAuraShots);
+    spawnPopup(`AURA x${catalystAuraShots}`);
     haptic([20, 30, 20]);
   }
 
   function triggerEmissionPowerUp() {
     if (cancelPendingPowerUp("emission")) return;
-    if (!emissionEnabled || busy || gameOver || won || emissionCharges <= 0 || pendingReversiblePowerUp)
-      return;
+    if (busy || gameOver || won || emissionCharges <= 0 || pendingReversiblePowerUp) return;
 
     const raisedQueue = queue.map((atom, i) =>
       eGunQueue[i] || blankQueue[i] ? atom : raiseAtomForEmission(atom),
@@ -4046,7 +4081,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
   }
 
   function triggerGravityPowerUp() {
-    if (!gravityEnabled || busy || gameOver || won || gravityCharges <= 0) return;
+    if (busy || gameOver || won || gravityCharges <= 0) return;
     setBusy(true);
     const fxId = Date.now();
     setGravityFxId(fxId);
@@ -4186,7 +4221,6 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
         }
         if (firstDiscovery && firstDiscovery > 1) {
           feedback({ type: "milestone", atomicNumber: firstDiscovery });
-          setDiscoveryEl(firstDiscovery);
         }
         if (checkGameOver(result.balls, geo)) {
           setGameOver(true);
@@ -4374,7 +4408,6 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       );
     } else if (firstDiscovery && firstDiscovery > 1) {
       feedback({ type: "milestone", atomicNumber: firstDiscovery });
-      setDiscoveryEl(firstDiscovery);
     }
   }
 
@@ -4697,21 +4730,65 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
             </div>
             <div
               style={{
-                height: 6,
-                background: "var(--surface-high)",
-                borderRadius: 3,
-                marginTop: 6,
-                overflow: "hidden",
+                position: "relative",
+                height: 22,
+                marginTop: 4,
               }}
             >
               <div
                 style={{
-                  width: `${progressPct}%`,
-                  height: "100%",
-                  background: "linear-gradient(90deg, var(--primary), var(--accent))",
-                  transition: "width 0.4s ease",
+                  position: "absolute",
+                  left: 0,
+                  right: 0,
+                  top: 8,
+                  height: 6,
+                  background: "var(--surface-high)",
+                  borderRadius: 3,
+                  overflow: "hidden",
                 }}
-              />
+              >
+                <div
+                  style={{
+                    width: `${progressPct}%`,
+                    height: "100%",
+                    background: "linear-gradient(90deg, var(--primary), var(--accent))",
+                    transition: "width 0.4s ease",
+                  }}
+                />
+              </div>
+              {newlyDiscoveredThisRun
+                .filter((atomicNumber) => atomicNumber <= target)
+                .map((atomicNumber) => {
+                  const read = readDiscoveryAtoms.includes(atomicNumber);
+                  return (
+                    <button
+                      key={atomicNumber}
+                      type="button"
+                      onClick={() => {
+                        setReadDiscoveryAtoms((current) =>
+                          current.includes(atomicNumber) ? current : [...current, atomicNumber],
+                        );
+                        setDiscoveryEl(atomicNumber);
+                      }}
+                      aria-label={`Read ${ELEMENTS[atomicNumber - 1]?.name ?? "element"} discovery`}
+                      style={{
+                        position: "absolute",
+                        left: `calc(${Math.min(100, Math.max(0, (atomicNumber / target) * 100))}% - 11px)`,
+                        top: 0,
+                        width: 22,
+                        height: 22,
+                        border: "none",
+                        padding: 0,
+                        borderRadius: 999,
+                        background: "transparent",
+                        cursor: "pointer",
+                        animation: read ? undefined : "icon-shimmer 1.5s ease-in-out infinite",
+                      }}
+                    >
+                      <ElementBall atomicNumber={atomicNumber} size={22} glow={!read} />
+                    </button>
+                  );
+                })}
             </div>
       </div>
       <button
@@ -5524,7 +5601,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
               padding: "2px 2px 4px",
             }}
           >
-            {transmuteEnabled && (transmuteCharges > 0 || pendingReversiblePowerUp === "transmute") && (
+            {(transmuteCharges > 0 || pendingReversiblePowerUp === "transmute") && (
               <button
                 type="button"
                 title="Transmute: reroll your current queued atom into a higher-tier atom."
@@ -5567,7 +5644,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
                 <span style={powerUpCount}>{transmuteCharges}</span>
               </button>
             )}
-            {fusionJumpEnabled && (fusionJumpCharges > 0 || fusionJumpArmed) && (
+            {(fusionJumpCharges > 0 || fusionJumpArmed) && (
               <button
                 type="button"
                 title="Fusion Jump: arm your next merge to skip one element tier."
@@ -5601,7 +5678,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
                 <span style={powerUpCount}>{fusionJumpArmed ? "↩" : fusionJumpCharges}</span>
               </button>
             )}
-            {catalystEnabled && (catalystCharges > 0 || catalystShotsRemaining > 0) && (
+            {(catalystCharges > 0 || catalystShotsRemaining > 0) && (
               <button
                 type="button"
                 title="Catalyst Aura: double fusion radius for your next 5 shots."
@@ -5643,7 +5720,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
                 </span>
               </button>
             )}
-            {emissionEnabled && (emissionCharges > 0 || pendingReversiblePowerUp === "emission") && (
+            {(emissionCharges > 0 || pendingReversiblePowerUp === "emission") && (
               <button
                 type="button"
                 title="Emission: raise the current queue and all future queue spawns by 1 tier."
@@ -5679,7 +5756,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
                 </span>
               </button>
             )}
-            {gravityEnabled && gravityCharges > 0 && (
+            {gravityCharges > 0 && (
               <button
                 type="button"
                 className={powerUpStage === "gravity" ? "target-claim-flash" : undefined}
@@ -5707,7 +5784,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
                 <span style={powerUpCount}>{gravityCharges}</span>
               </button>
             )}
-            {grabEnabled && grabs > 0 && (
+            {grabs > 0 && (
               <button
                 type="button"
                 className={powerUpStage === "grab" ? "target-claim-flash" : undefined}
@@ -5777,7 +5854,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
                 <span style={powerUpCount}>{compoundMode ? "×" : compoundCharges}</span>
               </button>
             )}
-            {gammaEnabled && (gammaCharges > 0 || pendingGamma) && (
+            {(gammaCharges > 0 || pendingGamma) && (
               <button
                 type="button"
                 title="Gamma Bomb: clear every non-stone atom in a wide radius."
@@ -5816,7 +5893,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
                 onClick={triggerQueueShufflePowerUp}
                 {...powerUpInfoHandlers(
                   "♻ Queue Shuffle",
-                  "Rerolls every atom currently waiting in your queue. Earned every 15 atom-on-stone hits.",
+                  "Rerolls every atom currently waiting in your queue. Lab upgrades reduce the atom-on-stone hit requirement.",
                 )}
                 disabled={busy || pendingGamma}
                 style={{
@@ -7083,6 +7160,10 @@ function ResultModal({
   const claimableOptions = (Object.keys(POWER_UP_INVENTORY_META) as InventoryPowerUpId[]).filter(
     (id) => (claimablePowerUps[id] ?? 0) > 0,
   );
+  const scoreGoal = level.scoreGoal ?? (level.targetElement * 1000 * (level.scoreMultiplier ?? 1));
+  const shotGoal = level.starShotsTwo ?? (level.parShots ? level.parShots + 5 : 50);
+  const scoreMet = score >= scoreGoal;
+  const shotsMet = shots <= shotGoal;
   return (
     <Modal>
       <div
@@ -7163,7 +7244,11 @@ function ResultModal({
       )}
       {!isPowerUpPass && (
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
-          <ResultStat label="Score" value={formatScore(score)} color="var(--accent)" />
+          <ResultStat
+            label="Score"
+            value={`${formatScore(score)} / ${formatScore(scoreGoal)}${scoreMet ? " (\u2605)" : ""}`}
+            color="var(--accent)"
+          />
           <ResultStat
             label="Target"
             value={ELEMENTS[level.targetElement - 1]?.symbol ?? "?"}
@@ -7171,7 +7256,7 @@ function ResultModal({
           />
           <ResultStat
             label="Shots"
-            value={`${shots}${level.parShots ? ` / ${getStarParShots(level)}` : ""}`}
+            value={`${shots} / ${shotGoal}${shotsMet ? " (\u2605)" : ""}`}
             color="var(--foreground)"
           />
           <ResultStat label="Best Combo" value={`${bestCombo}`} color="var(--foreground)" />
@@ -7318,18 +7403,6 @@ function ResultModal({
               </button>
             </>
           )}
-        </div>
-      )}
-      {level.scoreGoal && !isPowerUpPass && (
-        <div
-          style={{
-            fontSize: 11,
-            color: "var(--muted-foreground)",
-            textAlign: "center",
-            marginBottom: 12,
-          }}
-        >
-          Score goal: {formatScore(level.scoreGoal)}
         </div>
       )}
       <div style={{ display: "flex", gap: 8 }}>

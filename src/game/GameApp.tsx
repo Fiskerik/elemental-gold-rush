@@ -34,6 +34,7 @@ export function GameApp() {
   const appLanguage = useProgress((s) => s.appLanguage);
   const soundVolume = useProgress((s) => s.soundVolume);
   const musicVolume = useProgress((s) => s.musicVolume);
+  const refreshDailyFeatures = useProgress((s) => s.refreshDailyFeatures);
   const [screen, setScreen] = useState<Screen>({ name: "menu" });
   const [showLaunchScreen, setShowLaunchScreen] = useState(true);
   const [resumePrompt, setResumePrompt] = useState<ReturnType<typeof getSavedRunSummary>>(null);
@@ -93,6 +94,11 @@ export function GameApp() {
             onLab={() => setScreen({ name: "lab" })}
             onLibrary={() => setScreen({ name: "library" })}
             onProfile={() => setScreen({ name: "profile" })}
+            onDailyChallenge={() => {
+              refreshDailyFeatures();
+              const nextDailyChallenge = useProgress.getState().dailyChallenge;
+              setScreen({ name: "game", levelId: nextDailyChallenge.levelId, mode: "daily-challenge" });
+            }}
           />
           {resumePrompt && (
             <ResumeRunPrompt

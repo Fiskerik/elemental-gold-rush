@@ -11,7 +11,8 @@ export type GameModeId =
   | "pure-hydrogen"
   | "noble-gas-lock"
   | "gold-rush-timer"
-  | "isotope-decay";
+  | "isotope-decay"
+  | "daily-challenge";
 
 export interface GameModeConfig {
   id: GameModeId;
@@ -33,6 +34,19 @@ export const GAME_MODES: GameModeConfig[] = [
     description: "Classic level progression with targets, stars, and discoveries.",
     unlockedAtLevel: 1,
     rules: ["Reach the target element", "Earn stars for clean, fast clears"],
+  },
+  {
+    id: "daily-challenge",
+    name: "Daily Challenge",
+    emoji: "D",
+    kind: "challenge",
+    description: "A seeded daily run with the same target level for every player that day.",
+    unlockedAtLevel: 1,
+    rules: [
+      "One daily reward clear",
+      "Local best score is saved",
+      "Global leaderboard requires Game Center or backend sync",
+    ],
   },
   {
     id: "survival",
