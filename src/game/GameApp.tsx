@@ -20,7 +20,7 @@ import { useDomLocalization } from "@/game/useDomLocalization";
 type Screen =
   | { name: "menu" }
   | { name: "levels" }
-  | { name: "game"; levelId: number; mode?: GameModeId; resumeSavedRun?: boolean }
+  | { name: "game"; levelId: number; mode?: GameModeId; resumeSavedRun?: boolean; secretCompoundId?: string }
   | { name: "collection" }
   | { name: "shop" }
   | { name: "lab" }
@@ -87,6 +87,18 @@ export function GameApp() {
     setScreen({ name: "game", levelId: dailyChallenge.levelId, mode: "daily-challenge" });
   }
 
+  function startSecretCompound() {
+    refreshDailyFeatures();
+    const { secretCompound, revealSecretCompound } = useProgress.getState();
+    revealSecretCompound();
+    setScreen({
+      name: "game",
+      levelId: getLevelById(unlockedLevel)?.id ?? 1,
+      mode: "campaign",
+      secretCompoundId: secretCompound.compoundId,
+    });
+  }
+
   switch (screen.name) {
     case "menu":
       return (
@@ -101,6 +113,7 @@ export function GameApp() {
             onLibrary={() => setScreen({ name: "library" })}
             onProfile={() => setScreen({ name: "profile" })}
             onDailyChallenge={startDailyChallenge}
+            onSecretCompound={startSecretCompound}
           />
           {resumePrompt && (
             <ResumeRunPrompt
@@ -138,10 +151,11 @@ export function GameApp() {
     case "game":
       return (
         <GameBoard
-          key={`${screen.mode ?? "campaign"}-${screen.levelId}-${screen.resumeSavedRun ? "resume" : "new"}`}
+          key={`${screen.mode ?? "campaign"}-${screen.levelId}-${screen.secretCompoundId ?? "standard"}-${screen.resumeSavedRun ? "resume" : "new"}`}
           levelId={screen.levelId}
           mode={screen.mode}
           resumeSavedRun={screen.resumeSavedRun}
+          secretCompoundId={screen.secretCompoundId}
           onExit={() => setScreen({ name: "menu" })}
           onMap={() => setScreen({ name: "levels" })}
           onWin={(nextId) => {

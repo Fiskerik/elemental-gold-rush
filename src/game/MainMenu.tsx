@@ -39,6 +39,7 @@ interface Props {
   onLibrary: () => void;
   onProfile: () => void;
   onDailyChallenge: () => void;
+  onSecretCompound: () => void;
 }
 
 export function MainMenu({
@@ -51,6 +52,7 @@ export function MainMenu({
   onLibrary,
   onProfile,
   onDailyChallenge,
+  onSecretCompound,
 }: Props) {
   const isTabletLayout = useIsTabletLayout();
   const {
@@ -142,7 +144,7 @@ export function MainMenu({
       showDailyRewardToast("Secret Compound complete");
       return;
     }
-    showDailyRewardToast(secretCompoundDefinition ? `Clue: ${secretCompoundDefinition.fact}` : "Secret compound revealed");
+    onSecretCompound();
   }
   async function handleRewardedCoin() {
     if (rewardedAdBusy || hasProPack) return;
@@ -349,52 +351,6 @@ export function MainMenu({
           />
         </nav>
 
-        <section style={{ ...dailyPanel, padding: isTabletLayout ? 18 : dailyPanel.padding }}>
-          {dailyRewardToast && (
-            <div style={dailyToast} role="status" aria-live="polite">
-              <Sparkles size={15} aria-hidden="true" />
-              <span>{dailyRewardToast.text}</span>
-            </div>
-          )}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-            <div>
-              <div style={sectionLabel}>DAILY LAB</div>
-              <div style={{ fontSize: 12, color: "var(--muted-foreground)" }}>
-                {`Streak ${dailyStreak} - ${completedDailyQuests}/${dailyQuests.length} quests`}
-              </div>
-              <div style={{ fontSize: 11, color: "var(--muted-foreground)", marginTop: 2 }}>
-                {hasProPack ? "Pro daily quests pay 2x+ gold." : "Complete 4 daily tasks to claim."}
-              </div>
-              <div style={{ fontSize: 10, color: "var(--accent)", marginTop: 4, fontWeight: 800, letterSpacing: 0.6 }}>
-                {`Resets in ${resetCountdown}`}
-              </div>
-            </div>
-            <div style={{ display: "grid", justifyItems: "end", gap: 8 }}>
-              <button
-                onClick={handleDailyRewardClaim}
-                disabled={!dailyComplete || claimedDailyReward}
-                style={{
-                  ...claimBtn,
-                  background:
-                    dailyComplete && !claimedDailyReward
-                      ? "linear-gradient(135deg, var(--accent), var(--primary))"
-                      : "var(--surface-high)",
-                  color:
-                    dailyComplete && !claimedDailyReward
-                      ? "var(--primary-foreground)"
-                      : "var(--muted-foreground)",
-                  cursor: dailyComplete && !claimedDailyReward ? "pointer" : "not-allowed",
-                }}
-              >
-                {claimedDailyReward ? "Claimed" : "Claim"}
-              </button>
-              <div style={weeklyBonusPill}>
-                {weeklyBonus.todayClaimed ? `Today +${weeklyBonus.coinsEarnedToday}` : "Play today +1"}
-              </div>
-            </div>
-          </div>
-        </section>
-
         <section style={weeklyBonusCard}>
             <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
               <div>
@@ -464,6 +420,52 @@ export function MainMenu({
             <div style={{ fontSize: 10, color: "var(--muted-foreground)", lineHeight: 1.35 }}>
               {`1 coin each day you play. ${weeklyBonus.nextRewardText}.`}
             </div>
+        </section>
+
+        <section style={{ ...dailyPanel, padding: isTabletLayout ? 18 : dailyPanel.padding }}>
+          {dailyRewardToast && (
+            <div style={dailyToast} role="status" aria-live="polite">
+              <Sparkles size={15} aria-hidden="true" />
+              <span>{dailyRewardToast.text}</span>
+            </div>
+          )}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+            <div>
+              <div style={sectionLabel}>DAILY LAB</div>
+              <div style={{ fontSize: 12, color: "var(--muted-foreground)" }}>
+                {`Streak ${dailyStreak} - ${completedDailyQuests}/${dailyQuests.length} quests`}
+              </div>
+              <div style={{ fontSize: 11, color: "var(--muted-foreground)", marginTop: 2 }}>
+                {hasProPack ? "Pro daily quests pay 2x+ gold." : "Complete 4 daily tasks to claim."}
+              </div>
+              <div style={{ fontSize: 10, color: "var(--accent)", marginTop: 4, fontWeight: 800, letterSpacing: 0.6 }}>
+                {`Resets in ${resetCountdown}`}
+              </div>
+            </div>
+            <div style={{ display: "grid", justifyItems: "end", gap: 8 }}>
+              <button
+                onClick={handleDailyRewardClaim}
+                disabled={!dailyComplete || claimedDailyReward}
+                style={{
+                  ...claimBtn,
+                  background:
+                    dailyComplete && !claimedDailyReward
+                      ? "linear-gradient(135deg, var(--accent), var(--primary))"
+                      : "var(--surface-high)",
+                  color:
+                    dailyComplete && !claimedDailyReward
+                      ? "var(--primary-foreground)"
+                      : "var(--muted-foreground)",
+                  cursor: dailyComplete && !claimedDailyReward ? "pointer" : "not-allowed",
+                }}
+              >
+                {claimedDailyReward ? "Claimed" : "Claim"}
+              </button>
+              <div style={weeklyBonusPill}>
+                {weeklyBonus.todayClaimed ? `Today +${weeklyBonus.coinsEarnedToday}` : "Play today +1"}
+              </div>
+            </div>
+          </div>
         </section>
 
         <section style={{ ...dailyPanel, padding: isTabletLayout ? 18 : dailyPanel.padding }}>

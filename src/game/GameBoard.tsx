@@ -47,6 +47,7 @@ import {
   type CompoundDefinition,
   compoundKey,
   findCompoundByElements,
+  getCompoundHint,
 } from "./compounds";
 import { MoleculeVisual } from "./MoleculeVisual";
 import { PowerUpBadge } from "./PowerUpLibrary";
@@ -66,6 +67,7 @@ interface Props {
   onMap?: () => void;
   mode?: GameModeId;
   resumeSavedRun?: boolean;
+  secretCompoundId?: string;
 }
 
 const QUEUE_SIZE = 4;
@@ -680,19 +682,19 @@ function calculateStars(
 
 export function GameBoard(props: Props) {
   const level = getLevelById(props.levelId);
-  if (props.mode === "elemental-boss" || level?.specialStage === "elemental-boss") {
+  if (!props.secretCompoundId && (props.mode === "elemental-boss" || level?.specialStage === "elemental-boss")) {
     return <ElementalBossBoard {...props} mode="elemental-boss" />;
   }
-  if (props.mode === "periodic-guardian" || level?.specialStage === "periodic-guardian") {
+  if (!props.secretCompoundId && (props.mode === "periodic-guardian" || level?.specialStage === "periodic-guardian")) {
     return <PeriodicGuardianBoard {...props} mode="periodic-guardian" />;
   }
-  if (props.mode === "nucleus-core" || level?.specialStage === "nucleus-core") {
+  if (!props.secretCompoundId && (props.mode === "nucleus-core" || level?.specialStage === "nucleus-core")) {
     return <NucleusCoreBoard {...props} mode="nucleus-core" />;
   }
   return <StandardGameBoard {...props} />;
 }
 
-function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "campaign", resumeSavedRun = false }: Props) {
+function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "campaign", resumeSavedRun = false, secretCompoundId }: Props) {
   const isTabletLayout = useIsTabletLayout();
   const level = getLevelById(levelId) ?? LEVELS[0];
   const gameMode = getGameMode(mode);
@@ -705,7 +707,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
   const fusionJumpEnabled = level.id >= FUSION_JUMP_MIN_LEVEL;
   const catalystEnabled = level.id >= CATALYST_MIN_LEVEL;
   const stoneEnabled = level.id >= STONE_MIN_LEVEL;
-  const powerUpStage = mode === "campaign" ? level.powerUpStage : undefined;
+  const powerUpStage = mode === "campaign" && !secretCompoundId ? level.powerUpStage : undefined;
   const isPowerUpStage = powerUpStage != null;
   const compoundEnabled = mode === "campaign" && !isPowerUpStage;
   const blankEnabled = level.id >= BLANK_MIN_LEVEL;
@@ -1037,12 +1039,18 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
 
   const target = level.targetElement;
   const targetEl = ELEMENTS[target - 1];
+  const secretCompoundObjective = useMemo(
+    () => (secretCompoundId ? COMPOUNDS.find((compound) => compound.id === secretCompoundId) ?? null : null),
+    [secretCompoundId],
+  );
   const moleculeObjective = useMemo(
     () =>
+      secretCompoundObjective ??
       COMPOUNDS.find((compound) => compound.id === MOLECULE_CHALLENGE_BY_LEVEL[level.id]) ?? null,
-    [level.id],
+    [level.id, secretCompoundObjective],
   );
-  const isMoleculeChallenge = moleculeObjective != null && mode === "campaign";
+  const isSecretCompoundChallenge = secretCompoundObjective != null;
+  const isMoleculeChallenge = moleculeObjective != null && (mode === "campaign" || isSecretCompoundChallenge);
   const canIntroducePowerUps = mode === "campaign" && !isMoleculeChallenge && !isPowerUpStage;
   const unstableEnabled = level.id >= UNSTABLE_UNLOCK_LEVEL;
   const current = queue[0];
@@ -1318,7 +1326,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
   }
 
   function saveRunSnapshot() {
-    if (typeof window === "undefined" || won || gameOver) return;
+    if (typeof window === "undefined" || won || gameOver || isSecretCompoundChallenge) return;
     window.localStorage.setItem(SAVED_RUN_STORAGE_KEY, JSON.stringify(buildSavedRunSnapshot()));
   }
 
@@ -1455,7 +1463,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     const initialBalls = isPowerUpStage
       ? createPowerUpStageBoard(powerUpStage)
       : isMoleculeChallenge
-      ? createMoleculeChallengeBoard(moleculeObjective)
+      ? createMoleculeChallengeBoard(moleculeObjective, { startBelowHighest: isSecretCompoundChallenge })
       : mode === "pure-hydrogen"
         ? createEmptyBoard()
       : level.id >= SHUFFLE_MIN_LEVEL
@@ -1470,7 +1478,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     if (initialDiscoveries.length > 0) registerDiscoveries(initialDiscoveries);
     const powerUpQueuePrefix = isPowerUpStage ? powerUpStageQueuePrefix(powerUpStage) : [];
     const challengeQueuePrefix = isMoleculeChallenge
-      ? moleculeChallengeQueuePrefix(moleculeObjective)
+      ? moleculeChallengeQueuePrefix(moleculeObjective, { startBelowHighest: isSecretCompoundChallenge })
       : [];
     challengeQueuePlanRef.current = challengeQueuePrefix.slice(QUEUE_SIZE);
     const initialQueue = [
@@ -1638,7 +1646,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [levelId, level.gridRows, level.gridCols, level.maxQueueElement, mode, resumeSavedRun, isMoleculeChallenge, isPowerUpStage, powerUpStage, moleculeObjective, restartNonce]);
+  }, [levelId, level.gridRows, level.gridCols, level.maxQueueElement, mode, resumeSavedRun, isMoleculeChallenge, isSecretCompoundChallenge, isPowerUpStage, powerUpStage, moleculeObjective, restartNonce]);
 
   // Show a one-time tooltip the first time a shimmer atom appears in the queue.
   useEffect(() => {
@@ -1977,7 +1985,10 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       const awarded = completeDailyChallenge(stats.score);
       if (awarded) spawnPopup("Daily reward +5 coins");
     }
-    const secretAwarded = completeSecretCompound(formedCompoundsThisRun);
+    const completedCompoundIds = stats.compound
+      ? [...formedCompoundsThisRun, stats.compound.id]
+      : formedCompoundsThisRun;
+    const secretAwarded = completeSecretCompound(completedCompoundIds);
     if (secretAwarded) spawnPopup("Secret compound +5 coins");
     // Clear any in-flight score/merge popups so they don't bleed into the
     // win animation or appear behind the result modal.
@@ -2302,12 +2313,12 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     return { ...ball, unstableShots: unstableChargeCapacity(ball.atom) };
   }
 
-  function createMoleculeChallengeBoard(compound: CompoundDefinition | null): Board {
+  function createMoleculeChallengeBoard(compound: CompoundDefinition | null, options: { startBelowHighest?: boolean } = {}): Board {
     if (!compound) return createSeededBoard();
     const recipeAtoms = atomsForCompound(compound);
     const highestRecipeAtom = Math.max(...recipeAtoms, 1);
-    const startingAtom = level.id >= 15 ? Math.max(1, highestRecipeAtom - 1) : highestRecipeAtom;
-    const atoms = compound.id === "water" ? [7, 7, 1, 1] : [startingAtom];
+    const startingAtom = options.startBelowHighest || level.id >= 15 ? Math.max(1, highestRecipeAtom - 1) : highestRecipeAtom;
+    const atoms = compound.id === "water" && !options.startBelowHighest ? [7, 7, 1, 1] : [startingAtom];
     const count = atoms.length;
     const maxR = Math.max(...atoms.map((atom) => radiusFor(atom)), radiusFor(1));
     const cols = Math.min(4, Math.max(2, Math.ceil(Math.sqrt(count))));
@@ -2330,11 +2341,21 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     });
   }
 
-  function moleculeChallengeQueuePrefix(compound: CompoundDefinition | null): number[] {
+  function moleculeChallengeQueuePrefix(compound: CompoundDefinition | null, options: { startBelowHighest?: boolean } = {}): number[] {
     if (!compound) return [];
-    if (compound.id === "water") return [];
+    if (compound.id === "water" && !options.startBelowHighest) return [];
     const recipeAtoms = atomsForCompound(compound);
     const highestRecipeAtom = Math.max(...recipeAtoms, 1);
+    let skippedSecretHighest = false;
+    const atomsAfterSkippingHighest = recipeAtoms.filter((atom) => {
+      if (atom === highestRecipeAtom) {
+        if (skippedSecretHighest) return true;
+        skippedSecretHighest = true;
+        return false;
+      }
+      return true;
+    });
+    if (options.startBelowHighest) return [Math.max(1, highestRecipeAtom - 1), ...atomsAfterSkippingHighest];
     let skippedHighest = false;
     return recipeAtoms.filter((atom) => {
       if (atom === highestRecipeAtom && !skippedHighest) {
@@ -4135,12 +4156,13 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       );
       setDiscoveryCompound({ compound: matchingCompound, isNew: wasNew, count: nextCount, bonusScore });
       if (isMoleculeChallenge && moleculeObjective && matchingCompound.id === moleculeObjective.id) {
-        const timeSec = (Date.now() - startTimeRef.current) / 1000;
         const stars = 3;
         setEarnedStars(stars);
-        setLevelStars(levelId, stars);
+        if (!isSecretCompoundChallenge) {
+          setLevelStars(levelId, stars);
+          unlockLevel(getNextLevel(levelId)?.id ?? levelId + 1);
+        }
         reportQuestProgress({ levelCleared: true, starsEarned: stars });
-        unlockLevel(getNextLevel(levelId)?.id ?? levelId + 1);
         trackLevelWin(levelId, score + bonusScore, shots, Math.max(highest, getHighestOnBoard(balls)), mode);
         beginStageClear({
           stars,
@@ -5076,11 +5098,25 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
             <MoleculeVisual compound={moleculeObjective} size={38} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 10, letterSpacing: 1.5, color: "var(--accent)", fontWeight: 900 }}>
-                LAB CHALLENGE
+                {isSecretCompoundChallenge ? "SECRET COMPOUND" : "LAB CHALLENGE"}
               </div>
               <div style={{ fontSize: 13, fontWeight: 900 }}>
-                Form {moleculeObjective.name} ({moleculeObjective.formula}) to clear
+                {isSecretCompoundChallenge
+                  ? shots >= 50
+                    ? `Revealed: form ${moleculeObjective.name} (${moleculeObjective.formula})`
+                    : getCompoundHint(moleculeObjective)
+                  : `Form ${moleculeObjective.name} (${moleculeObjective.formula}) to clear`}
               </div>
+              {isSecretCompoundChallenge && shots < 50 && (
+                <div style={{ marginTop: 3, color: "var(--muted-foreground)", fontSize: 11 }}>
+                  Compound reveals after 50 shots
+                </div>
+              )}
+              {isSecretCompoundChallenge && shots >= 50 && (
+                <div style={{ marginTop: 3, color: "var(--muted-foreground)", fontSize: 11 }}>
+                  Use the compound tool when the recipe atoms are on the board.
+                </div>
+              )}
             </div>
           </div>
         )}

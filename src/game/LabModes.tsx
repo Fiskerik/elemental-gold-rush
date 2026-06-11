@@ -10,6 +10,8 @@ import {
   useProgress,
 } from "./store";
 import { useIsTabletLayout } from "./responsive";
+import { PowerUpBadge } from "./PowerUpLibrary";
+import { POWER_UP_UNLOCK_LEVELS } from "./powerUps";
 
 interface Props {
   onBack: () => void;
@@ -28,6 +30,7 @@ export function LabModes({ onBack, onStart }: Props) {
   const labLevelCap = getLabUpgradeLevelCap(unlockedLevel);
   const unlockedModes = new Set(getUnlockedGameModes(unlockedLevel).map((mode) => mode.id));
   const levelId = Math.min(unlockedLevel, MAX_LEVEL);
+  const discoveredUpgradeIds = LAB_UPGRADE_IDS.filter((id) => unlockedLevel >= POWER_UP_UNLOCK_LEVELS[id]);
   const defeatedBosses = new Set(
     (["elemental-boss", "periodic-guardian", "nucleus-core"] as BossId[]).filter(
       (id) => (levelStats[BOSSES[id].levelId]?.bestShots ?? null) != null,
@@ -52,30 +55,35 @@ export function LabModes({ onBack, onStart }: Props) {
           </p>
         </header>
         <section style={upgradePanel}>
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "baseline", marginBottom: 12 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", marginBottom: 12 }}>
             <div>
               <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--accent)", fontWeight: 900 }}>LAB UPGRADES</div>
               <h2 style={{ margin: "4px 0 0", fontSize: 22 }}>Permanent Power-Up Research</h2>
             </div>
-            <div style={{ color: "var(--accent)", fontWeight: 900, fontSize: 12 }}>{goldCoins} coins</div>
+            <div style={coinBalanceChip}>{goldCoins} coins</div>
           </div>
           <p style={{ margin: "0 0 12px", color: "var(--muted-foreground)", fontSize: 12, lineHeight: 1.45 }}>
             Upgrade levels unlock at campaign levels 5, 10, 20, 35, and 50. Toggle a researched power-up off to disable its bonus effects.
           </p>
           <div style={{ display: "grid", gridTemplateColumns: isTabletLayout ? "1fr 1fr" : "1fr", gap: 10 }}>
-            {LAB_UPGRADE_IDS.map((id) => {
+            {discoveredUpgradeIds.map((id) => {
               const meta = LAB_UPGRADE_META[id];
               const level = labUpgradeLevels[id] ?? 0;
               const active = labUpgradeEnabled[id] ?? true;
               const nextCost = LAB_UPGRADE_COSTS[level];
               const canUpgrade = labLevelCap > level && nextCost != null && goldCoins >= nextCost;
+              const activeBonuses = meta.bonuses.slice(0, Math.max(1, level));
+              const futureBonuses = meta.bonuses.slice(Math.max(1, level));
               return (
                 <article key={id} style={upgradeCard}>
                   <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
-                    <div>
-                      <h3 style={{ margin: 0, fontSize: 15 }}>{meta.name}</h3>
-                      <div style={{ marginTop: 3, color: "var(--muted-foreground)", fontSize: 11 }}>
-                        Level {level}/5 {labLevelCap <= level && level < 5 ? `- unlock next tier at campaign milestone` : ""}
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                      <PowerUpBadge icon={id} size={36} />
+                      <div>
+                        <h3 style={{ margin: 0, fontSize: 15 }}>{meta.name}</h3>
+                        <div style={{ marginTop: 3, color: "var(--muted-foreground)", fontSize: 11 }}>
+                          Level {level}/5 {labLevelCap <= level && level < 5 ? `- unlock next tier at campaign milestone` : ""}
+                        </div>
                       </div>
                     </div>
                     <button type="button" onClick={() => toggleLabUpgrade(id)} style={{ ...toggleBtn, color: active ? "var(--accent)" : "var(--muted-foreground)" }}>
@@ -86,11 +94,26 @@ export function LabModes({ onBack, onStart }: Props) {
                     <span style={{ ...upgradeProgressFill, width: `${(level / 5) * 100}%` }} />
                   </div>
                   <div style={{ display: "grid", gap: 4, marginTop: 8 }}>
-                    {meta.bonuses.map((bonus, index) => (
+                    {activeBonuses.map((bonus, index) => (
                       <div key={bonus} style={{ color: index < level ? "var(--success, var(--accent))" : "var(--muted-foreground)", fontSize: 11, lineHeight: 1.25 }}>
                         L{index + 1}: {bonus}
                       </div>
                     ))}
+                    {futureBonuses.length > 0 && (
+                      <details style={futureBonusDetails}>
+                        <summary style={futureBonusSummary}>Locked perks L{Math.max(2, level + 1)}-5</summary>
+                        <div style={{ display: "grid", gap: 4, marginTop: 6 }}>
+                          {futureBonuses.map((bonus, index) => {
+                            const bonusLevel = Math.max(1, level) + index + 1;
+                            return (
+                              <div key={bonus} style={{ color: "var(--muted-foreground)", fontSize: 11, lineHeight: 1.25 }}>
+                                L{bonusLevel}: {bonus}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </details>
+                    )}
                   </div>
                   <button type="button" disabled={!canUpgrade} onClick={() => upgradeLabPowerUp(id)} style={{ ...startBtn, marginTop: 10, opacity: canUpgrade ? 1 : 0.55 }}>
                     {level >= 5 ? "Maxed" : nextCost == null ? "Locked" : `Upgrade - ${nextCost} coins`}
@@ -299,6 +322,21 @@ const upgradeCard: React.CSSProperties = {
   border: "1px solid var(--border)",
 };
 
+const coinBalanceChip: React.CSSProperties = {
+  position: "sticky",
+  top: 8,
+  zIndex: 3,
+  color: "var(--accent)",
+  fontWeight: 900,
+  fontSize: 12,
+  whiteSpace: "nowrap",
+  padding: "7px 10px",
+  borderRadius: 999,
+  background: "var(--surface-high)",
+  border: "1px solid var(--border)",
+  boxShadow: "0 8px 18px rgba(0,0,0,0.16)",
+};
+
 const toggleBtn: React.CSSProperties = {
   border: "1px solid var(--border)",
   borderRadius: 999,
@@ -322,6 +360,22 @@ const upgradeProgressFill: React.CSSProperties = {
   height: "100%",
   background: "linear-gradient(90deg, var(--primary), var(--accent))",
 };
+
+const futureBonusDetails: React.CSSProperties = {
+  marginTop: 2,
+  padding: "6px 8px",
+  borderRadius: 9,
+  background: "var(--surface-high)",
+  border: "1px solid var(--border)",
+};
+
+const futureBonusSummary: React.CSSProperties = {
+  cursor: "pointer",
+  color: "var(--muted-foreground)",
+  fontSize: 11,
+  fontWeight: 800,
+};
+
 const backBtn: React.CSSProperties = {
   background: "var(--surface)",
   border: "1px solid var(--border)",
