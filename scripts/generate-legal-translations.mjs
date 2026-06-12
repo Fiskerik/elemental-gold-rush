@@ -61,7 +61,46 @@ async function translateDoc(doc, langCode, langLabel) {
     else if (ch === "}") { depth--; if (depth === 0) { end = i + 1; break; } }
   }
   if (end > 0) content = content.slice(0, end);
-  return JSON.parse(content);
+  try {
+    return JSON.parse(content);
+  } catch {
+    return JSON.parse(repairJson(content));
+  }
+}
+
+function repairJson(raw) {
+  // Re-escape stray double quotes that appear inside string values.
+  // A quote is structural if it opens after { [ : , or closes before } ] : ,
+  let out = "";
+  let inStr = false;
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw[i];
+    if (!inStr) {
+      out += ch;
+      if (ch === '"') inStr = true;
+      continue;
+    }
+    if (ch === "\\") {
+      out += ch + (raw[i + 1] ?? "");
+      i++;
+      continue;
+    }
+    if (ch === '"') {
+      // look ahead to next non-space char
+      let j = i + 1;
+      while (j < raw.length && /\s/.test(raw[j])) j++;
+      const next = raw[j];
+      if (next === undefined || next === "," || next === "}" || next === "]" || next === ":") {
+        out += '"';
+        inStr = false;
+      } else {
+        out += '\\"';
+      }
+      continue;
+    }
+    out += ch;
+  }
+  return out;
 }
 
 function buildEnglish(doc) {
