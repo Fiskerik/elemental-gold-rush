@@ -35,7 +35,17 @@ async function loadLegalData() {
     throw new Error(`Unbalanced literal for ${marker}`);
   };
 
-  const languages = extractLiteral("LEGAL_LANGUAGES", "[", "]");
+  const languages = [];
+  const langRe =
+    /\{\s*code:\s*"([^"]+)",\s*label:\s*"([^"]+)",\s*dir:\s*"([^"]+)"\s*\}/g;
+  const langBlock = src.slice(
+    src.indexOf("LEGAL_LANGUAGES"),
+    src.indexOf("LEGAL_LAST_UPDATED_DATE"),
+  );
+  let m;
+  while ((m = langRe.exec(langBlock)) !== null) {
+    languages.push({ code: m[1], label: m[2], dir: m[3] });
+  }
   const privacy = extractLiteral("PRIVACY_CONTENT", "{", "}");
   const terms = extractLiteral("TERMS_CONTENT", "{", "}");
   const dateMatch = src.match(/LEGAL_LAST_UPDATED_DATE\s*=\s*"([^"]*)"/);
