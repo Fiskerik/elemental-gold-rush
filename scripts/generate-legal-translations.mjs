@@ -35,6 +35,7 @@ async function translateDoc(doc, langCode, langLabel) {
         { role: "user", content: JSON.stringify(payload) },
       ],
       temperature: 0.2,
+      response_format: { type: "json_object" },
     }),
   });
   if (!res.ok) {
