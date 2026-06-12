@@ -111,7 +111,7 @@ export const PRIVACY_CONTENT: Record<LegalLang, LegalDoc> = {
       {
         "heading": "Panoramica",
         "body": [
-          "Atomic Fusion Rush è un gioco di puzzle pubblicato da EA Consulting. Questa informativa spiega quali dati vengono elaborati quando si utilizza il gioco nelle versioni web e mobile native."
+          "Atomic Fusion Rush è un gioco di puzzle pubblicato da EA Consulting. Questa informativa spiega quali dati vengono elaborati quando si utilizza il gioco su versioni web e mobile native."
         ]
       },
       {
@@ -121,8 +121,8 @@ export const PRIVACY_CONTENT: Record<LegalLang, LegalDoc> = {
         ],
         "list": [
           "Progressi di gioco come livelli, punteggio, elementi scoperti e inventario.",
-          "Stato di acquisto e diritti tramite RevenueCat e il fornitore dell'app store.",
-          "Metadati di crash e diagnostici quando gli strumenti di analisi/crash sono abilitati.",
+          "Stato degli acquisti e diritti tramite RevenueCat e il fornitore dell'app store.",
+          "Metadati di crash e diagnostica quando gli strumenti di analisi/crash sono abilitati.",
           "Consenso pubblicitario e metadati di consegna degli annunci per gli utenti non Pro."
         ]
       },
@@ -141,7 +141,7 @@ export const PRIVACY_CONTENT: Record<LegalLang, LegalDoc> = {
       {
         "heading": "Archiviazione e conservazione",
         "body": [
-          "Lo stato di gioco è principalmente archiviato localmente sul tuo dispositivo o browser. Se elimini l'app o cancelli la memoria del browser, i progressi locali potrebbero andare persi a meno che non vengano aggiunti in seguito sistemi di backup esterni."
+          "Lo stato del gioco è principalmente archiviato localmente sul tuo dispositivo o browser. Se elimini l'app o cancelli la memoria del browser, i progressi locali potrebbero andare persi a meno che non vengano aggiunti in seguito sistemi di backup esterni."
         ]
       },
       {
@@ -163,35 +163,33 @@ export const PRIVACY_CONTENT: Record<LegalLang, LegalDoc> = {
     "lastUpdatedLabel": "Última atualização",
     "sections": [
       {
-        "heading": "Visão Geral",
+        "heading": "Visão geral",
         "body": [
-          "Atomic Fusion Rush é um jogo de quebra-cabeça publicado pela EA Consulting. Esta política explica quais dados são processados quando você usa o jogo em versões web e mobile nativas."
+          "Atomic Fusion Rush é um jogo de quebra-cabeça publicado pela EA Consulting. Esta política explica quais dados são processados quando você usa o jogo em versões web e móveis nativas."
         ]
       },
       {
         "heading": "Dados que Processamos",
         "body": [
-          "Dependendo da plataforma e dos recursos habilitados, podemos processar:"
-        ]
-      },
-      {
+          "Dependendo da plataforma e dos recursos ativados, podemos processar:"
+        ],
         "list": [
           "Progresso do jogo, como níveis, pontuação, elementos descobertos e inventário.",
           "Status de compra e direitos via RevenueCat e o provedor da loja de aplicativos.",
-          "Metadados de falhas e diagnósticos quando as ferramentas de análise/falhas estão habilitadas.",
+          "Metadados de falhas e diagnóstico quando as ferramentas de análise/falha estão ativadas.",
           "Consentimento de publicidade e metadados de entrega de anúncios para usuários não-Pro."
         ]
       },
       {
         "heading": "Compras",
         "body": [
-          "As compras dentro do aplicativo são processadas através do faturamento da Apple App Store e do RevenueCat. Não recebemos seus detalhes completos de cartão de pagamento. O status da compra é usado para desbloquear direitos, como Atomic Fusion Lifetime."
+          "As compras dentro do aplicativo são processadas através do faturamento da Apple App Store e do RevenueCat. Não recebemos os detalhes completos do seu cartão de pagamento. O status da compra é usado para desbloquear direitos como o Atomic Fusion Lifetime."
         ]
       },
       {
         "heading": "Anúncios e Consentimento",
         "body": [
-          "Usuários não-Pro podem ver anúncios intersticiais. Usamos avisos de consentimento onde exigido por lei. Você pode remover anúncios forçados comprando Atomic Fusion Lifetime."
+          "Usuários não-Pro podem ver anúncios intersticiais. Usamos avisos de consentimento onde exigido por lei. Você pode remover anúncios forçados comprando o Atomic Fusion Lifetime."
         ]
       },
       {
@@ -203,7 +201,7 @@ export const PRIVACY_CONTENT: Record<LegalLang, LegalDoc> = {
       {
         "heading": "Seus Direitos",
         "body": [
-          "Dependendo da sua localização, você pode ter direitos de solicitar acesso, correção, exclusão ou limitação do processamento de dados pessoais."
+          "Dependendo da sua localização, você pode ter o direito de solicitar acesso, correção, exclusão ou limitação do processamento de dados pessoais."
         ]
       },
       {
@@ -221,19 +219,17 @@ export const PRIVACY_CONTENT: Record<LegalLang, LegalDoc> = {
       {
         "heading": "Genel Bakış",
         "body": [
-          "Atomic Fusion Rush, EA Consulting tarafından yayınlanan bir bulmaca oyunudur. Bu politika, oyunu web ve yerel mobil yapılar üzerinde kullandığınızda hangi verilerin işlendiğini açıklar."
+          "Atomic Fusion Rush, EA Consulting tarafından yayınlanan bir bulmaca oyunudur. Bu politika, oyunu web ve yerel mobil yapılarında kullandığınızda hangi verilerin işlendiğini açıklar."
         ]
       },
       {
         "heading": "İşlediğimiz Veriler",
         "body": [
           "Platforma ve etkinleştirilen özelliklere bağlı olarak şunları işleyebiliriz:"
-        ]
-      },
-      {
+        ],
         "list": [
           "Seviyeler, puan, keşfedilen öğeler ve envanter gibi oyun ilerlemesi.",
-          "RevenueCat ve uygulama mağazası sağlayıcısı aracılığıyla satın alma durumu ve yetkiler.",
+          "RevenueCat ve uygulama mağazası sağlayıcısı aracılığıyla satın alma durumu ve haklar.",
           "Analiz/çökme araçları etkinleştirildiğinde çökme ve teşhis meta verileri.",
           "Pro olmayan kullanıcılar için reklam onayı ve reklam sunumu meta verileri."
         ]
@@ -241,7 +237,7 @@ export const PRIVACY_CONTENT: Record<LegalLang, LegalDoc> = {
       {
         "heading": "Satın Almalar",
         "body": [
-          "Uygulama içi satın almalar Apple App Store faturalandırması ve RevenueCat aracılığıyla işlenir. Tam ödeme kartı bilgilerinizi almıyoruz. Satın alma durumu, Atomic Fusion Lifetime gibi yetkileri açmak için kullanılır."
+          "Uygulama içi satın almalar Apple App Store faturalandırması ve RevenueCat aracılığıyla işlenir. Tam ödeme kartı bilgilerinizi almıyoruz. Satın alma durumu, Atomic Fusion Lifetime gibi hakları açmak için kullanılır."
         ]
       },
       {
@@ -253,13 +249,13 @@ export const PRIVACY_CONTENT: Record<LegalLang, LegalDoc> = {
       {
         "heading": "Depolama ve Saklama",
         "body": [
-          "Oyun durumu öncelikle cihazınızda veya tarayıcınızda yerel olarak depolanır. Uygulamayı siler veya tarayıcı depolama alanını temizlerseniz, harici yedekleme sistemleri daha sonra eklenmedikçe yerel ilerleme kaybolabilir."
+          "Oyun durumu öncelikle cihazınızda veya tarayıcınızda yerel olarak depolanır. Uygulamayı silerseniz veya tarayıcı depolama alanını temizlerseniz, harici yedekleme sistemleri daha sonra eklenmedikçe yerel ilerleme kaybolabilir."
         ]
       },
       {
         "heading": "Haklarınız",
         "body": [
-          "Konumunuza bağlı olarak, kişisel veriler için erişim, düzeltme, silme veya işleme sınırlaması talep etme haklarınız olabilir."
+          "Konumunuza bağlı olarak, kişisel verilerin işlenmesi için erişim, düzeltme, silme veya sınırlama talep etme haklarınız olabilir."
         ]
       },
       {
@@ -277,7 +273,7 @@ export const PRIVACY_CONTENT: Record<LegalLang, LegalDoc> = {
       {
         "heading": "نظرة عامة",
         "body": [
-          "Atomic Fusion Rush هي لعبة ألغاز من نشر EA Consulting. توضح هذه السياسة البيانات التي تتم معالجتها عند استخدام اللعبة على الويب وإصدارات الهاتف المحمول الأصلية."
+          "Atomic Fusion Rush هي لعبة ألغاز نشرتها EA Consulting. توضح هذه السياسة البيانات التي تتم معالجتها عند استخدام اللعبة على الويب وإصدارات الهاتف المحمول الأصلية."
         ]
       },
       {
@@ -286,7 +282,7 @@ export const PRIVACY_CONTENT: Record<LegalLang, LegalDoc> = {
           "اعتمادًا على النظام الأساسي والميزات المُمكّنة، قد نقوم بمعالجة ما يلي:"
         ],
         "list": [
-          "تقدم اللعب مثل المستويات والنتيجة والعناصر المكتشفة والمخزون.",
+          "تقدم اللعب مثل المستويات، والنتيجة، والعناصر المكتشفة، والمخزون.",
           "حالة الشراء والاستحقاقات عبر RevenueCat ومزود متجر التطبيقات.",
           "بيانات تعريف الأعطال والتشخيص عند تمكين أدوات التحليلات/الأعطال.",
           "موافقة الإعلانات وبيانات تعريف تسليم الإعلانات للمستخدمين غير المحترفين."
@@ -317,7 +313,7 @@ export const PRIVACY_CONTENT: Record<LegalLang, LegalDoc> = {
         ]
       },
       {
-        "heading": "جهة الاتصال",
+        "heading": "اتصال",
         "body": [
           "لطلبات الخصوصية، اتصل بـ: eaconsulting.supp@gmail.com"
         ]
@@ -335,27 +331,27 @@ export const PRIVACY_CONTENT: Record<LegalLang, LegalDoc> = {
         ]
       },
       {
-        "heading": "処理するデータ",
+        "heading": "当社が処理するデータ",
         "body": [
-          "プラットフォームおよび有効な機能に応じて、以下のデータを処理する場合があります。"
+          "プラットフォームおよび有効になっている機能に応じて、当社は以下を処理する場合があります。"
         ],
         "list": [
           "レベル、スコア、発見された要素、インベントリなどのゲームプレイの進行状況。",
           "RevenueCatおよびアプリストアプロバイダーを介した購入状況と資格。",
-          "分析/クラッシュツールが有効な場合のクラッシュおよび診断メタデータ。",
-          "Proユーザー以外向けの広告同意および広告配信メタデータ。"
+          "分析/クラッシュツールが有効になっている場合のクラッシュおよび診断メタデータ。",
+          "Proユーザーではない場合の広告の同意および広告配信メタデータ。"
         ]
       },
       {
         "heading": "購入",
         "body": [
-          "アプリ内購入は、Apple App Storeの請求およびRevenueCatを通じて処理されます。お客様の完全な支払いカードの詳細は受け取りません。購入ステータスは、Atomic Fusion Lifetimeなどの資格を解除するために使用されます。"
+          "アプリ内購入は、Apple App Storeの請求およびRevenueCatを通じて処理されます。お客様の完全な支払いカードの詳細は当社には届きません。購入ステータスは、Atomic Fusion Lifetimeなどの資格を解除するために使用されます。"
         ]
       },
       {
         "heading": "広告と同意",
         "body": [
-          "Proユーザー以外は、インタースティシャル広告が表示される場合があります。法律で義務付けられている場合は、同意プロンプトを使用します。Atomic Fusion Lifetimeを購入することで、強制広告を削除できます。"
+          "Proユーザーではない場合、インタースティシャル広告が表示されることがあります。法律で義務付けられている場合は、同意のプロンプトを使用します。Atomic Fusion Lifetimeを購入することで、強制的な広告を削除できます。"
         ]
       },
       {
@@ -367,13 +363,13 @@ export const PRIVACY_CONTENT: Record<LegalLang, LegalDoc> = {
       {
         "heading": "お客様の権利",
         "body": [
-          "お客様の所在地によっては、個人データへのアクセス、修正、削除、または処理の制限を要求する権利がある場合があります。"
+          "お住まいの地域によっては、個人データのアクセス、修正、削除、または処理の制限を要求する権利がある場合があります。"
         ]
       },
       {
         "heading": "連絡先",
         "body": [
-          "プライバシーに関するお問い合わせは、eaconsulting.supp@gmail.comまでご連絡ください。"
+          "プライバシーに関するご要望は、eaconsulting.supp@gmail.comまでご連絡ください。"
         ]
       }
     ]
@@ -383,9 +379,9 @@ export const PRIVACY_CONTENT: Record<LegalLang, LegalDoc> = {
     "lastUpdatedLabel": "Terakhir diperbarui",
     "sections": [
       {
-        "heading": "Gambaran Umum",
+        "heading": "Ikhtisar",
         "body": [
-          "Atomic Fusion Rush adalah permainan puzzle yang diterbitkan oleh EA Consulting. Kebijakan ini menjelaskan data apa yang diproses saat Anda menggunakan permainan di web dan aplikasi seluler asli."
+          "Atomic Fusion Rush adalah permainan teka-teki yang diterbitkan oleh EA Consulting. Kebijakan ini menjelaskan data apa yang diproses saat Anda menggunakan permainan di web dan versi seluler asli."
         ]
       },
       {
@@ -415,7 +411,7 @@ export const PRIVACY_CONTENT: Record<LegalLang, LegalDoc> = {
       {
         "heading": "Penyimpanan dan Retensi",
         "body": [
-          "Status permainan terutama disimpan secara lokal di perangkat atau browser Anda. Jika Anda menghapus aplikasi atau menghapus penyimpanan browser, kemajuan lokal dapat hilang kecuali sistem cadangan eksternal ditambahkan nanti."
+          "Status permainan terutama disimpan secara lokal di perangkat atau peramban Anda. Jika Anda menghapus aplikasi atau menghapus penyimpanan peramban, kemajuan lokal mungkin hilang kecuali sistem cadangan eksternal ditambahkan di kemudian hari."
         ]
       },
       {
@@ -439,7 +435,7 @@ export const PRIVACY_CONTENT: Record<LegalLang, LegalDoc> = {
       {
         "heading": "Aperçu",
         "body": [
-          "Atomic Fusion Rush est un jeu de puzzle publié par EA Consulting. Cette politique explique quelles données sont traitées lorsque vous utilisez le jeu sur les versions web et mobiles natives."
+          "Atomic Fusion Rush est un jeu de réflexion publié par EA Consulting. Cette politique explique quelles données sont traitées lorsque vous utilisez le jeu sur des versions web et mobiles natives."
         ]
       },
       {
@@ -450,20 +446,20 @@ export const PRIVACY_CONTENT: Record<LegalLang, LegalDoc> = {
         "list": [
           "Progression du jeu, tels que les niveaux, le score, les éléments découverts et l'inventaire.",
           "État d'achat et droits via RevenueCat et le fournisseur de l'App Store.",
-          "Métadonnées de crash et de diagnostic lorsque les outils d'analyse/crash sont activés.",
+          "Métadonnées de crash et de diagnostic lorsque les outils d'analyse/de crash sont activés.",
           "Consentement publicitaire et métadonnées de diffusion d'annonces pour les utilisateurs non-Pro."
         ]
       },
       {
         "heading": "Achats",
         "body": [
-          "Les achats intégrés sont traités via la facturation de l'Apple App Store et RevenueCat. Nous ne recevons pas les détails complets de votre carte de paiement. Le statut d'achat est utilisé pour débloquer des droits tels que Atomic Fusion Lifetime."
+          "Les achats intégrés sont traités via la facturation de l'Apple App Store et RevenueCat. Nous ne recevons pas vos coordonnées complètes de carte de paiement. Le statut d'achat est utilisé pour débloquer des droits tels que Atomic Fusion Lifetime."
         ]
       },
       {
-        "heading": "Publicités et consentement",
+        "heading": "Annonces et consentement",
         "body": [
-          "Les utilisateurs non-Pro peuvent voir des publicités interstitielles. Nous utilisons des invites de consentement lorsque la loi l'exige. Vous pouvez supprimer les publicités forcées en achetant Atomic Fusion Lifetime."
+          "Les utilisateurs non-Pro peuvent voir des annonces interstitielles. Nous utilisons des invites de consentement lorsque la loi l'exige. Vous pouvez supprimer les annonces forcées en achetant Atomic Fusion Lifetime."
         ]
       },
       {
@@ -487,43 +483,43 @@ export const PRIVACY_CONTENT: Record<LegalLang, LegalDoc> = {
     ]
   },
   "ko": {
-    "title": "개인정보처리방침",
+    "title": "개인 정보 처리 방침",
     "lastUpdatedLabel": "최종 업데이트",
     "sections": [
       {
         "heading": "개요",
         "body": [
-          "Atomic Fusion Rush는 EA Consulting에서 배포하는 퍼즐 게임입니다. 본 정책은 웹 및 네이티브 모바일 빌드에서 게임을 사용할 때 처리되는 데이터를 설명합니다."
+          "Atomic Fusion Rush는 EA Consulting에서 발행한 퍼즐 게임입니다. 이 정책은 웹 및 기본 모바일 빌드에서 게임을 사용할 때 처리되는 데이터를 설명합니다."
         ]
       },
       {
-        "heading": "처리하는 데이터",
+        "heading": "당사가 처리하는 데이터",
         "body": [
-          "플랫폼 및 활성화된 기능에 따라 다음을 처리할 수 있습니다."
+          "플랫폼 및 활성화된 기능에 따라 다음을 처리할 수 있습니다:"
         ],
         "list": [
           "레벨, 점수, 발견된 요소 및 인벤토리와 같은 게임 플레이 진행 상황.",
           "RevenueCat 및 앱 스토어 제공업체를 통한 구매 상태 및 권한.",
           "분석/충돌 도구가 활성화된 경우 충돌 및 진단 메타데이터.",
-          "Pro 사용자가 아닌 경우 광고 동의 및 광고 전달 메타데이터."
+          "Pro 사용자가 아닌 사용자를 위한 광고 동의 및 광고 전달 메타데이터."
         ]
       },
       {
         "heading": "구매",
         "body": [
-          "인앱 구매는 Apple App Store 청구 및 RevenueCat을 통해 처리됩니다. 당사는 귀하의 전체 결제 카드 정보를 받지 않습니다. 구매 상태는 Atomic Fusion Lifetime과 같은 권한을 잠금 해제하는 데 사용됩니다."
+          "인앱 구매는 Apple App Store 결제 및 RevenueCat을 통해 처리됩니다. 당사는 귀하의 전체 결제 카드 정보를 받지 않습니다. 구매 상태는 Atomic Fusion Lifetime과 같은 권한을 잠금 해제하는 데 사용됩니다."
         ]
       },
       {
         "heading": "광고 및 동의",
         "body": [
-          "Pro 사용자가 아닌 경우 전면 광고를 볼 수 있습니다. 당사는 법률에서 요구하는 경우 동의 프롬프트를 사용합니다. Atomic Fusion Lifetime을 구매하여 강제 광고를 제거할 수 있습니다."
+          "Pro 사용자가 아닌 사용자는 전면 광고를 볼 수 있습니다. 당사는 법률에서 요구하는 경우 동의 프롬프트를 사용합니다. Atomic Fusion Lifetime을 구매하여 강제 광고를 제거할 수 있습니다."
         ]
       },
       {
         "heading": "저장 및 보존",
         "body": [
-          "게임 플레이 상태는 주로 귀하의 장치 또는 브라우저에 로컬로 저장됩니다. 앱을 삭제하거나 브라우저 저장 공간을 지우면 외부 백업 시스템이 나중에 추가되지 않는 한 로컬 진행 상황이 손실될 수 있습니다."
+          "게임 플레이 상태는 주로 장치 또는 브라우저에 로컬로 저장됩니다. 앱을 삭제하거나 브라우저 저장소를 지우면 외부 백업 시스템이 나중에 추가되지 않는 한 로컬 진행 상황이 손실될 수 있습니다."
         ]
       },
       {
@@ -571,13 +567,13 @@ export const PRIVACY_CONTENT: Record<LegalLang, LegalDoc> = {
       {
         "heading": "Anuncios y consentimiento",
         "body": [
-          "Los usuarios que no son Pro pueden ver anuncios intersticiales. Utilizamos avisos de consentimiento cuando lo exige la ley. Puedes eliminar los anuncios forzados comprando Atomic Fusion Lifetime."
+          "Los usuarios no Pro pueden ver anuncios intersticiales. Utilizamos avisos de consentimiento cuando lo exige la ley. Puedes eliminar los anuncios forzados comprando Atomic Fusion Lifetime."
         ]
       },
       {
         "heading": "Almacenamiento y retención",
         "body": [
-          "El estado del juego se almacena principalmente localmente en tu dispositivo o navegador. Si eliminas la aplicación o borras el almacenamiento del navegador, el progreso local puede perderse a menos que se agreguen sistemas de copia de seguridad externos más adelante."
+          "El estado del juego se almacena principalmente localmente en tu dispositivo o navegador. Si eliminas la aplicación o borras el almacenamiento del navegador, el progreso local puede perderse a menos que se agreguen sistemas de respaldo externos más adelante."
         ]
       },
       {
@@ -610,7 +606,7 @@ export const PRIVACY_CONTENT: Record<LegalLang, LegalDoc> = {
           "Tùy thuộc vào nền tảng và các tính năng được bật, chúng tôi có thể xử lý:"
         ],
         "list": [
-          "Tiến độ chơi trò chơi như cấp độ, điểm số, các yếu tố được khám phá và kho đồ.",
+          "Tiến trình chơi trò chơi như cấp độ, điểm số, các yếu tố đã khám phá và kho đồ.",
           "Trạng thái mua hàng và quyền lợi thông qua RevenueCat và nhà cung cấp cửa hàng ứng dụng.",
           "Dữ liệu siêu dữ liệu sự cố và chẩn đoán khi các công cụ phân tích/sự cố được bật.",
           "Sự đồng ý quảng cáo và siêu dữ liệu phân phối quảng cáo cho người dùng không phải Pro."
@@ -655,17 +651,17 @@ export const PRIVACY_CONTENT: Record<LegalLang, LegalDoc> = {
       {
         "heading": "Обзор",
         "body": [
-          "Atomic Fusion Rush — это игра-головоломка, изданная EA Consulting. Эта политика объясняет, какие данные обрабатываются при использовании игры в веб-версии и нативных мобильных сборках."
+          "Atomic Fusion Rush — это игра-головоломка, опубликованная EA Consulting. Эта политика объясняет, какие данные обрабатываются при использовании игры в веб-версии и нативных мобильных сборках."
         ]
       },
       {
         "heading": "Данные, которые мы обрабатываем",
         "body": [
-          "В зависимости от платформы и включенных функций, мы можем обрабатывать:"
+          "В зависимости от платформы и включенных функций мы можем обрабатывать:"
         ],
         "list": [
           "Прогресс игрового процесса, такой как уровни, очки, обнаруженные элементы и инвентарь.",
-          "Состояние покупки и права через RevenueCat и поставщика магазина приложений.",
+          "Статус покупки и права через RevenueCat и поставщика магазина приложений.",
           "Метаданные сбоев и диагностики, когда включены инструменты аналитики/сбоев.",
           "Согласие на рекламу и метаданные доставки рекламы для пользователей, не являющихся Pro."
         ]
@@ -691,11 +687,11 @@ export const PRIVACY_CONTENT: Record<LegalLang, LegalDoc> = {
       {
         "heading": "Ваши права",
         "body": [
-          "В зависимости от вашего местоположения, вы можете иметь право запрашивать доступ, исправление, удаление или ограничение обработки персональных данных."
+          "В зависимости от вашего местоположения вы можете иметь право запрашивать доступ, исправление, удаление или ограничение обработки персональных данных."
         ]
       },
       {
-        "heading": "Контакты",
+        "heading": "Контакт",
         "body": [
           "По вопросам конфиденциальности обращайтесь по адресу: eaconsulting.supp@gmail.com"
         ]
@@ -709,7 +705,7 @@ export const PRIVACY_CONTENT: Record<LegalLang, LegalDoc> = {
       {
         "heading": "概述",
         "body": [
-          "Atomic Fusion Rush是由EA Consulting发布的一款益智游戏。本政策解释了当您在网页和原生移动版本上使用游戏时，会处理哪些数据。"
+          "Atomic Fusion Rush 是由 EA Consulting 发布的一款益智游戏。本政策解释了当您在网络和原生移动版本上使用游戏时所处理的数据。"
         ]
       },
       {
@@ -719,21 +715,21 @@ export const PRIVACY_CONTENT: Record<LegalLang, LegalDoc> = {
         ],
         "list": [
           "游戏进度，例如关卡、分数、发现的元素和库存。",
-          "通过RevenueCat和应用商店提供商进行的购买状态和权益。",
-          "当启用分析/崩溃工具时，崩溃和诊断元数据。",
-          "非Pro用户的广告同意和广告投放元数据。"
+          "通过 RevenueCat 和应用商店提供商进行的购买状态和授权。",
+          "当分析/崩溃工具启用时，崩溃和诊断元数据。",
+          "非 Pro 用户的广告同意和广告投放元数据。"
         ]
       },
       {
         "heading": "购买",
         "body": [
-          "应用内购买通过Apple App Store账单和RevenueCat处理。我们不会收到您的完整支付卡详细信息。购买状态用于解锁Atomic Fusion Lifetime等权益。"
+          "应用内购买通过 Apple App Store 账单和 RevenueCat 进行处理。我们不会收到您的完整支付卡详细信息。购买状态用于解锁 Atomic Fusion Lifetime 等授权。"
         ]
       },
       {
         "heading": "广告和同意",
         "body": [
-          "非Pro用户可能会看到插页式广告。在法律要求的情况下，我们使用同意提示。您可以通过购买Atomic Fusion Lifetime来移除强制广告。"
+          "非 Pro 用户可能会看到插页式广告。我们会在法律要求的情况下使用同意提示。您可以通过购买 Atomic Fusion Lifetime 来移除强制广告。"
         ]
       },
       {
@@ -745,7 +741,7 @@ export const PRIVACY_CONTENT: Record<LegalLang, LegalDoc> = {
       {
         "heading": "您的权利",
         "body": [
-          "根据您所在的位置，您可能拥有请求访问、更正、删除或限制处理个人数据的权利。"
+          "根据您所在的位置，您可能有权请求访问、更正、删除或限制处理个人数据。"
         ]
       },
       {
@@ -758,12 +754,12 @@ export const PRIVACY_CONTENT: Record<LegalLang, LegalDoc> = {
   },
   "hi": {
     "title": "गोपनीयता नीति",
-    "lastUpdatedLabel": "अंतिम बार अपडेट किया गया",
+    "lastUpdatedLabel": "अंतिम अपडेट किया गया",
     "sections": [
       {
         "heading": "अवलोकन",
         "body": [
-          "एटॉमिक फ्यूजन रश ईए कंसल्टिंग द्वारा प्रकाशित एक पहेली गेम है। यह नीति बताती है कि जब आप वेब और नेटिव मोबाइल बिल्ड पर गेम का उपयोग करते हैं तो कौन सा डेटा संसाधित किया जाता है।"
+          "एटॉमिक फ़्यूज़न रश ईए कंसल्टिंग द्वारा प्रकाशित एक पहेली गेम है। यह नीति बताती है कि जब आप वेब और नेटिव मोबाइल बिल्ड पर गेम का उपयोग करते हैं तो कौन सा डेटा संसाधित किया जाता है।"
         ]
       },
       {
@@ -781,25 +777,25 @@ export const PRIVACY_CONTENT: Record<LegalLang, LegalDoc> = {
       {
         "heading": "खरीदें",
         "body": [
-          "इन-ऐप खरीदारी ऐप्पल ऐप स्टोर बिलिंग और रेवेन्यूकैट के माध्यम से संसाधित की जाती है। हमें आपके पूर्ण भुगतान कार्ड विवरण प्राप्त नहीं होते हैं। खरीद की स्थिति का उपयोग एटॉमिक फ्यूजन लाइफटाइम जैसे अधिकारों को अनलॉक करने के लिए किया जाता है।"
+          "इन-ऐप खरीदारी Apple App Store बिलिंग और RevenueCat के माध्यम से संसाधित की जाती है। हमें आपके पूर्ण भुगतान कार्ड विवरण प्राप्त नहीं होते हैं। खरीद की स्थिति का उपयोग एटॉमिक फ़्यूज़न लाइफ़टाइम जैसे अधिकारों को अनलॉक करने के लिए किया जाता है।"
         ]
       },
       {
         "heading": "विज्ञापन और सहमति",
         "body": [
-          "गैर-प्रो उपयोगकर्ता अंतरालीय विज्ञापन देख सकते हैं। हम कानून द्वारा आवश्यक होने पर सहमति संकेतों का उपयोग करते हैं। आप एटॉमिक फ्यूजन लाइफटाइम खरीदकर जबरन विज्ञापनों को हटा सकते हैं।"
+          "गैर-प्रो उपयोगकर्ता अंतरालीय विज्ञापन देख सकते हैं। हम कानून द्वारा आवश्यक होने पर सहमति संकेतों का उपयोग करते हैं। आप एटॉमिक फ़्यूज़न लाइफ़टाइम खरीदकर जबरन विज्ञापनों को हटा सकते हैं।"
         ]
       },
       {
         "heading": "भंडारण और प्रतिधारण",
         "body": [
-          "गेमप्ले स्थिति मुख्य रूप से आपके डिवाइस या ब्राउज़र पर स्थानीय रूप से संग्रहीत होती है। यदि आप ऐप को हटाते हैं या ब्राउज़र स्टोरेज साफ़ करते हैं, तो स्थानीय प्रगति खो सकती है जब तक कि बाद में बाहरी बैकअप सिस्टम नहीं जोड़े जाते।"
+          "गेमप्ले स्थिति मुख्य रूप से आपके डिवाइस या ब्राउज़र पर स्थानीय रूप से संग्रहीत होती है। यदि आप ऐप हटाते हैं या ब्राउज़र स्टोरेज साफ़ करते हैं, तो स्थानीय प्रगति खो सकती है जब तक कि बाद में बाहरी बैकअप सिस्टम नहीं जोड़े जाते।"
         ]
       },
       {
         "heading": "आपके अधिकार",
         "body": [
-          "आपके स्थान के आधार पर, आपके पास व्यक्तिगत डेटा के लिए पहुंच, सुधार, विलोपन या प्रसंस्करण की सीमा का अनुरोध करने का अधिकार हो सकता है।"
+          "आपके स्थान के आधार पर, आपको व्यक्तिगत डेटा के लिए प्रसंस्करण तक पहुंच, सुधार, विलोपन या सीमा का अनुरोध करने का अधिकार हो सकता है।"
         ]
       },
       {
@@ -817,7 +813,7 @@ export const PRIVACY_CONTENT: Record<LegalLang, LegalDoc> = {
       {
         "heading": "Übersicht",
         "body": [
-          "Atomic Fusion Rush ist ein Puzzlespiel, das von EA Consulting veröffentlicht wird. Diese Richtlinie erklärt, welche Daten verarbeitet werden, wenn Sie das Spiel im Web und in nativen mobilen Builds nutzen."
+          "Atomic Fusion Rush ist ein Puzzlespiel, das von EA Consulting veröffentlicht wird. Diese Richtlinie erklärt, welche Daten verarbeitet werden, wenn Sie das Spiel im Web und in nativen mobilen Builds verwenden."
         ]
       },
       {
@@ -828,14 +824,14 @@ export const PRIVACY_CONTENT: Record<LegalLang, LegalDoc> = {
         "list": [
           "Spielfortschritt wie Level, Punktzahl, entdeckte Elemente und Inventar.",
           "Kaufstatus und Berechtigungen über RevenueCat und den App-Store-Anbieter.",
-          "Absturz- und Diagnosemetadaten, wenn Analyse-/Absturz-Tools aktiviert sind.",
+          "Absturz- und Diagnose-Metadaten, wenn Analyse-/Absturz-Tools aktiviert sind.",
           "Werbeeinwilligung und Metadaten zur Anzeigenbereitstellung für Nicht-Pro-Benutzer."
         ]
       },
       {
         "heading": "Käufe",
         "body": [
-          "In-App-Käufe werden über die Abrechnung des Apple App Store und RevenueCat abgewickelt. Wir erhalten nicht Ihre vollständigen Zahlungskartendaten. Der Kaufstatus wird verwendet, um Berechtigungen wie Atomic Fusion Lifetime freizuschalten."
+          "In-App-Käufe werden über die Abrechnung des Apple App Store und RevenueCat abgewickelt. Wir erhalten Ihre vollständigen Zahlungskartendaten nicht. Der Kaufstatus wird verwendet, um Berechtigungen wie Atomic Fusion Lifetime freizuschalten."
         ]
       },
       {
@@ -847,7 +843,7 @@ export const PRIVACY_CONTENT: Record<LegalLang, LegalDoc> = {
       {
         "heading": "Speicherung und Aufbewahrung",
         "body": [
-          "Der Spielzustand wird hauptsächlich lokal auf Ihrem Gerät oder Browser gespeichert. Wenn Sie die App löschen oder den Browser-Speicher leeren, kann der lokale Fortschritt verloren gehen, es sei denn, es werden später externe Backup-Systeme hinzugefügt."
+          "Der Spielzustand wird hauptsächlich lokal auf Ihrem Gerät oder Browser gespeichert. Wenn Sie die App löschen oder den Browser-Speicher leeren, kann der lokale Fortschritt verloren gehen, es sei denn, externe Sicherungssysteme werden später hinzugefügt."
         ]
       },
       {
@@ -859,7 +855,7 @@ export const PRIVACY_CONTENT: Record<LegalLang, LegalDoc> = {
       {
         "heading": "Kontakt",
         "body": [
-          "Für Datenschutzanfragen kontaktieren Sie: eaconsulting.supp@gmail.com"
+          "Für Datenschutzanfragen kontaktieren Sie bitte: eaconsulting.supp@gmail.com"
         ]
       }
     ]
@@ -939,13 +935,18 @@ export const TERMS_CONTENT: Record<LegalLang, LegalDoc> = {
       {
         "heading": "Acquisti in-app",
         "body": [
-          "Gli acquisti sono gestiti dal negozio della piattaforma e da RevenueCat. Tutti gli acquisti sono soggetti ai termini di fatturazione, alle politiche di rimborso e alle regole regionali del negozio."
+          "Gli acquisti sono gestiti dal negozio della piattaforma e da RevenueCat. Tutti gli acquisti sono soggetti ai termini di fatturazione, alle politiche di rimborso e alle normative regionali del negozio."
         ]
       },
       {
         "heading": "Condotta del giocatore",
         "body": [
           "Accetti di non:"
+        ],
+        "list": [
+          "Tentare di decodificare o manomettere la logica di acquisto.",
+          "Sfruttare bug per una progressione ingiusta o un guadagno di valuta non autorizzato.",
+          "Utilizzare script automatizzati per abusare dei sistemi di gioco."
         ]
       },
       {
@@ -955,13 +956,13 @@ export const TERMS_CONTENT: Record<LegalLang, LegalDoc> = {
         ]
       },
       {
-        "heading": "Dichiarazione di non responsabilità e limitazione di responsabilità",
+        "heading": "Dichiarazione di non responsabilità e responsabilità",
         "body": [
-          "Il gioco è fornito così com'è, senza garanzie nella misura consentita dalla legge. Nella misura consentita dalla legge applicabile, non siamo responsabili per danni indiretti o consequenziali."
+          "Il gioco è fornito «così com'è», senza garanzie nella misura consentita dalla legge. Nella misura consentita dalla legge applicabile, non siamo responsabili per danni indiretti o consequenziali."
         ]
       },
       {
-        "heading": "Contatti",
+        "heading": "Contatto",
         "body": [
           "Richieste sui termini: eaconsulting.supp@gmail.com"
         ]
@@ -975,7 +976,7 @@ export const TERMS_CONTENT: Record<LegalLang, LegalDoc> = {
       {
         "heading": "Aceitação dos Termos",
         "body": [
-          "Ao usar o Atomic Fusion Rush, você concorda com estes Termos de Serviço e nossa Política de Privacidade."
+          "Ao usar o Atomic Fusion Rush, você concorda com estes Termos de Serviço e com nossa Política de Privacidade."
         ]
       },
       {
@@ -987,16 +988,14 @@ export const TERMS_CONTENT: Record<LegalLang, LegalDoc> = {
       {
         "heading": "Compras no Aplicativo",
         "body": [
-          "As compras são gerenciadas pela loja da plataforma e pela RevenueCat. Todas as compras estão sujeitas aos termos de faturamento, políticas de reembolso e regras regionais da loja."
+          "As compras são processadas pela loja da plataforma e pela RevenueCat. Todas as compras estão sujeitas aos termos de faturamento, políticas de reembolso e regras regionais da loja."
         ]
       },
       {
         "heading": "Conduta do Jogador",
         "body": [
           "Você concorda em não:"
-        ]
-      },
-      {
+        ],
         "list": [
           "Tentar fazer engenharia reversa ou adulterar a lógica de compra.",
           "Explorar bugs para progressão injusta ou ganho de moeda não autorizado.",
@@ -1012,7 +1011,7 @@ export const TERMS_CONTENT: Record<LegalLang, LegalDoc> = {
       {
         "heading": "Isenção de Responsabilidade e Limitação de Responsabilidade",
         "body": [
-          "O jogo é fornecido no estado em que se encontra, sem garantias, na extensão permitida por lei. Na extensão permitida pela lei aplicável, não somos responsáveis por danos indiretos ou consequenciais."
+          "O jogo é fornecido “no estado em que se encontra”, sem garantias, na extensão permitida por lei. Na extensão permitida pela lei aplicável, não somos responsáveis por danos indiretos ou consequenciais."
         ]
       },
       {
@@ -1030,29 +1029,29 @@ export const TERMS_CONTENT: Record<LegalLang, LegalDoc> = {
       {
         "heading": "Şartların Kabulü",
         "body": [
-          "Atomic Fusion Rush'ı kullanarak, bu Hizmet Şartlarını ve Gizlilik Politikamızı kabul etmiş olursunuz."
+          "Atomic Fusion Rush'ı kullanarak bu Hizmet Şartlarını ve Gizlilik Politikamızı kabul etmiş olursunuz."
         ]
       },
       {
         "heading": "Kullanım Lisansı",
         "body": [
-          "Size oyunu kişisel, ticari olmayan eğlence amaçlı kullanmanız için sınırlı, münhasır olmayan, devredilemez bir lisans veriyoruz."
+          "Size oyunu kişisel, ticari olmayan eğlence için kullanmanız üzere sınırlı, münhasır olmayan, devredilemez bir lisans veriyoruz."
         ]
       },
       {
         "heading": "Uygulama İçi Satın Almalar",
         "body": [
-          "Satın almalar platform mağazası ve RevenueCat tarafından yürütülür. Tüm satın almalar mağazanın faturalandırma şartlarına, iade politikalarına ve bölgesel kurallarına tabidir."
+          "Satın almalar platform mağazası ve RevenueCat tarafından gerçekleştirilir. Tüm satın almalar mağazanın faturalandırma şartlarına, iade politikalarına ve bölgesel kurallarına tabidir."
         ]
       },
       {
         "heading": "Oyuncu Davranışı",
         "body": [
-          "Şunları yapmamayı kabul edersiniz:"
+          "Şunları yapmamayı kabul ediyorsunuz:"
         ],
         "list": [
-          "Satın alma mantığını tersine mühendislikle çözmeye veya kurcalamaya çalışmak.",
-          "Haksız ilerleme veya yetkisiz para kazanımı için hataları istismar etmek.",
+          "Satın alma mantığını tersine mühendislik yapmaya veya kurcalamaya çalışmak.",
+          "Haksız ilerleme veya yetkisiz para kazanımı için hataları kullanmak.",
           "Oyun sistemlerini kötüye kullanmak için otomatik komut dosyaları kullanmak."
         ]
       },
@@ -1063,9 +1062,9 @@ export const TERMS_CONTENT: Record<LegalLang, LegalDoc> = {
         ]
       },
       {
-        "heading": "Feragatname ve Sorumluluk",
+        "heading": "Sorumluluk Reddi ve Yükümlülük",
         "body": [
-          "Oyun, yasaların izin verdiği ölçüde garantisiz olarak 'olduğu gibi' sağlanır. Yürürlükteki yasaların izin verdiği ölçüde, dolaylı veya sonuç olarak ortaya çıkan zararlardan sorumlu değiliz."
+          "Oyun, yasaların izin verdiği ölçüde garantisiz olarak «olduğu gibi» sağlanır. Yürürlükteki yasaların izin verdiği ölçüde, dolaylı veya sonuç olarak ortaya çıkan zararlardan sorumlu değiliz."
         ]
       },
       {
@@ -1083,7 +1082,7 @@ export const TERMS_CONTENT: Record<LegalLang, LegalDoc> = {
       {
         "heading": "قبول الشروط",
         "body": [
-          "باستخدامك Atomic Fusion Rush، فإنك توافق على شروط الخدمة هذه وسياسة الخصوصية الخاصة بنا."
+          "باستخدام Atomic Fusion Rush، فإنك توافق على شروط الخدمة هذه وسياسة الخصوصية الخاصة بنا."
         ]
       },
       {
@@ -1095,19 +1094,17 @@ export const TERMS_CONTENT: Record<LegalLang, LegalDoc> = {
       {
         "heading": "المشتريات داخل التطبيق",
         "body": [
-          "تتم معالجة المشتريات بواسطة متجر المنصة وRevenueCat. تخضع جميع المشتريات لشروط الفوترة الخاصة بالمتجر وسياسات استرداد الأموال والقواعد الإقليمية."
+          "تتم معالجة المشتريات بواسطة متجر المنصة وRevenueCat. تخضع جميع المشتريات لشروط الفوترة وسياسات الاسترداد والقواعد الإقليمية للمتجر."
         ]
       },
       {
         "heading": "سلوك اللاعب",
         "body": [
-          "أنت توافق على عدم:"
-        ]
-      },
-      {
+          "أنت توافق على عدم القيام بما يلي:"
+        ],
         "list": [
           "محاولة الهندسة العكسية أو التلاعب بمنطق الشراء.",
-          "استغلال الأخطاء لتحقيق تقدم غير عادل أو الحصول على عملة غير مصرح بها.",
+          "استغلال الأخطاء لتحقيق تقدم غير عادل أو كسب عملة غير مصرح به.",
           "استخدام البرامج النصية الآلية لإساءة استخدام أنظمة اللعب."
         ]
       },
@@ -1120,11 +1117,11 @@ export const TERMS_CONTENT: Record<LegalLang, LegalDoc> = {
       {
         "heading": "إخلاء المسؤولية والمسؤولية",
         "body": [
-          "يتم توفير اللعبة على أساس \"كما هي\"، دون ضمانات بالقدر الذي يسمح به القانون. إلى الحد الذي يسمح به القانون المعمول به، نحن لسنا مسؤولين عن الأضرار غير المباشرة أو التبعية."
+          "يتم توفير اللعبة على أساس «كما هي»، دون ضمانات بالقدر الذي يسمح به القانون. بالقدر الذي يسمح به القانون المعمول به، نحن لسنا مسؤولين عن الأضرار غير المباشرة أو التبعية."
         ]
       },
       {
-        "heading": "اتصل بنا",
+        "heading": "اتصل",
         "body": [
           "استفسارات الشروط: eaconsulting.supp@gmail.com"
         ]
@@ -1144,23 +1141,28 @@ export const TERMS_CONTENT: Record<LegalLang, LegalDoc> = {
       {
         "heading": "利用許諾",
         "body": [
-          "当社は、お客様に個人的、非商業的な娯楽目的でゲームを使用するための、限定的、非独占的、譲渡不可能なライセンスを付与します。"
+          "当社は、お客様に対し、個人的かつ非商業的な娯楽目的でゲームを使用するための、限定的、非独占的、譲渡不能なライセンスを付与します。"
         ]
       },
       {
         "heading": "アプリ内購入",
         "body": [
-          "購入はプラットフォームストアおよびRevenueCatによって処理されます。すべての購入は、ストアの請求条件、返金ポリシー、および地域規則に従います。"
+          "購入はプラットフォームストアとRevenueCatによって処理されます。すべての購入は、ストアの請求条件、返金ポリシー、および地域規則に従います。"
         ]
       },
       {
         "heading": "プレイヤーの行動",
         "body": [
           "お客様は以下の行為を行わないことに同意するものとします。"
+        ],
+        "list": [
+          "購入ロジックのリバースエンジニアリングまたは改ざんを試みること。",
+          "不当な進行や不正な通貨取得のためにバグを悪用すること。",
+          "ゲームプレイシステムを悪用するために自動スクリプトを使用すること。"
         ]
       },
       {
-        "heading": "利用可能性と変更",
+        "heading": "可用性と変更",
         "body": [
           "当社は、バランス調整、進行、収益化システムを含め、いつでも機能を更新、変更、または中止することができます。"
         ]
@@ -1168,13 +1170,13 @@ export const TERMS_CONTENT: Record<LegalLang, LegalDoc> = {
       {
         "heading": "免責事項と責任",
         "body": [
-          "本ゲームは、法律で許容される範囲において、いかなる保証もなく「現状有姿」で提供されます。適用される法律で許可される範囲において、当社は間接的または結果的な損害に対して責任を負いません。"
+          "ゲームは現状有姿で提供され、法律で許容される範囲で保証はありません。適用される法律で許可される範囲で、当社は間接的または結果的な損害に対して責任を負いません。"
         ]
       },
       {
-        "heading": "連絡先",
+        "heading": "お問い合わせ",
         "body": [
-          "利用規約に関するお問い合わせ：eaconsulting.supp@gmail.com"
+          "規約に関するお問い合わせ: eaconsulting.supp@gmail.com"
         ]
       }
     ]
@@ -1186,7 +1188,7 @@ export const TERMS_CONTENT: Record<LegalLang, LegalDoc> = {
       {
         "heading": "Penerimaan Ketentuan",
         "body": [
-          "Dengan menggunakan Atomic Fusion Rush, Anda menyetujui Ketentuan Layanan dan Kebijakan Privasi kami."
+          "Dengan menggunakan Atomic Fusion Rush, Anda menyetujui Ketentuan Layanan ini dan Kebijakan Privasi kami."
         ]
       },
       {
@@ -1209,7 +1211,7 @@ export const TERMS_CONTENT: Record<LegalLang, LegalDoc> = {
         "list": [
           "Mencoba merekayasa balik atau merusak logika pembelian.",
           "Mengeksploitasi bug untuk kemajuan yang tidak adil atau perolehan mata uang yang tidak sah.",
-          "Menggunakan skrip otomatis untuk menyalahgunakan sistem gameplay."
+          "Menggunakan skrip otomatis untuk menyalahgunakan sistem permainan."
         ]
       },
       {
@@ -1251,16 +1253,14 @@ export const TERMS_CONTENT: Record<LegalLang, LegalDoc> = {
       {
         "heading": "Achats intégrés",
         "body": [
-          "Les achats sont gérés par la boutique de la plateforme et RevenueCat. Tous les achats sont soumis aux conditions de facturation, aux politiques de remboursement et aux règles régionales de la boutique."
+          "Les achats sont gérés par le magasin de la plateforme et RevenueCat. Tous les achats sont soumis aux conditions de facturation, aux politiques de remboursement et aux règles régionales du magasin."
         ]
       },
       {
         "heading": "Conduite du joueur",
         "body": [
           "Vous vous engagez à ne pas :"
-        ]
-      },
-      {
+        ],
         "list": [
           "Tenter de désosser ou de manipuler la logique d'achat.",
           "Exploiter des bugs pour une progression injuste ou un gain de devise non autorisé.",
@@ -1276,7 +1276,7 @@ export const TERMS_CONTENT: Record<LegalLang, LegalDoc> = {
       {
         "heading": "Exclusion de garantie et limitation de responsabilité",
         "body": [
-          "Le jeu est fourni tel quel, sans garanties dans la mesure permise par la loi. Dans la mesure permise par la loi applicable, nous ne sommes pas responsables des dommages indirects ou consécutifs."
+          "Le jeu est fourni « tel quel », sans garanties dans la mesure permise par la loi. Dans la mesure permise par la loi applicable, nous ne sommes pas responsables des dommages indirects ou consécutifs."
         ]
       },
       {
@@ -1298,32 +1298,32 @@ export const TERMS_CONTENT: Record<LegalLang, LegalDoc> = {
         ]
       },
       {
-        "heading": "사용 라이선스",
+        "heading": "이용 라이선스",
         "body": [
-          "당사는 귀하에게 개인적, 비상업적 엔터테인먼트 목적으로 게임을 사용할 수 있는 제한적, 비독점적, 양도 불가능한 라이선스를 부여합니다."
+          "당사는 귀하에게 개인적, 비상업적 엔터테인먼트를 위해 게임을 사용할 수 있는 제한적이고 비독점적이며 양도 불가능한 라이선스를 부여합니다."
         ]
       },
       {
         "heading": "인앱 구매",
         "body": [
-          "구매는 플랫폼 스토어 및 RevenueCat에서 처리됩니다. 모든 구매는 스토어의 청구 약관, 환불 정책 및 지역 규칙에 따릅니다."
+          "구매는 플랫폼 스토어 및 RevenueCat에서 처리됩니다. 모든 구매는 스토어의 청구 약관, 환불 정책 및 지역 규칙의 적용을 받습니다."
         ]
       },
       {
         "heading": "플레이어 행동",
         "body": [
-          "귀하는 다음을 하지 않음에 동의합니다:"
+          "귀하는 다음을 하지 않을 것에 동의합니다:"
         ],
         "list": [
-          "구매 로직을 역설계하거나 조작하려는 시도.",
-          "불공정한 진행 또는 무단 통화 획득을 위해 버그를 악용.",
-          "게임 플레이 시스템을 남용하기 위해 자동화된 스크립트 사용."
+          "구매 로직을 역설계하거나 변조를 시도합니다.",
+          "불공정한 진행 또는 무단 통화 획득을 위해 버그를 악용합니다.",
+          "자동화된 스크립트를 사용하여 게임 플레이 시스템을 남용합니다."
         ]
       },
       {
         "heading": "가용성 및 변경",
         "body": [
-          "당사는 균형, 진행 및 수익화 시스템을 포함하여 언제든지 기능을 업데이트, 변경 또는 중단할 수 있습니다."
+          "당사는 밸런싱, 진행 및 수익화 시스템을 포함하여 언제든지 기능을 업데이트, 변경 또는 중단할 수 있습니다."
         ]
       },
       {
@@ -1341,17 +1341,17 @@ export const TERMS_CONTENT: Record<LegalLang, LegalDoc> = {
     ]
   },
   "es": {
-    "title": "Términos de servicio",
+    "title": "Términos de Servicio",
     "lastUpdatedLabel": "Última actualización",
     "sections": [
       {
-        "heading": "Aceptación de los términos",
+        "heading": "Aceptación de los Términos",
         "body": [
-          "Al usar Atomic Fusion Rush, usted acepta estos Términos de servicio y nuestra Política de privacidad."
+          "Al usar Atomic Fusion Rush, usted acepta estos Términos de Servicio y nuestra Política de Privacidad."
         ]
       },
       {
-        "heading": "Licencia de uso",
+        "heading": "Licencia de Uso",
         "body": [
           "Le otorgamos una licencia limitada, no exclusiva e intransferible para usar el juego con fines de entretenimiento personal y no comercial."
         ]
@@ -1363,21 +1363,26 @@ export const TERMS_CONTENT: Record<LegalLang, LegalDoc> = {
         ]
       },
       {
-        "heading": "Conducta del jugador",
+        "heading": "Conducta del Jugador",
         "body": [
           "Usted se compromete a no:"
+        ],
+        "list": [
+          "Intentar realizar ingeniería inversa o manipular la lógica de compra.",
+          "Explotar errores para una progresión injusta o una ganancia de moneda no autorizada.",
+          "Usar scripts automatizados para abusar de los sistemas de juego."
         ]
       },
       {
-        "heading": "Disponibilidad y cambios",
+        "heading": "Disponibilidad y Cambios",
         "body": [
           "Podemos actualizar, cambiar o descontinuar funciones en cualquier momento, incluidos los sistemas de equilibrio, progresión y monetización."
         ]
       },
       {
-        "heading": "Descargo de responsabilidad y responsabilidad",
+        "heading": "Descargo de Responsabilidad y Limitación de Responsabilidad",
         "body": [
-          "El juego se proporciona tal cual, sin garantías en la medida permitida por la ley. En la medida permitida por la ley aplicable, no somos responsables de daños indirectos o consecuentes."
+          "El juego se proporciona 'tal cual', sin garantías en la medida permitida por la ley. En la medida permitida por la ley aplicable, no somos responsables de daños indirectos o consecuentes."
         ]
       },
       {
@@ -1393,7 +1398,7 @@ export const TERMS_CONTENT: Record<LegalLang, LegalDoc> = {
     "lastUpdatedLabel": "Cập nhật lần cuối",
     "sections": [
       {
-        "heading": "Chấp nhận Điều khoản",
+        "heading": "Chấp nhận các điều khoản",
         "body": [
           "Bằng cách sử dụng Atomic Fusion Rush, bạn đồng ý với các Điều khoản dịch vụ này và Chính sách quyền riêng tư của chúng tôi."
         ]
@@ -1407,38 +1412,36 @@ export const TERMS_CONTENT: Record<LegalLang, LegalDoc> = {
       {
         "heading": "Mua hàng trong ứng dụng",
         "body": [
-          "Việc mua hàng được xử lý bởi cửa hàng nền tảng và RevenueCat. Tất cả các giao dịch mua đều tuân theo các điều khoản thanh toán, chính sách hoàn tiền và quy tắc khu vực của cửa hàng."
+          "Các giao dịch mua được xử lý bởi cửa hàng nền tảng và RevenueCat. Tất cả các giao dịch mua đều tuân theo các điều khoản thanh toán, chính sách hoàn tiền và quy tắc khu vực của cửa hàng."
         ]
       },
       {
         "heading": "Hành vi của người chơi",
         "body": [
           "Bạn đồng ý không:"
-        ]
-      },
-      {
+        ],
         "list": [
-          "Cố gắng đảo ngược kỹ thuật hoặc can thiệp vào logic mua hàng.",
-          "Khai thác lỗi để tiến bộ không công bằng hoặc kiếm tiền trái phép.",
+          "Cố gắng đảo ngược kỹ thuật hoặc giả mạo logic mua hàng.",
+          "Khai thác lỗi để tiến bộ không công bằng hoặc kiếm tiền tệ trái phép.",
           "Sử dụng các tập lệnh tự động để lạm dụng hệ thống trò chơi."
         ]
       },
       {
-        "heading": "Tính khả dụng và Thay đổi",
+        "heading": "Tính khả dụng và các thay đổi",
         "body": [
-          "Chúng tôi có thể cập nhật, thay đổi hoặc ngừng cung cấp các tính năng bất cứ lúc nào, bao gồm các hệ thống cân bằng, tiến độ và kiếm tiền."
+          "Chúng tôi có thể cập nhật, thay đổi hoặc ngừng cung cấp các tính năng bất cứ lúc nào, bao gồm các hệ thống cân bằng, tiến bộ và kiếm tiền."
         ]
       },
       {
-        "heading": "Tuyên bố từ chối trách nhiệm và Trách nhiệm pháp lý",
+        "heading": "Tuyên bố từ chối trách nhiệm và trách nhiệm pháp lý",
         "body": [
-          "Trò chơi được cung cấp trên cơ sở nguyên trạng, không có bảo hành trong phạm vi pháp luật cho phép. Trong phạm vi pháp luật hiện hành cho phép, chúng tôi không chịu trách nhiệm về các thiệt hại gián tiếp hoặc do hậu quả."
+          "Trò chơi được cung cấp trên cơ sở «nguyên trạng», không có bảo đảm trong phạm vi pháp luật cho phép. Trong phạm vi pháp luật hiện hành cho phép, chúng tôi không chịu trách nhiệm về các thiệt hại gián tiếp hoặc do hậu quả."
         ]
       },
       {
         "heading": "Liên hệ",
         "body": [
-          "Thắc mắc về điều khoản: eaconsulting.supp@gmail.com"
+          "Các câu hỏi về điều khoản: eaconsulting.supp@gmail.com"
         ]
       }
     ]
@@ -1469,6 +1472,11 @@ export const TERMS_CONTENT: Record<LegalLang, LegalDoc> = {
         "heading": "Поведение игрока",
         "body": [
           "Вы соглашаетесь не:"
+        ],
+        "list": [
+          "Пытаться реконструировать или вмешиваться в логику покупки.",
+          "Использовать ошибки для несправедливого прогресса или несанкционированного получения валюты.",
+          "Использовать автоматизированные скрипты для злоупотребления игровыми системами."
         ]
       },
       {
@@ -1478,32 +1486,27 @@ export const TERMS_CONTENT: Record<LegalLang, LegalDoc> = {
         ]
       },
       {
-        "heading": "Отказ от ответственности и ограничение ответственности",
+        "heading": "Отказ от ответственности",
         "body": [
           "Игра предоставляется «как есть», без каких-либо гарантий в пределах, разрешенных законом. В пределах, разрешенных применимым законодательством, мы не несем ответственности за косвенные или последующие убытки."
         ]
       },
       {
-        "heading": "Контакты",
+        "heading": "Контакт",
         "body": [
           "Вопросы по условиям: eaconsulting.supp@gmail.com"
         ]
       }
-    ],
-    "list": [
-      "Пытаться реконструировать или вмешиваться в логику покупки.",
-      "Использовать ошибки для несправедливого прогресса или несанкционированного получения валюты.",
-      "Использовать автоматизированные скрипты для злоупотребления игровыми системами."
     ]
   },
   "zh-Hans": {
     "title": "服务条款",
-    "lastUpdatedLabel": "上次更新时间",
+    "lastUpdatedLabel": "最后更新",
     "sections": [
       {
         "heading": "接受条款",
         "body": [
-          "使用 Atomic Fusion Rush，即表示您同意本服务条款和我们的隐私政策。"
+          "使用 Atomic Fusion Rush 即表示您同意本服务条款和我们的隐私政策。"
         ]
       },
       {
@@ -1515,7 +1518,7 @@ export const TERMS_CONTENT: Record<LegalLang, LegalDoc> = {
       {
         "heading": "应用内购买",
         "body": [
-          "购买由平台商店和 RevenueCat 处理。所有购买均受商店的计费条款、退款政策和地区规则的约束。"
+          "购买由平台商店和 RevenueCat 处理。所有购买均受商店的结算条款、退款政策和地区规则的约束。"
         ]
       },
       {
@@ -1524,8 +1527,8 @@ export const TERMS_CONTENT: Record<LegalLang, LegalDoc> = {
           "您同意不："
         ],
         "list": [
-          "尝试逆向工程或篡改购买逻辑。",
-          "利用漏洞获取不公平的进展或未经授权的货币。",
+          "试图逆向工程或篡改购买逻辑。",
+          "利用漏洞获取不公平的进展或未经授权的货币收益。",
           "使用自动化脚本滥用游戏系统。"
         ]
       },
@@ -1562,24 +1565,22 @@ export const TERMS_CONTENT: Record<LegalLang, LegalDoc> = {
       {
         "heading": "उपयोग करने का लाइसेंस",
         "body": [
-          "हम आपको व्यक्तिगत, गैर-व्यावसायिक मनोरंजन के लिए गेम का उपयोग करने के लिए एक सीमित, गैर-अनन्य, गैर-हस्तांतरणीय लाइसेंस प्रदान करते हैं।"
+          "हम आपको व्यक्तिगत, गैर-व्यावसायिक मनोरंजन के लिए गेम का उपयोग करने का एक सीमित, गैर-अनन्य, गैर-हस्तांतरणीय लाइसेंस प्रदान करते हैं।"
         ]
       },
       {
         "heading": "इन-ऐप खरीदारी",
         "body": [
-          "खरीदारी प्लेटफॉर्म स्टोर और RevenueCat द्वारा नियंत्रित की जाती है। सभी खरीदारी स्टोर के बिलिंग नियमों, वापसी नीतियों और क्षेत्रीय नियमों के अधीन हैं।"
+          "खरीदारी को प्लेटफ़ॉर्म स्टोर और RevenueCat द्वारा नियंत्रित किया जाता है। सभी खरीदारी स्टोर की बिलिंग शर्तों, वापसी नीतियों और क्षेत्रीय नियमों के अधीन हैं।"
         ]
       },
       {
-        "heading": "खिलाड़ी आचरण",
+        "heading": "खिलाड़ी का आचरण",
         "body": [
           "आप सहमत हैं कि आप ऐसा नहीं करेंगे:"
-        ]
-      },
-      {
+        ],
         "list": [
-          "खरीद तर्क को रिवर्स इंजीनियर करने या उसमें छेड़छाड़ करने का प्रयास करें।",
+          "खरीदारी तर्क को रिवर्स इंजीनियर करने या उसमें छेड़छाड़ करने का प्रयास करें।",
           "अनुचित प्रगति या अनधिकृत मुद्रा लाभ के लिए बग का फायदा उठाएं।",
           "गेमप्ले सिस्टम का दुरुपयोग करने के लिए स्वचालित स्क्रिप्ट का उपयोग करें।"
         ]
@@ -1593,7 +1594,7 @@ export const TERMS_CONTENT: Record<LegalLang, LegalDoc> = {
       {
         "heading": "अस्वीकरण और देयता",
         "body": [
-          "गेम यथा-स्थिति के आधार पर प्रदान किया जाता है, कानून द्वारा अनुमत सीमा तक वारंटी के बिना। लागू कानून द्वारा अनुमत सीमा तक, हम अप्रत्यक्ष या परिणामी नुकसान के लिए उत्तरदायी नहीं हैं।"
+          "गेम यथा-स्थिति के आधार पर प्रदान किया जाता है, कानून द्वारा अनुमत सीमा तक बिना वारंटी के। लागू कानून द्वारा अनुमत सीमा तक, हम अप्रत्यक्ष या परिणामी नुकसान के लिए उत्तरदायी नहीं हैं।"
         ]
       },
       {
@@ -1606,7 +1607,7 @@ export const TERMS_CONTENT: Record<LegalLang, LegalDoc> = {
   },
   "de": {
     "title": "Nutzungsbedingungen",
-    "lastUpdatedLabel": "Zuletzt aktualisiert",
+    "lastUpdatedLabel": "Zuletzt aktualisiert am",
     "sections": [
       {
         "heading": "Annahme der Bedingungen",
@@ -1615,7 +1616,7 @@ export const TERMS_CONTENT: Record<LegalLang, LegalDoc> = {
         ]
       },
       {
-        "heading": "Nutzungslizenz",
+        "heading": "Lizenz zur Nutzung",
         "body": [
           "Wir gewähren Ihnen eine beschränkte, nicht-exklusive, nicht übertragbare Lizenz zur Nutzung des Spiels für persönliche, nicht-kommerzielle Unterhaltungszwecke."
         ]
@@ -1629,20 +1630,18 @@ export const TERMS_CONTENT: Record<LegalLang, LegalDoc> = {
       {
         "heading": "Spielerverhalten",
         "body": [
-          "Sie stimmen zu, Folgendes zu unterlassen:"
-        ]
-      },
-      {
+          "Sie erklären sich damit einverstanden, Folgendes zu unterlassen:"
+        ],
         "list": [
-          "Versuchen, die Kauflokik zu dekompilieren oder zu manipulieren.",
-          "Fehler für unfaire Fortschritte oder unautorisierten Währungsgewinn auszunutzen.",
-          "Automatisierte Skripte zu verwenden, um Spielsysteme zu missbrauchen."
+          "Versuch, die Kauflogik zurückzuentwickeln oder zu manipulieren.",
+          "Ausnutzung von Fehlern für unfaire Fortschritte oder unautorisierten Währungsgewinn.",
+          "Verwendung automatisierter Skripte zur missbräuchlichen Nutzung von Gameplay-Systemen."
         ]
       },
       {
         "heading": "Verfügbarkeit und Änderungen",
         "body": [
-          "Wir können Funktionen jederzeit aktualisieren, ändern oder einstellen, einschließlich Balancing-, Fortschritts- und Monetarisierungssysteme."
+          "Wir können Funktionen jederzeit aktualisieren, ändern oder einstellen, einschließlich Balancing-, Fortschritts- und Monetarisierungssystemen."
         ]
       },
       {
