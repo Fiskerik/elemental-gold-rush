@@ -56,7 +56,7 @@ export function LegalDocument({ content }: LegalDocumentProps) {
 
   const toolbar = (
     <label className="document-language-picker">
-      <span>{doc.lastUpdatedLabel === "Last updated" ? "Language" : doc.lastUpdatedLabel && "Language"}</span>
+      <span>Language</span>
       <select
         aria-label="Select language"
         value={language}
