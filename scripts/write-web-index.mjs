@@ -13,7 +13,8 @@ async function loadLegalData() {
   const extractLiteral = (marker, open, close) => {
     const markerIdx = src.indexOf(marker);
     if (markerIdx === -1) throw new Error(`Missing ${marker} in legal data`);
-    const start = src.indexOf(open, markerIdx);
+    const eqIdx = src.indexOf("=", markerIdx);
+    const start = src.indexOf(open, eqIdx);
     let depth = 0;
     for (let i = start; i < src.length; i++) {
       const ch = src[i];
