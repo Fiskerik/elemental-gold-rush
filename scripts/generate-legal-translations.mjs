@@ -12,7 +12,6 @@ const MODEL = "google/gemini-2.5-flash";
 
 async function translateDoc(doc, langCode, langLabel) {
   const payload = {
-    ui: UI,
     title: doc.title,
     lastUpdatedLabel: UI.lastUpdatedLabel,
     sections: doc.sections,
@@ -44,6 +43,23 @@ async function translateDoc(doc, langCode, langLabel) {
   const data = await res.json();
   let content = data.choices?.[0]?.message?.content ?? "";
   content = content.trim().replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```$/i, "").trim();
+  const start = content.indexOf("{");
+  if (start > 0) content = content.slice(start);
+  // extract first balanced JSON object
+  let depth = 0, end = -1, inStr = false, esc = false;
+  for (let i = 0; i < content.length; i++) {
+    const ch = content[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (ch === "\\") esc = true;
+      else if (ch === '"') inStr = false;
+      continue;
+    }
+    if (ch === '"') inStr = true;
+    else if (ch === "{") depth++;
+    else if (ch === "}") { depth--; if (depth === 0) { end = i + 1; break; } }
+  }
+  if (end > 0) content = content.slice(0, end);
   return JSON.parse(content);
 }
 
