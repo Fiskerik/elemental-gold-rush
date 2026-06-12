@@ -137,7 +137,8 @@ export function LabModes({ onBack, onStart }: Props) {
                 </button>
               );
             })}
-          </div>        </section>
+          </div>
+        </section>
         <div style={{ display: "grid", gridTemplateColumns: isTabletLayout ? "1fr 1fr" : "1fr", gap: isTabletLayout ? 16 : 12 }}>
           {GAME_MODES.map((mode) => {
             const bossId = isBossMode(mode.id) ? mode.id : null;
@@ -337,6 +338,36 @@ const upgradeCard: React.CSSProperties = {
   border: "1px solid var(--border)",
 };
 
+const selectedUpgradeCard: React.CSSProperties = {
+  ...upgradeCard,
+  marginBottom: 10,
+};
+
+const upgradePickerGrid: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+  gap: 8,
+};
+
+const upgradePickerTile: React.CSSProperties = {
+  minWidth: 0,
+  minHeight: 86,
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: "9px 6px",
+  borderRadius: 12,
+  background: "var(--surface)",
+  border: "1px solid var(--border)",
+  color: "var(--foreground)",
+  cursor: "pointer",
+};
+
+const upgradePickerTileActive: React.CSSProperties = {
+  border: "1px solid var(--accent)",
+  boxShadow: "0 0 16px var(--accent-glow)",
+};
 const coinBalanceChip: React.CSSProperties = {
   position: "sticky",
   top: 8,
