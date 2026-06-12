@@ -751,7 +751,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
   } = useProgress();
 
   const labUpgradeLevel = useCallback(
-    (id: LabUpgradeId) => (id === "molecule" ? 0 : labUpgradeEnabled[id] ? labUpgradeLevels[id] ?? 0 : 0),
+    (id: LabUpgradeId) => (labUpgradeEnabled[id] ? labUpgradeLevels[id] ?? 0 : 0),
     [labUpgradeEnabled, labUpgradeLevels],
   );
   const initialLabCharge = useCallback(
@@ -783,10 +783,11 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
   const activeShimmerScoreMultiplier = labUpgradeLevel("shimmer") >= 2 ? 3 : 2;
   const activeShimmerGrabSteps = labUpgradeLevel("shimmer") >= 3 ? 3 : 2;
   const emissionShotScoreMultiplier = labUpgradeLevel("emission") >= 3 ? 2 : 1;
-  const compoundRegenMs = COMPOUND_REGEN_MS;
-  const compoundScoreMultiplier = 1;
-  const compoundHintCost = COMPOUND_HINT_COST;
-  const compoundSuperHintCost = COMPOUND_SUPER_HINT_COST;
+  const compoundRegenMs = labUpgradeLevel("molecule") >= 4 ? 4 * 60 * 1000 : COMPOUND_REGEN_MS;
+  const compoundScoreMultiplier = labUpgradeLevel("molecule") >= 3 ? 3 : labUpgradeLevel("molecule") >= 1 ? 2 : 1;
+  const compoundHintCost = labUpgradeLevel("molecule") >= 5 ? Math.ceil(COMPOUND_HINT_COST / 2) : COMPOUND_HINT_COST;
+  const compoundSuperHintCost =
+    labUpgradeLevel("molecule") >= 5 ? Math.ceil(COMPOUND_SUPER_HINT_COST / 2) : COMPOUND_SUPER_HINT_COST;
   const dailyRngRef = useRef<(() => number) | null>(null);
   if (dailyRngRef.current === null) {
     dailyRngRef.current =
@@ -860,6 +861,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
   const popupId = useRef(0);
   const eGunCooldownSlots = useRef(0);
   const challengeQueuePlanRef = useRef<number[]>([]);
+  const challengeQueuePoolRef = useRef<number[]>([]);
 
   // === Grab power-up ===
   // Earned by making 8 merge progress in a row.
@@ -1464,6 +1466,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
         setShuffleStartOpen(false);
         queueUndoRef.current = null;
         challengeQueuePlanRef.current = [];
+        challengeQueuePoolRef.current = [];
         eGunCooldownSlots.current = 0;
         startTimeRef.current = Date.now() - saved.elapsedMs;
         setElapsedMs(saved.elapsedMs);
@@ -1499,6 +1502,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
         ? dailyTargetAtomPlan().queueAtoms
       : [];
     challengeQueuePlanRef.current = challengeQueuePrefix.slice(QUEUE_SIZE);
+    challengeQueuePoolRef.current = challengeQueuePrefix;
     const initialQueue = [
       ...powerUpQueuePrefix,
       ...challengeQueuePrefix,
@@ -1638,6 +1642,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     setQueueShuffleCharges((powerUpStage === "queue-shuffle" ? 1 : 0) + initialLabCharge("queue-shuffle", 2));
     queueUndoRef.current = null;
     challengeQueuePlanRef.current = [];
+    challengeQueuePoolRef.current = [];
     eGunCooldownSlots.current = 0;
     startTimeRef.current = Date.now();
     setElapsedMs(0);
@@ -1919,7 +1924,11 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     if (powerUpStage === "blank") {
       return { atom: 1, shimmer: false, eGun: false, blank: true, unstable: false };
     }
-    const plannedChallengeAtom = isMoleculeChallenge || isDailyAtomChallenge ? challengeQueuePlanRef.current.shift() : undefined;
+    let plannedChallengeAtom = isMoleculeChallenge || isDailyAtomChallenge ? challengeQueuePlanRef.current.shift() : undefined;
+    if (plannedChallengeAtom == null && (isMoleculeChallenge || isDailyAtomChallenge) && challengeQueuePoolRef.current.length > 0) {
+      const pool = challengeQueuePoolRef.current;
+      plannedChallengeAtom = pool[Math.floor(dailyRandom() * pool.length)];
+    }
     if (plannedChallengeAtom != null) {
       return {
         atom: plannedChallengeAtom,
@@ -5178,7 +5187,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
               marginBottom: 10,
             }}
           >
-            <MoleculeVisual compound={moleculeObjective} size={38} />
+            {(!isSecretCompoundChallenge || shots >= 50) && <MoleculeVisual compound={moleculeObjective} size={38} />}
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 10, letterSpacing: 1.5, color: "var(--accent)", fontWeight: 900 }}>
                 {isSecretCompoundChallenge ? "SECRET COMPOUND" : "LAB CHALLENGE"}
@@ -5390,6 +5399,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
               onHint={(compound) => revealCompoundHint(compound, compoundHintCost)}
               onSuperHint={(compound) => revealCompoundHint(compound, compoundSuperHintCost)}
               onForm={formSelectedCompound}
+              hideObjectiveFormula={isSecretCompoundChallenge && shots < 50}
               onCancel={() => {
                 setCompoundMode(false);
                 setSelectedCompoundIds(new Set());
@@ -6984,6 +6994,7 @@ function CompoundSelectionPanel({
   onHint,
   onSuperHint,
   onForm,
+  hideObjectiveFormula = false,
   onCancel,
 }: {
   counts: Record<string, number>;
@@ -7001,11 +7012,13 @@ function CompoundSelectionPanel({
   onHint: (compound: CompoundDefinition) => void;
   onSuperHint: (compound: CompoundDefinition) => void;
   onForm: () => void;
+  hideObjectiveFormula?: boolean;
   onCancel: () => void;
 }) {
   const entries = Object.entries(counts).sort(([a], [b]) => a.localeCompare(b));
   const objectiveMismatch = objective != null && match != null && match.id !== objective.id;
   const canForm = match != null && !objectiveMismatch;
+  const hideMatchDetails = hideObjectiveFormula && objective != null && match?.id === objective.id;
   return (
     <div
       style={{
@@ -7095,7 +7108,7 @@ function CompoundSelectionPanel({
             border: "1px solid var(--border)",
           }}
         >
-          <MoleculeVisual compound={match} size={62} />
+          {!hideMatchDetails && <MoleculeVisual compound={match} size={62} />}
           <div style={{ minWidth: 0 }}>
             <div
               style={{
@@ -7105,10 +7118,10 @@ function CompoundSelectionPanel({
                 fontWeight: 900,
               }}
             >
-              {matchIsNew ? "NEW COMPOUND PREVIEW" : "COMPOUND PREVIEW"}
+              {hideMatchDetails ? "SECRET COMPOUND PREVIEW" : matchIsNew ? "NEW COMPOUND PREVIEW" : "COMPOUND PREVIEW"}
             </div>
-            <div style={{ fontSize: 14, fontWeight: 900 }}>{match.name}</div>
-            <div style={{ fontSize: 12, color: "var(--muted-foreground)" }}>{match.formula}</div>
+            <div style={{ fontSize: 14, fontWeight: 900 }}>{hideMatchDetails ? "Secret compound" : match.name}</div>
+            <div style={{ fontSize: 12, color: "var(--muted-foreground)" }}>{hideMatchDetails ? "Reveals after 50 shots" : match.formula}</div>
           </div>
         </div>
       )}
@@ -7129,11 +7142,17 @@ function CompoundSelectionPanel({
         }}
       >
         {objectiveMismatch
-          ? `Need ${objective?.formula ?? "target"}`
+          ? hideObjectiveFormula
+            ? "Need secret compound"
+            : `Need ${objective?.formula ?? "target"}`
           : match
-            ? `Form ${match.name}`
+            ? hideMatchDetails
+              ? "Form Secret Compound"
+              : `Form ${match.name}`
             : objective
-              ? `Form ${objective.formula}`
+              ? hideObjectiveFormula
+                ? "Form Secret Compound"
+                : `Form ${objective.formula}`
               : "Form Compound"}
       </button>
       {match && (

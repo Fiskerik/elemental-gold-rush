@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Atom, CalendarDays, Clock, Eye, FlaskConical, LockKeyhole, Map, Orbit, RotateCcw, Shield, Sparkles, type LucideIcon } from "lucide-react";
 import { MAX_LEVEL } from "./levels";
 import { GAME_MODES, GameModeId, getUnlockedGameModes } from "./challenges";
@@ -30,12 +31,14 @@ export function LabModes({ onBack, onStart }: Props) {
   const labLevelCap = getLabUpgradeLevelCap(unlockedLevel);
   const unlockedModes = new Set(getUnlockedGameModes(unlockedLevel).map((mode) => mode.id));
   const levelId = Math.min(unlockedLevel, MAX_LEVEL);
-  const discoveredUpgradeIds = LAB_UPGRADE_IDS.filter((id) => id !== "molecule" && unlockedLevel >= POWER_UP_UNLOCK_LEVELS[id]);
+  const discoveredUpgradeIds = LAB_UPGRADE_IDS.filter((id) => unlockedLevel >= POWER_UP_UNLOCK_LEVELS[id]);
   const defeatedBosses = new Set(
     (["elemental-boss", "periodic-guardian", "nucleus-core"] as BossId[]).filter(
       (id) => (levelStats[BOSSES[id].levelId]?.bestShots ?? null) != null,
     ),
   );
+  const [selectedUpgradeId, setSelectedUpgradeId] = useState<LabUpgradeId | null>(null);
+  const activeUpgradeId = selectedUpgradeId && discoveredUpgradeIds.includes(selectedUpgradeId) ? selectedUpgradeId : discoveredUpgradeIds[0] ?? null;
 
   return (
     <div className="app-shell" style={{ padding: isTabletLayout ? 28 : 20, paddingTop: isTabletLayout ? 36 : 32, minHeight: "100dvh" }}>
@@ -65,64 +68,76 @@ export function LabModes({ onBack, onStart }: Props) {
           <p style={{ margin: "0 0 12px", color: "var(--muted-foreground)", fontSize: 12, lineHeight: 1.45 }}>
             Upgrade levels unlock at campaign levels 5, 10, 20, 35, and 50. Toggle a researched power-up off to disable its bonus effects.
           </p>
-          <div style={{ display: "grid", gridTemplateColumns: isTabletLayout ? "1fr 1fr" : "1fr", gap: 10 }}>
+          {activeUpgradeId && (() => {
+            const id = activeUpgradeId;
+            const meta = LAB_UPGRADE_META[id];
+            const level = labUpgradeLevels[id] ?? 0;
+            const active = labUpgradeEnabled[id] ?? true;
+            const nextCost = LAB_UPGRADE_COSTS[level];
+            const canUpgrade = labLevelCap > level && nextCost != null && goldCoins >= nextCost;
+            const activeBonuses = meta.bonuses.slice(0, Math.max(1, level));
+            const futureBonuses = meta.bonuses.slice(Math.max(1, level));
+            return (
+              <article style={selectedUpgradeCard}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                    <PowerUpBadge icon={id} size={42} />
+                    <div>
+                      <h3 style={{ margin: 0, fontSize: 16 }}>{meta.name}</h3>
+                      <div style={{ marginTop: 3, color: "var(--muted-foreground)", fontSize: 11 }}>
+                        Level {level}/5 {labLevelCap <= level && level < 5 ? "- unlock next tier at campaign milestone" : ""}
+                      </div>
+                    </div>
+                  </div>
+                  <button type="button" onClick={() => toggleLabUpgrade(id)} style={{ ...toggleBtn, color: active ? "var(--accent)" : "var(--muted-foreground)" }}>
+                    {active ? "Active" : "Off"}
+                  </button>
+                </div>
+                <div style={upgradeProgressTrack}>
+                  <span style={{ ...upgradeProgressFill, width: `${(level / 5) * 100}%` }} />
+                </div>
+                <div style={{ display: "grid", gap: 4, marginTop: 8 }}>
+                  {activeBonuses.map((bonus, index) => (
+                    <div key={bonus} style={{ color: index < level ? "var(--success, var(--accent))" : "var(--muted-foreground)", fontSize: 11, lineHeight: 1.25 }}>
+                      L{index + 1}: {bonus}
+                    </div>
+                  ))}
+                  {futureBonuses.length > 0 && (
+                    <details style={futureBonusDetails}>
+                      <summary style={futureBonusSummary}>Locked perks L{Math.max(2, level + 1)}-5</summary>
+                      <div style={{ display: "grid", gap: 4, marginTop: 6 }}>
+                        {futureBonuses.map((bonus, index) => {
+                          const bonusLevel = Math.max(1, level) + index + 1;
+                          return (
+                            <div key={bonus} style={{ color: "var(--muted-foreground)", fontSize: 11, lineHeight: 1.25 }}>
+                              L{bonusLevel}: {bonus}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </details>
+                  )}
+                </div>
+                <button type="button" disabled={!canUpgrade} onClick={() => upgradeLabPowerUp(id)} style={{ ...startBtn, marginTop: 10, opacity: canUpgrade ? 1 : 0.55 }}>
+                  {level >= 5 ? "Maxed" : nextCost == null ? "Locked" : `Upgrade - ${nextCost} coins`}
+                </button>
+              </article>
+            );
+          })()}
+          <div style={upgradePickerGrid}>
             {discoveredUpgradeIds.map((id) => {
               const meta = LAB_UPGRADE_META[id];
               const level = labUpgradeLevels[id] ?? 0;
-              const active = labUpgradeEnabled[id] ?? true;
-              const nextCost = LAB_UPGRADE_COSTS[level];
-              const canUpgrade = labLevelCap > level && nextCost != null && goldCoins >= nextCost;
-              const activeBonuses = meta.bonuses.slice(0, Math.max(1, level));
-              const futureBonuses = meta.bonuses.slice(Math.max(1, level));
+              const active = activeUpgradeId === id;
               return (
-                <article key={id} style={upgradeCard}>
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-                      <PowerUpBadge icon={id} size={36} />
-                      <div>
-                        <h3 style={{ margin: 0, fontSize: 15 }}>{meta.name}</h3>
-                        <div style={{ marginTop: 3, color: "var(--muted-foreground)", fontSize: 11 }}>
-                          Level {level}/5 {labLevelCap <= level && level < 5 ? `- unlock next tier at campaign milestone` : ""}
-                        </div>
-                      </div>
-                    </div>
-                    <button type="button" onClick={() => toggleLabUpgrade(id)} style={{ ...toggleBtn, color: active ? "var(--accent)" : "var(--muted-foreground)" }}>
-                      {active ? "Active" : "Off"}
-                    </button>
-                  </div>
-                  <div style={upgradeProgressTrack}>
-                    <span style={{ ...upgradeProgressFill, width: `${(level / 5) * 100}%` }} />
-                  </div>
-                  <div style={{ display: "grid", gap: 4, marginTop: 8 }}>
-                    {activeBonuses.map((bonus, index) => (
-                      <div key={bonus} style={{ color: index < level ? "var(--success, var(--accent))" : "var(--muted-foreground)", fontSize: 11, lineHeight: 1.25 }}>
-                        L{index + 1}: {bonus}
-                      </div>
-                    ))}
-                    {futureBonuses.length > 0 && (
-                      <details style={futureBonusDetails}>
-                        <summary style={futureBonusSummary}>Locked perks L{Math.max(2, level + 1)}-5</summary>
-                        <div style={{ display: "grid", gap: 4, marginTop: 6 }}>
-                          {futureBonuses.map((bonus, index) => {
-                            const bonusLevel = Math.max(1, level) + index + 1;
-                            return (
-                              <div key={bonus} style={{ color: "var(--muted-foreground)", fontSize: 11, lineHeight: 1.25 }}>
-                                L{bonusLevel}: {bonus}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </details>
-                    )}
-                  </div>
-                  <button type="button" disabled={!canUpgrade} onClick={() => upgradeLabPowerUp(id)} style={{ ...startBtn, marginTop: 10, opacity: canUpgrade ? 1 : 0.55 }}>
-                    {level >= 5 ? "Maxed" : nextCost == null ? "Locked" : `Upgrade - ${nextCost} coins`}
-                  </button>
-                </article>
+                <button key={id} type="button" onClick={() => setSelectedUpgradeId(id)} style={{ ...upgradePickerTile, ...(active ? upgradePickerTileActive : null) }}>
+                  <PowerUpBadge icon={id} size={30} />
+                  <span style={{ marginTop: 6, fontWeight: 900, fontSize: 11, lineHeight: 1.1 }}>{meta.name}</span>
+                  <span style={{ marginTop: 3, color: "var(--muted-foreground)", fontSize: 10 }}>Lvl {level}/5</span>
+                </button>
               );
             })}
-          </div>
-        </section>
+          </div>        </section>
         <div style={{ display: "grid", gridTemplateColumns: isTabletLayout ? "1fr 1fr" : "1fr", gap: isTabletLayout ? 16 : 12 }}>
           {GAME_MODES.map((mode) => {
             const bossId = isBossMode(mode.id) ? mode.id : null;
