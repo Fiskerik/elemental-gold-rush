@@ -390,6 +390,35 @@
 .document-page-header {
   padding-top: 8px;
 }
+.document-page-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin: 0 0 4px;
+}
+.document-language-picker {
+  align-items: center;
+  display: inline-flex;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted-foreground);
+}
+.document-language-picker select {
+  appearance: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--foreground);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 750;
+  min-height: 38px;
+  padding: 8px 12px;
+}
+.document-language-picker select:focus-visible {
+  outline: 2px solid color-mix(in oklch, var(--primary) 60%, transparent);
+  outline-offset: 1px;
+}
 .document-page-header h1 {
   font-size: clamp(30px, 5vw, 40px);
   font-weight: 900;
