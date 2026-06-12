@@ -91,6 +91,8 @@ export function MainMenu({
   const dailyRewardToastTimeoutRef = useRef<number | null>(null);
   const [resetCountdown, setResetCountdown] = useState<string>(() => formatResetCountdown());
   const [rewardedAdBusy, setRewardedAdBusy] = useState(false);
+  const [rewardedAdMessage, setRewardedAdMessage] = useState<string | null>(null);
+  const rewardedAdMessageTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     const id = window.setInterval(() => {
@@ -114,6 +116,9 @@ export function MainMenu({
       if (dailyRewardToastTimeoutRef.current !== null) {
         window.clearTimeout(dailyRewardToastTimeoutRef.current);
       }
+      if (rewardedAdMessageTimeoutRef.current !== null) {
+        window.clearTimeout(rewardedAdMessageTimeoutRef.current);
+      }
     },
     [],
   );
@@ -128,6 +133,19 @@ export function MainMenu({
       setDailyRewardToast((current) => (current?.id === id ? null : current));
       dailyRewardToastTimeoutRef.current = null;
     }, 1800);
+  }
+
+  function showRewardedAdMessage(text: string, autoHide = true) {
+    if (rewardedAdMessageTimeoutRef.current !== null) {
+      window.clearTimeout(rewardedAdMessageTimeoutRef.current);
+      rewardedAdMessageTimeoutRef.current = null;
+    }
+    setRewardedAdMessage(text);
+    if (!autoHide) return;
+    rewardedAdMessageTimeoutRef.current = window.setTimeout(() => {
+      setRewardedAdMessage(null);
+      rewardedAdMessageTimeoutRef.current = null;
+    }, 3200);
   }
 
   function handleDailyRewardClaim() {
@@ -149,18 +167,18 @@ export function MainMenu({
   async function handleRewardedCoin() {
     if (rewardedAdBusy || hasProPack) return;
     setRewardedAdBusy(true);
-    showDailyRewardToast("Loading rewarded ad...");
+    showRewardedAdMessage("Loading ad...", false);
     try {
       const result = await showRewardedForCoin(hasProPack);
       if (result.rewarded) {
         grantGoldCoins(1);
         reportQuestProgress({ adsWatched: 1 });
-        showDailyRewardToast("+1 gold coin");
+        showRewardedAdMessage("+1 gold coin");
         return;
       }
-      showDailyRewardToast(result.reason ?? "Rewarded ad unavailable");
+      showRewardedAdMessage("Loading failed - please try again in a moment");
     } catch (error) {
-      showDailyRewardToast(error instanceof Error ? error.message : "Rewarded ad could not be started");
+      showRewardedAdMessage("Loading failed - please try again in a moment");
     } finally {
       setRewardedAdBusy(false);
     }
@@ -300,6 +318,11 @@ export function MainMenu({
               <GoldCoinIcon size={14} />+1
             </span>
           </button>
+          {rewardedAdMessage && (
+            <div style={rewardedAdMessageStyle} role="status" aria-live="polite">
+              {rewardedAdMessage}
+            </div>
+          )}
           <div style={progressTrack}>
             <div style={{ ...progressFill, width: `${campaignProgress}%` }} />
           </div>
@@ -746,6 +769,14 @@ const rewardedAdBtn: CSSProperties = {
   color: "var(--foreground)",
   fontWeight: 900,
   fontSize: 12,
+};
+
+const rewardedAdMessageStyle: CSSProperties = {
+  marginTop: 6,
+  color: "var(--accent)",
+  fontSize: 11,
+  fontWeight: 800,
+  textAlign: "center",
 };
 
 const dailyQuestClaimTrack: CSSProperties = {

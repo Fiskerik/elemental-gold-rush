@@ -3,6 +3,8 @@ import { LEVELS } from "./levels";
 import { getTodayQuestDate } from "./quests";
 
 export const DAILY_FEATURE_REWARD_COINS = 5;
+const DAILY_CHALLENGE_MIN_TARGET_ATOM = 10;
+const DAILY_CHALLENGE_MAX_TARGET_ATOM = 60;
 
 export interface DailyChallengeState {
   date: string;
@@ -29,8 +31,18 @@ export function hashDailySeed(value: string): number {
   return hash >>> 0;
 }
 
+function isEligibleDailyChallengeLevel(level: (typeof LEVELS)[number] | undefined): boolean {
+  return Boolean(
+    level &&
+      !level.specialStage &&
+      !level.powerUpStage &&
+      level.targetElement >= DAILY_CHALLENGE_MIN_TARGET_ATOM &&
+      level.targetElement <= DAILY_CHALLENGE_MAX_TARGET_ATOM,
+  );
+}
+
 export function createDailyChallenge(date = getTodayQuestDate()): DailyChallengeState {
-  const eligible = LEVELS.filter((level) => !level.specialStage && !level.powerUpStage && level.id >= 5);
+  const eligible = LEVELS.filter(isEligibleDailyChallengeLevel);
   const levels = eligible.length ? eligible : LEVELS;
   const index = hashDailySeed(`challenge-${date}`) % levels.length;
   return {
@@ -58,7 +70,8 @@ export function refreshDailyChallengeState(
   current: DailyChallengeState | undefined,
   date = getTodayQuestDate(),
 ): DailyChallengeState {
-  if (current?.date === date) return current;
+  const currentLevel = LEVELS.find((level) => level.id === current?.levelId);
+  if (current?.date === date && isEligibleDailyChallengeLevel(currentLevel)) return current;
   return createDailyChallenge(date);
 }
 

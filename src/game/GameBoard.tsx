@@ -1269,13 +1269,18 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     setActiveTip({ id, title, body, tone });
   }
 
-  function registerDiscoveries(atoms: number[]) {
+  function getCollectibleDiscoveries(atoms: number[]) {
     const uniqueAtoms = atoms.filter((atom, index) => atom > 1 && atoms.indexOf(atom) === index);
-    if (uniqueAtoms.length === 0) return;
-    recordDiscovery(uniqueAtoms);
+    return mode === "daily-challenge" ? uniqueAtoms.filter((atom) => atom === target) : uniqueAtoms;
+  }
+
+  function registerDiscoveries(atoms: number[]) {
+    const collectibleAtoms = getCollectibleDiscoveries(atoms);
+    if (collectibleAtoms.length === 0) return;
+    recordDiscovery(collectibleAtoms);
     setNewlyDiscoveredThisRun((current) => {
       const merged = [...current];
-      uniqueAtoms.forEach((atom) => {
+      collectibleAtoms.forEach((atom) => {
         if (!merged.includes(atom)) merged.push(atom);
       });
       return merged.sort((a, b) => a - b);
@@ -3045,7 +3050,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
           feedback({ type: "milestone", atomicNumber: firstDiscovery });
         }
       }
-      reportQuestProgress({ discoveries, reachedAtomicNumbers: Array.from(upgradedAtoms) });
+      reportQuestProgress({ discoveries: getCollectibleDiscoveries(discoveries), reachedAtomicNumbers: Array.from(upgradedAtoms) });
       setHighestElement(Math.max(highest, ...Array.from(upgradedAtoms)));
       setHighest((h) => Math.max(h, ...Array.from(upgradedAtoms)));
     }
@@ -3842,7 +3847,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
 
     reportQuestProgress({
       merges: result.merges.length,
-      discoveries: undiscovered,
+      discoveries: getCollectibleDiscoveries(undiscovered),
       reachedAtomicNumbers: Array.from(newAtoms),
       maxChainDepth: result.merges.length,
     });
@@ -4344,7 +4349,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     if (discoveries.length > 0) registerDiscoveries(discoveries);
 
     spawnPopup(boostsFutureQueue ? `EMISSION FLOOR +${emissionTierRaise}` : `EMISSION QUEUE +${emissionTierRaise}`);
-    reportQuestProgress({ discoveries, reachedAtomicNumbers });
+    reportQuestProgress({ discoveries: getCollectibleDiscoveries(discoveries), reachedAtomicNumbers });
     haptic([25, 45, 25]);
     if (powerUpStage === "emission") completePowerUpStageAfterDelay("emission", score);
   }
@@ -4497,7 +4502,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     if (mergeStoneBonus + crushStoneBonus > 0) spawnPopup(`⛰ +${formatScore(mergeStoneBonus + crushStoneBonus)}`);
     reportQuestProgress({
       merges: result.merges.length,
-      discoveries: undiscovered,
+      discoveries: getCollectibleDiscoveries(undiscovered),
       reachedAtomicNumbers: Array.from(newAtoms),
       maxChainDepth: result.merges.length,
     });
@@ -4731,7 +4736,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     }
     reportQuestProgress({
       merges: result.merges.length,
-      discoveries: undiscovered,
+      discoveries: getCollectibleDiscoveries(undiscovered),
       reachedAtomicNumbers: Array.from(newAtoms),
       maxChainDepth: result.merges.length,
     });
