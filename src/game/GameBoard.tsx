@@ -872,6 +872,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
   const [compoundCharges, setCompoundCharges] = useState(() => loadCompoundChargeState().charges);
   const [compoundMode, setCompoundMode] = useState(false);
   const [selectedCompoundIds, setSelectedCompoundIds] = useState<Set<number>>(new Set());
+  const [secretCompoundFormulaRevealed, setSecretCompoundFormulaRevealed] = useState(false);
   const [compoundFx, setCompoundFx] = useState<{
     compound: CompoundDefinition;
     atoms: { id: number; x: number; y: number; atom: number; r: number }[];
@@ -1114,6 +1115,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     null;
   const availableNewCompoundHint =
     availableCompoundHints.find((compound) => !discoveredCompounds.includes(compound.id)) ?? null;
+  const secretCompoundConcealed = isSecretCompoundChallenge && !secretCompoundFormulaRevealed && shots < 50;
 
   const sfx = (fn: () => void) => {
     if (soundEnabled) fn();
@@ -1372,6 +1374,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     setWinChoice(null);
     setContinueClaimPromptOpen(false);
     setContinuingPastTarget(false);
+    setSecretCompoundFormulaRevealed(false);
     setInventoryPickerOpen(false);
     setConfirmAction(null);
     setRestartNonce((nonce) => nonce + 1);
@@ -1484,6 +1487,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     }
     setNewlyDiscoveredThisRun([]);
     setReadDiscoveryAtoms([]);
+    setSecretCompoundFormulaRevealed(false);
     const initialBalls = isPowerUpStage
       ? createPowerUpStageBoard(powerUpStage)
       : isMoleculeChallenge
@@ -4275,7 +4279,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     }, 1450);
   }
 
-  function revealCompoundHint(compound: CompoundDefinition, cost: number) {
+  function revealCompoundHint(compound: CompoundDefinition, cost: number, options?: { revealSecret?: boolean }) {
     if (!compoundMode || busy) return;
     if (!spendGoldCoins(cost)) {
       spawnPopup(`Need ${cost} gold coin${cost === 1 ? "" : "s"}`);
@@ -4290,6 +4294,9 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       if (!symbol || !remaining[symbol]) continue;
       hintedIds.add(ball.id);
       remaining[symbol] -= 1;
+    }
+    if (options?.revealSecret) {
+      setSecretCompoundFormulaRevealed(true);
     }
     setSelectedCompoundIds(hintedIds);
     spawnPopup(`Hint: ${compound.formula}`);
@@ -5194,24 +5201,24 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
               marginBottom: 10,
             }}
           >
-            {(!isSecretCompoundChallenge || shots >= 50) && <MoleculeVisual compound={moleculeObjective} size={38} />}
+            {(!isSecretCompoundChallenge || !secretCompoundConcealed) && <MoleculeVisual compound={moleculeObjective} size={38} />}
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 10, letterSpacing: 1.5, color: "var(--accent)", fontWeight: 900 }}>
                 {isSecretCompoundChallenge ? "SECRET COMPOUND" : "LAB CHALLENGE"}
               </div>
               <div style={{ fontSize: 13, fontWeight: 900 }}>
                 {isSecretCompoundChallenge
-                  ? shots >= 50
+                  ? !secretCompoundConcealed
                     ? `Revealed: form ${moleculeObjective.name} (${moleculeObjective.formula})`
                     : getCompoundHint(moleculeObjective)
                   : `Form ${moleculeObjective.name} (${moleculeObjective.formula}) to clear`}
               </div>
-              {isSecretCompoundChallenge && shots < 50 && (
+              {isSecretCompoundChallenge && secretCompoundConcealed && (
                 <div style={{ marginTop: 3, color: "var(--muted-foreground)", fontSize: 11 }}>
                   Compound reveals after 50 shots
                 </div>
               )}
-              {isSecretCompoundChallenge && shots >= 50 && (
+              {isSecretCompoundChallenge && !secretCompoundConcealed && (
                 <div style={{ marginTop: 3, color: "var(--muted-foreground)", fontSize: 11 }}>
                   Use the compound tool when the recipe atoms are on the board.
                 </div>
@@ -5397,16 +5404,21 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
               matchScore={matchingCompoundScore}
               matchIsNew={matchingCompoundIsNew}
               objective={isMoleculeChallenge ? moleculeObjective : null}
-              discoveredHint={availableDiscoveredCompoundHint}
-              newHint={availableNewCompoundHint}
+              discoveredHint={isSecretCompoundChallenge ? null : availableDiscoveredCompoundHint}
+              newHint={isSecretCompoundChallenge ? moleculeObjective : availableNewCompoundHint}
               hintCost={compoundHintCost}
               superHintCost={compoundSuperHintCost}
               canAffordHint={goldCoins >= compoundHintCost}
               canAffordSuperHint={goldCoins >= compoundSuperHintCost}
               onHint={(compound) => revealCompoundHint(compound, compoundHintCost)}
-              onSuperHint={(compound) => revealCompoundHint(compound, compoundSuperHintCost)}
+              onSuperHint={(compound) =>
+                revealCompoundHint(compound, compoundSuperHintCost, {
+                  revealSecret: isSecretCompoundChallenge && compound.id === moleculeObjective?.id,
+                })
+              }
               onForm={formSelectedCompound}
-              hideObjectiveFormula={isSecretCompoundChallenge && shots < 50}
+              hideObjectiveFormula={secretCompoundConcealed}
+              hideNonObjectiveMatches={isSecretCompoundChallenge}
               onCancel={() => {
                 setCompoundMode(false);
                 setSelectedCompoundIds(new Set());
@@ -7002,6 +7014,7 @@ function CompoundSelectionPanel({
   onSuperHint,
   onForm,
   hideObjectiveFormula = false,
+  hideNonObjectiveMatches = false,
   onCancel,
 }: {
   counts: Record<string, number>;
@@ -7020,12 +7033,15 @@ function CompoundSelectionPanel({
   onSuperHint: (compound: CompoundDefinition) => void;
   onForm: () => void;
   hideObjectiveFormula?: boolean;
+  hideNonObjectiveMatches?: boolean;
   onCancel: () => void;
 }) {
   const entries = Object.entries(counts).sort(([a], [b]) => a.localeCompare(b));
   const objectiveMismatch = objective != null && match != null && match.id !== objective.id;
   const canForm = match != null && !objectiveMismatch;
   const hideMatchDetails = hideObjectiveFormula && objective != null && match?.id === objective.id;
+  const visibleMatch = hideNonObjectiveMatches && objectiveMismatch ? null : match;
+  const visibleMatchIsNew = visibleMatch ? matchIsNew : false;
   return (
     <div
       style={{
@@ -7102,7 +7118,7 @@ function CompoundSelectionPanel({
           )}
         </div>
       )}
-      {match && (
+      {visibleMatch && (
         <div
           style={{
             marginTop: 10,
@@ -7115,20 +7131,20 @@ function CompoundSelectionPanel({
             border: "1px solid var(--border)",
           }}
         >
-          {!hideMatchDetails && <MoleculeVisual compound={match} size={62} />}
+          {!hideMatchDetails && <MoleculeVisual compound={visibleMatch} size={62} />}
           <div style={{ minWidth: 0 }}>
             <div
               style={{
                 fontSize: 11,
                 letterSpacing: 1.2,
-                color: matchIsNew ? "var(--success, oklch(0.78 0.16 145))" : "var(--accent)",
+                color: visibleMatchIsNew ? "var(--success, oklch(0.78 0.16 145))" : "var(--accent)",
                 fontWeight: 900,
               }}
             >
-              {hideMatchDetails ? "SECRET COMPOUND PREVIEW" : matchIsNew ? "NEW COMPOUND PREVIEW" : "COMPOUND PREVIEW"}
+              {hideMatchDetails ? "SECRET COMPOUND PREVIEW" : visibleMatchIsNew ? "NEW COMPOUND PREVIEW" : "COMPOUND PREVIEW"}
             </div>
-            <div style={{ fontSize: 14, fontWeight: 900 }}>{hideMatchDetails ? "Secret compound" : match.name}</div>
-            <div style={{ fontSize: 12, color: "var(--muted-foreground)" }}>{hideMatchDetails ? "Reveals after 50 shots" : match.formula}</div>
+            <div style={{ fontSize: 14, fontWeight: 900 }}>{hideMatchDetails ? "Secret compound" : visibleMatch.name}</div>
+            <div style={{ fontSize: 12, color: "var(--muted-foreground)" }}>{hideMatchDetails ? "Reveals after 50 shots" : visibleMatch.formula}</div>
           </div>
         </div>
       )}
@@ -7162,7 +7178,7 @@ function CompoundSelectionPanel({
                 : `Form ${objective.formula}`
               : "Form Compound"}
       </button>
-      {match && (
+      {visibleMatch && (
         <div
           style={{
             marginTop: 8,
@@ -7174,7 +7190,7 @@ function CompoundSelectionPanel({
             color: "var(--accent)",
           }}
         >
-          <span>{matchIsNew ? "NEW compound" : "Already discovered"}</span>
+          <span>{visibleMatchIsNew ? "NEW compound" : "Already discovered"}</span>
           <span>+{formatScore(matchScore)}</span>
         </div>
       )}
