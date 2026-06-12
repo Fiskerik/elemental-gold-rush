@@ -10,125 +10,86 @@ if (!API_KEY) {
 const ENDPOINT = "https://ai.gateway.lovable.dev/v1/chat/completions";
 const MODEL = "google/gemini-2.5-flash";
 
-async function translateDoc(doc, langCode, langLabel) {
-  const payload = {
-    title: doc.title,
-    lastUpdatedLabel: UI.lastUpdatedLabel,
-    sections: doc.sections,
-  };
+// Flatten a doc into an ordered list of strings.
+function flatten(doc) {
+  const arr = [doc.title, UI.lastUpdatedLabel];
+  for (const s of doc.sections) {
+    arr.push(s.heading);
+    for (const b of s.body ?? []) arr.push(b);
+    for (const l of s.list ?? []) arr.push(l);
+  }
+  return arr;
+}
+
+// Rebuild a LegalDoc using English structure and a translated string list.
+function rebuild(doc, list) {
+  let i = 0;
+  const title = list[i++];
+  const lastUpdatedLabel = list[i++];
+  const sections = doc.sections.map((s) => {
+    const heading = list[i++];
+    const body = (s.body ?? []).map(() => list[i++]);
+    const out = { heading, body };
+    if (s.list) out.list = s.list.map(() => list[i++]);
+    return out;
+  });
+  return { title, lastUpdatedLabel, sections };
+}
+
+async function translateList(strings, langCode, langLabel) {
   const sys =
-    "You are a professional legal/app-store localization translator. Translate ALL human-readable strings in the given JSON into " +
-    langLabel +
-    " (" +
-    langCode +
-    "). Rules: keep the EXACT same JSON shape and keys; translate only the string VALUES; do NOT translate email addresses, brand/product names (Atomic Fusion Rush, Atomic Fusion Lifetime, EA Consulting, RevenueCat, Apple App Store, App Store, Pro), or numbers/dates; keep punctuation natural for the target language; return ONLY valid minified JSON, no markdown, no commentary.";
+    "You are a professional legal/app-store localization translator. You will receive a JSON array of English strings. " +
+    "Translate EVERY element into " + langLabel + " (" + langCode + "). " +
+    "Return a JSON array with EXACTLY the same length and order, each element being the translation of the input at the same index. " +
+    "Do NOT translate email addresses, brand/product names (Atomic Fusion Rush, Atomic Fusion Lifetime, EA Consulting, RevenueCat, Apple App Store, App Store, Pro). " +
+    "Do not add, remove, reorder, split, or merge elements. " +
+    "Inside any string, never use straight double-quote characters; if needed use single quotes or guillemets. " +
+    "Return ONLY a valid JSON object of the form {\"items\":[...]} with no markdown or commentary.";
   const res = await fetch(ENDPOINT, {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${API_KEY}`,
-      "Content-Type": "application/json",
-    },
+    headers: { Authorization: `Bearer ${API_KEY}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       model: MODEL,
       messages: [
         { role: "system", content: sys },
-        { role: "user", content: JSON.stringify(payload) },
+        { role: "user", content: JSON.stringify({ items: strings }) },
       ],
       temperature: 0.2,
       response_format: { type: "json_object" },
     }),
   });
-  if (!res.ok) {
-    throw new Error(`HTTP ${res.status}: ${await res.text()}`);
-  }
+  if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
   const data = await res.json();
-  let content = data.choices?.[0]?.message?.content ?? "";
-  content = content.trim().replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```$/i, "").trim();
-  const start = content.indexOf("{");
-  if (start > 0) content = content.slice(start);
-  // extract first balanced JSON object
-  let depth = 0, end = -1, inStr = false, esc = false;
-  for (let i = 0; i < content.length; i++) {
-    const ch = content[i];
-    if (inStr) {
-      if (esc) esc = false;
-      else if (ch === "\\") esc = true;
-      else if (ch === '"') inStr = false;
-      continue;
-    }
-    if (ch === '"') inStr = true;
-    else if (ch === "{") depth++;
-    else if (ch === "}") { depth--; if (depth === 0) { end = i + 1; break; } }
+  let content = (data.choices?.[0]?.message?.content ?? "").trim();
+  content = content.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```$/i, "").trim();
+  const parsed = JSON.parse(content);
+  const items = Array.isArray(parsed) ? parsed : parsed.items;
+  if (!Array.isArray(items) || items.length !== strings.length) {
+    throw new Error(`length mismatch: got ${items?.length} expected ${strings.length}`);
   }
-  if (end > 0) content = content.slice(0, end);
-  try {
-    return JSON.parse(content);
-  } catch {
-    return JSON.parse(repairJson(content));
-  }
-}
-
-function repairJson(raw) {
-  // Re-escape stray double quotes that appear inside string values.
-  // A quote is structural if it opens after { [ : , or closes before } ] : ,
-  let out = "";
-  let inStr = false;
-  for (let i = 0; i < raw.length; i++) {
-    const ch = raw[i];
-    if (!inStr) {
-      out += ch;
-      if (ch === '"') inStr = true;
-      continue;
-    }
-    if (ch === "\\") {
-      out += ch + (raw[i + 1] ?? "");
-      i++;
-      continue;
-    }
-    if (ch === '"') {
-      // look ahead to next non-space char
-      let j = i + 1;
-      while (j < raw.length && /\s/.test(raw[j])) j++;
-      const next = raw[j];
-      if (next === undefined || next === "," || next === "}" || next === "]" || next === ":") {
-        out += '"';
-        inStr = false;
-      } else {
-        out += '\\"';
-      }
-      continue;
-    }
-    out += ch;
-  }
-  return out;
-}
-
-function buildEnglish(doc) {
-  return {
-    title: doc.title,
-    lastUpdatedLabel: UI.lastUpdatedLabel,
-    sections: doc.sections,
-  };
+  return items;
 }
 
 async function build(doc) {
   const out = {};
+  const enList = flatten(doc);
   for (const { code, label } of LANGS) {
     if (code === "en") {
-      out[code] = buildEnglish(doc);
+      out[code] = rebuild(doc, enList);
       console.error(`  en ok`);
       continue;
     }
     let attempt = 0;
     while (true) {
       try {
-        out[code] = await translateDoc(doc, code, label);
+        const list = await translateList(enList, code, label);
+        out[code] = rebuild(doc, list);
         console.error(`  ${code} ok`);
         break;
       } catch (e) {
         attempt++;
         console.error(`  ${code} attempt ${attempt} failed: ${e.message}`);
-        if (attempt >= 3) throw e;
+        if (attempt >= 4) throw e;
         await new Promise((r) => setTimeout(r, 1500 * attempt));
       }
     }
