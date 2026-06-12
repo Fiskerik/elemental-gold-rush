@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Atom, CalendarDays, Clock, Eye, FlaskConical, LockKeyhole, Map, Orbit, RotateCcw, Shield, Sparkles, type LucideIcon } from "lucide-react";
-import { MAX_LEVEL } from "./levels";
+import { LEVELS, MAX_LEVEL } from "./levels";
 import { GAME_MODES, GameModeId, getUnlockedGameModes } from "./challenges";
 import { BOSSES, type BossId } from "./bosses";
 import {
@@ -16,7 +16,7 @@ import { POWER_UP_UNLOCK_LEVELS } from "./powerUps";
 
 interface Props {
   onBack: () => void;
-  onStart: (mode: GameModeId, levelId: number) => void;
+  onStart: (mode: GameModeId, levelId: number, options?: { secretCompoundId?: string }) => void;
 }
 
 export function LabModes({ onBack, onStart }: Props) {
@@ -26,11 +26,18 @@ export function LabModes({ onBack, onStart }: Props) {
   const goldCoins = useProgress((s) => s.goldCoins);
   const labUpgradeLevels = useProgress((s) => s.labUpgradeLevels);
   const labUpgradeEnabled = useProgress((s) => s.labUpgradeEnabled);
+  const refreshDailyFeatures = useProgress((s) => s.refreshDailyFeatures);
+  const revealSecretCompound = useProgress((s) => s.revealSecretCompound);
   const upgradeLabPowerUp = useProgress((s) => s.upgradeLabPowerUp);
   const toggleLabUpgrade = useProgress((s) => s.toggleLabUpgrade);
   const labLevelCap = getLabUpgradeLevelCap(unlockedLevel);
   const unlockedModes = new Set(getUnlockedGameModes(unlockedLevel).map((mode) => mode.id));
   const levelId = Math.min(unlockedLevel, MAX_LEVEL);
+  const latestStandardLevel =
+    [...LEVELS]
+      .reverse()
+      .find((level) => level.id <= levelId && !level.specialStage && !level.powerUpStage) ?? LEVELS[0];
+  const challengeLevelId = latestStandardLevel?.id ?? 1;
   const discoveredUpgradeIds = LAB_UPGRADE_IDS.filter((id) => unlockedLevel >= POWER_UP_UNLOCK_LEVELS[id]);
   const defeatedBosses = new Set(
     (["elemental-boss", "periodic-guardian", "nucleus-core"] as BossId[]).filter(
@@ -39,6 +46,19 @@ export function LabModes({ onBack, onStart }: Props) {
   );
   const [selectedUpgradeId, setSelectedUpgradeId] = useState<LabUpgradeId | null>(null);
   const activeUpgradeId = selectedUpgradeId && discoveredUpgradeIds.includes(selectedUpgradeId) ? selectedUpgradeId : discoveredUpgradeIds[0] ?? null;
+
+  function startDailyRound() {
+    refreshDailyFeatures();
+    const refreshed = useProgress.getState().dailyChallenge;
+    onStart("daily-challenge", refreshed.levelId);
+  }
+
+  function startDailyCompound() {
+    refreshDailyFeatures();
+    const { dailyChallenge: refreshedChallenge, secretCompound: refreshedCompound } = useProgress.getState();
+    revealSecretCompound();
+    onStart("campaign", refreshedChallenge.levelId, { secretCompoundId: refreshedCompound.compoundId });
+  }
 
   return (
     <div className="app-shell" style={{ padding: isTabletLayout ? 28 : 20, paddingTop: isTabletLayout ? 36 : 32, minHeight: "100dvh" }}>
@@ -192,18 +212,32 @@ export function LabModes({ onBack, onStart }: Props) {
                       <li key={rule}>{rule}</li>
                     ))}
                   </ul>
-                  <button
-                    disabled={locked}
-                    onClick={() =>
-                      onStart(
-                        mode.id,
-                        bossId ? BOSSES[bossId].levelId : levelId,
-                      )
-                    }
-                    style={startBtn}
-                  >
-                    {locked ? "Locked" : mode.id === "campaign" ? "Play Campaign" : bossId ? "Boss Battle" : "Start Mode"}
-                  </button>
+                  {mode.id === "daily-challenge" && !locked ? (
+                    <div style={dailyChoiceGrid}>
+                      <button type="button" onClick={startDailyRound} style={startBtn}>
+                        Round Challenge
+                      </button>
+                      <button type="button" onClick={startDailyCompound} style={{ ...startBtn, ...secondaryStartBtn }}>
+                        Compound Challenge
+                      </button>
+                      <span style={dailyChoiceHint}>
+                        Reruns are allowed for records. The daily coin reward still pays only once.
+                      </span>
+                    </div>
+                  ) : (
+                    <button
+                      disabled={locked}
+                      onClick={() =>
+                        onStart(
+                          mode.id,
+                          bossId ? BOSSES[bossId].levelId : mode.id === "campaign" ? levelId : challengeLevelId,
+                        )
+                      }
+                      style={startBtn}
+                    >
+                      {locked ? "Locked" : mode.id === "campaign" ? "Play Campaign" : bossId ? "Boss Battle" : "Start Mode"}
+                    </button>
+                  )}
                 </div>
               </article>
             );
@@ -475,4 +509,23 @@ const startBtn: React.CSSProperties = {
   color: "var(--primary-foreground)",
   fontWeight: 800,
   cursor: "pointer",
+};
+
+const secondaryStartBtn: React.CSSProperties = {
+  background: "linear-gradient(135deg, color-mix(in oklch, var(--accent) 42%, var(--surface)), var(--surface-high))",
+  color: "var(--foreground)",
+  border: "1px solid color-mix(in oklch, var(--accent) 55%, var(--border))",
+};
+
+const dailyChoiceGrid: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "1fr 1fr",
+  gap: 8,
+};
+
+const dailyChoiceHint: React.CSSProperties = {
+  gridColumn: "1 / -1",
+  color: "var(--muted-foreground)",
+  fontSize: 11,
+  lineHeight: 1.35,
 };

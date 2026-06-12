@@ -173,7 +173,9 @@ export function GameApp() {
       return (
         <LabModes
           onBack={() => setScreen({ name: "menu" })}
-          onStart={(mode, levelId) => setScreen({ name: "game", levelId, mode })}
+          onStart={(mode, levelId, options) =>
+            setScreen({ name: "game", levelId, mode, secretCompoundId: options?.secretCompoundId })
+          }
         />
       );
     case "library":

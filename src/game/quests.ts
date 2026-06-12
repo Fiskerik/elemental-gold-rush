@@ -8,6 +8,7 @@ export type DailyQuestType =
   | "chain_merge"
   | "earn_stars"
   | "purchase_item"
+  | "upgrade_powerup"
   | "watch_ad"
   | "use_unique_powerups"
   | "destroy_stone"
@@ -36,6 +37,7 @@ export interface QuestProgressEvent {
   maxChainDepth?: number;
   starsEarned?: number;
   itemsPurchased?: number;
+  powerUpsUpgraded?: number;
   adsWatched?: number;
   uniquePowerUpsUsedInRun?: number;
   stonesDestroyed?: number;
@@ -110,6 +112,13 @@ const DAILY_QUEST_POOL: Array<Omit<DailyQuest, "id" | "progress" | "completed"> 
     type: "purchase_item",
     title: "Purchase an item from the shop",
     description: "Spend saved gold on any shop power-up.",
+    target: 1,
+  },
+  {
+    slug: "upgrade-powerup",
+    type: "upgrade_powerup",
+    title: "Upgrade a power-up",
+    description: "Research one permanent Lab power-up upgrade.",
     target: 1,
   },
   {
@@ -243,6 +252,7 @@ export function applyQuestProgress(quests: DailyQuest[], event: QuestProgressEve
     if (quest.type === "chain_merge" && event.maxChainDepth !== undefined) progress = Math.max(progress, event.maxChainDepth);
     if (quest.type === "earn_stars" && event.starsEarned) progress += event.starsEarned;
     if (quest.type === "purchase_item" && event.itemsPurchased) progress += event.itemsPurchased;
+    if (quest.type === "upgrade_powerup" && event.powerUpsUpgraded) progress += event.powerUpsUpgraded;
     if (quest.type === "watch_ad" && event.adsWatched) progress += event.adsWatched;
     if (quest.type === "use_unique_powerups" && event.uniquePowerUpsUsedInRun !== undefined) progress = Math.max(progress, event.uniquePowerUpsUsedInRun);
     if (quest.type === "destroy_stone" && event.stonesDestroyed) progress += event.stonesDestroyed;

@@ -356,9 +356,16 @@ export const useProgress = create<ProgressState>()(
           const cost = LAB_UPGRADE_COSTS[current];
           if (s.goldCoins < cost) return s;
           upgraded = true;
+          const refreshed = refreshDailyQuests(
+            s.dailyQuestDate,
+            s.dailyQuests,
+            s.claimedDailyReward,
+          );
           return {
+            ...refreshed,
             goldCoins: s.goldCoins - cost,
             labUpgradeLevels: { ...levels, [id]: current + 1 },
+            dailyQuests: applyQuestProgress(refreshed.dailyQuests, { powerUpsUpgraded: 1 }),
           };
         });
         return upgraded;

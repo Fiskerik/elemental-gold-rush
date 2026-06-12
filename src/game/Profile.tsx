@@ -5,6 +5,20 @@ import { useIsTabletLayout } from "./responsive";
 import { SUPPORTED_LANGUAGES, t, toIntlLocale, type AppLanguage } from "./localization";
 import { COMPOUNDS } from "./compounds";
 import { BOSSES, type BossId } from "./bosses";
+import {
+  Atom,
+  BadgeCheck,
+  CalendarDays,
+  Coins,
+  Crown,
+  FlaskConical,
+  Medal,
+  Orbit,
+  Star,
+  Trophy,
+  Zap,
+  type LucideIcon,
+} from "lucide-react";
 
 interface Props {
   onBack: () => void;
@@ -114,11 +128,21 @@ export function Profile({ onBack }: Props) {
             </p>
             {hasProPack && <div style={proBadge}>PRO LAB PACK ACTIVE</div>}
           </div>
+          <div style={heroIconStack} aria-hidden="true">
+            <Crown size={20} />
+            <span>{completionPercent}%</span>
+          </div>
         </header>
+        <section style={heroMetricGrid}>
+          <HeroMetric icon={Atom} label={tr("Highest Atom")} value={`${highestEl?.symbol ?? "H"} #${highestElement}`} />
+          <HeroMetric icon={BadgeCheck} label={tr("Badges")} value={`${earnedBadges.length}`} />
+          <HeroMetric icon={Trophy} label={tr("Stars")} value={`${totalStars}`} />
+        </section>
         <section style={card}>
           <div style={sectionHeading}>{tr("Records")}</div>
           <div style={{ display: "grid", gap: 10 }}>
             <RecordRow
+              icon={Trophy}
               label={tr("Best level score")}
               value={bestLevelScoreEntry ? exactScore(bestLevelScoreEntry.score) : "0"}
               sub={
@@ -128,15 +152,16 @@ export function Profile({ onBack }: Props) {
               }
             />
             <RecordRow
+              icon={Zap}
               label={tr("Best challenge score")}
               value={bestChallengeEntry ? exactScore(bestChallengeEntry.score) : "0"}
               sub={bestChallengeEntry ? bestChallengeEntry.mode.replaceAll("-", " ") : tr("no record yet")}
             />
-            <RecordRow label={tr("Atoms unlocked")} value={`${discoveredElements.length}/${ELEMENTS.length}`} sub={`${completionPercent}%`} />
-            <RecordRow label={tr("Compounds unlocked")} value={`${discoveredCompounds.length}/${COMPOUNDS.length}`} sub={`${compoundPercent}%`} />
-            <RecordRow label={tr("Bosses unlocked")} value={`${unlockedBossCount}/${bossIds.length}`} sub={`${defeatedBossCount} defeated`} />
-            <RecordRow label={tr("Badges earned")} value={`${earnedBadges.length}`} />
-            <RecordRow label={tr("Campaign levels unlocked")} value={`${unlockedLevel}/${MAX_LEVEL}`} />
+            <RecordRow icon={Atom} label={tr("Atoms unlocked")} value={`${discoveredElements.length}/${ELEMENTS.length}`} sub={`${completionPercent}%`} />
+            <RecordRow icon={FlaskConical} label={tr("Compounds unlocked")} value={`${discoveredCompounds.length}/${COMPOUNDS.length}`} sub={`${compoundPercent}%`} />
+            <RecordRow icon={Orbit} label={tr("Bosses unlocked")} value={`${unlockedBossCount}/${bossIds.length}`} sub={`${defeatedBossCount} defeated`} />
+            <RecordRow icon={BadgeCheck} label={tr("Badges earned")} value={`${earnedBadges.length}`} />
+            <RecordRow icon={Medal} label={tr("Campaign levels unlocked")} value={`${unlockedLevel}/${MAX_LEVEL}`} />
             {unlockedLevel < MAX_LEVEL && (
               <button type="button" onClick={handleUnlockAllStages} style={profileActionButton}>
                 {tr("Unlock all stages")}
@@ -181,14 +206,16 @@ export function Profile({ onBack }: Props) {
               : grid.gridTemplateColumns,
           }}
         >
-          <ProfileStat label={tr("Total Score")} value={exactScore(totalScore)} sub={tr("career")} />
-          <ProfileStat label={tr("Gold Coins")} value={`${goldCoins}`} sub={tr("shop currency")} />
+          <ProfileStat icon={Trophy} label={tr("Total Score")} value={exactScore(totalScore)} sub={tr("career")} />
+          <ProfileStat icon={Coins} label={tr("Gold Coins")} value={`${goldCoins}`} sub={tr("shop currency")} />
           <ProfileStat
+            icon={CalendarDays}
             label={tr("Daily Streak")}
             value={`${dailyStreak}`}
             sub={tr(claimedDailyReward ? "claimed" : "active")}
           />
           <ProfileStat
+            icon={Zap}
             label={tr("Best Combo")}
             value={`${bestCombo}×`}
             sub={
@@ -202,16 +229,18 @@ export function Profile({ onBack }: Props) {
             }
           />
           <ProfileStat
+            icon={Atom}
             label={tr("Highest Atom")}
             value={tr(highestEl?.name ?? "Hydrogen")}
             sub={`${highestEl?.symbol ?? "H"} • #${highestElement}`}
           />
           <ProfileStat
+            icon={FlaskConical}
             label={tr("Elements")}
             value={`${discoveredElements.length}`}
             sub={tr(`${completionPercent}% found`)}
           />
-          <ProfileStat label={tr("Stars")} value={`${totalStars}`} sub={tr(`${perfectLevels} perfect`)} />
+          <ProfileStat icon={Star} label={tr("Stars")} value={`${totalStars}`} sub={tr(`${perfectLevels} perfect`)} />
         </section>
 
         <section style={card}>
@@ -259,9 +288,28 @@ export function Profile({ onBack }: Props) {
   );
 }
 
-function ProfileStat({ label, value, sub }: { label: string; value: string; sub: string }) {
+function HeroMetric({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }) {
+  return (
+    <div style={heroMetric}>
+      <span style={metricIconBubble}>
+        <Icon size={16} aria-hidden="true" />
+      </span>
+      <span style={{ minWidth: 0, display: "grid", gap: 1 }}>
+        <strong style={{ fontSize: 13, lineHeight: 1.1, overflow: "hidden", textOverflow: "ellipsis" }}>{value}</strong>
+        <small style={{ color: "var(--muted-foreground)", fontSize: 10, lineHeight: 1.1 }}>{label}</small>
+      </span>
+    </div>
+  );
+}
+
+function ProfileStat({ icon: Icon, label, value, sub }: { icon?: LucideIcon; label: string; value: string; sub: string }) {
   return (
     <div style={statCard}>
+      {Icon && (
+        <div style={statIcon}>
+          <Icon size={18} aria-hidden="true" />
+        </div>
+      )}
       <div
         style={{
           fontSize: 10,
@@ -289,10 +337,17 @@ function ProfileStat({ label, value, sub }: { label: string; value: string; sub:
   );
 }
 
-function RecordRow({ label, value, sub }: { label: string; value: string; sub?: string }) {
+function RecordRow({ icon: Icon, label, value, sub }: { icon?: LucideIcon; label: string; value: string; sub?: string }) {
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 13, alignItems: "flex-start" }}>
-      <span style={{ color: "var(--muted-foreground)" }}>{label}</span>
+    <div style={recordRow}>
+      <span style={recordLabel}>
+        {Icon && (
+          <span style={recordIcon}>
+            <Icon size={14} aria-hidden="true" />
+          </span>
+        )}
+        {label}
+      </span>
       <span style={{ textAlign: "right" }}>
         <strong>{value}</strong>
         {sub && <span style={{ display: "block", color: "var(--muted-foreground)", fontSize: 11, marginTop: 2 }}>{sub}</span>}
@@ -335,6 +390,64 @@ const avatar: React.CSSProperties = {
   fontSize: 30,
   fontWeight: 1000,
   boxShadow: "0 0 24px var(--primary-glow)",
+};
+
+const heroIconStack: React.CSSProperties = {
+  minWidth: 58,
+  display: "grid",
+  justifyItems: "center",
+  gap: 4,
+  padding: "10px 8px",
+  borderRadius: 16,
+  background: "color-mix(in oklch, var(--accent) 16%, var(--surface))",
+  border: "1px solid color-mix(in oklch, var(--accent) 55%, var(--border))",
+  color: "var(--accent)",
+  fontSize: 12,
+  fontWeight: 1000,
+  boxShadow: "0 0 18px color-mix(in oklch, var(--accent) 26%, transparent)",
+};
+
+const heroMetricGrid: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+  gap: 8,
+  margin: "-6px 0 12px",
+};
+
+const heroMetric: React.CSSProperties = {
+  minWidth: 0,
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+  padding: "9px 10px",
+  borderRadius: 14,
+  background: "var(--surface)",
+  border: "1px solid var(--border)",
+  boxShadow: "0 8px 20px rgba(0,0,0,0.14)",
+};
+
+const metricIconBubble: React.CSSProperties = {
+  width: 30,
+  height: 30,
+  flex: "0 0 auto",
+  display: "grid",
+  placeItems: "center",
+  borderRadius: 999,
+  background: "linear-gradient(135deg, var(--primary), var(--accent))",
+  color: "var(--primary-foreground)",
+  boxShadow: "0 0 14px var(--primary-glow)",
+};
+
+const statIcon: React.CSSProperties = {
+  width: 32,
+  height: 32,
+  margin: "0 auto 8px",
+  display: "grid",
+  placeItems: "center",
+  borderRadius: 12,
+  background: "color-mix(in oklch, var(--primary) 18%, var(--surface-high))",
+  color: "var(--primary)",
+  border: "1px solid color-mix(in oklch, var(--primary) 42%, var(--border))",
 };
 
 const proBadge: React.CSSProperties = {
@@ -421,6 +534,34 @@ const sectionHeading: React.CSSProperties = {
   color: "var(--accent)",
   fontWeight: 900,
   marginBottom: 8,
+};
+
+const recordRow: React.CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  gap: 12,
+  fontSize: 13,
+  alignItems: "flex-start",
+  padding: "8px 0",
+};
+
+const recordLabel: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 8,
+  color: "var(--muted-foreground)",
+};
+
+const recordIcon: React.CSSProperties = {
+  width: 26,
+  height: 26,
+  flex: "0 0 auto",
+  display: "grid",
+  placeItems: "center",
+  borderRadius: 9,
+  color: "var(--accent)",
+  background: "color-mix(in oklch, var(--accent) 12%, var(--surface-high))",
+  border: "1px solid color-mix(in oklch, var(--accent) 34%, var(--border))",
 };
 
 const bossRow: React.CSSProperties = {
