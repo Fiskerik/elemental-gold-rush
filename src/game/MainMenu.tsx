@@ -262,7 +262,7 @@ export function MainMenu({
                 <small>{dailyChallenge.completed ? "Cleared today" : `Reward +${DAILY_FEATURE_REWARD_COINS}`}</small>
               </span>
               <span style={dailyFeatureReward}>
-                {dailyChallenge.completed ? <CheckCircle2 size={18} aria-label="Completed" /> : `+${DAILY_FEATURE_REWARD_COINS}`}
+                {dailyChallenge.completed ? <CheckCircle2 size={18} aria-label="Completed" /> : <DailyGoldReward />}
               </span>
             </button>
             <button type="button" onClick={handleSecretCompoundPress} style={dailyFeatureBtn}>
@@ -278,7 +278,7 @@ export function MainMenu({
                 </small>
               </span>
               <span style={dailyFeatureReward}>
-                {secretCompound.completed ? <CheckCircle2 size={18} aria-label="Completed" /> : "+5"}
+                {secretCompound.completed ? <CheckCircle2 size={18} aria-label="Completed" /> : <DailyGoldReward />}
               </span>
             </button>
           </div>
@@ -725,7 +725,10 @@ const dailyFeatureText: CSSProperties = {
 };
 
 const dailyFeatureReward: CSSProperties = {
-  color: "var(--accent)",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  color: "var(--success, oklch(0.78 0.16 145))",
   fontWeight: 1000,
   fontSize: 13,
 };
@@ -905,6 +908,15 @@ function GoldCoinIcon({ size = 14 }: { size?: number }) {
         boxShadow: "0 0 8px oklch(0.84 0.16 85 / 0.4), inset 0 -2px 4px rgba(0,0,0,0.25)",
       }}
     />
+  );
+}
+
+function DailyGoldReward() {
+  return (
+    <strong style={weeklyReward}>
+      <GoldCoinIcon size={12} />
+      <span>x{DAILY_FEATURE_REWARD_COINS}</span>
+    </strong>
   );
 }
 

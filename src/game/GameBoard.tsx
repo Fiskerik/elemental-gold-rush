@@ -751,7 +751,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
   } = useProgress();
 
   const labUpgradeLevel = useCallback(
-    (id: LabUpgradeId) => (labUpgradeEnabled[id] ? labUpgradeLevels[id] ?? 0 : 0),
+    (id: LabUpgradeId) => (id === "molecule" ? 0 : labUpgradeEnabled[id] ? labUpgradeLevels[id] ?? 0 : 0),
     [labUpgradeEnabled, labUpgradeLevels],
   );
   const initialLabCharge = useCallback(
@@ -783,7 +783,10 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
   const activeShimmerScoreMultiplier = labUpgradeLevel("shimmer") >= 2 ? 3 : 2;
   const activeShimmerGrabSteps = labUpgradeLevel("shimmer") >= 3 ? 3 : 2;
   const emissionShotScoreMultiplier = labUpgradeLevel("emission") >= 3 ? 2 : 1;
-  const compoundRegenMs = labUpgradeLevel("molecule") >= 4 ? 4 * 60 * 1000 : COMPOUND_REGEN_MS;
+  const compoundRegenMs = COMPOUND_REGEN_MS;
+  const compoundScoreMultiplier = 1;
+  const compoundHintCost = COMPOUND_HINT_COST;
+  const compoundSuperHintCost = COMPOUND_SUPER_HINT_COST;
   const dailyRngRef = useRef<(() => number) | null>(null);
   if (dailyRngRef.current === null) {
     dailyRngRef.current =

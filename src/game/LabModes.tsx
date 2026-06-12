@@ -30,7 +30,7 @@ export function LabModes({ onBack, onStart }: Props) {
   const labLevelCap = getLabUpgradeLevelCap(unlockedLevel);
   const unlockedModes = new Set(getUnlockedGameModes(unlockedLevel).map((mode) => mode.id));
   const levelId = Math.min(unlockedLevel, MAX_LEVEL);
-  const discoveredUpgradeIds = LAB_UPGRADE_IDS.filter((id) => unlockedLevel >= POWER_UP_UNLOCK_LEVELS[id]);
+  const discoveredUpgradeIds = LAB_UPGRADE_IDS.filter((id) => id !== "molecule" && unlockedLevel >= POWER_UP_UNLOCK_LEVELS[id]);
   const defeatedBosses = new Set(
     (["elemental-boss", "periodic-guardian", "nucleus-core"] as BossId[]).filter(
       (id) => (levelStats[BOSSES[id].levelId]?.bestShots ?? null) != null,
