@@ -113,7 +113,7 @@ export const TERMS = {
     {
       heading: "Disclaimer and Liability",
       body: [
-        'The game is provided "as is" without warranties to the extent allowed by law. To the extent permitted by applicable law, we are not liable for indirect or consequential damages.',
+        `The game is provided “as is” without warranties to the extent allowed by law. To the extent permitted by applicable law, we are not liable for indirect or consequential damages.`,
       ],
     },
     {
