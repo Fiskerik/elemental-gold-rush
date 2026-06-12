@@ -1,5 +1,47 @@
-import { mkdir, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+
+// Extract the translation data objects directly from the generated TS file.
+// The data section is authored as JSON-compatible literals, so we can isolate
+// each export and JSON.parse it without a TypeScript loader.
+async function loadLegalData() {
+  const src = await readFile(
+    join(process.cwd(), "src/content/legalDocs.generated.ts"),
+    "utf8",
+  );
+
+  const extractLiteral = (marker, open, close) => {
+    const markerIdx = src.indexOf(marker);
+    if (markerIdx === -1) throw new Error(`Missing ${marker} in legal data`);
+    const start = src.indexOf(open, markerIdx);
+    let depth = 0;
+    for (let i = start; i < src.length; i++) {
+      const ch = src[i];
+      if (ch === '"') {
+        i++;
+        while (i < src.length && src[i] !== '"') {
+          if (src[i] === "\\") i++;
+          i++;
+        }
+        continue;
+      }
+      if (ch === open) depth++;
+      else if (ch === close) {
+        depth--;
+        if (depth === 0) return JSON.parse(src.slice(start, i + 1));
+      }
+    }
+    throw new Error(`Unbalanced literal for ${marker}`);
+  };
+
+  const languages = extractLiteral("LEGAL_LANGUAGES", "[", "]");
+  const privacy = extractLiteral("PRIVACY_CONTENT", "{", "}");
+  const terms = extractLiteral("TERMS_CONTENT", "{", "}");
+  const dateMatch = src.match(/LEGAL_LAST_UPDATED_DATE\s*=\s*"([^"]*)"/);
+  const lastUpdated = dateMatch ? dateMatch[1] : "";
+
+  return { languages, privacy, terms, lastUpdated };
+}
 
 const webDir = join(process.cwd(), "dist");
 const assetsDir = join(webDir, "assets");
