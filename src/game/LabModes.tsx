@@ -129,11 +129,26 @@ export function LabModes({ onBack, onStart }: Props) {
               const meta = LAB_UPGRADE_META[id];
               const level = labUpgradeLevels[id] ?? 0;
               const active = activeUpgradeId === id;
+              const levelLabel = level >= 5 ? "Lvl 5 - Max" : `Lvl ${level}/5`;
               return (
                 <button key={id} type="button" onClick={() => setSelectedUpgradeId(id)} style={{ ...upgradePickerTile, ...(active ? upgradePickerTileActive : null) }}>
                   <PowerUpBadge icon={id} size={30} />
                   <span style={{ marginTop: 6, fontWeight: 900, fontSize: 11, lineHeight: 1.1 }}>{meta.name}</span>
-                  <span style={{ marginTop: 3, color: "var(--muted-foreground)", fontSize: 10 }}>Lvl {level}/5</span>
+                  <span
+                    style={{
+                      marginTop: 3,
+                      color:
+                        level >= 5
+                          ? "var(--accent)"
+                          : level > 0
+                            ? "var(--success, oklch(0.78 0.16 145))"
+                            : "var(--muted-foreground)",
+                      fontSize: 10,
+                      fontWeight: level > 0 ? 900 : 700,
+                    }}
+                  >
+                    {levelLabel}
+                  </span>
                 </button>
               );
             })}

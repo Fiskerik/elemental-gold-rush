@@ -1060,13 +1060,15 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
   const moleculeObjective = useMemo(
     () =>
       secretCompoundObjective ??
-      COMPOUNDS.find((compound) => compound.id === MOLECULE_CHALLENGE_BY_LEVEL[level.id]) ?? null,
-    [level.id, secretCompoundObjective],
+      (mode === "campaign"
+        ? COMPOUNDS.find((compound) => compound.id === MOLECULE_CHALLENGE_BY_LEVEL[level.id]) ?? null
+        : null),
+    [level.id, mode, secretCompoundObjective],
   );
   const isSecretCompoundChallenge = secretCompoundObjective != null;
-  const isDailyMoleculeChallenge = moleculeObjective != null && mode === "daily-challenge";
-  const isDailyAtomChallenge = moleculeObjective == null && mode === "daily-challenge";
-  const isMoleculeChallenge = moleculeObjective != null && (mode === "campaign" || isSecretCompoundChallenge || isDailyMoleculeChallenge);
+  const isDailyMoleculeChallenge = false;
+  const isDailyAtomChallenge = mode === "daily-challenge";
+  const isMoleculeChallenge = moleculeObjective != null && (mode === "campaign" || isSecretCompoundChallenge);
   const canIntroducePowerUps = mode === "campaign" && !isMoleculeChallenge && !isPowerUpStage;
   const unstableEnabled = level.id >= UNSTABLE_UNLOCK_LEVEL;
   const current = queue[0];

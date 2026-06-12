@@ -95,7 +95,7 @@ workflows:
       - name: Install CocoaPods
         script: |
           cd ios/App
-          pod install
+          pod install --repo-update
       - name: Auto-increment iOS build number
         script: |
           cd ios/App
