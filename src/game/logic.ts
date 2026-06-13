@@ -193,7 +193,7 @@ export function placeAndMerge(
   adjacencyFactor = ADJ_FACTOR,
   fusionJump = false,
   survivorRadiusBonus = 0,
-  options?: Parameters<typeof resolveAdjacentMerges>[9],
+  options?: Parameters<typeof resolveAdjacentMerges>[10],
 ): MergeResult {
   return resolveAdjacentMerges(
     [...balls, { ...newBall }],
@@ -219,7 +219,7 @@ export function mergeSettledBoard(
   adjacencyFactor = ADJ_FACTOR,
   fusionJump = false,
   survivorRadiusBonus = 0,
-  options?: Parameters<typeof resolveAdjacentMerges>[9],
+  options?: Parameters<typeof resolveAdjacentMerges>[10],
 ): MergeResult {
   void geo;
   return resolveAdjacentMerges(

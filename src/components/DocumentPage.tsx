@@ -5,9 +5,18 @@ type DocumentPageProps = {
   intro?: ReactNode;
   lastUpdated?: string;
   title: string;
+  toolbar?: ReactNode;
+  contentDir?: "ltr" | "rtl";
 };
 
-export function DocumentPage({ children, intro, lastUpdated, title }: DocumentPageProps) {
+export function DocumentPage({
+  children,
+  intro,
+  lastUpdated,
+  title,
+  toolbar,
+  contentDir = "ltr",
+}: DocumentPageProps) {
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
     document.getElementById("document-page-root")?.scrollTo({ top: 0, left: 0 });
@@ -33,13 +42,17 @@ export function DocumentPage({ children, intro, lastUpdated, title }: DocumentPa
           </div>
         </nav>
 
-        <header className="document-page-header">
-          <h1>{title}</h1>
-          {lastUpdated && <p>Last updated: {lastUpdated}</p>}
-          {intro && <div className="document-page-intro">{intro}</div>}
-        </header>
+        {toolbar && <div className="document-page-toolbar">{toolbar}</div>}
 
-        <div className="document-page-sections">{children}</div>
+        <div dir={contentDir}>
+          <header className="document-page-header">
+            <h1>{title}</h1>
+            {lastUpdated && <p>{lastUpdated}</p>}
+            {intro && <div className="document-page-intro">{intro}</div>}
+          </header>
+
+          <div className="document-page-sections">{children}</div>
+        </div>
       </div>
     </main>
   );
