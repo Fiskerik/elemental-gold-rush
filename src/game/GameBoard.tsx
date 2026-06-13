@@ -131,6 +131,8 @@ const CHALLENGE_CLEAR_SCORE = 5000;
 const POWER_UP_CLEAR_DELAY_MS = 2000;
 const DAILY_COMPOUND_GRID_COLS = 10;
 const DAILY_COMPOUND_GRID_ROWS = 15;
+const TIME_STAR_LIMIT_SEC = 5 * 60;
+const TARGET_BAND_QUEUE_CHANCE = 0.2;
 
 function mergeComboCueDelay(index: number): number {
   return index * MERGE_COMBO_SOUND_STEP_MS;
@@ -669,21 +671,21 @@ function createSeededRng(seed: number): () => number {
 
 function calculateStars(
   level: (typeof LEVELS)[0],
-  score: number,
+  _score: number,
   shots: number,
   _bestCombo: number,
-  _timeSec: number,
+  timeSec: number,
 ): number {
+  if (isCompoundFormationLevel(level)) return 3;
   let stars = 1;
   const efficiencyTarget = getShotStarGoal(level);
   if (shots <= efficiencyTarget) stars += 1;
-  const masteryTarget = getScoreStarGoal(level);
-  if (score >= masteryTarget) stars += 1;
+  if (timeSec <= TIME_STAR_LIMIT_SEC) stars += 1;
   return Math.min(3, stars);
 }
 
-function getScoreStarGoal(level: (typeof LEVELS)[0]): number {
-  return level.scoreGoal ?? (level.targetElement * 1000 * (level.scoreMultiplier ?? 1));
+function isCompoundFormationLevel(level: (typeof LEVELS)[0]): boolean {
+  return MOLECULE_CHALLENGE_BY_LEVEL[level.id] != null;
 }
 
 function getShotStarGoal(level: (typeof LEVELS)[0]): number {
@@ -1274,7 +1276,6 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
   );
   const popupId = useRef(0);
   const eGunCooldownSlots = useRef(0);
-  const normalQueueBiasCounterRef = useRef(0);
   const challengeQueuePlanRef = useRef<number[]>([]);
   const challengeQueuePoolRef = useRef<number[]>([]);
 
@@ -1891,7 +1892,6 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
         challengeQueuePlanRef.current = [];
         challengeQueuePoolRef.current = [];
         eGunCooldownSlots.current = 0;
-        normalQueueBiasCounterRef.current = 0;
         startTimeRef.current = Date.now() - saved.elapsedMs;
         setElapsedMs(saved.elapsedMs);
         clearSavedRun();
@@ -2066,7 +2066,6 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     setQueueShuffleCharges((powerUpStage === "queue-shuffle" ? 1 : 0) + initialLabCharge("queue-shuffle", 2));
     queueUndoRef.current = null;
     eGunCooldownSlots.current = 0;
-    normalQueueBiasCounterRef.current = Math.floor(dailyRandom() * 2);
     startTimeRef.current = Date.now();
     setElapsedMs(0);
     trackGameStart(levelId, mode);
@@ -2263,8 +2262,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
 
   function shouldSpawnTargetBandQueueAtom(): boolean {
     if (!shouldBiasNormalQueueTowardTarget()) return false;
-    normalQueueBiasCounterRef.current += 1;
-    return normalQueueBiasCounterRef.current % 2 === 1;
+    return dailyRandom() < TARGET_BAND_QUEUE_CHANCE;
   }
 
   function discoveredSeedAtoms(maxSeedAtom: number): number[] {
@@ -6945,6 +6943,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
             shots={shots}
             bestCombo={runBestCombo}
             stars={earnedStars}
+            clearTimeMs={elapsedMs}
             newDiscoveries={newlyDiscoveredThisRun}
             formedCompounds={formedCompoundsThisRun}
             isPowerUpPass={isPowerUpStage}
@@ -6968,6 +6967,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
             shots={shots}
             bestCombo={runBestCombo}
             stars={0}
+            clearTimeMs={elapsedMs}
             newDiscoveries={newlyDiscoveredThisRun}
             formedCompounds={formedCompoundsThisRun}
             onDiscoveryClick={setDiscoveryEl}
@@ -7995,6 +7995,7 @@ function ResultModal({
   shots,
   bestCombo,
   stars,
+  clearTimeMs,
   newDiscoveries = [],
   formedCompounds = [],
   claimablePowerUps = {},
@@ -8013,6 +8014,7 @@ function ResultModal({
   shots: number;
   bestCombo: number;
   stars: number;
+  clearTimeMs: number;
   newDiscoveries?: number[];
   formedCompounds?: string[];
   claimablePowerUps?: Partial<Record<InventoryPowerUpId, number>>;
@@ -8042,10 +8044,11 @@ function ResultModal({
   const claimableOptions = (Object.keys(POWER_UP_INVENTORY_META) as InventoryPowerUpId[]).filter(
     (id) => (claimablePowerUps[id] ?? 0) > 0,
   );
-  const scoreGoal = getScoreStarGoal(level);
   const shotGoal = getShotStarGoal(level);
-  const scoreMet = score >= scoreGoal;
-  const shotsMet = shots <= shotGoal;
+  const didComplete = title === "LEVEL COMPLETE";
+  const timeMet = didComplete && clearTimeMs <= TIME_STAR_LIMIT_SEC * 1000;
+  const shotsMet = didComplete && shots <= shotGoal;
+  const isCompoundPass = isCompoundFormationLevel(level);
   return (
     <Modal>
       <div
@@ -8124,7 +8127,7 @@ function ResultModal({
           {Array.from({ length: 3 }, (_, i) => (i < stars ? "★" : "☆")).join("")}
         </div>
       )}
-      {!isPowerUpPass && (
+            {!isPowerUpPass && !isCompoundPass && (
         <div
           style={{
             display: "grid",
@@ -8137,11 +8140,11 @@ function ResultModal({
             textAlign: "left",
           }}
         >
-          <StarRequirementRow met label="Level cleared" detail="Finish the level objective" />
+          <StarRequirementRow met={didComplete} label="Level cleared" detail="Finish the level objective" />
           <StarRequirementRow
-            met={scoreMet}
-            label={`Over ${formatScore(scoreGoal)} points`}
-            detail={`You scored ${formatScore(score)}`}
+            met={timeMet}
+            label="Clear under 5 minutes"
+            detail={`Your time was ${formatTime(clearTimeMs)}`}
           />
           <StarRequirementRow
             met={shotsMet}
@@ -8150,17 +8153,30 @@ function ResultModal({
           />
         </div>
       )}
+      {!isPowerUpPass && isCompoundPass && stars > 0 && (
+        <p
+          style={{
+            fontSize: 13,
+            color: "var(--success, var(--accent))",
+            lineHeight: 1.5,
+            margin: "0 0 14px",
+            fontWeight: 800,
+          }}
+        >
+          Compound formed. Three stars awarded on completion.
+        </p>
+      )}
       {!isPowerUpPass && (
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
           <ResultStat
             label="Score"
-            value={`${formatScore(score)} / ${formatScore(scoreGoal)}`}
+            value={formatScore(score)}
             color="var(--accent)"
           />
           <ResultStat
-            label="Target"
-            value={ELEMENTS[level.targetElement - 1]?.symbol ?? "?"}
-            color="var(--primary)"
+            label="Time"
+            value={formatTime(clearTimeMs)}
+            color={timeMet ? "var(--success, var(--accent))" : "var(--foreground)"}
           />
           <ResultStat
             label="Shots"

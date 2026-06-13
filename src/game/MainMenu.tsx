@@ -12,7 +12,7 @@ import {
   Sparkles,
   Star,
   Settings as SettingsIcon,
-  LockKeyhole,
+  CircleQuestionMark,
   Trophy,
   User,
   type LucideIcon,
@@ -332,7 +332,7 @@ export function MainMenu({
               </span>
             </button>
             <button type="button" onClick={handleSecretCompoundPress} style={dailyFeatureBtn}>
-              <span style={dailyFeatureIcon}><LockKeyhole size={18} aria-hidden="true" /></span>
+              <span style={dailyFeatureIcon}><CircleQuestionMark size={18} aria-hidden="true" /></span>
               <span style={dailyFeatureText}>
                 <strong>Secret Compound</strong>
                 <small>

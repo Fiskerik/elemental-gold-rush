@@ -13,6 +13,7 @@ import {
   refreshDailyQuests,
 } from "./quests";
 import { WeeklyPlayBonusState, claimWeeklyPlayBonus, createWeeklyPlayBonus } from "./weeklyBonus";
+import { POWER_UP_UNLOCK_LEVELS } from "./powerUps";
 import {
   DAILY_FEATURE_REWARD_COINS,
   type DailyChallengeState,
@@ -69,6 +70,20 @@ export function getLabUpgradeLevelCap(unlockedLevel: number): number {
   return 0;
 }
 
+function grantUnlockedProStarterUpgrades(
+  levels: LabUpgradeLevels,
+  unlockedLevel: number,
+): { levels: LabUpgradeLevels; changed: boolean } {
+  const next = { ...levels };
+  let changed = false;
+  for (const id of LAB_UPGRADE_IDS) {
+    if (unlockedLevel < POWER_UP_UNLOCK_LEVELS[id]) continue;
+    const nextLevel = Math.max(next[id] ?? 0, 1);
+    changed ||= nextLevel !== next[id];
+    next[id] = nextLevel;
+  }
+  return { levels: next, changed };
+}
 export const emptyLabUpgradeLevels = (): LabUpgradeLevels =>
   Object.fromEntries(LAB_UPGRADE_IDS.map((id) => [id, 0])) as LabUpgradeLevels;
 
@@ -350,6 +365,7 @@ export const useProgress = create<ProgressState>()(
       upgradeLabPowerUp: (id) => {
         let upgraded = false;
         set((s) => {
+          if (s.unlockedLevel < POWER_UP_UNLOCK_LEVELS[id]) return s;
           const levels = normalizeLabUpgradeLevels(s.labUpgradeLevels);
           const current = levels[id] ?? 0;
           const cap = getLabUpgradeLevelCap(s.unlockedLevel);
@@ -377,8 +393,25 @@ export const useProgress = create<ProgressState>()(
             ...normalizeLabUpgradeEnabled(s.labUpgradeEnabled),
             [id]: !(s.labUpgradeEnabled[id] ?? true),
           },
-        })),      unlockLevel: (id) => set((s) => ({ unlockedLevel: Math.max(s.unlockedLevel, id) })),
-      setUnlockedLevel: (id) => set(() => ({ unlockedLevel: Math.max(1, Math.floor(id)) })),
+        })),
+      unlockLevel: (id) => set((s) => {
+        const unlockedLevel = Math.max(s.unlockedLevel, id);
+        if (!s.hasProPack) return { unlockedLevel };
+        const { levels: labUpgradeLevels } = grantUnlockedProStarterUpgrades(
+          normalizeLabUpgradeLevels(s.labUpgradeLevels),
+          unlockedLevel,
+        );
+        return { unlockedLevel, labUpgradeLevels };
+      }),
+      setUnlockedLevel: (id) => set((s) => {
+        const unlockedLevel = Math.max(1, Math.floor(id));
+        if (!s.hasProPack) return { unlockedLevel };
+        const { levels: labUpgradeLevels } = grantUnlockedProStarterUpgrades(
+          normalizeLabUpgradeLevels(s.labUpgradeLevels),
+          unlockedLevel,
+        );
+        return { unlockedLevel, labUpgradeLevels };
+      }),
       recordDiscovery: (nums) =>
         set((s) => {
           const next = new Set(s.discoveredElements);
@@ -576,13 +609,10 @@ export const useProgress = create<ProgressState>()(
       grantProPack: () =>
         set((s) => {
           const shouldGrantStarter = !s.proStarterCoinsGranted;
-          const labUpgradeLevels = normalizeLabUpgradeLevels(s.labUpgradeLevels);
-          let grantedUpgrade = false;
-          for (const id of LAB_UPGRADE_IDS) {
-            const nextLevel = Math.max(labUpgradeLevels[id] ?? 0, 1);
-            grantedUpgrade ||= nextLevel !== labUpgradeLevels[id];
-            labUpgradeLevels[id] = nextLevel;
-          }
+          const { levels: labUpgradeLevels, changed: grantedUpgrade } = grantUnlockedProStarterUpgrades(
+            normalizeLabUpgradeLevels(s.labUpgradeLevels),
+            s.unlockedLevel,
+          );
           if (s.hasProPack && s.proStarterCoinsGranted && !grantedUpgrade) return s;
           return {
             hasProPack: true,
