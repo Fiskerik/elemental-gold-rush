@@ -26,7 +26,6 @@ import { trackMenuAction } from "./analytics";
 import { initAds, showRewardedForCoin } from "./ads";
 import { getWeeklyPlayBonusView } from "./weeklyBonus";
 import { useIsTabletLayout } from "./responsive";
-import { COMPOUNDS } from "./compounds";
 import { DAILY_FEATURE_REWARD_COINS } from "./dailyFeatures";
 
 interface Props {
@@ -84,7 +83,6 @@ export function MainMenu({
   const dailyRewardAmount = hasProPack ? 5 : 2;
   const campaignProgress = Math.round((Math.min(unlockedLevel, MAX_LEVEL) / MAX_LEVEL) * 100);
   const weeklyBonus = getWeeklyPlayBonusView(weeklyPlayBonus);
-  const secretCompoundDefinition = COMPOUNDS.find((compound) => compound.id === secretCompound.compoundId);
   const [dailyRewardToast, setDailyRewardToast] = useState<{ id: number; text: string } | null>(
     null,
   );
@@ -291,7 +289,7 @@ export function MainMenu({
                   {secretCompound.completed
                     ? "Synthesized"
                     : secretCompound.revealed
-                      ? secretCompoundDefinition?.formula ?? "Revealed"
+                      ? "Clue unlocked"
                       : `Reveal clue +${DAILY_FEATURE_REWARD_COINS}`}
                 </small>
               </span>

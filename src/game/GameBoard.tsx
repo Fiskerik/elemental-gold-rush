@@ -129,6 +129,8 @@ const SCORE_POPUP_LIFETIME_MS = 1050;
 const MERGE_PULSE_LIFETIME_MS = 520;
 const CHALLENGE_CLEAR_SCORE = 5000;
 const POWER_UP_CLEAR_DELAY_MS = 2000;
+const DAILY_COMPOUND_GRID_COLS = 10;
+const DAILY_COMPOUND_GRID_ROWS = 15;
 
 function mergeComboCueDelay(index: number): number {
   return index * MERGE_COMBO_SOUND_STEP_MS;
@@ -682,6 +684,9 @@ function calculateStars(
 
 export function GameBoard(props: Props) {
   const level = getLevelById(props.levelId);
+  if (props.secretCompoundId) {
+    return <DailyCompoundGridBoard {...props} secretCompoundId={props.secretCompoundId} />;
+  }
   if (!props.secretCompoundId && (props.mode === "elemental-boss" || level?.specialStage === "elemental-boss")) {
     return <ElementalBossBoard {...props} mode="elemental-boss" />;
   }
@@ -694,6 +699,370 @@ export function GameBoard(props: Props) {
   return <StandardGameBoard {...props} />;
 }
 
+type DailyCompoundCell = {
+  id: number;
+  atom: number;
+  secret: boolean;
+};
+
+function DailyCompoundGridBoard({
+  secretCompoundId,
+  onExit,
+}: Props & { secretCompoundId: string }) {
+ const {
+    soundEnabled,
+    musicEnabled,
+    hapticsEnabled,
+    discoveredCompounds,
+    compoundCounts,
+    recordCompoundDiscovery,
+    addScore,
+    completeSecretCompound,
+    recordGameAttemptForAd,
+  } = useProgress();
+  const compound = useMemo(
+    () => COMPOUNDS.find((item) => item.id === secretCompoundId) ?? null,
+    [secretCompoundId],
+  );
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [revealedIds, setRevealedIds] = useState<Set<number>>(new Set());
+  const [wrongGuesses, setWrongGuesses] = useState(0);
+  const [message, setMessage] = useState("Find the hidden compound atoms.");
+  const [elapsedMs, setElapsedMs] = useState(0);
+  const [result, setResult] = useState<null | {
+    score: number;
+    awarded: boolean;
+    wasNew: boolean;
+    count: number;
+  }>(null);
+
+  useEffect(() => {
+    if (musicEnabled && !result) startAmbientMusic("compound");
+    else stopAmbientMusic();
+    return () => stopAmbientMusic();
+  }, [musicEnabled, result]);
+
+
+  useEffect(() => {
+    if (result) return;
+    const id = window.setInterval(() => setElapsedMs((ms) => ms + 500), 500);
+    return () => window.clearInterval(id);
+  }, [result]);
+
+  const secretAtoms = useMemo(() => (compound ? atomsForCompound(compound) : []), [compound]);
+  const cells = useMemo(
+    () => createDailyCompoundGrid(secretAtoms, DAILY_COMPOUND_GRID_COLS, DAILY_COMPOUND_GRID_ROWS, secretCompoundId),
+    [secretAtoms, secretCompoundId],
+  );
+  const selectedCells = useMemo(
+    () => cells.filter((cell) => selectedIds.has(cell.id)),
+    [cells, selectedIds],
+  );
+  const selectedCounts = useMemo(
+    () =>
+      selectedCells.reduce<Record<string, number>>((counts, cell) => {
+        const symbol = ELEMENTS[cell.atom - 1]?.symbol;
+        if (!symbol) return counts;
+        counts[symbol] = (counts[symbol] ?? 0) + 1;
+        return counts;
+      }, {}),
+    [selectedCells],
+  );
+  const hintsAvailable = Math.floor(wrongGuesses / 3);
+  const hintsUsed = revealedIds.size;
+  const canRevealHint = !result && hintsAvailable > hintsUsed && revealedIds.size < secretAtoms.length;
+  const elapsedSec = Math.floor(elapsedMs / 1000);
+
+  function toggleCell(cell: DailyCompoundCell) {
+    if (result || revealedIds.has(cell.id)) return;
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(cell.id)) next.delete(cell.id);
+      else next.add(cell.id);
+      return next;
+    });
+    if (hapticsEnabled) vibrate(8);
+  }
+
+  function revealHint() {
+    if (!canRevealHint) return;
+    const cell = cells
+      .filter((item) => item.secret && !revealedIds.has(item.id))
+      .sort((a, b) => b.atom - a.atom || a.id - b.id)[0];
+    if (!cell) return;
+    setRevealedIds((current) => new Set([...current, cell.id]));
+    setSelectedIds((current) => new Set([...current, cell.id]));
+    setMessage(`Hint marked ${ELEMENTS[cell.atom - 1]?.symbol ?? "an atom"}.`);
+    if (hapticsEnabled) vibrate([15, 25, 15]);
+  }
+
+  async function exitAfterResult() {
+    const progress = useProgress.getState();
+    if (!progress.hasProPack && progress.clearedStagesSinceAd >= 3) {
+      const shown = await showInterstitialIfReady(progress.hasProPack);
+      if (shown) progress.markInterstitialShown();
+    }
+    onExit();
+  }
+
+  function formCompound() {
+    if (!compound || result) return;
+    if (compoundKey(selectedCounts) !== compoundKey(compound.elements)) {
+      const nextWrong = wrongGuesses + 1;
+      setWrongGuesses(nextWrong);
+      setMessage(
+        nextWrong % 3 === 0
+          ? "Not the compound. An optional hint is now available."
+          : "Not the compound. Adjust your marked atoms.",
+      );
+      if (hapticsEnabled) vibrate(24);
+      return;
+    }
+    const selectedSecretCount = selectedCells.filter((cell) => cell.secret).length;
+    if (selectedSecretCount !== secretAtoms.length) {
+      const nextWrong = wrongGuesses + 1;
+      setWrongGuesses(nextWrong);
+      setMessage(
+        nextWrong % 3 === 0
+          ? "Those atoms match the formula, but not the hidden compound. An optional hint is available."
+          : "Those atoms match the formula, but not the hidden compound.",
+      );
+      if (hapticsEnabled) vibrate(24);
+      return;
+    }
+    const score = scoreDailyCompound(compound, wrongGuesses, hintsUsed, elapsedSec);
+    const wasNew = !discoveredCompounds.includes(compound.id);
+    const count = (compoundCounts[compound.id] ?? (wasNew ? 0 : 1)) + 1;
+    recordCompoundDiscovery(compound.id);
+    addScore(score);
+    recordGameAttemptForAd();
+    const awarded = completeSecretCompound([compound.id]);
+    const secretIds = cells.filter((cell) => cell.secret).map((cell) => cell.id);
+    setRevealedIds(new Set(secretIds));
+    setSelectedIds(new Set(secretIds));
+    setResult({ score, awarded, wasNew, count });
+    setMessage("Compound formed.");
+    if (soundEnabled) playShootSound();
+    if (hapticsEnabled) vibrate([20, 40, 20]);
+  }
+
+  if (!compound) {
+    return (
+      <div style={dailyCompoundShell}>
+        <div style={dailyCompoundMissingCard}>
+          <h2 style={{ margin: "0 0 8px" }}>Daily compound unavailable</h2>
+          <p style={{ color: "var(--muted-foreground)", margin: "0 0 14px" }}>
+            The selected compound could not be found.
+          </p>
+          <button type="button" onClick={onExit} style={modalBtn}>
+            Back to Menu
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={dailyCompoundShell}>
+      <div style={dailyCompoundHeader}>
+        <button type="button" onClick={onExit} style={dailyCompoundExitBtn}>
+          Exit
+        </button>
+        <div style={{ minWidth: 0 }}>
+          <div style={dailyCompoundKicker}>DAILY COMPOUND</div>
+          <div style={dailyCompoundTitle}>{getCompoundHint(compound)}</div>
+          <div style={dailyCompoundMeta}>
+            {selectedCells.length}/{compound.totalAtoms} marked - {wrongGuesses} wrong - {hintsUsed} hints - {elapsedSec}s
+          </div>
+        </div>
+        <div style={dailyCompoundScorePreview}>{formatScore(scoreDailyCompound(compound, wrongGuesses, hintsUsed, elapsedSec))}</div>
+      </div>
+
+      <div style={dailyCompoundBoard}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: `repeat(${DAILY_COMPOUND_GRID_COLS}, minmax(0, 1fr))`,
+            gridTemplateRows: `repeat(${DAILY_COMPOUND_GRID_ROWS}, minmax(0, 1fr))`,
+            gap: 4,
+            width: "100%",
+            height: "100%",
+          }}
+        >
+          {cells.map((cell) => {
+            const selected = selectedIds.has(cell.id);
+            const revealed = revealedIds.has(cell.id);
+            const size = Math.max(22, Math.min(38, Math.floor(520 / DAILY_COMPOUND_GRID_ROWS)));
+            return (
+              <button
+                key={cell.id}
+                type="button"
+                onClick={() => toggleCell(cell)}
+                aria-label={`${selected ? "Unmark" : "Mark"} ${ELEMENTS[cell.atom - 1]?.name ?? "atom"}`}
+                style={{
+                  minWidth: 0,
+                  minHeight: 0,
+                  borderRadius: 8,
+                  border: selected
+                    ? `2px solid ${revealed ? "var(--success, var(--accent))" : "var(--accent)"}`
+                    : "1px solid color-mix(in oklch, var(--border) 80%, transparent)",
+                  background: selected
+                    ? "color-mix(in oklch, var(--accent) 18%, var(--surface-high))"
+                    : "color-mix(in oklch, var(--surface) 84%, transparent)",
+                  display: "grid",
+                  placeItems: "center",
+                  padding: 0,
+                  cursor: result || revealed ? "default" : "pointer",
+                  boxShadow: revealed
+                    ? "0 0 18px var(--success, var(--accent))"
+                    : selected
+                      ? "0 0 12px var(--accent-glow)"
+                      : undefined,
+                }}
+              >
+                <ElementBall atomicNumber={cell.atom} size={size} glow={selected || revealed} />
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div style={dailyCompoundControls}>
+        <div style={dailyCompoundMessage}>{message}</div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            type="button"
+            onClick={revealHint}
+            disabled={!canRevealHint}
+            style={{
+              ...dailyCompoundSecondaryBtn,
+              opacity: canRevealHint ? 1 : 0.5,
+              cursor: canRevealHint ? "pointer" : "not-allowed",
+            }}
+          >
+            Optional Hint
+          </button>
+          <button
+            type="button"
+            onClick={formCompound}
+            disabled={selectedCells.length === 0 || Boolean(result)}
+            style={{
+              ...dailyCompoundPrimaryBtn,
+              opacity: selectedCells.length > 0 && !result ? 1 : 0.55,
+              cursor: selectedCells.length > 0 && !result ? "pointer" : "not-allowed",
+            }}
+          >
+            Form Compound
+          </button>
+        </div>
+      </div>
+
+      {result && (
+        <Modal>
+          <div style={{ textAlign: "center" }}>
+            <div style={dailyCompoundKicker}>COMPOUND FORMED</div>
+            <MoleculeVisual compound={compound} size={104} />
+            <h2 style={{ margin: "10px 0 4px", fontSize: 24 }}>{compound.name}</h2>
+            <div style={{ fontSize: 18, fontWeight: 900, color: "var(--accent)", marginBottom: 8 }}>
+              {compound.formula}
+            </div>
+            <p style={{ margin: "0 0 12px", color: "var(--muted-foreground)", lineHeight: 1.45 }}>
+              {compound.fact}
+            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
+              <ResultStat label="Score" value={formatScore(result.score)} color="var(--accent)" />
+              <ResultStat label="Wrong" value={`${wrongGuesses}`} color="var(--foreground)" />
+              <ResultStat label="Hints" value={`${hintsUsed}`} color="var(--foreground)" />
+              <ResultStat label="Time" value={`${elapsedSec}s`} color="var(--foreground)" />
+            </div>
+            <div style={{ color: "var(--success, var(--accent))", fontSize: 12, fontWeight: 900 }}>
+              {result.wasNew ? "Added to collection" : `Collection count ${result.count}`}
+              {result.awarded ? " - Daily reward +5 coins" : ""}
+            </div>
+            <button type="button" onClick={onExit} style={{ ...modalBtn, width: "100%" }}>
+              Back to Menu
+            </button>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+function createDailyCompoundGrid(
+  secretAtoms: number[],
+  cols: number,
+  rows: number,
+  compoundId: string,
+): DailyCompoundCell[] {
+  const count = cols * rows;
+  const highest = Math.max(...secretAtoms, 1);
+  const rng = createSeededRng(hashDailySeed(`daily-compound-grid-${getTodayQuestDate()}-${compoundId}-${cols}x${rows}`));
+  const cells: DailyCompoundCell[] = Array.from({ length: count }, (_, id) => ({
+    id,
+    atom: 1 + Math.floor(rng() * highest),
+    secret: false,
+  }));
+  if (secretAtoms.length === 0 || secretAtoms.length > count) return cells;
+
+  const directions = [
+    { dc: 1, dr: 0 },
+    { dc: -1, dr: 0 },
+    { dc: 0, dr: 1 },
+    { dc: 0, dr: -1 },
+    { dc: 1, dr: 1 },
+    { dc: -1, dr: 1 },
+    { dc: 1, dr: -1 },
+    { dc: -1, dr: -1 },
+  ];
+  const candidates: { col: number; row: number; dc: number; dr: number }[] = [];
+  for (const { dc, dr } of directions) {
+    for (let row = 0; row < rows; row += 1) {
+      for (let col = 0; col < cols; col += 1) {
+        const endCol = col + dc * (secretAtoms.length - 1);
+        const endRow = row + dr * (secretAtoms.length - 1);
+        if (endCol < 0 || endCol >= cols || endRow < 0 || endRow >= rows) continue;
+        candidates.push({ col, row, dc, dr });
+      }
+    }
+  }
+  shuffleWithRng(candidates, rng);
+  const placement = candidates[0];
+  if (!placement) return cells;
+
+  secretAtoms.forEach((atom, index) => {
+    const col = placement.col + placement.dc * index;
+    const row = placement.row + placement.dr * index;
+    const cell = cells[row * cols + col];
+    if (!cell) return;
+    cell.atom = atom;
+    cell.secret = true;
+  });
+  return cells;
+}
+
+function shuffleWithRng<T>(items: T[], rng: () => number): T[] {
+  for (let i = items.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(rng() * (i + 1));
+    [items[i], items[j]] = [items[j], items[i]];
+  }
+  return items;
+}
+
+function scoreDailyCompound(
+  compound: CompoundDefinition,
+  wrongGuesses: number,
+  hintsUsed: number,
+  elapsedSec: number,
+): number {
+  const base = 10000 + compound.bonusScore;
+  const firstTryBonus = wrongGuesses === 0 ? 1500 : 0;
+  const noHintBonus = hintsUsed === 0 ? 1500 : 0;
+  const wrongPenalty = wrongGuesses * 900;
+  const hintPenalty = hintsUsed * 1800;
+  const timePenalty = elapsedSec * 18;
+  return Math.max(250, Math.round(base + firstTryBonus + noHintBonus - wrongPenalty - hintPenalty - timePenalty));
+}
 function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "campaign", resumeSavedRun = false, secretCompoundId }: Props) {
   const isTabletLayout = useIsTabletLayout();
   const level = getLevelById(levelId) ?? LEVELS[0];
@@ -860,6 +1229,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
   );
   const popupId = useRef(0);
   const eGunCooldownSlots = useRef(0);
+  const normalQueueBiasCounterRef = useRef(0);
   const challengeQueuePlanRef = useRef<number[]>([]);
   const challengeQueuePoolRef = useRef<number[]>([]);
 
@@ -1478,6 +1848,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
         challengeQueuePlanRef.current = [];
         challengeQueuePoolRef.current = [];
         eGunCooldownSlots.current = 0;
+        normalQueueBiasCounterRef.current = 0;
         startTimeRef.current = Date.now() - saved.elapsedMs;
         setElapsedMs(saved.elapsedMs);
         clearSavedRun();
@@ -1533,12 +1904,11 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
           (!isEGun && !initialBlank[i] && shimmerEnabled && dailyRandom() < shimmerChance)),
     );
     const resolvedInitialQueue = initialQueue.map((atom, i) => {
-        if (i < initialPlannedCount) return atom;
-        return isPowerUpStage
-          ? atom
-          : initialShimmer[i]
-          ? generateQueueAtom(dynamicMaxQueue(initialBalls.length), initialBalls, true)
-          : Math.min(queueSpawnCap(), Math.max(atom, queueFloorFromBoard(initialBalls)));
+      if (i < initialPlannedCount) return atom;
+      if (isPowerUpStage || initialBlank[i] || initialEGun[i]) return atom;
+      if (initialShimmer[i]) return generateQueueAtom(dynamicMaxQueue(initialBalls.length), initialBalls, true);
+      if (shouldSpawnTargetBandQueueAtom()) return randomAvailableElement(target - 2, target - 5);
+      return Math.min(queueSpawnCap(), Math.max(atom, queueFloorFromBoard(initialBalls)));
     });
     const initialUnstable = resolvedInitialQueue.map(
       (atom, i) =>
@@ -1652,9 +2022,8 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     setShuffleStartOpen(false);
     setQueueShuffleCharges((powerUpStage === "queue-shuffle" ? 1 : 0) + initialLabCharge("queue-shuffle", 2));
     queueUndoRef.current = null;
-    challengeQueuePlanRef.current = [];
-    challengeQueuePoolRef.current = [];
     eGunCooldownSlots.current = 0;
+    normalQueueBiasCounterRef.current = Math.floor(dailyRandom() * 2);
     startTimeRef.current = Date.now();
     setElapsedMs(0);
     trackGameStart(levelId, mode);
@@ -1832,10 +2201,23 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
 
   function generateQueueAtom(maxElement: number, board: Board, forceUniform = false): number {
     const minElement = queueFloorFromBoard(board);
+    if (shouldSpawnTargetBandQueueAtom()) {
+      return randomAvailableElement(target - 2, target - 5);
+    }
     const effectiveMax = Math.max(minElement, maxElement);
     if (forceUniform) return randomAvailableElement(effectiveMax, minElement);
     const shiftedMax = effectiveMax - minElement + 1;
     return generateQueueElement(shiftedMax, currentQueueDecay(), dailyRandom) + minElement - 1;
+  }
+
+  function shouldBiasNormalQueueTowardTarget(): boolean {
+    return mode === "campaign" && level.id > 10 && !isMoleculeChallenge && !isPowerUpStage;
+  }
+
+  function shouldSpawnTargetBandQueueAtom(): boolean {
+    if (!shouldBiasNormalQueueTowardTarget()) return false;
+    normalQueueBiasCounterRef.current += 1;
+    return normalQueueBiasCounterRef.current % 2 === 1;
   }
 
   function discoveredSeedAtoms(maxSeedAtom: number): number[] {
@@ -4924,7 +5306,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     : winChoice;
 
   async function runAttemptAdIfDue() {
-    if (clearedStagesSinceAd < 5 || hasProPack) return;
+    if (clearedStagesSinceAd < 3 || hasProPack) return;
     const shown = await showInterstitialIfReady(hasProPack);
     if (shown) markInterstitialShown();
   }
@@ -7990,6 +8372,129 @@ function Modal({ children, zIndex = 100 }: { children: React.ReactNode; zIndex?:
   );
 }
 
+const dailyCompoundShell: React.CSSProperties = {
+  minHeight: "100dvh",
+  height: "100dvh",
+  display: "grid",
+  gridTemplateRows: "auto minmax(0, 1fr) auto",
+  gap: 10,
+  padding: 12,
+  boxSizing: "border-box",
+  background:
+    "radial-gradient(circle at 20% 12%, oklch(0.36 0.08 250 / 0.26), transparent 34%), radial-gradient(circle at 82% 82%, oklch(0.5 0.11 145 / 0.18), transparent 36%), var(--background)",
+  color: "var(--foreground)",
+};
+
+const dailyCompoundHeader: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "auto minmax(0, 1fr) auto",
+  alignItems: "center",
+  gap: 10,
+  padding: "10px 12px",
+  borderRadius: 12,
+  border: "1px solid var(--border)",
+  background: "var(--surface-elevated)",
+  boxShadow: "0 12px 30px rgba(0,0,0,0.28)",
+};
+
+const dailyCompoundExitBtn: React.CSSProperties = {
+  border: "1px solid var(--border)",
+  borderRadius: 10,
+  padding: "9px 11px",
+  background: "var(--surface)",
+  color: "var(--foreground)",
+  fontWeight: 850,
+  cursor: "pointer",
+};
+
+const dailyCompoundKicker: React.CSSProperties = {
+  fontSize: 10,
+  letterSpacing: 2,
+  color: "var(--accent)",
+  fontWeight: 900,
+};
+
+const dailyCompoundTitle: React.CSSProperties = {
+  marginTop: 2,
+  fontSize: 14,
+  fontWeight: 900,
+  lineHeight: 1.25,
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+};
+
+const dailyCompoundMeta: React.CSSProperties = {
+  marginTop: 3,
+  fontSize: 11,
+  color: "var(--muted-foreground)",
+  fontWeight: 750,
+};
+
+const dailyCompoundScorePreview: React.CSSProperties = {
+  minWidth: 68,
+  textAlign: "right",
+  fontSize: 18,
+  fontWeight: 950,
+  color: "var(--accent)",
+};
+
+const dailyCompoundBoard: React.CSSProperties = {
+  minHeight: 0,
+  padding: 6,
+  borderRadius: 14,
+  border: "1px solid var(--border)",
+  background: "linear-gradient(180deg, oklch(0.18 0.05 275), oklch(0.12 0.035 275))",
+  boxShadow: "inset 0 0 30px rgba(79, 195, 247, 0.08)",
+  overflow: "hidden",
+};
+
+const dailyCompoundControls: React.CSSProperties = {
+  display: "grid",
+  gap: 8,
+  padding: "10px 12px",
+  borderRadius: 12,
+  border: "1px solid var(--border)",
+  background: "var(--surface-elevated)",
+};
+
+const dailyCompoundMessage: React.CSSProperties = {
+  minHeight: 18,
+  color: "var(--muted-foreground)",
+  fontSize: 12,
+  fontWeight: 800,
+};
+
+const dailyCompoundPrimaryBtn: React.CSSProperties = {
+  flex: 1,
+  border: "none",
+  borderRadius: 12,
+  padding: "12px 14px",
+  background: "linear-gradient(135deg, var(--accent), var(--primary))",
+  color: "var(--primary-foreground)",
+  fontWeight: 900,
+  boxShadow: "0 0 16px var(--accent-glow)",
+};
+
+const dailyCompoundSecondaryBtn: React.CSSProperties = {
+  flex: 1,
+  border: "1px solid var(--border)",
+  borderRadius: 12,
+  padding: "12px 14px",
+  background: "var(--surface-high)",
+  color: "var(--foreground)",
+  fontWeight: 850,
+};
+
+const dailyCompoundMissingCard: React.CSSProperties = {
+  alignSelf: "center",
+  justifySelf: "center",
+  width: "min(100%, 360px)",
+  padding: 22,
+  borderRadius: 16,
+  border: "1px solid var(--border)",
+  background: "var(--surface-elevated)",
+  textAlign: "center",
+};
 const modalBtn: React.CSSProperties = {
   flex: 1,
   marginTop: 14,

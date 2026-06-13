@@ -234,6 +234,7 @@ interface ProgressState {
   ) => void;
   setChallengeBestScore: (mode: GameModeId, score: number) => void;
   grantProPack: () => void;
+  recordGameAttemptForAd: () => void;
   markInterstitialShown: () => void;
   addInventoryPowerUps: (powerUps: Partial<Record<InventoryPowerUpId, number>>) => void;
   consumeInventoryPowerUps: (powerUps: Partial<Record<InventoryPowerUpId, number>>) => boolean;
@@ -590,6 +591,8 @@ export const useProgress = create<ProgressState>()(
             labUpgradeLevels,
           };
         }),
+      recordGameAttemptForAd: () =>
+        set((s) => ({ clearedStagesSinceAd: s.clearedStagesSinceAd + 1 })),
       markInterstitialShown: () => set({ clearedStagesSinceAd: 0 }),
       addInventoryPowerUps: (powerUps) =>
         set((s) => ({
@@ -645,11 +648,11 @@ export const useProgress = create<ProgressState>()(
       toggleAppTheme: () => set((s) => ({ appTheme: s.appTheme === "dark" ? "light" : "dark" })),
       setShootingStyle: (style) => set({ shootingStyle: style, hasChosenShootingStyle: true }),
       reset: () =>
-        set({
+        set((s) => ({
           unlockedLevel: 1,
           highestElement: 1,
           totalScore: 0,
-          goldCoins: 0,
+          goldCoins: s.goldCoins,
           discoveredElements: [1],
           discoveredCompounds: [],
           compoundCounts: {},
@@ -683,7 +686,7 @@ export const useProgress = create<ProgressState>()(
           labUpgradeEnabled: emptyLabUpgradeEnabled(),
           dailyChallenge: createDailyChallenge(),
           secretCompound: createSecretCompound(),
-        }),
+        })),
     }),
     {
       name: "elemental-gold-rush",

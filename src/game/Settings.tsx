@@ -63,7 +63,9 @@ export function Settings({ onBack }: { onBack: () => void }) {
           />
           <button
             onClick={() => {
-              if (confirm("Reset all progress? This cannot be undone.")) reset();
+              if (!confirm("Reset all progress? This cannot be undone.")) return;
+              if (!confirm("Only your unspent gold coins will be saved. Levels, discoveries, upgrades, inventory, and records will be reset.")) return;
+              reset();
             }}
             style={{
               marginTop: 16,
