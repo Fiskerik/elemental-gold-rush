@@ -17,16 +17,35 @@ import {
   User,
   type LucideIcon,
 } from "lucide-react";
-import { LEVELS, MAX_LEVEL, getLevelById } from "./levels";
+import { LEVELS, MAX_LEVEL, MOLECULE_CHALLENGE_BY_LEVEL, getLevelById, type PowerUpStageId } from "./levels";
 import { useProgress } from "./store";
 import { formatScore } from "./logic";
 import { ELEMENTS } from "./elements";
 import { ElementBall } from "./ElementBall";
+import { COMPOUNDS } from "./compounds";
+import { MoleculeVisual } from "./MoleculeVisual";
+import { PowerUpBadge } from "./PowerUpLibrary";
 import { trackMenuAction } from "./analytics";
 import { initAds, showRewardedForCoin } from "./ads";
 import { getWeeklyPlayBonusView } from "./weeklyBonus";
 import { useIsTabletLayout } from "./responsive";
 import { DAILY_FEATURE_REWARD_COINS } from "./dailyFeatures";
+
+const POWER_UP_STAGE_LABELS: Record<PowerUpStageId, string> = {
+  shimmer: "Merge the shimmering queued atom",
+  unstable: "Stabilize the unstable atom",
+  grab: "Use Grab to create a merge",
+  egun: "Fire the E-Gun through atoms",
+  gravity: "Use Gravity to group atoms",
+  stone: "Place and crack the Stone",
+  transmute: "Transmute, then merge",
+  "fusion-jump": "Use Fusion Jump to skip a tier",
+  catalyst: "Trigger a Catalyst chain",
+  emission: "Boost the waiting queue",
+  gamma: "Clear atoms with Gamma",
+  blank: "Use a Blank Atom wildcard",
+  "queue-shuffle": "Shuffle the queue",
+};
 
 interface Props {
   onPlay: () => void;
@@ -39,6 +58,31 @@ interface Props {
   onProfile: () => void;
   onDailyChallenge: () => void;
   onSecretCompound: () => void;
+}
+
+type NextRunGoal =
+  | { kind: "atom"; text: string }
+  | { kind: "compound"; text: string; compound: (typeof COMPOUNDS)[number] }
+  | { kind: "powerup"; text: string; powerUp: PowerUpStageId };
+
+function getNextRunGoal(level: (typeof LEVELS)[number]): NextRunGoal {
+  if (level.powerUpStage) {
+    return {
+      kind: "powerup",
+      text: `${level.name} - ${POWER_UP_STAGE_LABELS[level.powerUpStage]}`,
+      powerUp: level.powerUpStage,
+    };
+  }
+  const compound = COMPOUNDS.find((item) => item.id === MOLECULE_CHALLENGE_BY_LEVEL[level.id]);
+  if (compound) {
+    return {
+      kind: "compound",
+      text: `${level.name} - form ${compound.name}`,
+      compound,
+    };
+  }
+  const targetEl = ELEMENTS[(level.targetElement ?? 1) - 1];
+  return { kind: "atom", text: `${level.name} - reach ${targetEl?.symbol ?? "H"}` };
 }
 
 export function MainMenu({
@@ -77,10 +121,10 @@ export function MainMenu({
   } = useProgress();
   const highestEl = ELEMENTS[highestElement - 1];
   const nextLevel = getLevelById(unlockedLevel) ?? LEVELS[LEVELS.length - 1];
-  const targetEl = ELEMENTS[(nextLevel?.targetElement ?? 1) - 1];
+  const nextRunGoal = getNextRunGoal(nextLevel);
   const completedDailyQuests = dailyQuests.filter((quest) => quest.completed).length;
   const dailyComplete = dailyQuests.length > 0 && completedDailyQuests >= 4;
-  const dailyRewardAmount = hasProPack ? 5 : 2;
+  const dailyRewardAmount = hasProPack ? 5 : 3;
   const campaignProgress = Math.round((Math.min(unlockedLevel, MAX_LEVEL) / MAX_LEVEL) * 100);
   const weeklyBonus = getWeeklyPlayBonusView(weeklyPlayBonus);
   const [dailyRewardToast, setDailyRewardToast] = useState<{ id: number; text: string } | null>(
@@ -243,7 +287,7 @@ export function MainMenu({
                 Level {unlockedLevel}
               </div>
               <div style={{ fontSize: 13, color: "var(--muted-foreground)", marginTop: 4 }}>
-                {`${nextLevel?.name ?? ""} - target ${targetEl?.symbol ?? "H"}`}
+                {nextRunGoal.text}
               </div>
             </div>
             <button
@@ -268,7 +312,13 @@ export function MainMenu({
               <Play size={20} fill="currentColor" aria-hidden="true" />
               Continue
             </span>
-            <ElementBall atomicNumber={nextLevel?.targetElement ?? 1} size={54} glow />
+            {nextRunGoal.kind === "compound" ? (
+              <MoleculeVisual compound={nextRunGoal.compound} size={54} />
+            ) : nextRunGoal.kind === "powerup" ? (
+              <PowerUpBadge icon={nextRunGoal.powerUp} size={54} />
+            ) : (
+              <ElementBall atomicNumber={nextLevel?.targetElement ?? 1} size={54} glow />
+            )}
           </button>
           <div style={dailyFeatureGrid}>
             <button type="button" onClick={onDailyChallenge} style={dailyFeatureBtn}>
@@ -310,7 +360,7 @@ export function MainMenu({
           >
             <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
               <Clapperboard size={17} aria-hidden="true" />
-              {rewardedAdBusy ? "Loading ad..." : "Watch ad for bonus coin"}
+              {rewardedAdBusy ? "Loading ad..." : "Free coins"}
             </span>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
               <GoldCoinIcon size={14} />+1
@@ -461,7 +511,7 @@ export function MainMenu({
                 {`Streak ${dailyStreak} - ${completedDailyQuests}/${dailyQuests.length} quests`}
               </div>
               <div style={{ fontSize: 11, color: "var(--muted-foreground)", marginTop: 2 }}>
-                {hasProPack ? "Pro daily quests pay 2x+ gold." : "Complete 4 daily tasks to claim."}
+                {hasProPack ? "Pro daily quests include bonus gold." : "Complete 4 daily tasks to claim +3."}
               </div>
               <div style={{ fontSize: 10, color: "var(--accent)", marginTop: 4, fontWeight: 800, letterSpacing: 0.6 }}>
                 {`Resets in ${resetCountdown}`}

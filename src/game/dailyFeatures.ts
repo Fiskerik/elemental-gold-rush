@@ -2,7 +2,7 @@ import { COMPOUNDS } from "./compounds";
 import { LEVELS } from "./levels";
 import { getTodayQuestDate } from "./quests";
 
-export const DAILY_FEATURE_REWARD_COINS = 5;
+export const DAILY_FEATURE_REWARD_COINS = 3;
 const DAILY_CHALLENGE_MIN_TARGET_ATOM = 10;
 const DAILY_CHALLENGE_MAX_TARGET_ATOM = 60;
 

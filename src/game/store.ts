@@ -504,7 +504,7 @@ export const useProgress = create<ProgressState>()(
           );
           if (refreshed.claimedDailyReward || !areDailyQuestsComplete(refreshed.dailyQuests))
             return refreshed;
-          const bonusCoins = s.hasProPack ? 5 : 2;
+          const bonusCoins = s.hasProPack ? 5 : 3;
           return {
             ...refreshed,
             claimedDailyReward: true,

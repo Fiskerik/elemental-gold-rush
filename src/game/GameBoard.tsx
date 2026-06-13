@@ -52,7 +52,7 @@ import {
 import { MoleculeVisual } from "./MoleculeVisual";
 import { PowerUpBadge } from "./PowerUpLibrary";
 import { POWER_UP_UNLOCK_LEVELS } from "./powerUps";
-import { hashDailySeed } from "./dailyFeatures";
+import { DAILY_FEATURE_REWARD_COINS, hashDailySeed } from "./dailyFeatures";
 import { getTodayQuestDate } from "./quests";
 import { showInterstitialIfReady } from "./ads";
 import { useIsTabletLayout } from "./responsive";
@@ -675,11 +675,19 @@ function calculateStars(
   _timeSec: number,
 ): number {
   let stars = 1;
-  const efficiencyTarget = level.starShotsTwo ?? (level.parShots ? level.parShots + 5 : 50);
+  const efficiencyTarget = getShotStarGoal(level);
   if (shots <= efficiencyTarget) stars += 1;
-  const masteryTarget = level.scoreGoal ?? (level.targetElement * 1000 * (level.scoreMultiplier ?? 1));
+  const masteryTarget = getScoreStarGoal(level);
   if (score >= masteryTarget) stars += 1;
   return Math.min(3, stars);
+}
+
+function getScoreStarGoal(level: (typeof LEVELS)[0]): number {
+  return level.scoreGoal ?? (level.targetElement * 1000 * (level.scoreMultiplier ?? 1));
+}
+
+function getShotStarGoal(level: (typeof LEVELS)[0]): number {
+  return level.starShotsTwo ?? (level.parShots ? level.parShots + 5 : 50);
 }
 
 export function GameBoard(props: Props) {
@@ -737,7 +745,7 @@ function DailyCompoundGridBoard({
   }>(null);
 
   useEffect(() => {
-    if (musicEnabled && !result) startAmbientMusic("compound");
+    if (musicEnabled && !result) startAmbientMusic("default");
     else stopAmbientMusic();
     return () => stopAmbientMusic();
   }, [musicEnabled, result]);
@@ -818,14 +826,13 @@ function DailyCompoundGridBoard({
       if (hapticsEnabled) vibrate(24);
       return;
     }
-    const selectedSecretCount = selectedCells.filter((cell) => cell.secret).length;
-    if (selectedSecretCount !== secretAtoms.length) {
+    if (!isLinkedCompoundSelection(selectedCells, secretAtoms, DAILY_COMPOUND_GRID_COLS)) {
       const nextWrong = wrongGuesses + 1;
       setWrongGuesses(nextWrong);
       setMessage(
         nextWrong % 3 === 0
           ? "Those atoms match the formula, but not the hidden compound. An optional hint is available."
-          : "Those atoms match the formula, but not the hidden compound.",
+          : "Those atoms match the formula, but they are not linked in the compound pattern.",
       );
       if (hapticsEnabled) vibrate(24);
       return;
@@ -837,9 +844,9 @@ function DailyCompoundGridBoard({
     addScore(score);
     recordGameAttemptForAd();
     const awarded = completeSecretCompound([compound.id]);
-    const secretIds = cells.filter((cell) => cell.secret).map((cell) => cell.id);
-    setRevealedIds(new Set(secretIds));
-    setSelectedIds(new Set(secretIds));
+    const formedIds = selectedCells.map((cell) => cell.id);
+    setRevealedIds(new Set(formedIds));
+    setSelectedIds(new Set(formedIds));
     setResult({ score, awarded, wasNew, count });
     setMessage("Compound formed.");
     if (soundEnabled) playShootSound();
@@ -977,7 +984,7 @@ function DailyCompoundGridBoard({
             </div>
             <div style={{ color: "var(--success, var(--accent))", fontSize: 12, fontWeight: 900 }}>
               {result.wasNew ? "Added to collection" : `Collection count ${result.count}`}
-              {result.awarded ? " - Daily reward +5 coins" : ""}
+              {result.awarded ? ` - Daily reward +${DAILY_FEATURE_REWARD_COINS} coins` : ""}
             </div>
             <button type="button" onClick={onExit} style={{ ...modalBtn, width: "100%" }}>
               Back to Menu
@@ -1041,6 +1048,42 @@ function createDailyCompoundGrid(
   return cells;
 }
 
+function isLinkedCompoundSelection(
+  selectedCells: DailyCompoundCell[],
+  secretAtoms: number[],
+  cols: number,
+): boolean {
+  if (selectedCells.length !== secretAtoms.length || secretAtoms.length === 0) return false;
+  if (secretAtoms.length === 1) return selectedCells[0]?.atom === secretAtoms[0];
+
+  const selectedById = new Map(selectedCells.map((cell) => [cell.id, cell]));
+  const directions = [
+    { dc: 1, dr: 0 },
+    { dc: 0, dr: 1 },
+    { dc: 1, dr: 1 },
+    { dc: 1, dr: -1 },
+  ];
+
+  for (const cell of selectedCells) {
+    const col = cell.id % cols;
+    const row = Math.floor(cell.id / cols);
+    for (const { dc, dr } of directions) {
+      const line = Array.from({ length: secretAtoms.length }, (_, index) => {
+        const nextCol = col + dc * index;
+        const nextRow = row + dr * index;
+        if (nextCol < 0 || nextCol >= cols || nextRow < 0) return null;
+        return selectedById.get(nextRow * cols + nextCol) ?? null;
+      });
+      if (line.some((item) => item == null)) continue;
+      const atoms = line.map((item) => item?.atom ?? 0);
+      const forward = atoms.every((atom, index) => atom === secretAtoms[index]);
+      const reverse = atoms.every((atom, index) => atom === secretAtoms[secretAtoms.length - 1 - index]);
+      if (forward || reverse) return true;
+    }
+  }
+  return false;
+}
+
 function shuffleWithRng<T>(items: T[], rng: () => number): T[] {
   for (let i = items.length - 1; i > 0; i -= 1) {
     const j = Math.floor(rng() * (i + 1));
@@ -1067,24 +1110,15 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
   const isTabletLayout = useIsTabletLayout();
   const level = getLevelById(levelId) ?? LEVELS[0];
   const gameMode = getGameMode(mode);
-  const shimmerEnabled = level.id >= SHIMMER_MIN_LEVEL;
-  const grabEnabled = level.id >= GRAB_MIN_LEVEL;
-  const eGunEnabled = level.id >= EGUN_MIN_LEVEL;
-  const gravityEnabled = level.id >= GRAVITY_MIN_LEVEL;
-  const emissionEnabled = level.id >= EMISSION_MIN_LEVEL;
-  const transmuteEnabled = level.id >= TRANSMUTE_MIN_LEVEL;
-  const fusionJumpEnabled = level.id >= FUSION_JUMP_MIN_LEVEL;
-  const catalystEnabled = level.id >= CATALYST_MIN_LEVEL;
-  const stoneEnabled = level.id >= STONE_MIN_LEVEL;
   const powerUpStage = mode === "campaign" && !secretCompoundId ? level.powerUpStage : undefined;
   const isPowerUpStage = powerUpStage != null;
   const compoundEnabled = mode === "campaign" && !isPowerUpStage;
-  const blankEnabled = level.id >= BLANK_MIN_LEVEL;
   const {
     recordDiscovery,
     addScore,
     setHighestElement,
     unlockLevel,
+    unlockedLevel,
     soundEnabled,
     musicEnabled,
     hapticsEnabled,
@@ -1118,6 +1152,17 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     clearedStagesSinceAd,
     markInterstitialShown,
   } = useProgress();
+  const progressionPowerUpLevel = Math.max(level.id, unlockedLevel);
+  const shimmerEnabled = progressionPowerUpLevel >= SHIMMER_MIN_LEVEL;
+  const grabEnabled = progressionPowerUpLevel >= GRAB_MIN_LEVEL;
+  const eGunEnabled = progressionPowerUpLevel >= EGUN_MIN_LEVEL;
+  const gravityEnabled = progressionPowerUpLevel >= GRAVITY_MIN_LEVEL;
+  const emissionEnabled = progressionPowerUpLevel >= EMISSION_MIN_LEVEL;
+  const transmuteEnabled = progressionPowerUpLevel >= TRANSMUTE_MIN_LEVEL;
+  const fusionJumpEnabled = progressionPowerUpLevel >= FUSION_JUMP_MIN_LEVEL;
+  const catalystEnabled = progressionPowerUpLevel >= CATALYST_MIN_LEVEL;
+  const stoneEnabled = progressionPowerUpLevel >= STONE_MIN_LEVEL;
+  const blankEnabled = progressionPowerUpLevel >= BLANK_MIN_LEVEL;
 
   const labUpgradeLevel = useCallback(
     (id: LabUpgradeId) => (labUpgradeEnabled[id] ? labUpgradeLevels[id] ?? 0 : 0),
@@ -1194,7 +1239,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
   const [unstableQueue, setUnstableQueue] = useState<boolean[]>(() =>
     Array.from(
       { length: QUEUE_SIZE },
-      () => level.id >= UNSTABLE_UNLOCK_LEVEL && dailyRandom() < unstableSpawnChance,
+      () => progressionPowerUpLevel >= UNSTABLE_UNLOCK_LEVEL && dailyRandom() < unstableSpawnChance,
     ),
   );
   const [score, setScore] = useState(0);
@@ -1402,8 +1447,8 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
 
   // === Pre-level shuffle (lvl 10+) ===
   // Player gets 3 reshuffles of 4 starting atoms before the level begins.
-  const shuffleEnabled = level.id >= SHUFFLE_MIN_LEVEL;
-  const gammaEnabled = level.id >= GAMMA_MIN_LEVEL;
+  const shuffleEnabled = progressionPowerUpLevel >= SHUFFLE_MIN_LEVEL;
+  const gammaEnabled = progressionPowerUpLevel >= GAMMA_MIN_LEVEL;
   const [shuffleStartOpen, setShuffleStartOpen] = useState(false);
   const [shufflesLeft, setShufflesLeft] = useState(SHUFFLE_LIMIT);
   const [shuffleAtoms, setShuffleAtoms] = useState<number[]>([]);
@@ -1441,7 +1486,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
   const isDailyAtomChallenge = mode === "daily-challenge";
   const isMoleculeChallenge = moleculeObjective != null && (mode === "campaign" || isSecretCompoundChallenge);
   const canIntroducePowerUps = mode === "campaign" && !isMoleculeChallenge && !isPowerUpStage;
-  const unstableEnabled = level.id >= UNSTABLE_UNLOCK_LEVEL;
+  const unstableEnabled = progressionPowerUpLevel >= UNSTABLE_UNLOCK_LEVEL;
   const current = queue[0];
   const currentIsEGun = eGunQueue[0] ?? false;
   const currentIsBlank = blankQueue[0] ?? false;
@@ -1598,9 +1643,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     toggleMusic();
   };
 
-  const ambientMusicTheme = isMoleculeChallenge
-    ? "compound"
-    : isPowerUpStage
+  const ambientMusicTheme = isPowerUpStage
       ? "powerup"
       : "default";
 
@@ -1867,7 +1910,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
         ? createDailyChallengeBoard()
       : mode === "pure-hydrogen"
         ? createEmptyBoard()
-      : level.id >= SHUFFLE_MIN_LEVEL
+      : shuffleEnabled
         ? buildShuffleStartBoard(generateShuffleAtoms())
         : createSeededBoard();
     setBalls(initialBalls);
@@ -1917,7 +1960,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
         !initialEGun[i] &&
         !initialBlank[i] &&
         canBeUnstableAtom(atom) &&
-        level.id >= UNSTABLE_UNLOCK_LEVEL &&
+        progressionPowerUpLevel >= UNSTABLE_UNLOCK_LEVEL &&
         dailyRandom() < unstableSpawnChance,
     );
     setQueue(resolvedInitialQueue);
@@ -2028,14 +2071,14 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     setElapsedMs(0);
     trackGameStart(levelId, mode);
     // Per-level intro tooltips for newly unlocked features.
-    if (canIntroducePowerUps && level.id >= SHIMMER_MIN_LEVEL) {
+    if (canIntroducePowerUps && shimmerEnabled) {
       showTip(
         "feature-shimmer-unlock",
         "✦ Shimmering atoms unlocked",
         "Some atoms in your queue now shimmer with a rainbow halo. Land a successful merge with one to score 2× points and fill the Grab combo bar twice as fast.",
       );
     }
-    if (canIntroducePowerUps && level.id >= GRAB_MIN_LEVEL) {
+    if (canIntroducePowerUps && grabEnabled) {
       // First-ever Grab unlock: give one free charge so the player can try it immediately.
       if (!seenTips.includes("feature-grab-unlock")) {
         setGrabs((g) => g + 1);
@@ -2047,7 +2090,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
         "Build the Grab combo bar by making 8 merge progress in a row. When it fills, tap the Grab button (bottom-right), then drag any atom on the board to a new position — surrounding atoms slide out of the way to make room. Use it to set up huge merge chains.",
       );
     }
-    if (canIntroducePowerUps && level.id >= BLANK_MIN_LEVEL) {
+    if (canIntroducePowerUps && blankEnabled) {
       showTip(
         "feature-blank-unlock",
         "✦ Blank atom unlocked!",
@@ -2201,6 +2244,10 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
 
   function generateQueueAtom(maxElement: number, board: Board, forceUniform = false): number {
     const minElement = queueFloorFromBoard(board);
+    if (isMoleculeChallenge && moleculeObjective) {
+      const highestRecipeAtom = Math.max(...atomsForCompound(moleculeObjective), 1);
+      return randomAvailableElement(highestRecipeAtom, 1);
+    }
     if (shouldSpawnTargetBandQueueAtom()) {
       return randomAvailableElement(target - 2, target - 5);
     }
@@ -2317,14 +2364,23 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     if (powerUpStage === "blank") {
       return { atom: 1, shimmer: false, eGun: false, blank: true, unstable: false };
     }
-    let plannedChallengeAtom = isMoleculeChallenge || isDailyAtomChallenge ? challengeQueuePlanRef.current.shift() : undefined;
-    if (plannedChallengeAtom == null && (isMoleculeChallenge || isDailyAtomChallenge) && challengeQueuePoolRef.current.length > 0) {
+    let plannedChallengeAtom = isDailyAtomChallenge ? challengeQueuePlanRef.current.shift() : undefined;
+    if (plannedChallengeAtom == null && isDailyAtomChallenge && challengeQueuePoolRef.current.length > 0) {
       const pool = challengeQueuePoolRef.current;
       plannedChallengeAtom = pool[Math.floor(dailyRandom() * pool.length)];
     }
     if (plannedChallengeAtom != null) {
       return {
         atom: plannedChallengeAtom,
+        shimmer: false,
+        eGun: false,
+        blank: false,
+        unstable: false,
+      };
+    }
+    if (isMoleculeChallenge) {
+      return {
+        atom: generateQueueAtom(maxElement, board),
         shimmer: false,
         eGun: false,
         blank: false,
@@ -2400,22 +2456,26 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     // even if the player exits before the result modal is dismissed.
     if (!runRecordedRef.current) {
       runRecordedRef.current = true;
-      recordLevelRun(levelId, {
-        score: stats.score,
-        shots: stats.shots,
-        powerUpsUsed: runPowerUpsUsedRef.current,
-        won: true,
-      });
+      if (mode === "daily-challenge") {
+        recordGameAttemptForAd();
+      } else {
+        recordLevelRun(levelId, {
+          score: stats.score,
+          shots: stats.shots,
+          powerUpsUsed: runPowerUpsUsedRef.current,
+          won: true,
+        });
+      }
     }
     if (mode === "daily-challenge") {
       const awarded = completeDailyChallenge(stats.score);
-      if (awarded) spawnPopup("Daily reward +5 coins");
+      if (awarded) spawnPopup(`Daily reward +${DAILY_FEATURE_REWARD_COINS} coins`);
     }
     const completedCompoundIds = stats.compound
       ? [...formedCompoundsThisRun, stats.compound.id]
       : formedCompoundsThisRun;
     const secretAwarded = completeSecretCompound(completedCompoundIds);
-    if (secretAwarded) spawnPopup("Secret compound +5 coins");
+    if (secretAwarded) spawnPopup(`Secret compound +${DAILY_FEATURE_REWARD_COINS} coins`);
     // Clear any in-flight score/merge popups so they don't bleed into the
     // win animation or appear behind the result modal.
     setPopups([]);
@@ -3463,9 +3523,11 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       const timeSec = (Date.now() - startTimeRef.current) / 1000;
       const stars = calculateStars(level, score, nextShots, runBestCombo, timeSec);
       setEarnedStars(stars);
-      setLevelStars(levelId, stars);
-      reportQuestProgress({ levelCleared: true, starsEarned: stars });
-      unlockLevel(getNextLevel(levelId)?.id ?? levelId + 1);
+      if (mode === "campaign") {
+        setLevelStars(levelId, stars);
+        reportQuestProgress({ levelCleared: true, starsEarned: stars });
+        unlockLevel(getNextLevel(levelId)?.id ?? levelId + 1);
+      }
       trackLevelWin(levelId, score, nextShots, nextHighest, mode);
       if (mode !== "campaign") setChallengeBestScore(mode, score);
       beginStageClear(
@@ -4267,9 +4329,11 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
           const timeSec = (Date.now() - startTimeRef.current) / 1000;
           const stars = calculateStars(level, nextScore, nextShots, nextBestCombo, timeSec);
           setEarnedStars(stars);
-          setLevelStars(levelId, stars);
-          reportQuestProgress({ levelCleared: true, starsEarned: stars });
-          unlockLevel(getNextLevel(levelId)?.id ?? levelId + 1);
+          if (mode === "campaign") {
+            setLevelStars(levelId, stars);
+            reportQuestProgress({ levelCleared: true, starsEarned: stars });
+            unlockLevel(getNextLevel(levelId)?.id ?? levelId + 1);
+          }
           // Offer a choice — claim the win or keep playing for score.
           trackLevelWin(levelId, nextScore, nextShots, nextHighest, mode);
           if (mode !== "campaign") setChallengeBestScore(mode, nextScore);
@@ -4915,9 +4979,11 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
             timeSec,
           );
           setEarnedStars(stars);
-          setLevelStars(levelId, stars);
-          reportQuestProgress({ levelCleared: true, starsEarned: stars });
-          unlockLevel(getNextLevel(levelId)?.id ?? levelId + 1);
+          if (mode === "campaign") {
+            setLevelStars(levelId, stars);
+            reportQuestProgress({ levelCleared: true, starsEarned: stars });
+            unlockLevel(getNextLevel(levelId)?.id ?? levelId + 1);
+          }
           beginStageClear(
             {
               stars,
@@ -5140,9 +5206,11 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       const nextBestCombo = Math.max(runBestCombo, result.merges.length);
       const stars = calculateStars(level, nextScore, shots, nextBestCombo, timeSec);
       setEarnedStars(stars);
-      setLevelStars(levelId, stars);
-      reportQuestProgress({ levelCleared: true, starsEarned: stars });
-      unlockLevel(getNextLevel(levelId)?.id ?? levelId + 1);
+      if (mode === "campaign") {
+        setLevelStars(levelId, stars);
+        reportQuestProgress({ levelCleared: true, starsEarned: stars });
+        unlockLevel(getNextLevel(levelId)?.id ?? levelId + 1);
+      }
       if (mode !== "campaign") setChallengeBestScore(mode, nextScore);
       beginStageClear(
         {
@@ -7974,8 +8042,8 @@ function ResultModal({
   const claimableOptions = (Object.keys(POWER_UP_INVENTORY_META) as InventoryPowerUpId[]).filter(
     (id) => (claimablePowerUps[id] ?? 0) > 0,
   );
-  const scoreGoal = level.scoreGoal ?? (level.targetElement * 1000 * (level.scoreMultiplier ?? 1));
-  const shotGoal = level.starShotsTwo ?? (level.parShots ? level.parShots + 5 : 50);
+  const scoreGoal = getScoreStarGoal(level);
+  const shotGoal = getShotStarGoal(level);
   const scoreMet = score >= scoreGoal;
   const shotsMet = shots <= shotGoal;
   return (
@@ -8057,10 +8125,36 @@ function ResultModal({
         </div>
       )}
       {!isPowerUpPass && (
+        <div
+          style={{
+            display: "grid",
+            gap: 8,
+            background: "var(--surface)",
+            border: "1px solid var(--border)",
+            borderRadius: 12,
+            padding: 10,
+            marginBottom: 12,
+            textAlign: "left",
+          }}
+        >
+          <StarRequirementRow met label="Level cleared" detail="Finish the level objective" />
+          <StarRequirementRow
+            met={scoreMet}
+            label={`Over ${formatScore(scoreGoal)} points`}
+            detail={`You scored ${formatScore(score)}`}
+          />
+          <StarRequirementRow
+            met={shotsMet}
+            label={`${shotGoal} shots or fewer`}
+            detail={`You used ${shots} shot${shots === 1 ? "" : "s"}`}
+          />
+        </div>
+      )}
+      {!isPowerUpPass && (
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
           <ResultStat
             label="Score"
-            value={`${formatScore(score)} / ${formatScore(scoreGoal)}${scoreMet ? " (\u2605)" : ""}`}
+            value={`${formatScore(score)} / ${formatScore(scoreGoal)}`}
             color="var(--accent)"
           />
           <ResultStat
@@ -8070,7 +8164,7 @@ function ResultModal({
           />
           <ResultStat
             label="Shots"
-            value={`${shots} / ${shotGoal}${shotsMet ? " (\u2605)" : ""}`}
+            value={`${shots} / ${shotGoal}`}
             color="var(--foreground)"
           />
           <ResultStat label="Best Combo" value={`${bestCombo}`} color="var(--foreground)" />
@@ -8231,6 +8325,30 @@ function ResultModal({
         </button>
       </div>
     </Modal>
+  );
+}
+
+function StarRequirementRow({ met, label, detail }: { met: boolean; label: string; detail: string }) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "28px 1fr", gap: 8, alignItems: "center" }}>
+      <div
+        aria-hidden="true"
+        style={{
+          fontSize: 22,
+          lineHeight: 1,
+          color: met ? "var(--accent)" : "var(--muted-foreground)",
+          textAlign: "center",
+        }}
+      >
+        {met ? "\u2605" : "\u2606"}
+      </div>
+      <div>
+        <div style={{ fontSize: 13, fontWeight: 900, color: met ? "var(--foreground)" : "var(--muted-foreground)" }}>
+          {label}
+        </div>
+        <div style={{ fontSize: 11, color: "var(--muted-foreground)", marginTop: 2 }}>{detail}</div>
+      </div>
+    </div>
   );
 }
 
