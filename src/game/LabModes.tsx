@@ -13,6 +13,7 @@ import {
 import { useIsTabletLayout } from "./responsive";
 import { PowerUpBadge } from "./PowerUpLibrary";
 import { POWER_UP_UNLOCK_LEVELS } from "./powerUps";
+import { t } from "./localization";
 
 interface Props {
   onBack: () => void;
@@ -26,6 +27,7 @@ export function LabModes({ onBack, onStart }: Props) {
   const goldCoins = useProgress((s) => s.goldCoins);
   const labUpgradeLevels = useProgress((s) => s.labUpgradeLevels);
   const labUpgradeEnabled = useProgress((s) => s.labUpgradeEnabled);
+  const appLanguage = useProgress((s) => s.appLanguage);
   const refreshDailyFeatures = useProgress((s) => s.refreshDailyFeatures);
   const revealSecretCompound = useProgress((s) => s.revealSecretCompound);
   const upgradeLabPowerUp = useProgress((s) => s.upgradeLabPowerUp);
@@ -46,6 +48,7 @@ export function LabModes({ onBack, onStart }: Props) {
   );
   const [selectedUpgradeId, setSelectedUpgradeId] = useState<LabUpgradeId | null>(null);
   const activeUpgradeId = selectedUpgradeId && discoveredUpgradeIds.includes(selectedUpgradeId) ? selectedUpgradeId : discoveredUpgradeIds[0] ?? null;
+  const tr = (text: string) => t(text, appLanguage);
 
   function startDailyRound() {
     refreshDailyFeatures();
@@ -68,25 +71,25 @@ export function LabModes({ onBack, onStart }: Props) {
         </button>
         <header style={{ textAlign: "center", margin: "18px 0 20px" }}>
           <div style={{ fontSize: 12, letterSpacing: 3, color: "var(--accent)", fontWeight: 800 }}>
-            LAB EXPERIMENTS
+            {tr("LAB EXPERIMENTS")}
           </div>
           <h1 className="gold-text" style={{ margin: "6px 0", fontSize: 34 }}>
-            Game Modes
+            {tr("Game Modes")}
           </h1>
           <p style={{ color: "var(--muted-foreground)", fontSize: 13, margin: 0 }}>
-            Try campaign variants, challenge rules, and Survival.
+            {tr("Try campaign variants, challenge rules, and Survival.")}
           </p>
         </header>
         <section style={upgradePanel}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", marginBottom: 12 }}>
             <div>
-              <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--accent)", fontWeight: 900 }}>LAB UPGRADES</div>
-              <h2 style={{ margin: "4px 0 0", fontSize: 22 }}>Permanent Power-Up Research</h2>
+              <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--accent)", fontWeight: 900 }}>{tr("LAB UPGRADES")}</div>
+              <h2 style={{ margin: "4px 0 0", fontSize: 22 }}>{tr("Permanent Power-Up Research")}</h2>
             </div>
-            <div style={coinBalanceChip}>{goldCoins} coins</div>
+            <div style={coinBalanceChip}>{`${goldCoins} ${tr("coins")}`}</div>
           </div>
           <p style={{ margin: "0 0 12px", color: "var(--muted-foreground)", fontSize: 12, lineHeight: 1.45 }}>
-            Upgrade levels unlock at campaign levels 5, 10, 20, 35, and 50. Toggle a researched power-up off to disable its bonus effects.
+            {tr("Upgrade levels unlock at campaign levels 5, 10, 20, 35, and 50. Toggle a researched power-up off to disable its bonus effects.")}
           </p>
           {activeUpgradeId && (() => {
             const id = activeUpgradeId;
@@ -103,14 +106,14 @@ export function LabModes({ onBack, onStart }: Props) {
                   <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
                     <PowerUpBadge icon={id} size={42} />
                     <div>
-                      <h3 style={{ margin: 0, fontSize: 16 }}>{meta.name}</h3>
+                      <h3 style={{ margin: 0, fontSize: 16 }}>{tr(meta.name)}</h3>
                       <div style={{ marginTop: 3, color: "var(--muted-foreground)", fontSize: 11 }}>
-                        Level {level}/5 {labLevelCap <= level && level < 5 ? "- unlock next tier at campaign milestone" : ""}
+                        {`${tr("Level")} ${level}/5 ${labLevelCap <= level && level < 5 ? tr("- unlock next tier at campaign milestone") : ""}`}
                       </div>
                     </div>
                   </div>
                   <button type="button" onClick={() => toggleLabUpgrade(id)} style={{ ...toggleBtn, color: active ? "var(--accent)" : "var(--muted-foreground)" }}>
-                    {active ? "Active" : "Off"}
+                    {tr(active ? "Active" : "Off")}
                   </button>
                 </div>
                 <div style={upgradeProgressTrack}>
@@ -119,18 +122,18 @@ export function LabModes({ onBack, onStart }: Props) {
                 <div style={{ display: "grid", gap: 4, marginTop: 8 }}>
                   {activeBonuses.map((bonus, index) => (
                     <div key={bonus} style={{ color: index < level ? "var(--success, var(--accent))" : "var(--muted-foreground)", fontSize: 11, lineHeight: 1.25 }}>
-                      L{index + 1}: {bonus}
+                      {`${tr("L")}${index + 1}: ${tr(bonus)}`}
                     </div>
                   ))}
                   {futureBonuses.length > 0 && (
                     <details style={futureBonusDetails}>
-                      <summary style={futureBonusSummary}>Locked perks L{Math.max(2, level + 1)}-5</summary>
+                      <summary style={futureBonusSummary}>{tr(`Locked perks L${Math.max(2, level + 1)}-5`)}</summary>
                       <div style={{ display: "grid", gap: 4, marginTop: 6 }}>
                         {futureBonuses.map((bonus, index) => {
                           const bonusLevel = Math.max(1, level) + index + 1;
                           return (
                             <div key={bonus} style={{ color: "var(--muted-foreground)", fontSize: 11, lineHeight: 1.25 }}>
-                              L{bonusLevel}: {bonus}
+                              {`${tr("L")}${bonusLevel}: ${tr(bonus)}`}
                             </div>
                           );
                         })}
@@ -139,7 +142,7 @@ export function LabModes({ onBack, onStart }: Props) {
                   )}
                 </div>
                 <button type="button" disabled={!canUpgrade} onClick={() => upgradeLabPowerUp(id)} style={{ ...startBtn, marginTop: 10, opacity: canUpgrade ? 1 : 0.55 }}>
-                  {level >= 5 ? "Maxed" : nextCost == null ? "Locked" : `Upgrade - ${nextCost} coins`}
+                  {level >= 5 ? tr("Maxed") : nextCost == null ? tr("Locked") : `${tr("Upgrade")} - ${nextCost} ${tr("coins")}`}
                 </button>
               </article>
             );
@@ -153,7 +156,7 @@ export function LabModes({ onBack, onStart }: Props) {
               return (
                 <button key={id} type="button" onClick={() => setSelectedUpgradeId(id)} style={{ ...upgradePickerTile, ...(active ? upgradePickerTileActive : null) }}>
                   <PowerUpBadge icon={id} size={30} />
-                  <span style={{ marginTop: 6, fontWeight: 900, fontSize: 11, lineHeight: 1.1 }}>{meta.name}</span>
+                  <span style={{ marginTop: 6, fontWeight: 900, fontSize: 11, lineHeight: 1.1 }}>{tr(meta.name)}</span>
                   <span
                     style={{
                       marginTop: 3,
@@ -167,7 +170,7 @@ export function LabModes({ onBack, onStart }: Props) {
                       fontWeight: level > 0 ? 900 : 700,
                     }}
                   >
-                    {levelLabel}
+                    {tr(levelLabel)}
                   </span>
                 </button>
               );
@@ -185,9 +188,9 @@ export function LabModes({ onBack, onStart }: Props) {
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
-                    <h2 style={{ margin: 0, fontSize: 16 }}>{mode.name}</h2>
+                    <h2 style={{ margin: 0, fontSize: 16 }}>{tr(mode.name)}</h2>
                     <span style={{ color: "var(--accent)", fontSize: 11, fontWeight: 800 }}>
-                      {locked ? `Defeat Lv ${mode.unlockedAtLevel - 1}` : bossId ? "BOSS BATTLE" : mode.kind.toUpperCase()}
+                      {tr(locked ? `Defeat Lv ${mode.unlockedAtLevel - 1}` : bossId ? "BOSS BATTLE" : mode.kind.toUpperCase())}
                     </span>
                   </div>
                   <p
@@ -198,7 +201,7 @@ export function LabModes({ onBack, onStart }: Props) {
                       lineHeight: 1.45,
                     }}
                   >
-                    {mode.description}
+                    {tr(mode.description)}
                   </p>
                   <ul
                     style={{
@@ -209,19 +212,19 @@ export function LabModes({ onBack, onStart }: Props) {
                     }}
                   >
                     {mode.rules.map((rule) => (
-                      <li key={rule}>{rule}</li>
+                      <li key={rule}>{tr(rule)}</li>
                     ))}
                   </ul>
                   {mode.id === "daily-challenge" && !locked ? (
                     <div style={dailyChoiceGrid}>
                       <button type="button" onClick={startDailyRound} style={startBtn}>
-                        Round Challenge
+                        {tr("Round Challenge")}
                       </button>
                       <button type="button" onClick={startDailyCompound} style={{ ...startBtn, ...secondaryStartBtn }}>
-                        Compound Challenge
+                        {tr("Compound Challenge")}
                       </button>
                       <span style={dailyChoiceHint}>
-                        Reruns are allowed for records. The daily coin reward still pays only once.
+                        {tr("Reruns are allowed for records. The daily coin reward still pays only once.")}
                       </span>
                     </div>
                   ) : (
@@ -235,7 +238,7 @@ export function LabModes({ onBack, onStart }: Props) {
                       }
                       style={startBtn}
                     >
-                      {locked ? "Locked" : mode.id === "campaign" ? "Play Campaign" : bossId ? "Boss Battle" : "Start Mode"}
+                      {tr(locked ? "Locked" : mode.id === "campaign" ? "Play Campaign" : bossId ? "Boss Battle" : "Start Mode")}
                     </button>
                   )}
                 </div>

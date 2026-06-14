@@ -102,6 +102,26 @@ function translateTrimmed(text: string, language: AppLanguage): string | undefin
     return `${dictionary.Level ?? "Level"} ${levelSlash[1]} / ${levelSlash[2]}`;
   }
 
+  const labLevel = /^Lvl (\d+)\/5$/.exec(source);
+  if (labLevel) {
+    return `${dictionary.Lvl ?? "Lvl"} ${labLevel[1]}/5`;
+  }
+
+  const labLevelMax = /^Lvl 5 - Max$/.exec(source);
+  if (labLevelMax) {
+    return `${dictionary.Lvl ?? "Lvl"} 5 - ${dictionary.Max ?? "Max"}`;
+  }
+
+  const lockedPerks = /^Locked perks L(\d+)-5$/.exec(source);
+  if (lockedPerks) {
+    return `${dictionary["Locked perks"] ?? "Locked perks"} ${dictionary.L ?? "L"}${lockedPerks[1]}-5`;
+  }
+
+  const coinCount = /^(\d+) coins$/.exec(source);
+  if (coinCount) {
+    return `${coinCount[1]} ${dictionary.coins ?? "coins"}`;
+  }
+
   const levelRequirement = /^Level (\d+) \/ (.+)$/.exec(source);
   if (levelRequirement) {
     const requirement =
@@ -137,6 +157,11 @@ function translateTrimmed(text: string, language: AppLanguage): string | undefin
     return `${dictionary["Complete 4 of 6 quests to claim"] ?? "Complete 4 of 6 quests to claim"} ${dailyPrizeShort[1]} ${dictionary["gold coins."] ?? "gold coins."}`;
   }
 
+  const dailyTasksPrize = /^Complete 4 daily tasks to claim \+(\d+)\.$/.exec(source);
+  if (dailyTasksPrize) {
+    return `${dictionary["Complete 4 daily tasks to claim"] ?? "Complete 4 daily tasks to claim"} +${dailyTasksPrize[1]}.`;
+  }
+
   const resetsIn = /^Resets in (.+)$/.exec(source);
   if (resetsIn) {
     return `${dictionary["Resets in"] ?? "Resets in"} ${resetsIn[1]}`;
@@ -160,6 +185,11 @@ function translateTrimmed(text: string, language: AppLanguage): string | undefin
   const dayLabel = /^Day (\d+)$/.exec(source);
   if (dayLabel) {
     return `${dictionary.Day ?? "Day"} ${dayLabel[1]}`;
+  }
+
+  const fullPeriodLabel = /^Full Period (\d+)$/.exec(source);
+  if (fullPeriodLabel) {
+    return `${dictionary["Full Period"] ?? "Full Period"} ${fullPeriodLabel[1]}`;
   }
 
   const bonusDays = /^(\d+) days? to \+5 bonus coins$/.exec(source);
@@ -1712,3 +1742,4 @@ for (const [language, translations] of Object.entries(GLOBAL_TRANSLATION_EXTENSI
 >) {
   Object.assign(TRANSLATIONS[language] ?? (TRANSLATIONS[language] = {}), translations);
 }
+

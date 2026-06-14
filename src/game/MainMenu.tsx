@@ -30,6 +30,7 @@ import { initAds, showRewardedForCoin } from "./ads";
 import { getWeeklyPlayBonusView } from "./weeklyBonus";
 import { useIsTabletLayout } from "./responsive";
 import { DAILY_FEATURE_REWARD_COINS } from "./dailyFeatures";
+import { t } from "./localization";
 
 const POWER_UP_STAGE_LABELS: Record<PowerUpStageId, string> = {
   shimmer: "Merge the shimmering queued atom",
@@ -109,6 +110,7 @@ export function MainMenu({
     weeklyPlayBonus,
     dailyChallenge,
     secretCompound,
+    appLanguage,
     bestCombo,
     hasProPack,
     refreshDailyLab,
@@ -120,6 +122,7 @@ export function MainMenu({
     revealSecretCompound,
   } = useProgress();
   const highestEl = ELEMENTS[highestElement - 1];
+  const tr = (text: string) => t(text, appLanguage);
   const nextLevel = getLevelById(unlockedLevel) ?? LEVELS[LEVELS.length - 1];
   const nextRunGoal = getNextRunGoal(nextLevel);
   const completedDailyQuests = dailyQuests.filter((quest) => quest.completed).length;
@@ -320,8 +323,8 @@ export function MainMenu({
             <button type="button" onClick={onDailyChallenge} style={dailyFeatureBtn}>
               <span style={dailyFeatureIcon}><Trophy size={18} aria-hidden="true" /></span>
               <span style={dailyFeatureText}>
-                <strong>Daily Challenge</strong>
-                <small>{dailyChallenge.completed ? "Cleared today" : `Reward +${DAILY_FEATURE_REWARD_COINS}`}</small>
+                <strong style={dailyFeatureTextStrong}>{tr("Daily Challenge")}</strong>
+                <small>{tr(dailyChallenge.completed ? "Cleared today" : `Reward +${DAILY_FEATURE_REWARD_COINS}`)}</small>
               </span>
               <span style={dailyFeatureReward}>
                 {dailyChallenge.completed ? <CheckCircle2 size={18} aria-label="Completed" /> : <DailyGoldReward />}
@@ -330,13 +333,13 @@ export function MainMenu({
             <button type="button" onClick={handleSecretCompoundPress} style={dailyFeatureBtn}>
               <span style={dailyFeatureIcon}><CircleQuestionMark size={18} aria-hidden="true" /></span>
               <span style={dailyFeatureText}>
-                <strong>Secret Compound</strong>
+                <strong style={dailyFeatureTextStrong}>{tr("Secret Compound")}</strong>
                 <small>
-                  {secretCompound.completed
+                  {tr(secretCompound.completed
                     ? "Synthesized"
                     : secretCompound.revealed
                       ? "Clue unlocked"
-                      : `Reveal clue +${DAILY_FEATURE_REWARD_COINS}`}
+                      : `Reveal clue +${DAILY_FEATURE_REWARD_COINS}`)}
                 </small>
               </span>
               <span style={dailyFeatureReward}>
@@ -507,7 +510,7 @@ export function MainMenu({
                 {`Streak ${dailyStreak} - ${completedDailyQuests}/${dailyQuests.length} quests`}
               </div>
               <div style={{ fontSize: 11, color: "var(--muted-foreground)", marginTop: 2 }}>
-                {hasProPack ? "Pro daily quests include bonus gold." : "Complete 4 daily tasks to claim +3."}
+                {tr(hasProPack ? "Pro daily quests include bonus gold." : "Complete 4 daily tasks to claim +3.")}
               </div>
               <div style={{ fontSize: 10, color: "var(--accent)", marginTop: 4, fontWeight: 800, letterSpacing: 0.6 }}>
                 {`Resets in ${resetCountdown}`}
@@ -566,7 +569,7 @@ export function MainMenu({
                   <QuestIcon type={quest.type} completed={quest.completed} />
                 </span>
                 <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {quest.title}
+                  {tr(quest.title)}
                 </span>
                 <span style={questProgressWrap} aria-label={`${quest.progress} of ${quest.target}`}>
                   {quest.completed ? (
@@ -761,7 +764,7 @@ const dailyFeatureGrid: CSSProperties = {
 const dailyFeatureBtn: CSSProperties = {
   minWidth: 0,
   display: "grid",
-  gridTemplateColumns: "28px minmax(0, 1fr) auto",
+  gridTemplateColumns: "28px minmax(0, 1fr) 22px",
   alignItems: "center",
   gap: 8,
   border: "1px solid color-mix(in oklch, var(--primary) 45%, var(--border))",
@@ -789,12 +792,24 @@ const dailyFeatureText: CSSProperties = {
   gap: 2,
   fontSize: 11,
   lineHeight: 1.1,
+  overflow: "hidden",
+  wordBreak: "normal",
+  overflowWrap: "anywhere",
+};
+
+const dailyFeatureTextStrong: CSSProperties = {
+  minWidth: 0,
+  fontSize: "clamp(10px, 2.55vw, 11px)",
+  lineHeight: 1.05,
+  overflowWrap: "anywhere",
+  hyphens: "auto",
 };
 
 const dailyFeatureReward: CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
+  minWidth: 22,
   color: "var(--success, oklch(0.78 0.16 145))",
   fontWeight: 1000,
   fontSize: 13,

@@ -393,7 +393,7 @@ export function Collection({ onBack }: { onBack: () => void }) {
                     <div style={{ fontSize: 12, lineHeight: 1.45 }}>{tr(elementDetails.sample)}</div>
                   </div>
                 </div>
-                <p style={{ fontSize: 13, lineHeight: 1.55, margin: 0 }}>{el.fact}</p>
+                <p style={{ fontSize: 13, lineHeight: 1.55, margin: 0 }}>{tr(el.fact)}</p>
                 <div style={elementPropertyGrid}>
                   <ElementProperty label={tr("Molar mass")} value={elementDetails.molarMass} />
                   <ElementProperty label={tr("Phase")} value={tr(elementDetails.phase)} />

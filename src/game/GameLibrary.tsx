@@ -6,6 +6,7 @@ import { PowerUpBadge } from "./PowerUpLibrary";
 import { POWER_UPS } from "./powerUps";
 import { useProgress } from "./store";
 import { useIsTabletLayout } from "./responsive";
+import { t } from "./localization";
 
 interface Props {
   onBack: () => void;
@@ -15,7 +16,9 @@ export function GameLibrary({ onBack }: Props) {
   const isTabletLayout = useIsTabletLayout();
   const unlockedLevel = useProgress((s) => s.unlockedLevel);
   const levelStats = useProgress((s) => s.levelStats);
+  const appLanguage = useProgress((s) => s.appLanguage);
   const [tab, setTab] = useState<"challenges" | "powerups" | "bosses">("powerups");
+  const tr = (text: string) => t(text, appLanguage);
   const powerUpsByOccurrence = [...POWER_UPS].sort(
     (a, b) => POWER_UP_OCCURRENCE[a.icon] - POWER_UP_OCCURRENCE[b.icon],
   );
@@ -28,13 +31,13 @@ export function GameLibrary({ onBack }: Props) {
         </button>
         <header style={{ textAlign: "center", margin: "18px 0 20px" }}>
           <div style={{ fontSize: 12, letterSpacing: 3, color: "var(--accent)", fontWeight: 900 }}>
-            GAME LIBRARY
+            {tr("GAME LIBRARY")}
           </div>
           <h1 className="gold-text" style={{ margin: "6px 0", fontSize: 34 }}>
-            Challenges & Power-Ups
+            {tr("Challenges & Power-Ups")}
           </h1>
           <p style={{ color: "var(--muted-foreground)", fontSize: 13, margin: 0 }}>
-            Browse every challenge rule set and learn what each lab tool does.
+            {tr("Browse every challenge rule set and learn what each lab tool does.")}
           </p>
         </header>
 
@@ -43,19 +46,19 @@ export function GameLibrary({ onBack }: Props) {
             onClick={() => setTab("powerups")}
             style={{ ...tabBtn, ...(tab === "powerups" ? tabBtnActive : {}) }}
           >
-            Power-Ups
+            {tr("Power-Ups")}
           </button>
           <button
             onClick={() => setTab("challenges")}
             style={{ ...tabBtn, ...(tab === "challenges" ? tabBtnActive : {}) }}
           >
-            Challenges
+            {tr("Challenges")}
           </button>
           <button
             onClick={() => setTab("bosses")}
             style={{ ...tabBtn, ...(tab === "bosses" ? tabBtnActive : {}) }}
           >
-            Bosses
+            {tr("Bosses")}
           </button>
         </div>
 
@@ -71,15 +74,15 @@ export function GameLibrary({ onBack }: Props) {
                   </div>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
-                      <h2 style={{ margin: 0, fontSize: 16 }}>{mode.name}</h2>
+                      <h2 style={{ margin: 0, fontSize: 16 }}>{tr(mode.name)}</h2>
                       <span style={{ color: "var(--accent)", fontSize: 11, fontWeight: 900 }}>
-                        {locked ? `UNLOCKS LV ${mode.unlockedAtLevel}` : mode.kind.toUpperCase()}
+                        {tr(locked ? `UNLOCKS LV ${mode.unlockedAtLevel}` : mode.kind.toUpperCase())}
                       </span>
                     </div>
-                    <p style={description}>{mode.description}</p>
+                    <p style={description}>{tr(mode.description)}</p>
                     <ul style={rulesList}>
                       {mode.rules.map((rule) => (
-                        <li key={rule}>{rule}</li>
+                        <li key={rule}>{tr(rule)}</li>
                       ))}
                     </ul>
                   </div>
@@ -100,11 +103,11 @@ export function GameLibrary({ onBack }: Props) {
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
-                    <h2 style={{ margin: 0, fontSize: 16 }}>{powerUp.name}</h2>
+                    <h2 style={{ margin: 0, fontSize: 16 }}>{tr(powerUp.name)}</h2>
                   </div>
-                  <p style={{ ...description, marginBottom: 0 }}>{powerUp.description}</p>
+                  <p style={{ ...description, marginBottom: 0 }}>{tr(powerUp.description)}</p>
                   <div style={{ color: "var(--accent)", fontSize: 11, fontWeight: 900 }}>
-                    {`Obtained: ${powerUp.unlock}`}
+                    {tr(`Obtained: ${powerUp.unlock}`)}
                   </div>
                 </div>
               </article>
@@ -126,16 +129,16 @@ export function GameLibrary({ onBack }: Props) {
                     </div>
                     <div style={{ flex: 1 }}>
                       <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
-                        <h2 style={{ margin: 0, fontSize: 16 }}>{defeated ? config.name : "Unknown Boss"}</h2>
+                        <h2 style={{ margin: 0, fontSize: 16 }}>{tr(defeated ? config.name : "Unknown Boss")}</h2>
                         <span style={{ color: "var(--accent)", fontSize: 11, fontWeight: 900 }}>
-                          {defeated ? `LEVEL ${config.levelId}` : `LOCKED LV ${config.levelId}`}
+                          {tr(defeated ? `LEVEL ${config.levelId}` : `LOCKED LV ${config.levelId}`)}
                         </span>
                       </div>
-                      <p style={description}>{defeated ? boss.lore : "Defeat this boss in Campaign to archive its field notes."}</p>
+                      <p style={description}>{tr(defeated ? boss.lore : "Defeat this boss in Campaign to archive its field notes.")}</p>
                       {defeated && (
                         <ul style={rulesList}>
                           {boss.mechanics.map((rule) => (
-                            <li key={rule}>{rule}</li>
+                            <li key={rule}>{tr(rule)}</li>
                           ))}
                         </ul>
                       )}
