@@ -616,13 +616,13 @@ export function Shop({ onBack }: { onBack: () => void }) {
           <button
             type="button"
             onClick={handleRewardedCoin}
-            disabled={hasProPack || appStorePurchaseBusy}
+            disabled={appStorePurchaseBusy}
             style={{
               ...shopButton,
               width: "100%",
               marginBottom: 10,
-              opacity: hasProPack || appStorePurchaseBusy ? 0.6 : 1,
-              cursor: hasProPack || appStorePurchaseBusy ? "not-allowed" : "pointer",
+              opacity: appStorePurchaseBusy ? 0.6 : 1,
+              cursor: appStorePurchaseBusy ? "not-allowed" : "pointer",
             }}
           >
             <span
@@ -634,7 +634,7 @@ export function Shop({ onBack }: { onBack: () => void }) {
               }}
             >
               <Clapperboard size={18} aria-hidden="true" />
-              {pendingProductId === "rewarded" ? "Loading ad..." : "Watch rewarded ad for +1 coin"}
+              {pendingProductId === "rewarded" ? "Loading ad..." : "Free coins"}
             </span>
           </button>
           <div

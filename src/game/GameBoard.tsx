@@ -2489,7 +2489,11 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       setStageClearFx(null);
       // Small extra beat so the fade-out of the animation completes before
       // the score modal mounts on top.
-      setWinChoice(stats);
+      if (mode === "daily-challenge") {
+        setWon(true);
+      } else {
+        setWinChoice(stats);
+      }
       setBusy(false);
       stageClearTimeoutRef.current = null;
     }, STAGE_CLEAR_ANIMATION_MS + 400);

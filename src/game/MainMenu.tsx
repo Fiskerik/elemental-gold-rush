@@ -207,7 +207,7 @@ export function MainMenu({
     onSecretCompound();
   }
   async function handleRewardedCoin() {
-    if (rewardedAdBusy || hasProPack) return;
+    if (rewardedAdBusy) return;
     setRewardedAdBusy(true);
     showRewardedAdMessage("Loading ad...", false);
     try {
@@ -351,11 +351,11 @@ export function MainMenu({
           <button
             type="button"
             onClick={handleRewardedCoin}
-            disabled={hasProPack || rewardedAdBusy}
+            disabled={rewardedAdBusy}
             style={{
               ...rewardedAdBtn,
-              opacity: hasProPack || rewardedAdBusy ? 0.58 : 1,
-              cursor: hasProPack || rewardedAdBusy ? "not-allowed" : "pointer",
+              opacity: rewardedAdBusy ? 0.58 : 1,
+              cursor: rewardedAdBusy ? "not-allowed" : "pointer",
             }}
           >
             <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>

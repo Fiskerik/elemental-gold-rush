@@ -3,7 +3,6 @@ import {
   AdMob,
   InterstitialAdPluginEvents,
   RewardAdPluginEvents,
-  type AdMobRewardItem,
 } from "@capacitor-community/admob";
 
 export type RewardedAdResult = {
@@ -70,17 +69,9 @@ function removeAdListener(handle: PluginListenerHandle | null): void {
   void handle.remove().catch(() => {});
 }
 
-function isRewardedResponse(reward: AdMobRewardItem | undefined): boolean {
-  if (!reward) return false;
-  if (typeof reward.amount === "number") return reward.amount > 0;
-  if (typeof reward.amount === "string") return Number(reward.amount) > 0;
-  return Boolean(reward.type);
-}
-
 async function waitForRewardedCompletion(): Promise<RewardedAdResult> {
   const handles: PluginListenerHandle[] = [];
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
-  let dismissed = false;
   let settled = false;
 
   return new Promise<RewardedAdResult>((resolve) => {
@@ -97,46 +88,45 @@ async function waitForRewardedCompletion(): Promise<RewardedAdResult> {
     };
 
     void (async () => {
-      const rewardedHandle = await addAdListener(RewardAdPluginEvents.Rewarded, () => {
-        rewardedEarned = true;
-        finish({ rewarded: true });
-      });
-      if (rewardedHandle) handles.push(rewardedHandle);
-
-      const failedHandle = await addAdListener(RewardAdPluginEvents.FailedToShow, (error) => {
-        const reason = describeAdError(error) || "Rewarded ad could not be shown.";
-        lastRewardedError = reason;
-        finish({ rewarded: false, reason });
-      });
-      if (failedHandle) handles.push(failedHandle);
-
-      const dismissedHandle = await addAdListener(RewardAdPluginEvents.Dismissed, () => {
-        dismissed = true;
-        setTimeout(() => {
-          if (!rewardedEarned) {
-            finish({ rewarded: false, reason: "The ad closed before a reward was granted." });
-          }
-        }, 500);
-      });
-      if (dismissedHandle) handles.push(dismissedHandle);
-
-      timeoutId = setTimeout(() => {
-        finish({
-          rewarded: false,
-          reason: "Timed out waiting for the rewarded ad to finish. Try again shortly.",
-        });
-      }, 120_000);
-
       try {
-        const reward = await AdMob.showRewardVideoAd();
-        if (rewardedEarned || isRewardedResponse(reward)) {
+        const rewardedHandle = await addAdListener(RewardAdPluginEvents.Rewarded, () => {
+          rewardedEarned = true;
+          finish({ rewarded: true });
+        });
+        if (rewardedHandle) handles.push(rewardedHandle);
+
+        const failedHandle = await addAdListener(RewardAdPluginEvents.FailedToShow, (error) => {
+          const reason = describeAdError(error) || "Rewarded ad could not be shown.";
+          lastRewardedError = reason;
+          finish({ rewarded: false, reason });
+        });
+        if (failedHandle) handles.push(failedHandle);
+
+        const dismissedHandle = await addAdListener(RewardAdPluginEvents.Dismissed, () => {
+          setTimeout(() => {
+            if (!rewardedEarned) {
+              finish({ rewarded: false, reason: "The ad closed before a reward was granted." });
+            }
+          }, 3_000);
+        });
+        if (dismissedHandle) handles.push(dismissedHandle);
+
+        timeoutId = setTimeout(() => {
+          finish({
+            rewarded: false,
+            reason: "Timed out waiting for the rewarded ad to finish. Try again shortly.",
+          });
+        }, 120_000);
+
+        await AdMob.showRewardVideoAd();
+        if (rewardedEarned) {
           finish({ rewarded: true });
           return;
         }
-        finish({
-          rewarded: false,
-          reason: dismissed ? "The ad closed before a reward was granted." : "Rewarded ad finished without a reward callback.",
-        });
+        // The native plugin resolves showRewardVideoAd only from the
+        // on-user-earned-reward handler. Some mediated networks provide a
+        // zero/empty reward payload, so a resolved call is still a valid reward.
+        finish({ rewarded: true });
       } catch (error) {
         const reason = describeAdError(error) || lastRewardedError || "Rewarded ad could not be shown.";
         lastRewardedError = reason;
@@ -255,10 +245,7 @@ export async function showInterstitialIfReady(hasProPack: boolean): Promise<bool
   }
 }
 
-export async function showRewardedForCoin(hasProPack: boolean): Promise<RewardedAdResult> {
-  if (hasProPack) {
-    return { rewarded: false, reason: "Rewarded ads are disabled for the Pro Lab Pack." };
-  }
+export async function showRewardedForCoin(_hasProPack: boolean): Promise<RewardedAdResult> {
   if (!Capacitor.isNativePlatform()) {
     return { rewarded: false, reason: "Rewarded ads are available in the iPhone app." };
   }
