@@ -132,7 +132,7 @@ const POWER_UP_CLEAR_DELAY_MS = 2000;
 const DAILY_COMPOUND_GRID_COLS = 10;
 const DAILY_COMPOUND_GRID_ROWS = 15;
 const TIME_STAR_LIMIT_SEC = 5 * 60;
-const TARGET_BAND_QUEUE_CHANCE = 0.2;
+const TARGET_BAND_QUEUE_CHANCE = 0.15;
 
 function mergeComboCueDelay(index: number): number {
   return index * MERGE_COMBO_SOUND_STEP_MS;
@@ -845,7 +845,7 @@ function DailyCompoundGridBoard({
     recordCompoundDiscovery(compound.id);
     addScore(score);
     recordGameAttemptForAd();
-    const awarded = completeSecretCompound([compound.id]);
+    const awarded = completeSecretCompound([compound.id], score);
     const formedIds = selectedCells.map((cell) => cell.id);
     setRevealedIds(new Set(formedIds));
     setSelectedIds(new Set(formedIds));
@@ -3360,6 +3360,9 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
         return { ...b, stoneHp: newHp, r: Math.max(initialR * 0.35, initialR * (newHp / maxHp)) };
       })
       .filter((b): b is Ball => b !== null);
+    if (destroyedCount > 0) {
+      reportQuestProgress({ stonesDestroyed: destroyedCount });
+    }
     return { balls: ballsAfterDamage, bonus, hitIds, destroyedCount };
   }
 
@@ -3864,6 +3867,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
           grantFusionJump(1);
           spawnPopup("Blank + Fusion Jump");
         }
+        reportQuestProgress({ stonesDestroyed: 1 });
         spawnPopup("✦ STONE ERASED");
         haptic([30, 60, 30, 90]);
         setBusy(false);
@@ -3924,6 +3928,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
         if (newHp <= 0) {
           directStoneBonus = stoneDestroyBonus(maxHp);
           grantFusionJump(fusionJumpRewardForStoneDestroy(1));
+          reportQuestProgress({ stonesDestroyed: 1 });
           spawnPopup(`⛰ +${formatScore(directStoneBonus)}`);
           haptic([40, 60, 40, 60, 100]);
         } else {
@@ -4051,6 +4056,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
             }
             if (totalBonus > 0) {
               grantFusionJump(fusionJumpRewardForStoneDestroy(destroyedCount));
+              reportQuestProgress({ stonesDestroyed: destroyedCount });
               if (!isPowerUpStage) {
                 setScore((s) => s + totalBonus);
                 addScore(totalBonus);
@@ -5630,6 +5636,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
                         borderRadius: 999,
                         background: "transparent",
                         cursor: "pointer",
+                        zIndex: read ? 1 : 3,
                         animation: read ? undefined : "icon-shimmer 1.5s ease-in-out infinite",
                       }}
                     >
@@ -8056,6 +8063,7 @@ function ResultModal({
   nextLabel?: string;
 }) {
   const [selectedSavePowerUp, setSelectedSavePowerUp] = useState<InventoryPowerUpId | null>(null);
+  const [selectedCompound, setSelectedCompound] = useState<CompoundDefinition | null>(null);
   const formedCompoundDefinitions = formedCompounds
     .map((id) => COMPOUNDS.find((compound) => compound.id === id))
     .filter((compound): compound is CompoundDefinition => Boolean(compound));
@@ -8274,13 +8282,36 @@ function ResultModal({
           </div>
           <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
             {formedCompoundDefinitions.map((compound, index) => (
-              <div key={`${compound.id}-${index}`} style={{ width: 78, textAlign: "center" }}>
+              <button
+                key={`${compound.id}-${index}`}
+                type="button"
+                onClick={() => setSelectedCompound(compound)}
+                style={{
+                  width: 78,
+                  textAlign: "center",
+                  border: "none",
+                  background: "transparent",
+                  color: "var(--foreground)",
+                  padding: 0,
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                }}
+              >
                 <MoleculeVisual compound={compound} size={48} />
                 <div style={{ marginTop: 4, fontSize: 10, fontWeight: 900 }}>{compound.formula}</div>
-              </div>
+              </button>
             ))}
           </div>
         </div>
+      )}
+      {selectedCompound && (
+        <CompoundDiscoveryModal
+          compound={selectedCompound}
+          isNew={false}
+          count={1}
+          bonusScore={selectedCompound.bonusScore}
+          onClose={() => setSelectedCompound(null)}
+        />
       )}
       {onClaimPowerUp && !isPowerUpPass && (claimableOptions.length > 0 || claimedPowerUp) && (
         <div

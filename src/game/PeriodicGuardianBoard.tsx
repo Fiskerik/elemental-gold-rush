@@ -46,6 +46,7 @@ interface ProjectileAnim {
 
 interface BeamAnim {
   until: number;
+  atom: QueueAtom;
 }
 
 interface VictorySummary {
@@ -272,7 +273,10 @@ export function PeriodicGuardianBoard({ levelId, onExit, onWin, onMap = onExit, 
   const attemptsLeft = Math.max(0, config.maxShots - attemptsUsed);
   const healthPct = clamp(bossHealth / SUCCESS_TARGET, 0, 1);
   const idleRemainingMs = Math.max(0, IDLE_BEAM_MS - (clock - lastPlayerActionRef.current));
-  const queueCurrent = queue[0] ?? { atom: GROUP_CONFIG.metals.atoms[0] ?? 3, group: "metals" as GuardianGroup };
+  const queueCurrent = useMemo<QueueAtom>(
+    () => queue[0] ?? { atom: GROUP_CONFIG.metals.atoms[0] ?? 3, group: "metals" },
+    [queue],
+  );
   const idlePct = clamp(idleRemainingMs / IDLE_BEAM_MS, 0, 1);
 
   const weakSpots = useMemo<WeakSpotPose[]>(() => {
@@ -356,14 +360,14 @@ export function PeriodicGuardianBoard({ levelId, onExit, onWin, onMap = onExit, 
     setBossFlash("beam");
     vibrate(20);
     const timeoutId = window.setTimeout(() => setBossFlash(null), 220);
-    setBeamAnim({ until: Date.now() + 420 });
+    setBeamAnim({ until: Date.now() + 420, atom: queueCurrent });
     setAttemptsUsed((current) => current + 1);
     setQueue((current) => {
       const [, ...rest] = current;
       return [...rest, drawQueueAtom(groupBagRef)];
     });
     return () => window.clearTimeout(timeoutId);
-  }, [attemptsLeft, idleRemainingMs, result]);
+  }, [attemptsLeft, idleRemainingMs, queueCurrent, result]);
 
   useEffect(() => {
     if (!beamAnim) return;
@@ -918,7 +922,7 @@ export function PeriodicGuardianBoard({ levelId, onExit, onWin, onMap = onExit, 
                   zIndex: 5,
                 }}
               >
-                <GroupBall atom={queueCurrent.atom} group={queueCurrent.group} size={44} />
+                <GroupBall atom={beamAnim.atom.atom} group={beamAnim.atom.group} size={44} />
               </div>
             </>
           )}

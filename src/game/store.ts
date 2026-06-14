@@ -218,11 +218,15 @@ interface ProgressState {
   labUpgradeEnabled: LabUpgradeEnabled;
   dailyChallenge: DailyChallengeState;
   secretCompound: SecretCompoundState;
+  dailyBoardRuns: number;
+  dailyBoardBestScore: number;
+  dailyCompoundRuns: number;
+  dailyCompoundBestScore: number;
   markTipSeen: (id: string) => void;
   refreshDailyFeatures: () => void;
   completeDailyChallenge: (score: number) => boolean;
   revealSecretCompound: () => void;
-  completeSecretCompound: (compoundIds: string[]) => boolean;
+  completeSecretCompound: (compoundIds: string[], score?: number) => boolean;
   upgradeLabPowerUp: (id: LabUpgradeId) => boolean;
   toggleLabUpgrade: (id: LabUpgradeId) => void;
   unlockLevel: (id: number) => void;
@@ -312,6 +316,10 @@ export const useProgress = create<ProgressState>()(
       labUpgradeEnabled: emptyLabUpgradeEnabled(),
       dailyChallenge: initialDailyChallenge,
       secretCompound: initialSecretCompound,
+      dailyBoardRuns: 0,
+      dailyBoardBestScore: 0,
+      dailyCompoundRuns: 0,
+      dailyCompoundBestScore: 0,
       markTipSeen: (id) =>
         set((s) => (s.seenTips.includes(id) ? s : { seenTips: [...s.seenTips, id] })),
       refreshDailyFeatures: () =>
@@ -332,6 +340,8 @@ export const useProgress = create<ProgressState>()(
           awarded = !dailyChallenge.rewardClaimed;
           return {
             dailyChallenge: nextChallenge,
+            dailyBoardRuns: s.dailyBoardRuns + 1,
+            dailyBoardBestScore: Math.max(s.dailyBoardBestScore, nextChallenge.bestScore),
             goldCoins: s.goldCoins + (awarded ? DAILY_FEATURE_REWARD_COINS : 0),
           };
         });
@@ -342,13 +352,14 @@ export const useProgress = create<ProgressState>()(
           const secretCompound = refreshSecretCompoundState(s.secretCompound);
           return { secretCompound: { ...secretCompound, revealed: true } };
         }),
-      completeSecretCompound: (compoundIds) => {
+      completeSecretCompound: (compoundIds, score) => {
         let awarded = false;
         set((s) => {
           const secretCompound = refreshSecretCompoundState(s.secretCompound);
           const completed = compoundIds.includes(secretCompound.compoundId);
           if (!completed) return { secretCompound };
           awarded = !secretCompound.rewardClaimed;
+          const scoredRun = typeof score === "number";
           return {
             secretCompound: {
               ...secretCompound,
@@ -356,6 +367,10 @@ export const useProgress = create<ProgressState>()(
               completed: true,
               rewardClaimed: true,
             },
+            dailyCompoundRuns: s.dailyCompoundRuns + (scoredRun ? 1 : 0),
+            dailyCompoundBestScore: scoredRun
+              ? Math.max(s.dailyCompoundBestScore, Math.max(0, Math.floor(score)))
+              : s.dailyCompoundBestScore,
             goldCoins: s.goldCoins + (awarded ? DAILY_FEATURE_REWARD_COINS : 0),
             dailyQuests: applyQuestProgress(s.dailyQuests, { secretCompoundCleared: true }),
           };
@@ -716,6 +731,10 @@ export const useProgress = create<ProgressState>()(
           labUpgradeEnabled: emptyLabUpgradeEnabled(),
           dailyChallenge: createDailyChallenge(),
           secretCompound: createSecretCompound(),
+          dailyBoardRuns: 0,
+          dailyBoardBestScore: 0,
+          dailyCompoundRuns: 0,
+          dailyCompoundBestScore: 0,
         })),
     }),
     {
@@ -766,6 +785,11 @@ export const useProgress = create<ProgressState>()(
           labUpgradeEnabled: normalizeLabUpgradeEnabled(persistedState?.labUpgradeEnabled),
           dailyChallenge: refreshDailyChallengeState(persistedState?.dailyChallenge ?? current.dailyChallenge),
           secretCompound: refreshSecretCompoundState(persistedState?.secretCompound ?? current.secretCompound),
+          dailyBoardRuns: persistedState?.dailyBoardRuns ?? current.dailyBoardRuns,
+          dailyBoardBestScore: persistedState?.dailyBoardBestScore ?? current.dailyBoardBestScore,
+          dailyCompoundRuns: persistedState?.dailyCompoundRuns ?? current.dailyCompoundRuns,
+          dailyCompoundBestScore:
+            persistedState?.dailyCompoundBestScore ?? current.dailyCompoundBestScore,
         } as ProgressState;
       },
     },

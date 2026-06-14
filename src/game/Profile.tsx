@@ -42,9 +42,12 @@ export function Profile({ onBack }: Props) {
     levelStats,
     challengeBestScores,
     hasProPack,
+    dailyBoardRuns,
+    dailyBoardBestScore,
+    dailyCompoundRuns,
+    dailyCompoundBestScore,
     appTheme,
     appLanguage,
-    setUnlockedLevel,
     setAppTheme,
     setAppLanguage,
   } = useProgress();
@@ -76,20 +79,6 @@ export function Profile({ onBack }: Props) {
   const unlockedBossCount = bossIds.filter((id) => unlockedLevel >= BOSSES[id].levelId).length;
   const defeatedBossCount = bossIds.filter((id) => (levelStats[BOSSES[id].levelId]?.bestShots ?? null) != null).length;
   const exactScore = (score: number) => numberFormatter.format(Math.max(0, Math.floor(score)));
-
-  function handleUnlockAllStages() {
-    if (unlockedLevel >= MAX_LEVEL) {
-      setUnlockedLevel(1);
-      return;
-    }
-    const entered = window.prompt(tr("Enter unlock password"));
-    if (entered == null) return;
-    if (entered === "MussePigg14!") {
-      setUnlockedLevel(MAX_LEVEL);
-      return;
-    }
-    window.alert(tr("Wrong password."));
-  }
 
   return (
     <div
@@ -159,14 +148,21 @@ export function Profile({ onBack }: Props) {
             />
             <RecordRow icon={Atom} label={tr("Atoms unlocked")} value={`${discoveredElements.length}/${ELEMENTS.length}`} sub={`${completionPercent}%`} />
             <RecordRow icon={FlaskConical} label={tr("Compounds unlocked")} value={`${discoveredCompounds.length}/${COMPOUNDS.length}`} sub={`${compoundPercent}%`} />
+            <RecordRow
+              icon={CalendarDays}
+              label={tr("Daily Board")}
+              value={exactScore(dailyBoardBestScore)}
+              sub={`${dailyBoardRuns} ${tr("played all time")}`}
+            />
+            <RecordRow
+              icon={FlaskConical}
+              label={tr("Daily Compound")}
+              value={exactScore(dailyCompoundBestScore)}
+              sub={`${dailyCompoundRuns} ${tr("played all time")}`}
+            />
             <RecordRow icon={Orbit} label={tr("Bosses unlocked")} value={`${unlockedBossCount}/${bossIds.length}`} sub={`${defeatedBossCount} defeated`} />
             <RecordRow icon={BadgeCheck} label={tr("Badges earned")} value={`${earnedBadges.length}`} />
             <RecordRow icon={Medal} label={tr("Campaign levels unlocked")} value={`${unlockedLevel}/${MAX_LEVEL}`} />
-            {unlockedLevel < MAX_LEVEL && (
-              <button type="button" onClick={handleUnlockAllStages} style={profileActionButton}>
-                {tr("Unlock all stages")}
-              </button>
-            )}
           </div>
         </section>
 
@@ -515,17 +511,6 @@ const languageSelect: React.CSSProperties = {
   fontWeight: 800,
   fontFamily: "inherit",
   cursor: "pointer",
-};
-
-const profileActionButton: React.CSSProperties = {
-  border: "none",
-  borderRadius: 12,
-  padding: "12px 16px",
-  background: "linear-gradient(135deg, var(--primary), oklch(0.55 0.15 230))",
-  color: "var(--primary-foreground)",
-  fontWeight: 900,
-  cursor: "pointer",
-  boxShadow: "0 4px 16px var(--primary-glow)",
 };
 
 const sectionHeading: React.CSSProperties = {

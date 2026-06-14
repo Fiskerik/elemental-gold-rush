@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import { ELEMENTS } from "./elements";
 import { useProgress } from "./store";
 import { ElementBall } from "./ElementBall";
@@ -6,6 +6,7 @@ import { BADGES, BADGE_GROUPS } from "./badges";
 import { COMPOUNDS, getCompoundHint, type CompoundDefinition } from "./compounds";
 import { MoleculeVisual } from "./MoleculeVisual";
 import { useIsTabletLayout } from "./responsive";
+import { getElementCollectionDetails } from "./elementDetails";
 
 export function Collection({ onBack }: { onBack: () => void }) {
   const isTabletLayout = useIsTabletLayout();
@@ -16,6 +17,7 @@ export function Collection({ onBack }: { onBack: () => void }) {
   const foundCompounds = new Set(discoveredCompounds);
   const earned = new Set(earnedBadges);
   const el = selected ? ELEMENTS[selected - 1] : null;
+  const elementDetails = el ? getElementCollectionDetails(el) : null;
 
   return (
     <div className="app-shell" style={{ padding: isTabletLayout ? 24 : 16, paddingBottom: isTabletLayout ? 40 : 32 }}>
@@ -373,8 +375,46 @@ export function Collection({ onBack }: { onBack: () => void }) {
             >
               {el.symbol} • #{el.atomicNumber} • {el.atomicMass}
             </div>
-            {found.has(el.atomicNumber) ? (
-              <p style={{ fontSize: 13, lineHeight: 1.55, margin: 0 }}>{el.fact}</p>
+            {found.has(el.atomicNumber) && elementDetails ? (
+              <div style={{ display: "grid", gap: 12 }}>
+                <div style={elementSampleCard}>
+                  <div
+                    style={{
+                      ...elementSampleSwatch,
+                      background: `radial-gradient(circle at 34% 26%, ${el.glowColor}, ${el.color} 55%, color-mix(in oklch, ${el.color}, black 35%))`,
+                    }}
+                  />
+                  <div>
+                    <div style={{ fontSize: 11, color: "var(--muted-foreground)", fontWeight: 800 }}>
+                      MATERIAL SAMPLE
+                    </div>
+                    <div style={{ fontSize: 12, lineHeight: 1.45 }}>{elementDetails.sample}</div>
+                  </div>
+                </div>
+                <p style={{ fontSize: 13, lineHeight: 1.55, margin: 0 }}>{el.fact}</p>
+                <div style={elementPropertyGrid}>
+                  <ElementProperty label="Molar mass" value={elementDetails.molarMass} />
+                  <ElementProperty label="Phase" value={elementDetails.phase} />
+                  <ElementProperty label="Melting point" value={elementDetails.meltingPoint ?? "Varies / not listed"} />
+                  <ElementProperty label="Boiling point" value={elementDetails.boilingPoint ?? "Varies / not listed"} />
+                  <ElementProperty label="Density" value={elementDetails.density ?? "Data not listed"} />
+                  <ElementProperty label="Period / group" value={`${el.period} / ${el.group ?? "-"}`} />
+                </div>
+                <div style={elementInfoBlock}>
+                  <strong>Uses</strong>
+                  <span>{elementDetails.uses.join(", ")}</span>
+                </div>
+                {elementDetails.compounds.length > 0 && (
+                  <div style={elementInfoBlock}>
+                    <strong>Known compounds</strong>
+                    <span>{elementDetails.compounds.join(", ")}</span>
+                  </div>
+                )}
+                <div style={elementInfoBlock}>
+                  <strong>Extra trivia</strong>
+                  <span>{elementDetails.trivia}</span>
+                </div>
+              </div>
             ) : (
               <p
                 style={{
@@ -446,3 +486,59 @@ export function Collection({ onBack }: { onBack: () => void }) {
     </div>
   );
 }
+
+function ElementProperty({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={elementPropertyCard}>
+      <span style={{ color: "var(--muted-foreground)", fontSize: 10, fontWeight: 800 }}>
+        {label}
+      </span>
+      <strong style={{ fontSize: 12 }}>{value}</strong>
+    </div>
+  );
+}
+
+const elementSampleCard: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "54px 1fr",
+  gap: 10,
+  alignItems: "center",
+  padding: 10,
+  borderRadius: 12,
+  border: "1px solid var(--border)",
+  background: "var(--surface)",
+};
+
+const elementSampleSwatch: CSSProperties = {
+  width: 54,
+  height: 54,
+  borderRadius: 14,
+  border: "1px solid color-mix(in oklch, var(--border), white 16%)",
+  boxShadow: "inset 0 -8px 14px rgba(0,0,0,0.28), 0 0 16px var(--accent-glow)",
+};
+
+const elementPropertyGrid: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+  gap: 8,
+};
+
+const elementPropertyCard: CSSProperties = {
+  display: "grid",
+  gap: 3,
+  padding: "8px 9px",
+  borderRadius: 10,
+  border: "1px solid var(--border)",
+  background: "var(--surface)",
+};
+
+const elementInfoBlock: CSSProperties = {
+  display: "grid",
+  gap: 4,
+  fontSize: 12,
+  lineHeight: 1.45,
+  padding: "9px 10px",
+  borderRadius: 10,
+  background: "color-mix(in oklch, var(--accent) 8%, var(--surface))",
+  border: "1px solid color-mix(in oklch, var(--accent) 24%, var(--border))",
+};

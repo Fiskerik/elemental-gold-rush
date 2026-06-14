@@ -200,10 +200,6 @@ export function MainMenu({
 
   function handleSecretCompoundPress() {
     revealSecretCompound();
-    if (secretCompound.completed) {
-      showDailyRewardToast("Secret Compound complete");
-      return;
-    }
     onSecretCompound();
   }
   async function handleRewardedCoin() {

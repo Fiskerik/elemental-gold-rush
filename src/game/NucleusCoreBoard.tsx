@@ -37,6 +37,7 @@ interface OrbitPose extends Point {
 interface AttackAnim {
   id: string;
   atom: number;
+  destroyedAtom: number;
   startedAt: number;
   durationMs: number;
 }
@@ -443,20 +444,22 @@ export function NucleusCoreBoard({ levelId, onExit, onWin, onMap = onExit, mode 
     setAttackAnim({
       id: attackAtom.id,
       atom: attackAtom.atom,
+      destroyedAtom: currentShot,
       startedAt: clock,
       durationMs: 520,
     });
     vibrate(22);
     const timeoutId = window.setTimeout(() => setBossFlash(null), 240);
     return () => window.clearTimeout(timeoutId);
-  }, [attackAnim, clock, coreAtoms, result]);
+  }, [attackAnim, clock, coreAtoms, currentShot, result]);
 
   useEffect(() => {
     if (!attackAnim) return;
     if (clock >= attackAnim.startedAt + attackAnim.durationMs) {
+      consumeQueue(coreAtoms.map((item) => item.atom));
       setAttackAnim(null);
     }
-  }, [attackAnim, clock]);
+  }, [attackAnim, clock, consumeQueue, coreAtoms]);
 
   useEffect(() => {
     if (result || projectileRef.current || !level) return;
@@ -879,6 +882,18 @@ export function NucleusCoreBoard({ levelId, onExit, onWin, onMap = onExit, mode 
                   <ElementBall atomicNumber={attackAnim.atom} size={36} glow />
                 </div>
               )}
+              <div
+                className="guardian-vaporized-atom"
+                style={{
+                  position: "absolute",
+                  left: launcher.x - 22,
+                  top: launcher.y - 22,
+                  zIndex: 7,
+                  pointerEvents: "none",
+                }}
+              >
+                <ElementBall atomicNumber={attackAnim.destroyedAtom} size={44} glow />
+              </div>
             </>
           )}
 
