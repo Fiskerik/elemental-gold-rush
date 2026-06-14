@@ -103,20 +103,21 @@ async function waitForRewardedCompletion(): Promise<RewardedAdResult> {
         if (failedHandle) handles.push(failedHandle);
 
         const dismissedHandle = await addAdListener(RewardAdPluginEvents.Dismissed, () => {
-          setTimeout(() => {
-            if (!rewardedEarned) {
-              finish({ rewarded: false, reason: "The ad closed before a reward was granted." });
-            }
-          }, 3_000);
+          finish({ rewarded: true });
         });
         if (dismissedHandle) handles.push(dismissedHandle);
 
+        const showedHandle = await addAdListener(RewardAdPluginEvents.Showed, () => {
+          lastRewardedError = "";
+        });
+        if (showedHandle) handles.push(showedHandle);
+
         timeoutId = setTimeout(() => {
-          finish({
-            rewarded: false,
-            reason: "Timed out waiting for the rewarded ad to finish. Try again shortly.",
-          });
-        }, 120_000);
+          // Some mediated rewarded adapters never resolve the Capacitor call or
+          // emit the final reward/dismiss event. The ad was prepared and no
+          // native show failure arrived, so fail open and grant the opt-in coin.
+          finish({ rewarded: true });
+        }, 45_000);
 
         await AdMob.showRewardVideoAd();
         if (rewardedEarned) {

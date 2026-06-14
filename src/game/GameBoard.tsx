@@ -1368,6 +1368,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
   const [claimedResultPowerUp, setClaimedResultPowerUp] = useState<InventoryPowerUpId | null>(null);
   const runPowerUpsUsedRef = useRef(0);
   const powerUpStageCompletedRef = useRef(false);
+  const dailyTargetClearTriggeredRef = useRef(false);
   const [transmuteStagePending, setTransmuteStagePending] = useState(false);
   const [queueShuffleStagePending, setQueueShuffleStagePending] = useState(false);
   const runRecordedRef = useRef(false);
@@ -1791,6 +1792,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     setSecretCompoundFormulaRevealed(false);
     setInventoryPickerOpen(false);
     setConfirmAction(null);
+    dailyTargetClearTriggeredRef.current = false;
     setRestartNonce((nonce) => nonce + 1);
   }
 
@@ -1873,6 +1875,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
         setClaimedResultPowerUp(null);
         runPowerUpsUsedRef.current = saved.runPowerUpsUsed;
         powerUpStageCompletedRef.current = false;
+        dailyTargetClearTriggeredRef.current = false;
         setTransmuteStagePending(false);
         setQueueShuffleStagePending(false);
         runRecordedRef.current = false;
@@ -2049,6 +2052,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     setClaimedResultPowerUp(null);
     runPowerUpsUsedRef.current = 0;
     powerUpStageCompletedRef.current = false;
+    dailyTargetClearTriggeredRef.current = false;
     setTransmuteStagePending(false);
     setQueueShuffleStagePending(false);
     runRecordedRef.current = false;
@@ -2512,6 +2516,38 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     feedback({ type: "win" });
     showStageClearAnimation(pending.stats);
   }
+
+  useEffect(() => {
+    if (mode !== "daily-challenge") return;
+    if (dailyTargetClearTriggeredRef.current || highest < target) return;
+    if (busy || won || gameOver || isMoleculeChallenge || isPowerUpStage || continuingPastTarget) return;
+    if (stageClearFx || winChoice) return;
+
+    dailyTargetClearTriggeredRef.current = true;
+    const timeSec = (Date.now() - startTimeRef.current) / 1000;
+    const stars = calculateStars(level, score, shots, runBestCombo, timeSec);
+    setEarnedStars(stars);
+    trackLevelWin(levelId, score, shots, highest, mode);
+    setChallengeBestScore(mode, score);
+    beginStageClear({ stars, score, shots, bestCombo: runBestCombo });
+  }, [
+    busy,
+    continuingPastTarget,
+    gameOver,
+    highest,
+    isMoleculeChallenge,
+    isPowerUpStage,
+    level,
+    levelId,
+    mode,
+    runBestCombo,
+    score,
+    shots,
+    stageClearFx,
+    target,
+    winChoice,
+    won,
+  ]);
 
   function completePowerUpStage(stage: PowerUpStageId | undefined = powerUpStage, scoreOverride = score) {
     if (!stage || powerUpStageCompletedRef.current || won || gameOver) return;
