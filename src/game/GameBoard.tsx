@@ -1138,6 +1138,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     setChallengeBestScore,
     completeDailyChallenge,
     completeSecretCompound,
+    recordGameAttemptForAd,
     labUpgradeLevels,
     labUpgradeEnabled,
     powerUpInventory,
@@ -2516,38 +2517,6 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     feedback({ type: "win" });
     showStageClearAnimation(pending.stats);
   }
-
-  useEffect(() => {
-    if (mode !== "daily-challenge") return;
-    if (dailyTargetClearTriggeredRef.current || highest < target) return;
-    if (busy || won || gameOver || isMoleculeChallenge || isPowerUpStage || continuingPastTarget) return;
-    if (stageClearFx || winChoice) return;
-
-    dailyTargetClearTriggeredRef.current = true;
-    const timeSec = (Date.now() - startTimeRef.current) / 1000;
-    const stars = calculateStars(level, score, shots, runBestCombo, timeSec);
-    setEarnedStars(stars);
-    trackLevelWin(levelId, score, shots, highest, mode);
-    setChallengeBestScore(mode, score);
-    beginStageClear({ stars, score, shots, bestCombo: runBestCombo });
-  }, [
-    busy,
-    continuingPastTarget,
-    gameOver,
-    highest,
-    isMoleculeChallenge,
-    isPowerUpStage,
-    level,
-    levelId,
-    mode,
-    runBestCombo,
-    score,
-    shots,
-    stageClearFx,
-    target,
-    winChoice,
-    won,
-  ]);
 
   function completePowerUpStage(stage: PowerUpStageId | undefined = powerUpStage, scoreOverride = score) {
     if (!stage || powerUpStageCompletedRef.current || won || gameOver) return;
@@ -4363,7 +4332,15 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
           failPowerUpStage("FUSION JUMP MISSED");
           return;
         }
-        if (result.levelComplete && !isMoleculeChallenge && !isPowerUpStage && !continuingPastTarget) {
+        const dailyTargetReached =
+          isDailyAtomChallenge && nextHighest >= target && !dailyTargetClearTriggeredRef.current;
+        if (
+          (result.levelComplete || dailyTargetReached) &&
+          !isMoleculeChallenge &&
+          !isPowerUpStage &&
+          !continuingPastTarget
+        ) {
+          if (isDailyAtomChallenge) dailyTargetClearTriggeredRef.current = true;
           const timeSec = (Date.now() - startTimeRef.current) / 1000;
           const stars = calculateStars(level, nextScore, nextShots, nextBestCombo, timeSec);
           setEarnedStars(stars);
@@ -5007,7 +4984,15 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     setTimeout(
       () => {
         setHighlightId(null);
-        if (result.levelComplete && !isMoleculeChallenge && !isPowerUpStage && !continuingPastTarget) {
+        const dailyTargetReached =
+          isDailyAtomChallenge && nextHighest >= target && !dailyTargetClearTriggeredRef.current;
+        if (
+          (result.levelComplete || dailyTargetReached) &&
+          !isMoleculeChallenge &&
+          !isPowerUpStage &&
+          !continuingPastTarget
+        ) {
+          if (isDailyAtomChallenge) dailyTargetClearTriggeredRef.current = true;
           const timeSec = (Date.now() - startTimeRef.current) / 1000;
           const stars = calculateStars(
             level,
@@ -5511,7 +5496,11 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
               {getModeLevelLabel(gameMode, level)}
             </div>
             <div style={{ fontSize: 14, fontWeight: 700 }}>
-              {gameMode.id === "campaign" ? level.name : `${gameMode.emoji} ${gameMode.name}`}
+              {gameMode.id === "campaign"
+                ? level.name
+                : gameMode.emoji
+                  ? `${gameMode.emoji} ${gameMode.name}`
+                  : gameMode.name}
             </div>
             <div
               style={{

@@ -37,8 +37,8 @@ export const GAME_MODES: GameModeConfig[] = [
   },
   {
     id: "daily-challenge",
-    name: "Daily Challenge",
-    emoji: "D",
+    name: "Daily Board",
+    emoji: "",
     kind: "challenge",
     description: "Seeded daily Round and Compound challenges that can be replayed for better records.",
     unlockedAtLevel: 1,
