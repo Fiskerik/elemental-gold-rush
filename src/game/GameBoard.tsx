@@ -5512,7 +5512,11 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
               {getModeLevelLabel(gameMode, level)}
             </div>
             <div style={{ fontSize: 14, fontWeight: 700 }}>
-              {gameMode.id === "campaign" ? level.name : `${gameMode.emoji} ${gameMode.name}`}
+              {gameMode.id === "campaign"
+                ? level.name
+                : gameMode.emoji
+                  ? `${gameMode.emoji} ${gameMode.name}`
+                  : gameMode.name}
             </div>
             <div
               style={{
