@@ -4364,7 +4364,15 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
           failPowerUpStage("FUSION JUMP MISSED");
           return;
         }
-        if (result.levelComplete && !isMoleculeChallenge && !isPowerUpStage && !continuingPastTarget) {
+        const dailyTargetReached =
+          isDailyAtomChallenge && nextHighest >= target && !dailyTargetClearTriggeredRef.current;
+        if (
+          (result.levelComplete || dailyTargetReached) &&
+          !isMoleculeChallenge &&
+          !isPowerUpStage &&
+          !continuingPastTarget
+        ) {
+          if (isDailyAtomChallenge) dailyTargetClearTriggeredRef.current = true;
           const timeSec = (Date.now() - startTimeRef.current) / 1000;
           const stars = calculateStars(level, nextScore, nextShots, nextBestCombo, timeSec);
           setEarnedStars(stars);
