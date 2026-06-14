@@ -2518,38 +2518,6 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     showStageClearAnimation(pending.stats);
   }
 
-  useEffect(() => {
-    if (mode !== "daily-challenge") return;
-    if (dailyTargetClearTriggeredRef.current || highest < target) return;
-    if (busy || won || gameOver || isMoleculeChallenge || isPowerUpStage || continuingPastTarget) return;
-    if (stageClearFx || winChoice) return;
-
-    dailyTargetClearTriggeredRef.current = true;
-    const timeSec = (Date.now() - startTimeRef.current) / 1000;
-    const stars = calculateStars(level, score, shots, runBestCombo, timeSec);
-    setEarnedStars(stars);
-    trackLevelWin(levelId, score, shots, highest, mode);
-    setChallengeBestScore(mode, score);
-    beginStageClear({ stars, score, shots, bestCombo: runBestCombo });
-  }, [
-    busy,
-    continuingPastTarget,
-    gameOver,
-    highest,
-    isMoleculeChallenge,
-    isPowerUpStage,
-    level,
-    levelId,
-    mode,
-    runBestCombo,
-    score,
-    shots,
-    stageClearFx,
-    target,
-    winChoice,
-    won,
-  ]);
-
   function completePowerUpStage(stage: PowerUpStageId | undefined = powerUpStage, scoreOverride = score) {
     if (!stage || powerUpStageCompletedRef.current || won || gameOver) return;
     powerUpStageCompletedRef.current = true;
