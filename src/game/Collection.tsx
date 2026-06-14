@@ -7,10 +7,12 @@ import { COMPOUNDS, getCompoundHint, type CompoundDefinition } from "./compounds
 import { MoleculeVisual } from "./MoleculeVisual";
 import { useIsTabletLayout } from "./responsive";
 import { getElementCollectionDetails } from "./elementDetails";
+import { t } from "./localization";
 
 export function Collection({ onBack }: { onBack: () => void }) {
   const isTabletLayout = useIsTabletLayout();
-  const { discoveredElements, discoveredCompounds, compoundCounts, earnedBadges } = useProgress();
+  const { discoveredElements, discoveredCompounds, compoundCounts, earnedBadges, appLanguage } = useProgress();
+  const tr = (text: string) => t(text, appLanguage);
   const [selected, setSelected] = useState<number | null>(null);
   const [selectedCompound, setSelectedCompound] = useState<CompoundDefinition | null>(null);
   const found = new Set(discoveredElements);
@@ -360,7 +362,7 @@ export function Collection({ onBack }: { onBack: () => void }) {
                 textAlign: "center",
               }}
             >
-              {el.category.toUpperCase().replace("-", " ")}
+              {tr(el.category.toUpperCase().replace("-", " "))}
             </div>
             <div style={{ fontSize: 26, fontWeight: 800, textAlign: "center", marginTop: 4 }}>
               {el.name}
@@ -386,33 +388,33 @@ export function Collection({ onBack }: { onBack: () => void }) {
                   />
                   <div>
                     <div style={{ fontSize: 11, color: "var(--muted-foreground)", fontWeight: 800 }}>
-                      MATERIAL SAMPLE
+                      {tr("MATERIAL SAMPLE")}
                     </div>
-                    <div style={{ fontSize: 12, lineHeight: 1.45 }}>{elementDetails.sample}</div>
+                    <div style={{ fontSize: 12, lineHeight: 1.45 }}>{tr(elementDetails.sample)}</div>
                   </div>
                 </div>
                 <p style={{ fontSize: 13, lineHeight: 1.55, margin: 0 }}>{el.fact}</p>
                 <div style={elementPropertyGrid}>
-                  <ElementProperty label="Molar mass" value={elementDetails.molarMass} />
-                  <ElementProperty label="Phase" value={elementDetails.phase} />
-                  <ElementProperty label="Melting point" value={elementDetails.meltingPoint ?? "Varies / not listed"} />
-                  <ElementProperty label="Boiling point" value={elementDetails.boilingPoint ?? "Varies / not listed"} />
-                  <ElementProperty label="Density" value={elementDetails.density ?? "Data not listed"} />
-                  <ElementProperty label="Period / group" value={`${el.period} / ${el.group ?? "-"}`} />
+                  <ElementProperty label={tr("Molar mass")} value={elementDetails.molarMass} />
+                  <ElementProperty label={tr("Phase")} value={tr(elementDetails.phase)} />
+                  <ElementProperty label={tr("Melting point")} value={elementDetails.meltingPoint ?? tr("Varies / not listed")} />
+                  <ElementProperty label={tr("Boiling point")} value={elementDetails.boilingPoint ?? tr("Varies / not listed")} />
+                  <ElementProperty label={tr("Density")} value={elementDetails.density ?? tr("Data not listed")} />
+                  <ElementProperty label={tr("Period / group")} value={`${el.period} / ${el.group ?? "-"}`} />
                 </div>
                 <div style={elementInfoBlock}>
-                  <strong>Uses</strong>
-                  <span>{elementDetails.uses.join(", ")}</span>
+                  <strong>{tr("Uses")}</strong>
+                  <span>{elementDetails.uses.map(tr).join(", ")}</span>
                 </div>
                 {elementDetails.compounds.length > 0 && (
                   <div style={elementInfoBlock}>
-                    <strong>Known compounds</strong>
+                    <strong>{tr("Known compounds")}</strong>
                     <span>{elementDetails.compounds.join(", ")}</span>
                   </div>
                 )}
                 <div style={elementInfoBlock}>
-                  <strong>Extra trivia</strong>
-                  <span>{elementDetails.trivia}</span>
+                  <strong>{tr("Extra trivia")}</strong>
+                  <span>{tr(elementDetails.trivia)}</span>
                 </div>
               </div>
             ) : (
@@ -425,7 +427,7 @@ export function Collection({ onBack }: { onBack: () => void }) {
                   fontStyle: "italic",
                 }}
               >
-                Locked. Discover this element through fusion to unlock its facts.
+                {tr("Locked. Discover this element through fusion to unlock its facts.")}
               </p>
             )}
           </div>
@@ -463,16 +465,16 @@ export function Collection({ onBack }: { onBack: () => void }) {
               <MoleculeVisual compound={selectedCompound} size={104} locked={!foundCompounds.has(selectedCompound.id)} />
             </div>
             <div style={{ fontSize: 24, fontWeight: 900, textAlign: "center" }}>
-              {foundCompounds.has(selectedCompound.id) ? selectedCompound.name : "Unknown Compound"}
+              {foundCompounds.has(selectedCompound.id) ? selectedCompound.name : tr("Unknown Compound")}
             </div>
             <div style={{ fontSize: 16, fontWeight: 900, color: "var(--accent)", textAlign: "center", marginBottom: 12 }}>
               {foundCompounds.has(selectedCompound.id) ? selectedCompound.formula : "???"}
             </div>
             {foundCompounds.has(selectedCompound.id) && (
               <div style={{ fontSize: 12, color: "var(--accent)", textAlign: "center", marginBottom: 10 }}>
-                {`Found ${compoundCounts[selectedCompound.id] ?? 1} time${
+                {tr(`Found ${compoundCounts[selectedCompound.id] ?? 1} time${
                   (compoundCounts[selectedCompound.id] ?? 1) === 1 ? "" : "s"
-                }`}
+                }`)}
               </div>
             )}
             <p style={{ fontSize: 13, lineHeight: 1.55, margin: 0, color: "var(--foreground)" }}>

@@ -160,7 +160,7 @@ export function Profile({ onBack }: Props) {
               value={exactScore(dailyCompoundBestScore)}
               sub={`${dailyCompoundRuns} ${tr("played all time")}`}
             />
-            <RecordRow icon={Orbit} label={tr("Bosses unlocked")} value={`${unlockedBossCount}/${bossIds.length}`} sub={`${defeatedBossCount} defeated`} />
+            <RecordRow icon={Orbit} label={tr("Bosses unlocked")} value={`${unlockedBossCount}/${bossIds.length}`} sub={tr(`${defeatedBossCount} defeated`)} />
             <RecordRow icon={BadgeCheck} label={tr("Badges earned")} value={`${earnedBadges.length}`} />
             <RecordRow icon={Medal} label={tr("Campaign levels unlocked")} value={`${unlockedLevel}/${MAX_LEVEL}`} />
           </div>

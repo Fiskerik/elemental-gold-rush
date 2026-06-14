@@ -182,16 +182,16 @@ const KNOWN_PHYSICAL: Record<
 };
 
 const CATEGORY_USES: Record<Element["category"], string[]> = {
-  "alkali-metal": ["Reactive salts", "Specialty batteries", "Chemical synthesis"],
-  "alkaline-earth": ["Light alloys", "Minerals", "Industrial compounds"],
-  "transition-metal": ["Alloys", "Catalysts", "Electrical and structural materials"],
-  "post-transition": ["Low-melting alloys", "Coatings", "Electronics"],
-  metalloid: ["Semiconductors", "Glass and ceramics", "Specialty materials"],
-  "reactive-nonmetal": ["Biochemistry", "Industrial gases", "Organic and inorganic compounds"],
-  "noble-gas": ["Lighting", "Inert atmospheres", "Specialized lasers"],
-  lanthanide: ["Magnets", "Phosphors", "High-tech alloys"],
-  actinide: ["Nuclear fuels", "Research", "Dense specialty materials"],
-  unknown: ["Research chemistry", "Nuclear science", "Short-lived laboratory studies"],
+  "alkali-metal": ["Reactive salts", "Batteries", "Chemical synthesis"],
+  "alkaline-earth": ["Alloys", "Minerals", "Industrial compounds"],
+  "transition-metal": ["Alloys", "Catalysts", "Electronics"],
+  "post-transition": ["Alloys", "Coatings", "Electronics"],
+  metalloid: ["Semiconductors", "Glass and ceramics", "Electronics"],
+  "reactive-nonmetal": ["Biochemistry", "Industrial gases", "Chemical synthesis"],
+  "noble-gas": ["Lighting", "Inert atmospheres", "Lasers"],
+  lanthanide: ["Magnets", "Lighting", "Alloys"],
+  actinide: ["Nuclear fuels", "Research", "Nuclear science"],
+  unknown: ["Research chemistry", "Nuclear science", "Laboratory studies"],
 };
 
 function inferPhase(element: Element): string {
@@ -213,13 +213,10 @@ export function getElementCollectionDetails(element: Element): ElementPhysicalDe
     boilingPoint: known?.boilingPoint,
     density: known?.density,
     phase: known?.phase ?? inferPhase(element),
-    uses: known?.uses ?? CATEGORY_USES[element.category],
+    uses: CATEGORY_USES[element.category],
     compounds,
     trivia:
-      known?.trivia ??
       `${element.name} belongs to the ${element.category.replace("-", " ")} family in period ${element.period}.`,
-    sample:
-      known?.sample ??
-      `A collection sample would typically be shown as a ${element.category.replace("-", " ")} material specimen.`,
+    sample: `A collection sample would typically be shown as a ${element.category.replace("-", " ")} material specimen.`,
   };
 }

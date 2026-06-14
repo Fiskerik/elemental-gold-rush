@@ -76,6 +76,10 @@ function translateTrimmed(text: string, language: AppLanguage): string | undefin
   if (dictionary[text]) return dictionary[text];
   const source = text.replace(/\s+/g, " ");
   if (source !== text && dictionary[source]) return dictionary[source];
+  const lowerSource = source.toLowerCase();
+  if (source !== lowerSource && dictionary[lowerSource]) {
+    return source === source.toUpperCase() ? dictionary[lowerSource].toUpperCase() : dictionary[lowerSource];
+  }
 
   const arrowPrefix = /^([←→]) (.+)$/.exec(source);
   if (arrowPrefix) {
@@ -297,6 +301,67 @@ function translateTrimmed(text: string, language: AppLanguage): string | undefin
     return `${dictionary.Found ?? "Found"} ${foundCount[1]} ${foundCount[1] === "1" ? (dictionary.time ?? "time") : (dictionary.times ?? "times")}`;
   }
 
+  const playedAllTime = /^(\d+) played all time$/.exec(source);
+  if (playedAllTime) {
+    return `${playedAllTime[1]} ${dictionary["played all time"] ?? "played all time"}`;
+  }
+
+  const defeatedCount = /^(\d+) defeated$/.exec(source);
+  if (defeatedCount) {
+    return `${defeatedCount[1]} ${dictionary.defeated ?? "defeated"}`;
+  }
+
+  const rewardCoins = /^Reward \+(\d+)$/.exec(source);
+  if (rewardCoins) {
+    return `${dictionary.Reward ?? "Reward"} +${rewardCoins[1]}`;
+  }
+
+  const revealClueCoins = /^Reveal clue \+(\d+)$/.exec(source);
+  if (revealClueCoins) {
+    return `${dictionary["Reveal clue"] ?? "Reveal clue"} +${revealClueCoins[1]}`;
+  }
+
+  const goldCoinToast = /^\+(\d+) gold coins?$/.exec(source);
+  if (goldCoinToast) {
+    return `+${goldCoinToast[1]} ${goldCoinToast[1] === "1" ? (dictionary["gold coin"] ?? "gold coin") : (dictionary["gold coins"] ?? "gold coins")}`;
+  }
+
+  const goldCoinStreakToast = /^\+(\d+) gold coins? \(\+(\d+) streak bonus\)$/.exec(source);
+  if (goldCoinStreakToast) {
+    const coins =
+      goldCoinStreakToast[1] === "1"
+        ? (dictionary["gold coin"] ?? "gold coin")
+        : (dictionary["gold coins"] ?? "gold coins");
+    return `+${goldCoinStreakToast[1]} ${coins} (+${goldCoinStreakToast[2]} ${dictionary["streak bonus"] ?? "streak bonus"})`;
+  }
+
+  const shotsOrFewer = /^(\d+) shots? or fewer$/.exec(source);
+  if (shotsOrFewer) {
+    return `${shotsOrFewer[1]} ${dictionary["shots or fewer"] ?? "shots or fewer"}`;
+  }
+
+  const usedShots = /^You used (\d+) shots?$/.exec(source);
+  if (usedShots) {
+    return `${dictionary["You used"] ?? "You used"} ${usedShots[1]} ${usedShots[1] === "1" ? (dictionary.shot ?? "shot") : (dictionary.shots ?? "shots")}`;
+  }
+
+  const timeWas = /^Your time was (.+)$/.exec(source);
+  if (timeWas) {
+    return `${dictionary["Your time was"] ?? "Your time was"} ${timeWas[1]}`;
+  }
+
+  const formedBang = /^(.+) formed!$/.exec(source);
+  if (formedBang) {
+    return `${formedBang[1]} ${dictionary["formed!"] ?? "formed!"}`;
+  }
+
+  const alreadyDiscoveredCount = /^Already discovered - found (\d+) times?$/.exec(source);
+  if (alreadyDiscoveredCount) {
+    return `${dictionary["Already discovered"] ?? "Already discovered"} - ${dictionary.found ?? "found"} ${alreadyDiscoveredCount[1]} ${
+      alreadyDiscoveredCount[1] === "1" ? (dictionary.time ?? "time") : (dictionary.times ?? "times")
+    }`;
+  }
+
   const noCoins = /^You need (\d+) gold coins? to buy (.+)\.$/.exec(source);
   if (noCoins) {
     const item = translateTrimmed(noCoins[2], language) ?? noCoins[2];
@@ -313,6 +378,19 @@ function translateTrimmed(text: string, language: AppLanguage): string | undefin
   if (introducedAt) {
     const item = translateTrimmed(introducedAt[1], language) ?? introducedAt[1];
     return `${item} ${dictionary["is introduced at level"] ?? "is introduced at level"} ${introducedAt[2]}.`;
+  }
+
+  const elementFamilyTrivia = /^(.+) belongs to the (.+) family in period (\d+)\.$/.exec(source);
+  if (elementFamilyTrivia) {
+    const elementName = translateTrimmed(elementFamilyTrivia[1], language) ?? elementFamilyTrivia[1];
+    const family = translateTrimmed(elementFamilyTrivia[2], language) ?? elementFamilyTrivia[2];
+    return `${elementName} ${dictionary["belongs to the"] ?? "belongs to the"} ${family} ${dictionary["family in period"] ?? "family in period"} ${elementFamilyTrivia[3]}.`;
+  }
+
+  const sampleSpecimen = /^A collection sample would typically be shown as a (.+) material specimen\.$/.exec(source);
+  if (sampleSpecimen) {
+    const material = translateTrimmed(sampleSpecimen[1], language) ?? sampleSpecimen[1];
+    return `${dictionary["A collection sample would typically be shown as a"] ?? "A collection sample would typically be shown as a"} ${material} ${dictionary["material specimen."] ?? "material specimen."}`;
   }
 
   const coinPurchaseAdded = /^(\d+) gold coins? added from App Store purchase\.$/.exec(source);
