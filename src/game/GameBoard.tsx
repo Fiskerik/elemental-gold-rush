@@ -1138,6 +1138,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     setChallengeBestScore,
     completeDailyChallenge,
     completeSecretCompound,
+    recordGameAttemptForAd,
     labUpgradeLevels,
     labUpgradeEnabled,
     powerUpInventory,
