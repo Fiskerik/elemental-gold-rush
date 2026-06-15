@@ -11,15 +11,45 @@ import { t } from "./localization";
 
 export function Collection({ onBack }: { onBack: () => void }) {
   const isTabletLayout = useIsTabletLayout();
-  const { discoveredElements, discoveredCompounds, compoundCounts, earnedBadges, appLanguage } = useProgress();
+  const {
+    discoveredElements,
+    discoveredCompounds,
+    compoundCounts,
+    earnedBadges,
+    appLanguage,
+    goldCoins,
+    unlockLockedElementsForCoins,
+    unlockLockedCompoundsForCoins,
+  } = useProgress();
   const tr = (text: string) => t(text, appLanguage);
   const [selected, setSelected] = useState<number | null>(null);
   const [selectedCompound, setSelectedCompound] = useState<CompoundDefinition | null>(null);
+  const [purchaseMessage, setPurchaseMessage] = useState("");
   const found = new Set(discoveredElements);
   const foundCompounds = new Set(discoveredCompounds);
   const earned = new Set(earnedBadges);
   const el = selected ? ELEMENTS[selected - 1] : null;
   const elementDetails = el ? getElementCollectionDetails(el) : null;
+  const lockedElementCount = ELEMENTS.length - discoveredElements.length;
+  const lockedCompoundCount = COMPOUNDS.length - discoveredCompounds.length;
+
+  function handleUnlockElements() {
+    const unlocked = unlockLockedElementsForCoins(50);
+    setPurchaseMessage(
+      unlocked
+        ? tr("Locked elements unlocked.")
+        : tr("Need 50 gold coins or no locked elements remain."),
+    );
+  }
+
+  function handleUnlockCompounds() {
+    const unlocked = unlockLockedCompoundsForCoins(100);
+    setPurchaseMessage(
+      unlocked
+        ? tr("Locked compounds unlocked.")
+        : tr("Need 100 gold coins or no locked compounds remain."),
+    );
+  }
 
   return (
     <div className="app-shell" style={{ padding: isTabletLayout ? 24 : 16, paddingBottom: isTabletLayout ? 40 : 32 }}>
@@ -45,7 +75,42 @@ export function Collection({ onBack }: { onBack: () => void }) {
               {`${discoveredElements.length} / 118 elements discovered`}
             </div>
           </div>
+          <div style={collectionWalletPill}>{goldCoins} gold</div>
         </div>
+
+        <section style={collectionUnlockPanel}>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 900 }}>{tr("Unlock collection entries")}</div>
+            <div style={{ fontSize: 11, color: "var(--muted-foreground)", marginTop: 2 }}>
+              {tr("Spend gold to reveal locked collection facts immediately.")}
+            </div>
+          </div>
+          <div style={collectionUnlockActions}>
+            <button
+              type="button"
+              onClick={handleUnlockElements}
+              disabled={lockedElementCount <= 0 || goldCoins < 50}
+              style={{
+                ...collectionUnlockBtn,
+                opacity: lockedElementCount > 0 && goldCoins >= 50 ? 1 : 0.55,
+              }}
+            >
+              {tr("Locked elements")} - 50
+            </button>
+            <button
+              type="button"
+              onClick={handleUnlockCompounds}
+              disabled={lockedCompoundCount <= 0 || goldCoins < 100}
+              style={{
+                ...collectionUnlockBtn,
+                opacity: lockedCompoundCount > 0 && goldCoins >= 100 ? 1 : 0.55,
+              }}
+            >
+              {tr("Locked compounds")} - 100
+            </button>
+          </div>
+          {purchaseMessage && <div style={collectionPurchaseMessage}>{purchaseMessage}</div>}
+        </section>
 
         {/* Real periodic-table layout: 18 columns × 7 periods + lanthanide/actinide rows */}
         <div style={{ paddingBottom: 8 }}>
@@ -345,8 +410,17 @@ export function Collection({ onBack }: { onBack: () => void }) {
               maxWidth: isTabletLayout ? 560 : 380,
               width: "100%",
               animation: "pop-in 240ms ease-out",
+              position: "relative",
             }}
           >
+            <button
+              type="button"
+              onClick={() => setSelected(null)}
+              aria-label={tr("Close")}
+              style={collectionModalCloseBtn}
+            >
+              X
+            </button>
             <div style={{ display: "flex", justifyContent: "center", marginBottom: 14 }}>
               <ElementBall
                 atomicNumber={el.atomicNumber}
@@ -459,8 +533,17 @@ export function Collection({ onBack }: { onBack: () => void }) {
               maxWidth: isTabletLayout ? 560 : 380,
               width: "100%",
               animation: "pop-in 240ms ease-out",
+              position: "relative",
             }}
           >
+            <button
+              type="button"
+              onClick={() => setSelectedCompound(null)}
+              aria-label={tr("Close")}
+              style={collectionModalCloseBtn}
+            >
+              X
+            </button>
             <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
               <MoleculeVisual compound={selectedCompound} size={104} locked={!foundCompounds.has(selectedCompound.id)} />
             </div>
@@ -499,6 +582,65 @@ function ElementProperty({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
+
+const collectionWalletPill: CSSProperties = {
+  flex: "0 0 auto",
+  padding: "7px 10px",
+  borderRadius: 999,
+  border: "1px solid var(--border)",
+  background: "var(--surface-high)",
+  color: "var(--accent)",
+  fontSize: 12,
+  fontWeight: 900,
+};
+
+const collectionUnlockPanel: CSSProperties = {
+  display: "grid",
+  gap: 10,
+  marginBottom: 16,
+  padding: 12,
+  borderRadius: 14,
+  border: "1px solid color-mix(in oklch, var(--accent) 32%, var(--border))",
+  background: "color-mix(in oklch, var(--accent) 8%, var(--surface))",
+};
+
+const collectionUnlockActions: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+  gap: 8,
+};
+
+const collectionUnlockBtn: CSSProperties = {
+  border: "none",
+  borderRadius: 10,
+  padding: "9px 10px",
+  background: "linear-gradient(135deg, var(--accent), var(--primary))",
+  color: "var(--primary-foreground)",
+  fontSize: 12,
+  fontWeight: 900,
+  cursor: "pointer",
+};
+
+const collectionPurchaseMessage: CSSProperties = {
+  color: "var(--muted-foreground)",
+  fontSize: 11,
+  fontWeight: 800,
+};
+
+const collectionModalCloseBtn: CSSProperties = {
+  position: "absolute",
+  top: 12,
+  right: 12,
+  width: 32,
+  height: 32,
+  borderRadius: 999,
+  border: "1px solid var(--border)",
+  background: "var(--surface-high)",
+  color: "var(--foreground)",
+  fontSize: 13,
+  fontWeight: 950,
+  cursor: "pointer",
+};
 
 const elementSampleCard: CSSProperties = {
   display: "grid",

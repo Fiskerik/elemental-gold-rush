@@ -127,7 +127,7 @@ export function MainMenu({
   const nextRunGoal = getNextRunGoal(nextLevel);
   const completedDailyQuests = dailyQuests.filter((quest) => quest.completed).length;
   const dailyComplete = dailyQuests.length > 0 && completedDailyQuests >= 4;
-  const dailyRewardAmount = hasProPack ? 5 : 3;
+  const dailyRewardAmount = hasProPack ? 10 : 3;
   const campaignProgress = Math.round((Math.min(unlockedLevel, MAX_LEVEL) / MAX_LEVEL) * 100);
   const weeklyBonus = getWeeklyPlayBonusView(weeklyPlayBonus);
   const [dailyRewardToast, setDailyRewardToast] = useState<{ id: number; text: string } | null>(
@@ -214,7 +214,8 @@ export function MainMenu({
       if (result.rewarded) {
         grantGoldCoins(1);
         reportQuestProgress({ adsWatched: 1 });
-        showRewardedAdMessage("+1 gold coin");
+        showRewardedAdMessage("");
+        showDailyRewardToast("+1 gold coin");
         return;
       }
       showRewardedAdMessage("Loading failed - please try again in a moment");

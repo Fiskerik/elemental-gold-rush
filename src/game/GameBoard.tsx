@@ -738,6 +738,7 @@ function DailyCompoundGridBoard({
   const [revealedIds, setRevealedIds] = useState<Set<number>>(new Set());
   const [wrongGuesses, setWrongGuesses] = useState(0);
   const [message, setMessage] = useState("Find the hidden compound atoms.");
+  const [checkFx, setCheckFx] = useState<null | { id: number; tone: "right" | "wrong"; text: string }>(null);
   const [elapsedMs, setElapsedMs] = useState(0);
   const [result, setResult] = useState<null | {
     score: number;
@@ -815,6 +816,14 @@ function DailyCompoundGridBoard({
     onExit();
   }
 
+  function showCompoundCheck(tone: "right" | "wrong", text: string) {
+    const id = Date.now();
+    setCheckFx({ id, tone, text });
+    window.setTimeout(() => {
+      setCheckFx((current) => (current?.id === id ? null : current));
+    }, 900);
+  }
+
   function formCompound() {
     if (!compound || result) return;
     if (compoundKey(selectedCounts) !== compoundKey(compound.elements)) {
@@ -825,6 +834,7 @@ function DailyCompoundGridBoard({
           ? "Not the compound. An optional hint is now available."
           : "Not the compound. Adjust your marked atoms.",
       );
+      showCompoundCheck("wrong", "Wrong");
       if (hapticsEnabled) vibrate(24);
       return;
     }
@@ -836,13 +846,14 @@ function DailyCompoundGridBoard({
           ? "Those atoms match the formula, but not the hidden compound. An optional hint is available."
           : "Those atoms match the formula, but they are not linked in the compound pattern.",
       );
+      showCompoundCheck("wrong", "Wrong");
       if (hapticsEnabled) vibrate(24);
       return;
     }
     const score = scoreDailyCompound(compound, wrongGuesses, hintsUsed, elapsedSec);
     const wasNew = !discoveredCompounds.includes(compound.id);
-    const count = (compoundCounts[compound.id] ?? (wasNew ? 0 : 1)) + 1;
-    recordCompoundDiscovery(compound.id);
+    const count = wasNew ? 1 : Math.max(1, compoundCounts[compound.id] ?? 1);
+    if (wasNew) recordCompoundDiscovery(compound.id);
     addScore(score);
     recordGameAttemptForAd();
     const awarded = completeSecretCompound([compound.id], score);
@@ -851,6 +862,7 @@ function DailyCompoundGridBoard({
     setSelectedIds(new Set(formedIds));
     setResult({ score, awarded, wasNew, count });
     setMessage("Compound formed.");
+    showCompoundCheck("right", "Right");
     if (soundEnabled) playShootSound();
     if (hapticsEnabled) vibrate([20, 40, 20]);
   }
@@ -881,7 +893,10 @@ function DailyCompoundGridBoard({
           <div style={dailyCompoundKicker}>DAILY COMPOUND</div>
           <div style={dailyCompoundTitle}>{getCompoundHint(compound)}</div>
           <div style={dailyCompoundMeta}>
-            {selectedCells.length}/{compound.totalAtoms} marked - {wrongGuesses} wrong - {hintsUsed} hints - {elapsedSec}s
+            <span style={dailyCompoundMetaBox}>{selectedCells.length}/{compound.totalAtoms} marked</span>
+            <span style={dailyCompoundMetaBox}>{wrongGuesses} wrong</span>
+            <span style={dailyCompoundMetaBox}>{hintsUsed} hints</span>
+            <span style={dailyCompoundMetaBox}>{elapsedSec}s</span>
           </div>
         </div>
         <div style={dailyCompoundScorePreview}>{formatScore(scoreDailyCompound(compound, wrongGuesses, hintsUsed, elapsedSec))}</div>
@@ -937,6 +952,16 @@ function DailyCompoundGridBoard({
       </div>
 
       <div style={dailyCompoundControls}>
+        {checkFx && (
+          <div
+            key={checkFx.id}
+            className={`daily-compound-check-fx ${checkFx.tone}`}
+            role="status"
+            aria-live="polite"
+          >
+            {checkFx.text}
+          </div>
+        )}
         <div style={dailyCompoundMessage}>{message}</div>
         <div style={{ display: "flex", gap: 8 }}>
           <button
@@ -1198,6 +1223,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
   const fusionJumpScoreMultiplier = labUpgradeLevel("fusion-jump") >= 4 ? 3 : labUpgradeLevel("fusion-jump") >= 2 ? 2 : 1;
   const unstableScoreMultiplier = labUpgradeLevel("unstable") >= 1 ? 3 : 2;
   const activeShimmerScoreMultiplier = labUpgradeLevel("shimmer") >= 2 ? 3 : 2;
+  const dailyFeatureRewardAmount = hasProPack ? 5 : DAILY_FEATURE_REWARD_COINS;
   const activeShimmerGrabSteps = labUpgradeLevel("shimmer") >= 3 ? 3 : 2;
   const emissionShotScoreMultiplier = labUpgradeLevel("emission") >= 3 ? 2 : 1;
   const compoundRegenMs = labUpgradeLevel("molecule") >= 4 ? 4 * 60 * 1000 : COMPOUND_REGEN_MS;
@@ -1375,6 +1401,8 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
   const runRecordedRef = useRef(false);
   const inventoryCompoundChargesRef = useRef(0);
   const compoundBonusChargeGrantedRef = useRef(false);
+  const pendingDiscoveryAtomsRef = useRef<number[]>([]);
+  const pendingCompoundDiscoveryIdsRef = useRef<string[]>([]);
   const [inventoryPickerOpen, setInventoryPickerOpen] = useState(false);
   const [confirmAction, setConfirmAction] = useState<null | "restart" | "leave">(null);
   const [restartNonce, setRestartNonce] = useState(0);
@@ -1512,7 +1540,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     [matchingCompound, selectedCompoundAtoms],
   );
   const matchingCompoundIsNew = matchingCompound
-    ? !discoveredCompounds.includes(matchingCompound.id)
+    ? !isCompoundDiscoveredOrPending(matchingCompound.id)
     : false;
   const availableCompoundHints = useMemo(() => {
     const boardCounts = countsForBalls(balls.filter((ball) => ball.stoneHp == null));
@@ -1528,11 +1556,11 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     return hasCompoundRecipe(countsForBalls(balls.filter((ball) => ball.stoneHp == null)), moleculeObjective);
   }, [balls, isMoleculeChallenge, moleculeObjective]);
   const availableDiscoveredCompoundHint =
-    availableCompoundHints.find((compound) => discoveredCompounds.includes(compound.id)) ??
+    availableCompoundHints.find((compound) => isCompoundDiscoveredOrPending(compound.id)) ??
     availableCompoundHints[0] ??
     null;
   const availableNewCompoundHint =
-    availableCompoundHints.find((compound) => !discoveredCompounds.includes(compound.id)) ?? null;
+    availableCompoundHints.find((compound) => !isCompoundDiscoveredOrPending(compound.id)) ?? null;
   const secretCompoundConcealed = isSecretCompoundChallenge && !secretCompoundFormulaRevealed && shots < 50;
 
   const sfx = (fn: () => void) => {
@@ -1638,7 +1666,10 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     showMergeBurstFx(merges);
     showScorePopups(merges, pointMultiplier);
     showMergePulseFx(board, merges, finalBallId);
-    if (merges.length >= 2) feedback({ type: "combo", mergeCount: merges.length });
+    if (merges.length >= 2) {
+      feedback({ type: "combo", mergeCount: merges.length });
+      reportQuestProgress({ comboReactionsInRun: 1 });
+    }
   }
   const toggleInGameMusic = () => {
     if (!musicEnabled) startAmbientMusic(ambientMusicTheme);
@@ -1695,14 +1726,41 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
   function registerDiscoveries(atoms: number[]) {
     const collectibleAtoms = getCollectibleDiscoveries(atoms);
     if (collectibleAtoms.length === 0) return;
-    recordDiscovery(collectibleAtoms);
+    const knownAtoms = new Set([...discoveredElements, ...pendingDiscoveryAtomsRef.current]);
+    const newAtoms = collectibleAtoms.filter((atom) => !knownAtoms.has(atom));
+    if (newAtoms.length === 0) return;
+    pendingDiscoveryAtomsRef.current = [...pendingDiscoveryAtomsRef.current, ...newAtoms].sort(
+      (a, b) => a - b,
+    );
     setNewlyDiscoveredThisRun((current) => {
       const merged = [...current];
-      collectibleAtoms.forEach((atom) => {
+      newAtoms.forEach((atom) => {
         if (!merged.includes(atom)) merged.push(atom);
       });
       return merged.sort((a, b) => a - b);
     });
+  }
+
+  function isCompoundDiscoveredOrPending(compoundId: string) {
+    return discoveredCompounds.includes(compoundId) || pendingCompoundDiscoveryIdsRef.current.includes(compoundId);
+  }
+
+  function stageCompoundDiscovery(compoundId: string) {
+    if (isCompoundDiscoveredOrPending(compoundId)) return;
+    pendingCompoundDiscoveryIdsRef.current = [...pendingCompoundDiscoveryIdsRef.current, compoundId];
+  }
+
+  function commitRunDiscoveries() {
+    if (pendingDiscoveryAtomsRef.current.length > 0) {
+      recordDiscovery(pendingDiscoveryAtomsRef.current);
+      pendingDiscoveryAtomsRef.current = [];
+    }
+    if (pendingCompoundDiscoveryIdsRef.current.length > 0) {
+      pendingCompoundDiscoveryIdsRef.current.forEach((compoundId) =>
+        recordCompoundDiscovery(compoundId),
+      );
+      pendingCompoundDiscoveryIdsRef.current = [];
+    }
   }
 
   function loadSavedRunSnapshot(): SavedRunSnapshot | null {
@@ -1884,6 +1942,8 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
         setInventoryPickerOpen(false);
         setShotHistory([]);
         setHistoryOpen(false);
+        pendingDiscoveryAtomsRef.current = [];
+        pendingCompoundDiscoveryIdsRef.current = [];
         setQueueShuffleCharges(saved.queueShuffleCharges);
         setStoneHitTally(saved.stoneHitTally);
         setGammaCharges(saved.gammaCharges);
@@ -1905,6 +1965,8 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     }
     setNewlyDiscoveredThisRun([]);
     setReadDiscoveryAtoms([]);
+    pendingDiscoveryAtomsRef.current = [];
+    pendingCompoundDiscoveryIdsRef.current = [];
     setSecretCompoundFormulaRevealed(false);
     const initialBalls = isPowerUpStage
       ? createPowerUpStageBoard(powerUpStage)
@@ -2455,6 +2517,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     if (stageClearTimeoutRef.current !== null) {
       window.clearTimeout(stageClearTimeoutRef.current);
     }
+    commitRunDiscoveries();
     // Record the cleared run immediately so campaign-map stats update
     // even if the player exits before the result modal is dismissed.
     if (!runRecordedRef.current) {
@@ -2472,13 +2535,13 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     }
     if (mode === "daily-challenge") {
       const awarded = completeDailyChallenge(stats.score);
-      if (awarded) spawnPopup(`Daily reward +${DAILY_FEATURE_REWARD_COINS} coins`);
+      if (awarded) spawnPopup(`Daily reward +${dailyFeatureRewardAmount} coins`);
     }
     const completedCompoundIds = stats.compound
       ? [...formedCompoundsThisRun, stats.compound.id]
       : formedCompoundsThisRun;
     const secretAwarded = completeSecretCompound(completedCompoundIds);
-    if (secretAwarded) spawnPopup(`Secret compound +${DAILY_FEATURE_REWARD_COINS} coins`);
+    if (secretAwarded) spawnPopup(`Secret compound +${dailyFeatureRewardAmount} coins`);
     // Clear any in-flight score/merge popups so they don't bleed into the
     // win animation or appear behind the result modal.
     setPopups([]);
@@ -4691,14 +4754,14 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     });
 
     window.setTimeout(() => {
-      const wasNew = !discoveredCompounds.includes(matchingCompound.id);
+      const wasNew = !isCompoundDiscoveredOrPending(matchingCompound.id);
       const nextCount = (compoundCounts[matchingCompound.id] ?? (wasNew ? 0 : 1)) + 1;
       setBalls((currentBalls) =>
         relaxBoard(currentBalls.filter((ball) => !selectedAtoms.some((atom) => atom.id === ball.id))),
       );
       setFormingCompoundIds(new Set());
       setCompoundFx(null);
-      recordCompoundDiscovery(matchingCompound.id);
+      stageCompoundDiscovery(matchingCompound.id);
       setFormedCompoundsThisRun((current) => [...current, matchingCompound.id]);
       if (!isMoleculeChallenge && labUpgradeLevel("molecule") >= 2 && !compoundBonusChargeGrantedRef.current) {
         compoundBonusChargeGrantedRef.current = true;
@@ -8618,10 +8681,24 @@ const dailyCompoundTitle: React.CSSProperties = {
 };
 
 const dailyCompoundMeta: React.CSSProperties = {
-  marginTop: 3,
+  display: "flex",
+  flexWrap: "wrap",
+  gap: 5,
+  marginTop: 6,
   fontSize: 11,
   color: "var(--muted-foreground)",
   fontWeight: 750,
+};
+
+const dailyCompoundMetaBox: React.CSSProperties = {
+  padding: "4px 7px",
+  borderRadius: 999,
+  border: "1px solid color-mix(in oklch, var(--border) 82%, transparent)",
+  background: "color-mix(in oklch, var(--surface-high) 72%, transparent)",
+  color: "var(--foreground)",
+  fontSize: 10,
+  fontWeight: 900,
+  whiteSpace: "nowrap",
 };
 
 const dailyCompoundScorePreview: React.CSSProperties = {
@@ -8643,6 +8720,7 @@ const dailyCompoundBoard: React.CSSProperties = {
 };
 
 const dailyCompoundControls: React.CSSProperties = {
+  position: "relative",
   display: "grid",
   gap: 8,
   padding: "10px 12px",

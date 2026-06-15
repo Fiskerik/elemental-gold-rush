@@ -160,7 +160,7 @@ const DAILY_QUEST_POOL: Array<Omit<DailyQuest, "id" | "progress" | "completed"> 
     slug: "combo-reactions",
     type: "combo_reactions",
     title: "Trigger 10 combo reactions",
-    description: "Create ten combo reactions in a single game.",
+    description: "Create ten combo reactions across today's runs.",
     target: 10,
   },
 ];
@@ -258,7 +258,7 @@ export function applyQuestProgress(quests: DailyQuest[], event: QuestProgressEve
     if (quest.type === "destroy_stone" && event.stonesDestroyed) progress += event.stonesDestroyed;
     if (quest.type === "merge_unstable" && event.unstableMergesInRun !== undefined) progress = Math.max(progress, event.unstableMergesInRun);
     if (quest.type === "single_game_score" && event.runScore !== undefined) progress = Math.max(progress, event.runScore);
-    if (quest.type === "combo_reactions" && event.comboReactionsInRun !== undefined) progress = Math.max(progress, event.comboReactionsInRun);
+    if (quest.type === "combo_reactions" && event.comboReactionsInRun) progress += event.comboReactionsInRun;
     if (quest.type === "secret_compound" && event.secretCompoundCleared) progress = quest.target;
 
     const cappedProgress = Math.min(progress, quest.target);

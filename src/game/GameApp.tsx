@@ -36,6 +36,7 @@ export function GameApp() {
   const musicVolume = useProgress((s) => s.musicVolume);
   const refreshDailyFeatures = useProgress((s) => s.refreshDailyFeatures);
   const [screen, setScreen] = useState<Screen>({ name: "menu" });
+  const [gameRunNonce, setGameRunNonce] = useState(0);
   const [showLaunchScreen, setShowLaunchScreen] = useState(true);
   const [resumePrompt, setResumePrompt] = useState<ReturnType<typeof getSavedRunSummary>>(null);
 
@@ -151,7 +152,7 @@ export function GameApp() {
     case "game":
       return (
         <GameBoard
-          key={`${screen.mode ?? "campaign"}-${screen.levelId}-${screen.secretCompoundId ?? "standard"}-${screen.resumeSavedRun ? "resume" : "new"}`}
+          key={`${screen.mode ?? "campaign"}-${screen.levelId}-${screen.secretCompoundId ?? "standard"}-${screen.resumeSavedRun ? "resume" : "new"}-${gameRunNonce}`}
           levelId={screen.levelId}
           mode={screen.mode}
           resumeSavedRun={screen.resumeSavedRun}
@@ -159,8 +160,14 @@ export function GameApp() {
           onExit={() => setScreen({ name: "menu" })}
           onMap={() => setScreen({ name: "levels" })}
           onWin={(nextId) => {
+            setGameRunNonce((nonce) => nonce + 1);
             if (nextId)
-              setScreen({ name: "game", levelId: nextId, mode: screen.mode ?? "campaign" });
+              setScreen({
+                name: "game",
+                levelId: nextId,
+                mode: screen.mode ?? "campaign",
+                secretCompoundId: nextId === screen.levelId ? screen.secretCompoundId : undefined,
+              });
             else setScreen({ name: "menu" });
           }}
         />

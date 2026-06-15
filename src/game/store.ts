@@ -23,6 +23,8 @@ import {
   refreshDailyChallengeState,
   refreshSecretCompoundState,
 } from "./dailyFeatures";
+import { COMPOUNDS } from "./compounds";
+import { ELEMENTS } from "./elements";
 
 export const INVENTORY_POWER_UPS = [
   "transmute",
@@ -233,6 +235,8 @@ interface ProgressState {
   setUnlockedLevel: (id: number) => void;
   recordDiscovery: (atomicNumbers: number[]) => void;
   recordCompoundDiscovery: (compoundId: string) => void;
+  unlockLockedElementsForCoins: (coinCost: number) => boolean;
+  unlockLockedCompoundsForCoins: (coinCost: number) => boolean;
   addScore: (n: number) => void;
   spendScore: (cost: number) => boolean;
   spendGoldCoins: (cost: number) => boolean;
@@ -331,18 +335,19 @@ export const useProgress = create<ProgressState>()(
         let awarded = false;
         set((s) => {
           const dailyChallenge = refreshDailyChallengeState(s.dailyChallenge);
+          awarded = !dailyChallenge.rewardClaimed;
+          const rewardCoins = s.hasProPack ? 5 : DAILY_FEATURE_REWARD_COINS;
           const nextChallenge = {
             ...dailyChallenge,
             completed: true,
             rewardClaimed: true,
             bestScore: Math.max(dailyChallenge.bestScore, Math.max(0, Math.floor(score))),
           };
-          awarded = !dailyChallenge.rewardClaimed;
           return {
             dailyChallenge: nextChallenge,
             dailyBoardRuns: s.dailyBoardRuns + 1,
             dailyBoardBestScore: Math.max(s.dailyBoardBestScore, nextChallenge.bestScore),
-            goldCoins: s.goldCoins + (awarded ? DAILY_FEATURE_REWARD_COINS : 0),
+            goldCoins: s.goldCoins + (awarded ? rewardCoins : 0),
           };
         });
         return awarded;
@@ -360,6 +365,7 @@ export const useProgress = create<ProgressState>()(
           if (!completed) return { secretCompound };
           awarded = !secretCompound.rewardClaimed;
           const scoredRun = typeof score === "number";
+          const rewardCoins = s.hasProPack ? 5 : DAILY_FEATURE_REWARD_COINS;
           return {
             secretCompound: {
               ...secretCompound,
@@ -368,10 +374,10 @@ export const useProgress = create<ProgressState>()(
               rewardClaimed: true,
             },
             dailyCompoundRuns: s.dailyCompoundRuns + (scoredRun ? 1 : 0),
-            dailyCompoundBestScore: scoredRun
+            dailyCompoundBestScore: scoredRun && awarded
               ? Math.max(s.dailyCompoundBestScore, Math.max(0, Math.floor(score)))
               : s.dailyCompoundBestScore,
-            goldCoins: s.goldCoins + (awarded ? DAILY_FEATURE_REWARD_COINS : 0),
+            goldCoins: s.goldCoins + (awarded ? rewardCoins : 0),
             dailyQuests: applyQuestProgress(s.dailyQuests, { secretCompoundCleared: true }),
           };
         });
@@ -447,6 +453,59 @@ export const useProgress = create<ProgressState>()(
             [compoundId]: (s.compoundCounts[compoundId] ?? 0) + 1,
           },
         })),
+      unlockLockedElementsForCoins: (coinCost) => {
+        let unlocked = false;
+        set((s) => {
+          const normalizedCost = Math.max(0, Math.floor(coinCost));
+          const current = new Set(s.discoveredElements);
+          const locked = ELEMENTS.map((element) => element.atomicNumber).filter((atomicNumber) => !current.has(atomicNumber));
+          if (locked.length === 0 || s.goldCoins < normalizedCost) return s;
+          locked.forEach((atomicNumber) => current.add(atomicNumber));
+          const discoveredElements = Array.from(current).sort((a, b) => a - b);
+          unlocked = true;
+          const refreshed = refreshDailyQuests(
+            s.dailyQuestDate,
+            s.dailyQuests,
+            s.claimedDailyReward,
+          );
+          return {
+            ...refreshed,
+            goldCoins: s.goldCoins - normalizedCost,
+            discoveredElements,
+            earnedBadges: getEarnedBadgeIds(discoveredElements),
+            dailyQuests: applyQuestProgress(refreshed.dailyQuests, { itemsPurchased: 1 }),
+          };
+        });
+        return unlocked;
+      },
+      unlockLockedCompoundsForCoins: (coinCost) => {
+        let unlocked = false;
+        set((s) => {
+          const normalizedCost = Math.max(0, Math.floor(coinCost));
+          const current = new Set(s.discoveredCompounds);
+          const locked = COMPOUNDS.map((compound) => compound.id).filter((compoundId) => !current.has(compoundId));
+          if (locked.length === 0 || s.goldCoins < normalizedCost) return s;
+          locked.forEach((compoundId) => current.add(compoundId));
+          const compoundCounts = { ...s.compoundCounts };
+          locked.forEach((compoundId) => {
+            compoundCounts[compoundId] = Math.max(1, compoundCounts[compoundId] ?? 0);
+          });
+          unlocked = true;
+          const refreshed = refreshDailyQuests(
+            s.dailyQuestDate,
+            s.dailyQuests,
+            s.claimedDailyReward,
+          );
+          return {
+            ...refreshed,
+            goldCoins: s.goldCoins - normalizedCost,
+            discoveredCompounds: Array.from(current),
+            compoundCounts,
+            dailyQuests: applyQuestProgress(refreshed.dailyQuests, { itemsPurchased: 1 }),
+          };
+        });
+        return unlocked;
+      },
       addScore: (n) => set((s) => ({ totalScore: s.totalScore + Math.max(0, Math.floor(n)) })),
       spendScore: (cost) => {
         let spent = false;
@@ -552,7 +611,7 @@ export const useProgress = create<ProgressState>()(
           );
           if (refreshed.claimedDailyReward || !areDailyQuestsComplete(refreshed.dailyQuests))
             return refreshed;
-          const bonusCoins = s.hasProPack ? 5 : 3;
+          const bonusCoins = s.hasProPack ? 10 : 3;
           return {
             ...refreshed,
             claimedDailyReward: true,

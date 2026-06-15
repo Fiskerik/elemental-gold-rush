@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Clapperboard } from "lucide-react";
 import { type InventoryPowerUpId, useProgress } from "./store";
 import { POWER_UP_UNLOCK_LEVELS } from "./powerUps";
@@ -133,6 +133,8 @@ export function Shop({ onBack }: { onBack: () => void }) {
   const [purchaseSupportBusy, setPurchaseSupportBusy] = useState(false);
   const [purchaseSupportMessage, setPurchaseSupportMessage] = useState("");
   const [purchaseReport, setPurchaseReport] = useState("");
+  const [coinToast, setCoinToast] = useState<{ id: number; text: string } | null>(null);
+  const coinToastTimeoutRef = useRef<number | null>(null);
   const proPack = getProductById(PRODUCT_IDS.proLabPack);
   const purchaseDebugEnabled = isPurchaseDebugUiEnabled();
   const purchaseDebugLocked = purchaseDebugEnabled && purchaseDebugBusy;
@@ -145,6 +147,27 @@ export function Shop({ onBack }: { onBack: () => void }) {
     if (hasProPack) return;
     void initAds(false);
   }, [hasProPack]);
+
+  useEffect(
+    () => () => {
+      if (coinToastTimeoutRef.current !== null) {
+        window.clearTimeout(coinToastTimeoutRef.current);
+      }
+    },
+    [],
+  );
+
+  function showCoinToast(text: string) {
+    const id = Date.now();
+    if (coinToastTimeoutRef.current !== null) {
+      window.clearTimeout(coinToastTimeoutRef.current);
+    }
+    setCoinToast({ id, text });
+    coinToastTimeoutRef.current = window.setTimeout(() => {
+      setCoinToast((current) => (current?.id === id ? null : current));
+      coinToastTimeoutRef.current = null;
+    }, 1800);
+  }
 
   function refreshPurchaseDebugLogs(open = purchaseDebugOpen) {
     setPurchaseDebugLogs(getLogs());
@@ -261,6 +284,7 @@ export function Shop({ onBack }: { onBack: () => void }) {
         grantGoldCoins(1);
         reportQuestProgress({ adsWatched: 1 });
         setMessage("Reward complete: +1 gold coin.");
+        showCoinToast("+1 gold coin");
         return;
       }
       setMessage(
@@ -526,7 +550,8 @@ export function Shop({ onBack }: { onBack: () => void }) {
               <Benefit text="Remove forced interstitial ads." />
               <Benefit text="Unlock the Pro Lab profile badge." />
               <Benefit text="Get 100 starting gold coins." />
-              <Benefit text="Daily quest claims pay 5 gold coins instead of 2." />
+              <Benefit text="Daily quest claims pay 10 gold coins instead of 3." />
+              <Benefit text="Daily challenges award 5 gold coins each instead of 3." />
             </div>
             {hasProPack ? (
               <div style={proPackActive}>Pro Lab Pack Active</div>
@@ -673,6 +698,8 @@ export function Shop({ onBack }: { onBack: () => void }) {
             })}
           </div>
         </section>
+
+        {coinToast && <div style={shopCoinToast}>{coinToast.text}</div>}
 
         <section
           style={{
@@ -879,6 +906,24 @@ const purchaseSupportPanel: React.CSSProperties = {
   border: "1px solid var(--border)",
   display: "grid",
   gap: 10,
+};
+
+const shopCoinToast: React.CSSProperties = {
+  position: "fixed",
+  top: "calc(env(safe-area-inset-top, 0px) + 18px)",
+  right: 18,
+  zIndex: 1200,
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 6,
+  padding: "8px 10px",
+  borderRadius: 999,
+  background: "linear-gradient(135deg, var(--accent), var(--primary))",
+  color: "var(--primary-foreground)",
+  fontSize: 11,
+  fontWeight: 900,
+  boxShadow: "0 10px 26px var(--accent-glow)",
+  animation: "coin-toast-rise 1800ms ease-out forwards",
 };
 
 const purchaseSupportTitle: React.CSSProperties = {
