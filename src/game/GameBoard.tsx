@@ -133,7 +133,7 @@ const POWER_UP_CLEAR_DELAY_MS = 2000;
 const DAILY_COMPOUND_GRID_COLS = 10;
 const DAILY_COMPOUND_GRID_ROWS = 15;
 const TIME_STAR_LIMIT_SEC = 5 * 60;
-const TARGET_BAND_QUEUE_CHANCE = 0.15;
+const TARGET_BAND_QUEUE_CHANCE = 0.08;
 
 function mergeComboCueDelay(index: number): number {
   return index * MERGE_COMBO_SOUND_STEP_MS;
@@ -2018,7 +2018,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       if (i < initialPlannedCount) return atom;
       if (isPowerUpStage || initialBlank[i] || initialEGun[i]) return atom;
       if (initialShimmer[i]) return generateQueueAtom(dynamicMaxQueue(initialBalls.length), initialBalls, true);
-      if (shouldSpawnTargetBandQueueAtom()) return randomAvailableElement(target - 2, target - 5);
+      if (shouldSpawnTargetBandQueueAtom()) return randomAvailableElement(target - 4, target - 5);
       return Math.min(queueSpawnCap(), Math.max(atom, queueFloorFromBoard(initialBalls)));
     });
     const initialUnstable = resolvedInitialQueue.map(
@@ -2317,7 +2317,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       return randomAvailableElement(highestRecipeAtom, 1);
     }
     if (shouldSpawnTargetBandQueueAtom()) {
-      return randomAvailableElement(target - 2, target - 5);
+      return randomAvailableElement(target - 4, target - 5);
     }
     const effectiveMax = Math.max(minElement, maxElement);
     if (forceUniform) return randomAvailableElement(effectiveMax, minElement);
