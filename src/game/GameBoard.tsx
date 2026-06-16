@@ -48,6 +48,7 @@ import {
   compoundKey,
   findCompoundByElements,
   getCompoundHint,
+  NEW_COMPOUND_DISCOVERY_BONUS,
 } from "./compounds";
 import { MoleculeVisual } from "./MoleculeVisual";
 import { PowerUpBadge } from "./PowerUpLibrary";
@@ -854,13 +855,14 @@ function DailyCompoundGridBoard({
     const wasNew = !discoveredCompounds.includes(compound.id);
     const count = wasNew ? 1 : Math.max(1, compoundCounts[compound.id] ?? 1);
     if (wasNew) recordCompoundDiscovery(compound.id);
-    addScore(score);
+    const totalScore = score + (wasNew ? NEW_COMPOUND_DISCOVERY_BONUS : 0);
+    addScore(totalScore);
     recordGameAttemptForAd();
-    const awarded = completeSecretCompound([compound.id], score);
+    const awarded = completeSecretCompound([compound.id], totalScore);
     const formedIds = selectedCells.map((cell) => cell.id);
     setRevealedIds(new Set(formedIds));
     setSelectedIds(new Set(formedIds));
-    setResult({ score, awarded, wasNew, count });
+    setResult({ score: totalScore, awarded, wasNew, count });
     setMessage("Compound formed.");
     showCompoundCheck("right", "Right");
     if (soundEnabled) playShootSound();
@@ -4379,6 +4381,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     const fusionJumpResolved = shotPowerUps.includes("Fusion Jump") && result.merges.length > 0;
     const catalystResolved =
       shotPowerUps.includes("Catalyst Aura") && result.merges.length >= 2;
+    reportQuestProgress({ runScore: nextScore });
     const powerUpStageResolved =
       (powerUpStage === "shimmer" && shimmerHit) ||
       (powerUpStage === "unstable" && result.merges.some((merge) => merge.stabilizedIsotope)) ||
@@ -4756,6 +4759,8 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     window.setTimeout(() => {
       const wasNew = !isCompoundDiscoveredOrPending(matchingCompound.id);
       const nextCount = (compoundCounts[matchingCompound.id] ?? (wasNew ? 0 : 1)) + 1;
+      const newCompoundBonus = wasNew ? NEW_COMPOUND_DISCOVERY_BONUS : 0;
+      const totalBonus = bonusScore + newCompoundBonus;
       setBalls((currentBalls) =>
         relaxBoard(currentBalls.filter((ball) => !selectedAtoms.some((atom) => atom.id === ball.id))),
       );
@@ -4769,16 +4774,18 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
         saveCompoundChargeState(1, null);
         spawnPopup("Compound charge +1");
       }
-      setScore((currentScore) => currentScore + bonusScore);
-      addScore(bonusScore);
+      setScore((currentScore) => currentScore + totalBonus);
+      addScore(totalBonus);
+      reportQuestProgress({ runScore: score + totalBonus });
       pushShotHistory({
         shot: shots,
-        action: `Formed ${matchingCompound.name}`,
-        points: bonusScore,
+        action: `Formed ${matchingCompound.name}${wasNew ? " (new!)" : ""}`,
+        points: totalBonus,
         powerUp: isotopeBonus ? "Compound, Isotope x2" : "Compound",
       });
       addGrabProgressSteps(1);
       spawnPopup(`+${formatScore(bonusScore)}`);
+      if (newCompoundBonus > 0) spawnPopup(`NEW COMPOUND +${formatScore(newCompoundBonus)}`);
       if (isotopeBonus) spawnPopup("ISOTOPE x2");
       const textFxId = Date.now();
       setCompoundTextFx({ id: textFxId, compound: matchingCompound, isNew: wasNew });
@@ -4786,7 +4793,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
         () => setCompoundTextFx((fx) => (fx?.id === textFxId ? null : fx)),
         1800,
       );
-      setDiscoveryCompound({ compound: matchingCompound, isNew: wasNew, count: nextCount, bonusScore });
+      setDiscoveryCompound({ compound: matchingCompound, isNew: wasNew, count: nextCount, bonusScore: totalBonus });
       if (isMoleculeChallenge && moleculeObjective && matchingCompound.id === moleculeObjective.id) {
         const stars = 3;
         setEarnedStars(stars);
@@ -5043,6 +5050,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       reachedAtomicNumbers: Array.from(newAtoms),
       maxChainDepth: result.merges.length,
     });
+    reportQuestProgress({ runScore: score + gained });
     const nextHighest = Math.max(highest, result.highestElement);
     setHighest(nextHighest);
     setHighestElement(nextHighest);
@@ -5287,6 +5295,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       reachedAtomicNumbers: Array.from(newAtoms),
       maxChainDepth: result.merges.length,
     });
+    reportQuestProgress({ runScore: nextScore });
     setTimeout(
       () => setHighlightId(null),
       MERGE_COMBO_START_MS + result.merges.length * MERGE_COMBO_STEP_MS + MERGE_COMBO_END_PAD_MS,
