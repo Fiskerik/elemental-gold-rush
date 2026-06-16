@@ -2,6 +2,9 @@ export type CompoundRarity = "common" | "uncommon" | "rare";
 
 import { ELEMENTS } from "./elements";
 
+/** Extra points awarded the first time a player discovers a brand-new compound. */
+export const NEW_COMPOUND_DISCOVERY_BONUS = 5000;
+
 export interface CompoundDefinition {
   id: string;
   name: string;
