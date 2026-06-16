@@ -2018,7 +2018,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       if (i < initialPlannedCount) return atom;
       if (isPowerUpStage || initialBlank[i] || initialEGun[i]) return atom;
       if (initialShimmer[i]) return generateQueueAtom(dynamicMaxQueue(initialBalls.length), initialBalls, true);
-      if (shouldSpawnTargetBandQueueAtom()) return randomAvailableElement(target - 4, target - 5);
+      if (shouldBiasNormalQueueTowardTarget()) return biasedTargetSpawnAtom();
       return Math.min(queueSpawnCap(), Math.max(atom, queueFloorFromBoard(initialBalls)));
     });
     const initialUnstable = resolvedInitialQueue.map(
