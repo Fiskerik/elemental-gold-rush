@@ -764,8 +764,15 @@ function DailyCompoundGridBoard({
 
   const secretAtoms = useMemo(() => (compound ? atomsForCompound(compound) : []), [compound]);
   const cells = useMemo(
-    () => createDailyCompoundGrid(secretAtoms, DAILY_COMPOUND_GRID_COLS, DAILY_COMPOUND_GRID_ROWS, secretCompoundId),
-    [secretAtoms, secretCompoundId],
+    () =>
+      createDailyCompoundGrid(
+        secretAtoms,
+        DAILY_COMPOUND_GRID_COLS,
+        DAILY_COMPOUND_GRID_ROWS,
+        secretCompoundId,
+        shuffleKey,
+      ),
+    [secretAtoms, secretCompoundId, shuffleKey],
   );
   const selectedCells = useMemo(
     () => cells.filter((cell) => selectedIds.has(cell.id)),
