@@ -4377,7 +4377,6 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     });
 
     const fusionJumpResolved = shotPowerUps.includes("Fusion Jump") && result.merges.length > 0;
-    void 0;
     const catalystResolved =
       shotPowerUps.includes("Catalyst Aura") && result.merges.length >= 2;
     const powerUpStageResolved =
