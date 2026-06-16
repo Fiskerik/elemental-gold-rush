@@ -877,6 +877,17 @@ function DailyCompoundGridBoard({
     if (hapticsEnabled) vibrate([20, 40, 20]);
   }
 
+  function resetBoard() {
+    setShuffleKey(Math.random());
+    setSelectedIds(new Set());
+    setRevealedIds(new Set());
+    setWrongGuesses(0);
+    setMessage("Find the hidden compound atoms.");
+    setCheckFx(null);
+    setElapsedMs(0);
+    setResult(null);
+  }
+
   if (!compound) {
     return (
       <div style={dailyCompoundShell}>
