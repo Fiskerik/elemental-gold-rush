@@ -552,6 +552,7 @@ export function Shop({ onBack }: { onBack: () => void }) {
               <Benefit text="Get 100 starting gold coins." />
               <Benefit text="Daily quest claims pay 10 gold coins instead of 3." />
               <Benefit text="Daily challenges award 5 gold coins each instead of 3." />
+              <Benefit text="Level 1 upgrade to all power-ups (10 coin refund each for already upgraded)." />
             </div>
             {hasProPack ? (
               <div style={proPackActive}>Pro Lab Pack Active</div>

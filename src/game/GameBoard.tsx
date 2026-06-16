@@ -735,6 +735,7 @@ function DailyCompoundGridBoard({
     () => COMPOUNDS.find((item) => item.id === secretCompoundId) ?? null,
     [secretCompoundId],
   );
+  const [shuffleKey, setShuffleKey] = useState(() => Math.random());
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [revealedIds, setRevealedIds] = useState<Set<number>>(new Set());
   const [wrongGuesses, setWrongGuesses] = useState(0);
@@ -763,8 +764,15 @@ function DailyCompoundGridBoard({
 
   const secretAtoms = useMemo(() => (compound ? atomsForCompound(compound) : []), [compound]);
   const cells = useMemo(
-    () => createDailyCompoundGrid(secretAtoms, DAILY_COMPOUND_GRID_COLS, DAILY_COMPOUND_GRID_ROWS, secretCompoundId),
-    [secretAtoms, secretCompoundId],
+    () =>
+      createDailyCompoundGrid(
+        secretAtoms,
+        DAILY_COMPOUND_GRID_COLS,
+        DAILY_COMPOUND_GRID_ROWS,
+        secretCompoundId,
+        shuffleKey,
+      ),
+    [secretAtoms, secretCompoundId, shuffleKey],
   );
   const selectedCells = useMemo(
     () => cells.filter((cell) => selectedIds.has(cell.id)),
@@ -867,6 +875,17 @@ function DailyCompoundGridBoard({
     showCompoundCheck("right", "Right");
     if (soundEnabled) playShootSound();
     if (hapticsEnabled) vibrate([20, 40, 20]);
+  }
+
+  function resetBoard() {
+    setShuffleKey(Math.random());
+    setSelectedIds(new Set());
+    setRevealedIds(new Set());
+    setWrongGuesses(0);
+    setMessage("Find the hidden compound atoms.");
+    setCheckFx(null);
+    setElapsedMs(0);
+    setResult(null);
   }
 
   if (!compound) {
@@ -1015,9 +1034,14 @@ function DailyCompoundGridBoard({
               {result.wasNew ? "Added to collection" : `Collection count ${result.count}`}
               {result.awarded ? ` - Daily reward +${DAILY_FEATURE_REWARD_COINS} coins` : ""}
             </div>
-            <button type="button" onClick={onExit} style={{ ...modalBtn, width: "100%" }}>
-              Back to Menu
-            </button>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              <button type="button" onClick={resetBoard} style={modalBtn}>
+                Play Again
+              </button>
+              <button type="button" onClick={onExit} style={modalBtn}>
+                Back to Menu
+              </button>
+            </div>
           </div>
         </Modal>
       )}
@@ -1030,10 +1054,15 @@ function createDailyCompoundGrid(
   cols: number,
   rows: number,
   compoundId: string,
+  sessionSeed = 0,
 ): DailyCompoundCell[] {
   const count = cols * rows;
   const highest = Math.max(...secretAtoms, 1);
-  const rng = createSeededRng(hashDailySeed(`daily-compound-grid-${getTodayQuestDate()}-${compoundId}-${cols}x${rows}`));
+  const rng = createSeededRng(
+    hashDailySeed(
+      `daily-compound-grid-${getTodayQuestDate()}-${compoundId}-${cols}x${rows}-${sessionSeed}`,
+    ),
+  );
   const cells: DailyCompoundCell[] = Array.from({ length: count }, (_, id) => ({
     id,
     atom: 1 + Math.floor(rng() * highest),
