@@ -133,7 +133,7 @@ const POWER_UP_CLEAR_DELAY_MS = 2000;
 const DAILY_COMPOUND_GRID_COLS = 10;
 const DAILY_COMPOUND_GRID_ROWS = 15;
 const TIME_STAR_LIMIT_SEC = 5 * 60;
-const TARGET_BAND_QUEUE_CHANCE = 0.15;
+const TARGET_BAND_QUEUE_CHANCE = 0.08;
 
 function mergeComboCueDelay(index: number): number {
   return index * MERGE_COMBO_SOUND_STEP_MS;
