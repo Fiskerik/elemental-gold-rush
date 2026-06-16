@@ -2316,8 +2316,8 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       const highestRecipeAtom = Math.max(...atomsForCompound(moleculeObjective), 1);
       return randomAvailableElement(highestRecipeAtom, 1);
     }
-    if (shouldSpawnTargetBandQueueAtom()) {
-      return randomAvailableElement(target - 4, target - 5);
+    if (shouldBiasNormalQueueTowardTarget()) {
+      return biasedTargetSpawnAtom();
     }
     const effectiveMax = Math.max(minElement, maxElement);
     if (forceUniform) return randomAvailableElement(effectiveMax, minElement);
@@ -2329,9 +2329,16 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     return mode === "campaign" && level.id > 10 && !isMoleculeChallenge && !isPowerUpStage;
   }
 
-  function shouldSpawnTargetBandQueueAtom(): boolean {
-    if (!shouldBiasNormalQueueTowardTarget()) return false;
-    return dailyRandom() < TARGET_BAND_QUEUE_CHANCE;
+  // Spawns mostly low-tier atoms (1 .. target-3) so the player builds up, with
+  // an 8% chance of a high-band atom (target-12 .. target-3) for variety.
+  // Used by daily-board and standard campaign levels.
+  function biasedTargetSpawnAtom(): number {
+    const highHigh = Math.max(1, target - 3);
+    const highLow = Math.max(1, target - 12);
+    if (dailyRandom() < TARGET_BAND_QUEUE_CHANCE) {
+      return randomAvailableElement(highHigh, highLow);
+    }
+    return randomAvailableElement(highHigh, 1);
   }
 
   function discoveredSeedAtoms(maxSeedAtom: number): number[] {
