@@ -1,6 +1,8 @@
 // Level definitions for Elemental Fusion
 // Each level: shoot elements, merge to reach the target element
 
+import { ELEMENTS } from "./elements";
+
 export interface Level {
   id: number;
   /** Display name */
