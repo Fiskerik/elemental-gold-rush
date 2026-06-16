@@ -4379,6 +4379,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     const fusionJumpResolved = shotPowerUps.includes("Fusion Jump") && result.merges.length > 0;
     const catalystResolved =
       shotPowerUps.includes("Catalyst Aura") && result.merges.length >= 2;
+    reportQuestProgress({ runScore: nextScore });
     const powerUpStageResolved =
       (powerUpStage === "shimmer" && shimmerHit) ||
       (powerUpStage === "unstable" && result.merges.some((merge) => merge.stabilizedIsotope)) ||
