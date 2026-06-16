@@ -48,6 +48,7 @@ import {
   compoundKey,
   findCompoundByElements,
   getCompoundHint,
+  NEW_COMPOUND_DISCOVERY_BONUS,
 } from "./compounds";
 import { MoleculeVisual } from "./MoleculeVisual";
 import { PowerUpBadge } from "./PowerUpLibrary";
