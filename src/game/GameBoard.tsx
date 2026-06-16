@@ -1034,9 +1034,14 @@ function DailyCompoundGridBoard({
               {result.wasNew ? "Added to collection" : `Collection count ${result.count}`}
               {result.awarded ? ` - Daily reward +${DAILY_FEATURE_REWARD_COINS} coins` : ""}
             </div>
-            <button type="button" onClick={onExit} style={{ ...modalBtn, width: "100%" }}>
-              Back to Menu
-            </button>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              <button type="button" onClick={resetBoard} style={modalBtn}>
+                Play Again
+              </button>
+              <button type="button" onClick={onExit} style={modalBtn}>
+                Back to Menu
+              </button>
+            </div>
           </div>
         </Modal>
       )}
