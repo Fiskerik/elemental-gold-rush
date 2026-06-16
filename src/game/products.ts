@@ -37,6 +37,8 @@ export const PRODUCTS: ProductDefinition[] = [
     benefits: [
       "Remove forced interstitial ads.",
       "Unlock the Pro Lab profile badge.",
+      "Instantly boosts every unlocked power-up to Level 1 for free.",
+      "Refunds 10 coins for each power-up you already upgraded to Level 1.",
       "Includes 50 starting gold coins in the App Store build.",
       "Daily quest claims pay 10 gold coins instead of 3.",
       "Daily challenges award 5 gold coins each instead of 3.",
