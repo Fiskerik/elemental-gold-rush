@@ -10,8 +10,8 @@ export type RewardedAdResult = {
   reason?: string;
 };
 
-const TEST_INTERSTITIAL_ID = "ca-app-pub-8854735603167656/6238016576";
-const TEST_REWARDED_ID = "ca-app-pub-8854735603167656/8761449585";
+const GOOGLE_IOS_TEST_INTERSTITIAL_ID = "ca-app-pub-3940256099942544/4411468910";
+const GOOGLE_IOS_TEST_REWARDED_ID = "ca-app-pub-3940256099942544/1712485313";
 
 let initialized = false;
 let initFailed = false;
@@ -29,12 +29,26 @@ function configuredEnvValue(value: unknown): string {
   return trimmed && trimmed !== "undefined" && trimmed !== "null" ? trimmed : "";
 }
 
+function envFlagEnabled(value: unknown): boolean {
+  return typeof value === "string" && /^(1|true|yes|on)$/i.test(value.trim());
+}
+
+function shouldUseAdMobTestAds(): boolean {
+  const raw = configuredEnvValue(import.meta.env.VITE_ADMOB_USE_TEST_ADS);
+  return raw ? envFlagEnabled(raw) : true;
+}
+
 function getInterstitialId(): string {
-  return configuredEnvValue(import.meta.env.VITE_ADMOB_IOS_INTERSTITIAL_ID) || TEST_INTERSTITIAL_ID;
+  if (shouldUseAdMobTestAds()) return GOOGLE_IOS_TEST_INTERSTITIAL_ID;
+  return (
+    configuredEnvValue(import.meta.env.VITE_ADMOB_IOS_INTERSTITIAL_ID) ||
+    GOOGLE_IOS_TEST_INTERSTITIAL_ID
+  );
 }
 
 function getRewardedId(): string {
-  return configuredEnvValue(import.meta.env.VITE_ADMOB_IOS_REWARDED_ID) || TEST_REWARDED_ID;
+  if (shouldUseAdMobTestAds()) return GOOGLE_IOS_TEST_REWARDED_ID;
+  return configuredEnvValue(import.meta.env.VITE_ADMOB_IOS_REWARDED_ID) || GOOGLE_IOS_TEST_REWARDED_ID;
 }
 
 function shouldRequestTrackingAuthorization(): boolean {
@@ -141,7 +155,7 @@ export async function initAds(hasProPack: boolean): Promise<void> {
   if (hasProPack || initialized || initFailed || !Capacitor.isNativePlatform()) return;
   try {
     await AdMob.initialize({
-      initializeForTesting: !import.meta.env.PROD,
+      initializeForTesting: shouldUseAdMobTestAds() || !import.meta.env.PROD,
     });
     initialized = true;
 
