@@ -5044,6 +5044,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       reachedAtomicNumbers: Array.from(newAtoms),
       maxChainDepth: result.merges.length,
     });
+    reportQuestProgress({ runScore: score + gained });
     const nextHighest = Math.max(highest, result.highestElement);
     setHighest(nextHighest);
     setHighestElement(nextHighest);
