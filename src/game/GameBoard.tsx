@@ -855,13 +855,14 @@ function DailyCompoundGridBoard({
     const wasNew = !discoveredCompounds.includes(compound.id);
     const count = wasNew ? 1 : Math.max(1, compoundCounts[compound.id] ?? 1);
     if (wasNew) recordCompoundDiscovery(compound.id);
-    addScore(score);
+    const totalScore = score + (wasNew ? NEW_COMPOUND_DISCOVERY_BONUS : 0);
+    addScore(totalScore);
     recordGameAttemptForAd();
-    const awarded = completeSecretCompound([compound.id], score);
+    const awarded = completeSecretCompound([compound.id], totalScore);
     const formedIds = selectedCells.map((cell) => cell.id);
     setRevealedIds(new Set(formedIds));
     setSelectedIds(new Set(formedIds));
-    setResult({ score, awarded, wasNew, count });
+    setResult({ score: totalScore, awarded, wasNew, count });
     setMessage("Compound formed.");
     showCompoundCheck("right", "Right");
     if (soundEnabled) playShootSound();
