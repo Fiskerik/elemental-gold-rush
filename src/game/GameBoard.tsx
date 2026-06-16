@@ -1030,10 +1030,15 @@ function createDailyCompoundGrid(
   cols: number,
   rows: number,
   compoundId: string,
+  sessionSeed = 0,
 ): DailyCompoundCell[] {
   const count = cols * rows;
   const highest = Math.max(...secretAtoms, 1);
-  const rng = createSeededRng(hashDailySeed(`daily-compound-grid-${getTodayQuestDate()}-${compoundId}-${cols}x${rows}`));
+  const rng = createSeededRng(
+    hashDailySeed(
+      `daily-compound-grid-${getTodayQuestDate()}-${compoundId}-${cols}x${rows}-${sessionSeed}`,
+    ),
+  );
   const cells: DailyCompoundCell[] = Array.from({ length: count }, (_, id) => ({
     id,
     atom: 1 + Math.floor(rng() * highest),
