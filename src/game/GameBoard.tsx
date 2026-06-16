@@ -2439,9 +2439,8 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       return { atom: 1, shimmer: false, eGun: false, blank: true, unstable: false };
     }
     let plannedChallengeAtom = isDailyAtomChallenge ? challengeQueuePlanRef.current.shift() : undefined;
-    if (plannedChallengeAtom == null && isDailyAtomChallenge && challengeQueuePoolRef.current.length > 0) {
-      const pool = challengeQueuePoolRef.current;
-      plannedChallengeAtom = pool[Math.floor(dailyRandom() * pool.length)];
+    if (plannedChallengeAtom == null && isDailyAtomChallenge) {
+      plannedChallengeAtom = biasedTargetSpawnAtom();
     }
     if (plannedChallengeAtom != null) {
       return {
@@ -3120,10 +3119,13 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     const highestBuildAtom = Math.max(1, target - 3);
     const atoms = Array.from({ length: 10 }, (_, index) => highestBuildAtom - index).filter((atom) => atom >= 1);
     const shuffledAtoms = shuffleDailyAtoms(atoms, `daily-target-${target}`);
+    // Queue is mostly low atoms (1 .. target-3) with an 8% high-band chance so
+    // the daily board plays like a normal level instead of only spawning highs.
+    const queueAtoms = Array.from({ length: 30 }, () => biasedTargetSpawnAtom());
     return {
       highestBuildAtom,
       boardAtoms: shuffledAtoms,
-      queueAtoms: shuffledAtoms,
+      queueAtoms,
     };
   }
 
