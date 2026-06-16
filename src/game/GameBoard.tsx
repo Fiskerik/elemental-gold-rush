@@ -4757,6 +4757,8 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     window.setTimeout(() => {
       const wasNew = !isCompoundDiscoveredOrPending(matchingCompound.id);
       const nextCount = (compoundCounts[matchingCompound.id] ?? (wasNew ? 0 : 1)) + 1;
+      const newCompoundBonus = wasNew ? NEW_COMPOUND_DISCOVERY_BONUS : 0;
+      const totalBonus = bonusScore + newCompoundBonus;
       setBalls((currentBalls) =>
         relaxBoard(currentBalls.filter((ball) => !selectedAtoms.some((atom) => atom.id === ball.id))),
       );
@@ -4770,16 +4772,18 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
         saveCompoundChargeState(1, null);
         spawnPopup("Compound charge +1");
       }
-      setScore((currentScore) => currentScore + bonusScore);
-      addScore(bonusScore);
+      setScore((currentScore) => currentScore + totalBonus);
+      addScore(totalBonus);
+      reportQuestProgress({ runScore: score + totalBonus });
       pushShotHistory({
         shot: shots,
-        action: `Formed ${matchingCompound.name}`,
-        points: bonusScore,
+        action: `Formed ${matchingCompound.name}${wasNew ? " (new!)" : ""}`,
+        points: totalBonus,
         powerUp: isotopeBonus ? "Compound, Isotope x2" : "Compound",
       });
       addGrabProgressSteps(1);
       spawnPopup(`+${formatScore(bonusScore)}`);
+      if (newCompoundBonus > 0) spawnPopup(`NEW COMPOUND +${formatScore(newCompoundBonus)}`);
       if (isotopeBonus) spawnPopup("ISOTOPE x2");
       const textFxId = Date.now();
       setCompoundTextFx({ id: textFxId, compound: matchingCompound, isNew: wasNew });
@@ -4787,7 +4791,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
         () => setCompoundTextFx((fx) => (fx?.id === textFxId ? null : fx)),
         1800,
       );
-      setDiscoveryCompound({ compound: matchingCompound, isNew: wasNew, count: nextCount, bonusScore });
+      setDiscoveryCompound({ compound: matchingCompound, isNew: wasNew, count: nextCount, bonusScore: totalBonus });
       if (isMoleculeChallenge && moleculeObjective && matchingCompound.id === moleculeObjective.id) {
         const stars = 3;
         setEarnedStars(stars);
