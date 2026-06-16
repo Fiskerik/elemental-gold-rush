@@ -735,6 +735,7 @@ function DailyCompoundGridBoard({
     () => COMPOUNDS.find((item) => item.id === secretCompoundId) ?? null,
     [secretCompoundId],
   );
+  const [shuffleKey, setShuffleKey] = useState(() => Math.random());
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [revealedIds, setRevealedIds] = useState<Set<number>>(new Set());
   const [wrongGuesses, setWrongGuesses] = useState(0);
