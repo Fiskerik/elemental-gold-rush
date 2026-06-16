@@ -410,112 +410,152 @@ function makePowerUpLevel(
   };
 }
 
-const NITROGEN_LEVEL_SEED: LevelSeed = {
-  name: "Nitrogen Climb",
-  description: "Reach Nitrogen.",
-  lore: "Nitrogen fills most of the air and anchors amino acids, proteins, and fertilizers.",
-  targetElement: 7,
-};
+// === 100-stage campaign map =========================================
+// Layout:
+//   - Every 5th level (5..95) is a compound (molecule) challenge.
+//   - Levels 31 and 61 are bosses; level 100 is the final boss.
+//   - Power-up tutorial stages are sprinkled across early/mid game.
+//   - All remaining levels are atom-climb stages, biased toward
+//     well-known elements.
 
-const SULFUR_LEVEL_SEED: LevelSeed = {
-  name: "Sulfur Spark",
-  description: "Reach Sulfur.",
-  lore: "Sulfur colors hot springs, strengthens proteins, and gives fireworks and minerals their bite.",
-  targetElement: 16,
-};
+const TOTAL_CAMPAIGN_LEVELS = 100;
 
-const IODINE_LEVEL_SEED: LevelSeed = {
-  name: "Iodine Signal",
-  description: "Reach Iodine.",
-  lore: "Iodine disinfects wounds, supports thyroid hormones, and stains starch a deep blue-black.",
-  targetElement: 53,
-};
-const ANTIMONY_LEVEL_SEED: LevelSeed = {
-  name: "Antimony Edge",
-  description: "Reach Antimony.",
-  lore: "Antimony hardens alloys, sharpens flame retardants, and has appeared in cosmetics and medicines since antiquity.",
-  targetElement: 51,
-};
+// Curated lore for well-known atoms (falls back to element facts otherwise).
+const CURATED_ATOM_SEEDS: Record<number, LevelSeed> = {};
+for (const seed of LEVEL_SEEDS) {
+  if (!(seed.targetElement in CURATED_ATOM_SEEDS)) {
+    CURATED_ATOM_SEEDS[seed.targetElement] = seed;
+  }
+}
 
-const MERCURY_LEVEL_SEED: LevelSeed = {
-  name: "Mercury Mirror",
-  description: "Reach Mercury.",
-  lore: "Mercury is the only metal liquid at room temperature, once used in thermometers and mirrors.",
-  targetElement: 80,
-};
+function atomSeedFor(atomicNumber: number): LevelSeed {
+  const curated = CURATED_ATOM_SEEDS[atomicNumber];
+  if (curated) return curated;
+  const element = ELEMENTS[atomicNumber - 1];
+  return {
+    name: `${element?.name ?? "Unknown"} Ascent`,
+    description: `Reach ${element?.name ?? "the target element"}.`,
+    lore: element?.fact ?? "Climb the periodic table one fusion at a time.",
+    targetElement: atomicNumber,
+  };
+}
 
-const EARLY_LEVELS: Level[] = [
-  makeAtomLevel(LEVEL_SEEDS[0], 1, 1),
-  makeAtomLevel(LEVEL_SEEDS[3], 2, 2),
-  makePowerUpLevel(3, "shimmer", "Shimmer Practice", "Merge the shimmering queued atom to clear the stage.", 3, 3),
-  makeAtomLevel(NITROGEN_LEVEL_SEED, 4, 3),
-  makeAtomLevel(LEVEL_SEEDS[5], 7, 4),
-  makePowerUpLevel(6, "unstable", "Unstable Isotope", "Merge an unstable atom before its shell depletes.", 10, 10),
-  makePowerUpLevel(8, "grab", "Grab Training", "Use Grab to reposition an atom and create a merge.", 5, 5),
-  makeAtomLevel(LEVEL_SEEDS[6], 9, 5),
-  makePowerUpLevel(11, "egun", "E-Gun Calibration", "Fire the E-Gun through a molecule to upgrade it.", 6, 6),
-  makeAtomLevel(LEVEL_SEEDS[7], 12, 6),
-  makePowerUpLevel(13, "gravity", "Gravity Well", "Gravity is earned every 30 successful merges. Use it to pull scattered atoms together.", 7, 7),
-  makeAtomLevel(LEVEL_SEEDS[8], 14, 7),
-  makeAtomLevel(SULFUR_LEVEL_SEED, 16, 8),
-  makePowerUpLevel(17, "stone", "Stone Impact", "Miss three opening shots, then place the loaded Stone.", 10, 10),
-  makeAtomLevel(LEVEL_SEEDS[9], 18, 9),
-  makePowerUpLevel(19, "transmute", "Transmute Shot", "Transmute your queued atom, then merge it into the board.", 13, 13),
-  makePowerUpLevel(22, "fusion-jump", "Fusion Jump", "Arm Fusion Jump and merge Chlorine into Potassium.", 19, 17),
-  makeAtomLevel(LEVEL_SEEDS[10], 23, 11),
-  makePowerUpLevel(24, "catalyst", "Catalyst Chain", "Activate Catalyst and trigger a chain reaction.", 24, 6),
-  makeAtomLevel(LEVEL_SEEDS[12], 26, 12),
-  makePowerUpLevel(27, "emission", "Emission Burst", "Use Emission to raise the waiting queue.", 29, 29),
-  makeAtomLevel(LEVEL_SEEDS[13], 28, 13),
-  makePowerUpLevel(29, "gamma", "Gamma Bomb", "Use Gamma Bomb to clear a dense board.", 33, 6),
-  makeAtomLevel(LEVEL_SEEDS[18], 31, 14),
-  makePowerUpLevel(32, "blank", "Blank Breakthrough", "Use a Blank Atom to reach Krypton through the stone wall.", 36, 35),
-  makeAtomLevel(LEVEL_SEEDS[19], 33, 15),
-  makePowerUpLevel(34, "queue-shuffle", "Queue Shuffle", "Shuffle the queue, then fire one of the new atoms.", 42, 42),
+// Ascending atom targets, prioritizing well-known elements. Exactly 65 — one
+// per non-compound, non-boss, non-tutorial slot in the 100-stage map.
+const ATOM_TARGET_ORDER: number[] = [
+  1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
+  11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
+  21, 22, 23, 24, 25, 26, 27, 28, 29, 30,
+  31, 32, 33, 34, 35, 36, 37, 38, 39, 40,
+  41, 42, 45, 46, 47, 48, 49, 50, 51, 52,
+  53, 54, 55, 56, 74, 78, 79, 80, 82, 83,
+  86, 88, 90, 92, 94,
 ];
 
-const EARLY_LEVEL_IDS = new Set(EARLY_LEVELS.map((level) => level.id));
-let nextPostTutorialLevelId = 36;
-const POST_TUTORIAL_ATOM_SEEDS: LevelSeed[] = [
-  ANTIMONY_LEVEL_SEED,
-  IODINE_LEVEL_SEED,
-  LEVEL_SEEDS[20],
-  LEVEL_SEEDS[21],
-  LEVEL_SEEDS[22],
-  LEVEL_SEEDS[23],
-  LEVEL_SEEDS[24],
-  LEVEL_SEEDS[25],
-  LEVEL_SEEDS[26],
-  LEVEL_SEEDS[27],
-  LEVEL_SEEDS[28],
-  MERCURY_LEVEL_SEED,
-  LEVEL_SEEDS[29],
-  LEVEL_SEEDS[30],
-  LEVEL_SEEDS[31],
-  LEVEL_SEEDS[32],
-  LEVEL_SEEDS[33],
-  LEVEL_SEEDS[34],
-  LEVEL_SEEDS[35],
-  LEVEL_SEEDS[36],
-  LEVEL_SEEDS[37],
-  LEVEL_SEEDS[38],
-  LEVEL_SEEDS[39],
-];
-const ATOM_LEVELS: Level[] = [
-  ...EARLY_LEVELS,
-  ...POST_TUTORIAL_ATOM_SEEDS.map((seed, index) => {
-    const atomStage = 16 + index;
-    while (nextPostTutorialLevelId % 5 === 0 || SPECIAL_LEVEL_IDS.has(nextPostTutorialLevelId)) nextPostTutorialLevelId += 1;
-    const id = nextPostTutorialLevelId;
-    nextPostTutorialLevelId += 1;
-    return makeAtomLevel(seed, id, atomStage);
-  }),
-].filter((level) => !MOLECULE_CHALLENGE_BY_LEVEL[level.id] || EARLY_LEVEL_IDS.has(level.id));
+interface PowerUpStageSeed {
+  stage: PowerUpStageId;
+  name: string;
+  description: string;
+  target: number;
+  maxQueue: number;
+}
 
-const CHALLENGE_LEVELS: Level[] = Object.keys(MOLECULE_CHALLENGE_BY_LEVEL).map((key) => {
-  const id = Number(key);
-  const previousAtoms = ATOM_LEVELS.filter((level) => level.id < id);
-  const previousAtom = previousAtoms[previousAtoms.length - 1] ?? ATOM_LEVELS[0];
+// Power-up tutorial stages, placed on specific non-compound, non-boss levels.
+const POWER_UP_STAGE_BY_LEVEL: Record<number, PowerUpStageSeed> = {
+  3: { stage: "shimmer", name: "Shimmer Practice", description: "Merge the shimmering queued atom to clear the stage.", target: 3, maxQueue: 3 },
+  6: { stage: "grab", name: "Grab Training", description: "Use Grab to reposition an atom and create a merge.", target: 5, maxQueue: 5 },
+  8: { stage: "unstable", name: "Unstable Isotope", description: "Merge an unstable atom before its shell depletes.", target: 10, maxQueue: 10 },
+  12: { stage: "egun", name: "E-Gun Calibration", description: "Fire the E-Gun through a molecule to upgrade it.", target: 6, maxQueue: 6 },
+  14: { stage: "gravity", name: "Gravity Well", description: "Gravity is earned every 30 successful merges. Use it to pull scattered atoms together.", target: 7, maxQueue: 7 },
+  17: { stage: "stone", name: "Stone Impact", description: "Miss three opening shots, then place the loaded Stone.", target: 10, maxQueue: 10 },
+  23: { stage: "transmute", name: "Transmute Shot", description: "Transmute your queued atom, then merge it into the board.", target: 13, maxQueue: 13 },
+  27: { stage: "fusion-jump", name: "Fusion Jump", description: "Arm Fusion Jump and merge Chlorine into Potassium.", target: 19, maxQueue: 17 },
+  33: { stage: "catalyst", name: "Catalyst Chain", description: "Activate Catalyst and trigger a chain reaction.", target: 24, maxQueue: 6 },
+  38: { stage: "emission", name: "Emission Burst", description: "Use Emission to raise the waiting queue.", target: 29, maxQueue: 29 },
+  44: { stage: "gamma", name: "Gamma Bomb", description: "Use Gamma Bomb to clear a dense board.", target: 33, maxQueue: 6 },
+  52: { stage: "blank", name: "Blank Breakthrough", description: "Use a Blank Atom to reach Krypton through the stone wall.", target: 36, maxQueue: 35 },
+  58: { stage: "queue-shuffle", name: "Queue Shuffle", description: "Shuffle the queue, then fire one of the new atoms.", target: 42, maxQueue: 42 },
+};
+
+type BossKind = NonNullable<Level["specialStage"]>;
+
+const BOSS_STAGE_BY_LEVEL: Record<number, BossKind> = {
+  31: "elemental-boss",
+  61: "periodic-guardian",
+  100: "nucleus-core",
+};
+
+function makeBossLevel(id: number, kind: BossKind): Level {
+  if (kind === "elemental-boss") {
+    return {
+      id,
+      name: "Elemental Boss",
+      description: "Match the open eyes, charge Blank atoms, and bring the creature down in 100 shots.",
+      lore: "A warped elemental beholder crawls out of the lab ceiling. Its orbiting eye-stalks answer only to clean reactions and relentless pressure.",
+      targetElement: 10,
+      maxQueueElement: 10,
+      queueDecay: 0.45,
+      gridCols: 10,
+      gridRows: 12,
+      scoreMultiplier: 4.8,
+      parShots: 55,
+      starShotsThree: 40,
+      starShotsTwo: 70,
+      parTimeSec: 240,
+      scoreGoal: 60_000,
+      comboGoal: 4,
+      milestoneFact:
+        "Boss atoms never rise above Neon. This fight is about recognition, timing, and setting up the perfect Blank shot.",
+      specialStage: "elemental-boss",
+    };
+  }
+  if (kind === "periodic-guardian") {
+    return {
+      id,
+      name: "The Periodic Guardian",
+      description: "Read the guardian's active element group and strike the core 20 times before your 50 shots run dry.",
+      lore: "A living monument of the periodic table rises from the archive. Its shell rotates through the great families, and only the right group can pierce its heart.",
+      targetElement: 18,
+      maxQueueElement: 18,
+      queueDecay: 0.5,
+      gridCols: 10,
+      gridRows: 12,
+      scoreMultiplier: 5.2,
+      parShots: 32,
+      starShotsThree: 24,
+      starShotsTwo: 38,
+      parTimeSec: 210,
+      scoreGoal: 80_000,
+      comboGoal: 5,
+      milestoneFact:
+        "The guardian only recognizes three elemental families: Metals, Halogens, and Noble Gases. Learn the rhythm and the whole table starts to feel alive.",
+      specialStage: "periodic-guardian",
+    };
+  }
+  return {
+    id,
+    name: "The Nucleus",
+    description: "The final boss. Bank shots around a black hole, peel away the orbit atoms, and expose the eye before the core overwhelms the field.",
+    lore: "A magnetic singularity anchors a living nucleus in the final chamber. Its orbiting atoms shred careless lines, and its hidden eye punishes hesitation. This is the last stand.",
+    targetElement: 10,
+    maxQueueElement: 10,
+    queueDecay: 0.48,
+    gridCols: 10,
+    gridRows: 12,
+    scoreMultiplier: 6.2,
+    parShots: 48,
+    starShotsThree: 32,
+    starShotsTwo: 52,
+    parTimeSec: 260,
+    scoreGoal: 120_000,
+    comboGoal: 6,
+    milestoneFact:
+      "The Nucleus bends trajectory instead of rules. You win by reading curved lines, not by forcing straight shots. Beat it and the table is yours.",
+    specialStage: "nucleus-core",
+  };
+}
+
+function makeCompoundLevel(id: number, previousAtom: Level): Level {
   const difficulty = id - 1;
   const parShots = 18 + Math.floor(id * 0.8);
   return {
@@ -536,75 +576,54 @@ const CHALLENGE_LEVELS: Level[] = Object.keys(MOLECULE_CHALLENGE_BY_LEVEL).map((
     scoreGoal: Math.round((900 + difficulty * 380) * previousAtom.scoreMultiplier),
     comboGoal: previousAtom.comboGoal,
   };
-});
+}
 
-const SPECIAL_LEVELS: Level[] = [
-  {
-    id: 21,
-    name: "Elemental Boss",
-    description: "Match the open eyes, charge Blank atoms, and bring the creature down in 100 shots.",
-    lore: "A warped elemental beholder crawls out of the lab ceiling. Its orbiting eye-stalks answer only to clean reactions and relentless pressure.",
-    targetElement: 10,
-    maxQueueElement: 10,
-    queueDecay: 0.45,
-    gridCols: 10,
-    gridRows: 12,
-    scoreMultiplier: 4.8,
-    parShots: 55,
-    starShotsThree: 40,
-    starShotsTwo: 70,
-    parTimeSec: 240,
-    scoreGoal: 60_000,
-    comboGoal: 4,
-    milestoneFact:
-      "Boss atoms never rise above Neon. This fight is about recognition, timing, and setting up the perfect Blank shot.",
-    specialStage: "elemental-boss",
-  },
-  {
-    id: 41,
-    name: "The Periodic Guardian",
-    description: "Read the guardian's active element group and strike the core 20 times before your 50 shots run dry.",
-    lore: "A living monument of the periodic table rises from the archive. Its shell rotates through the great families, and only the right group can pierce its heart.",
-    targetElement: 18,
-    maxQueueElement: 18,
-    queueDecay: 0.5,
-    gridCols: 10,
-    gridRows: 12,
-    scoreMultiplier: 5.2,
-    parShots: 32,
-    starShotsThree: 24,
-    starShotsTwo: 38,
-    parTimeSec: 210,
-    scoreGoal: 80_000,
-    comboGoal: 5,
-    milestoneFact:
-      "The guardian only recognizes three elemental families: Metals, Halogens, and Noble Gases. Learn the rhythm and the whole table starts to feel alive.",
-    specialStage: "periodic-guardian",
-  },
-  {
-    id: 65,
-    name: "The Nucleus",
-    description: "Bank shots around a black hole, peel away the orbit atoms, and expose the eye before the core overwhelms the field.",
-    lore: "A magnetic singularity anchors a living nucleus in the upper chamber. Its orbiting atoms shred careless lines, and its hidden eye punishes hesitation.",
-    targetElement: 10,
-    maxQueueElement: 10,
-    queueDecay: 0.48,
-    gridCols: 10,
-    gridRows: 12,
-    scoreMultiplier: 5.6,
-    parShots: 42,
-    starShotsThree: 28,
-    starShotsTwo: 46,
-    parTimeSec: 220,
-    scoreGoal: 95_000,
-    comboGoal: 5,
-    milestoneFact:
-      "The Nucleus bends trajectory instead of rules. You win by reading curved lines, not by forcing straight shots.",
-    specialStage: "nucleus-core",
-  },
-];
+function buildCampaignLevels(): Level[] {
+  const byId = new Map<number, Level>();
+  const compoundIds: number[] = [];
+  let atomIndex = 0;
 
-export const LEVELS: Level[] = [...ATOM_LEVELS, ...CHALLENGE_LEVELS, ...SPECIAL_LEVELS].sort((a, b) => a.id - b.id);
+  // Pass 1: atom levels, power-up tutorials, and bosses.
+  for (let id = 1; id <= TOTAL_CAMPAIGN_LEVELS; id += 1) {
+    if (BOSS_STAGE_BY_LEVEL[id]) {
+      byId.set(id, makeBossLevel(id, BOSS_STAGE_BY_LEVEL[id]));
+      continue;
+    }
+    if (MOLECULE_CHALLENGE_BY_LEVEL[id]) {
+      compoundIds.push(id);
+      continue;
+    }
+    const tutorial = POWER_UP_STAGE_BY_LEVEL[id];
+    if (tutorial) {
+      byId.set(
+        id,
+        makePowerUpLevel(id, tutorial.stage, tutorial.name, tutorial.description, tutorial.target, tutorial.maxQueue),
+      );
+      continue;
+    }
+    const target = ATOM_TARGET_ORDER[atomIndex] ?? 118;
+    atomIndex += 1;
+    byId.set(id, makeAtomLevel(atomSeedFor(target), id, atomIndex));
+  }
+
+  // Pass 2: compound challenges reference the nearest preceding atom level.
+  for (const id of compoundIds) {
+    let previousAtom: Level | undefined;
+    for (let j = id - 1; j >= 1; j -= 1) {
+      const candidate = byId.get(j);
+      if (candidate && !candidate.specialStage && !candidate.powerUpStage) {
+        previousAtom = candidate;
+        break;
+      }
+    }
+    previousAtom = previousAtom ?? byId.get(1) ?? makeAtomLevel(atomSeedFor(2), 1, 1);
+    byId.set(id, makeCompoundLevel(id, previousAtom));
+  }
+
+  return Array.from(byId.values()).sort((a, b) => a.id - b.id);
+}
+
+export const LEVELS: Level[] = buildCampaignLevels();
 
 export function getLevelById(id: number): Level | undefined {
   return LEVELS.find((l) => l.id === id);
