@@ -5289,6 +5289,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       reachedAtomicNumbers: Array.from(newAtoms),
       maxChainDepth: result.merges.length,
     });
+    reportQuestProgress({ runScore: nextScore });
     setTimeout(
       () => setHighlightId(null),
       MERGE_COMBO_START_MS + result.merges.length * MERGE_COMBO_STEP_MS + MERGE_COMBO_END_PAD_MS,
