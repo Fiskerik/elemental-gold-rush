@@ -531,6 +531,190 @@ export const COMPOUND_STRUCTURES: Record<string, CompoundStructure> = {
       { from: 1, to: 4 },
       { from: 1, to: 5 }
     ],
+  },
+  "ethane": {
+    atoms: [
+      { symbol: "C", x: -0.28, y: 0 },
+      { symbol: "C", x: 0.28, y: 0 },
+      { symbol: "H", x: -0.62, y: -0.34 },
+      { symbol: "H", x: -0.62, y: 0.34 },
+      { symbol: "H", x: -0.18, y: 0.5 },
+      { symbol: "H", x: 0.62, y: -0.34 },
+      { symbol: "H", x: 0.62, y: 0.34 },
+      { symbol: "H", x: 0.18, y: -0.5 }
+    ],
+    bonds: [
+      { from: 0, to: 1 },
+      { from: 0, to: 2 },
+      { from: 0, to: 3 },
+      { from: 0, to: 4 },
+      { from: 1, to: 5 },
+      { from: 1, to: 6 },
+      { from: 1, to: 7 }
+    ],
+  },
+  "phosphoric-acid": {
+    atoms: [
+      { symbol: "P", x: 0, y: 0 },
+      { symbol: "O", x: 0, y: -0.55 },
+      { symbol: "O", x: 0.5, y: 0.25 },
+      { symbol: "O", x: -0.5, y: 0.25 },
+      { symbol: "O", x: 0, y: 0.55 },
+      { symbol: "H", x: 0.78, y: 0.55 },
+      { symbol: "H", x: -0.78, y: 0.55 },
+      { symbol: "H", x: 0.3, y: 0.82 }
+    ],
+    bonds: [
+      { from: 0, to: 1, order: 2 },
+      { from: 0, to: 2 },
+      { from: 0, to: 3 },
+      { from: 0, to: 4 },
+      { from: 2, to: 5 },
+      { from: 3, to: 6 },
+      { from: 4, to: 7 }
+    ],
+  },
+  "potassium-hydroxide": {
+    atoms: [{ symbol: "K", x: -0.5, y: 0 }, { symbol: "O", x: 0, y: 0 }, { symbol: "H", x: 0.5, y: 0 }],
+    bonds: [{ from: 0, to: 1 }, { from: 1, to: 2 }],
+  },
+  "sulfur-trioxide": {
+    atoms: [
+      { symbol: "S", x: 0, y: 0 },
+      { symbol: "O", x: 0, y: -0.55 },
+      { symbol: "O", x: 0.48, y: 0.3 },
+      { symbol: "O", x: -0.48, y: 0.3 }
+    ],
+    bonds: [{ from: 0, to: 1, order: 2 }, { from: 0, to: 2, order: 2 }, { from: 0, to: 3, order: 2 }],
+  },
+  "hydrazine": {
+    atoms: [
+      { symbol: "N", x: -0.28, y: 0 },
+      { symbol: "N", x: 0.28, y: 0 },
+      { symbol: "H", x: -0.62, y: -0.34 },
+      { symbol: "H", x: -0.62, y: 0.34 },
+      { symbol: "H", x: 0.62, y: -0.34 },
+      { symbol: "H", x: 0.62, y: 0.34 }
+    ],
+    bonds: [{ from: 0, to: 1 }, { from: 0, to: 2 }, { from: 0, to: 3 }, { from: 1, to: 4 }, { from: 1, to: 5 }],
+  },
+  "boric-acid": {
+    atoms: [
+      { symbol: "B", x: 0, y: 0 },
+      { symbol: "O", x: 0, y: -0.5 },
+      { symbol: "O", x: 0.45, y: 0.28 },
+      { symbol: "O", x: -0.45, y: 0.28 },
+      { symbol: "H", x: 0.3, y: -0.72 },
+      { symbol: "H", x: 0.78, y: 0.5 },
+      { symbol: "H", x: -0.78, y: 0.5 }
+    ],
+    bonds: [
+      { from: 0, to: 1 },
+      { from: 0, to: 2 },
+      { from: 0, to: 3 },
+      { from: 1, to: 4 },
+      { from: 2, to: 5 },
+      { from: 3, to: 6 }
+    ],
+  },
+  "hydrogen-bromide": {
+    atoms: [{ symbol: "H", x: -0.32, y: 0 }, { symbol: "Br", x: 0.32, y: 0 }],
+    bonds: [{ from: 0, to: 1 }],
+  },
+  "phosgene": {
+    atoms: [
+      { symbol: "C", x: 0, y: 0 },
+      { symbol: "O", x: 0, y: -0.55 },
+      { symbol: "Cl", x: 0.52, y: 0.3 },
+      { symbol: "Cl", x: -0.52, y: 0.3 }
+    ],
+    bonds: [{ from: 0, to: 1, order: 2 }, { from: 0, to: 2 }, { from: 0, to: 3 }],
+  },
+  "aluminum-chloride": {
+    atoms: [
+      { symbol: "Al", x: 0, y: 0 },
+      { symbol: "Cl", x: 0, y: -0.55 },
+      { symbol: "Cl", x: 0.52, y: 0.3 },
+      { symbol: "Cl", x: -0.52, y: 0.3 }
+    ],
+    bonds: [{ from: 0, to: 1 }, { from: 0, to: 2 }, { from: 0, to: 3 }],
+  },
+  "calcium-fluoride": {
+    atoms: [{ symbol: "F", x: -0.5, y: 0 }, { symbol: "Ca", x: 0, y: 0 }, { symbol: "F", x: 0.5, y: 0 }],
+    bonds: [{ from: 0, to: 1 }, { from: 1, to: 2 }],
+  },
+  "sodium-fluoride": {
+    atoms: [{ symbol: "Na", x: -0.32, y: 0 }, { symbol: "F", x: 0.32, y: 0 }],
+    bonds: [{ from: 0, to: 1 }],
+  },
+  "potassium-iodide": {
+    atoms: [{ symbol: "K", x: -0.34, y: 0 }, { symbol: "I", x: 0.34, y: 0 }],
+    bonds: [{ from: 0, to: 1 }],
+  },
+  "formic-acid": {
+    atoms: [
+      { symbol: "C", x: 0, y: 0 },
+      { symbol: "O", x: 0, y: -0.55 },
+      { symbol: "O", x: 0.5, y: 0.28 },
+      { symbol: "H", x: -0.5, y: 0.28 },
+      { symbol: "H", x: 0.82, y: 0.52 }
+    ],
+    bonds: [{ from: 0, to: 1, order: 2 }, { from: 0, to: 2 }, { from: 0, to: 3 }, { from: 2, to: 4 }],
+  },
+  "acetaldehyde": {
+    atoms: [
+      { symbol: "C", x: -0.34, y: 0 },
+      { symbol: "C", x: 0.24, y: 0 },
+      { symbol: "O", x: 0.58, y: -0.42 },
+      { symbol: "H", x: -0.68, y: -0.34 },
+      { symbol: "H", x: -0.68, y: 0.34 },
+      { symbol: "H", x: -0.24, y: 0.5 },
+      { symbol: "H", x: 0.5, y: 0.42 }
+    ],
+    bonds: [
+      { from: 0, to: 1 },
+      { from: 1, to: 2, order: 2 },
+      { from: 0, to: 3 },
+      { from: 0, to: 4 },
+      { from: 0, to: 5 },
+      { from: 1, to: 6 }
+    ],
+  },
+  "dinitrogen-tetroxide": {
+    atoms: [
+      { symbol: "N", x: -0.3, y: 0 },
+      { symbol: "N", x: 0.3, y: 0 },
+      { symbol: "O", x: -0.66, y: -0.42 },
+      { symbol: "O", x: -0.66, y: 0.42 },
+      { symbol: "O", x: 0.66, y: -0.42 },
+      { symbol: "O", x: 0.66, y: 0.42 }
+    ],
+    bonds: [
+      { from: 0, to: 1 },
+      { from: 0, to: 2, order: 2 },
+      { from: 0, to: 3 },
+      { from: 1, to: 4, order: 2 },
+      { from: 1, to: 5 }
+    ],
+  },
+  "sulfur-hexafluoride": {
+    atoms: [
+      { symbol: "S", x: 0, y: 0 },
+      { symbol: "F", x: 0, y: -0.58 },
+      { symbol: "F", x: 0, y: 0.58 },
+      { symbol: "F", x: 0.55, y: 0 },
+      { symbol: "F", x: -0.55, y: 0 },
+      { symbol: "F", x: 0.34, y: 0.34 },
+      { symbol: "F", x: -0.34, y: -0.34 }
+    ],
+    bonds: [
+      { from: 0, to: 1 },
+      { from: 0, to: 2 },
+      { from: 0, to: 3 },
+      { from: 0, to: 4 },
+      { from: 0, to: 5 },
+      { from: 0, to: 6 }
+    ],
   }
 };
 
