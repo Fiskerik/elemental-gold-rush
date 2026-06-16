@@ -150,6 +150,22 @@ export const COMPOUNDS: CompoundDefinition[] = [
   compound("magnesium-sulfate", "Magnesium Sulfate", "MgSO₄", { Mg: 1, S: 1, O: 4 }, 3200, "rare", "Magnesium sulfate is Epsom salt, used in baths to soothe sore muscles."),
   compound("calcium-sulfate", "Calcium Sulfate", "CaSO₄", { Ca: 1, S: 1, O: 4 }, 3100, "rare", "Calcium sulfate is the main ingredient in plaster and gypsum drywall."),
 
+  compound("ethane", "Ethane", "C₂H₆", { C: 2, H: 6 }, 2600, "uncommon", "Ethane is the second-largest component of natural gas and is cracked to make plastics."),
+  compound("phosphoric-acid", "Phosphoric Acid", "H₃PO₄", { H: 3, P: 1, O: 4 }, 3600, "rare", "Phosphoric acid gives colas their tangy bite and is used in fertilizers and rust removers."),
+  compound("potassium-hydroxide", "Potassium Hydroxide", "KOH", { K: 1, O: 1, H: 1 }, 2800, "uncommon", "Potassium hydroxide is caustic potash, used to make soft soaps and batteries."),
+  compound("sulfur-trioxide", "Sulfur Trioxide", "SO₃", { S: 1, O: 3 }, 2700, "uncommon", "Sulfur trioxide reacts with water to form sulfuric acid and drives acid rain."),
+  compound("hydrazine", "Hydrazine", "N₂H₄", { N: 2, H: 4 }, 3000, "rare", "Hydrazine is a powerful rocket fuel that can ignite on contact with an oxidizer."),
+  compound("boric-acid", "Boric Acid", "H₃BO₃", { H: 3, B: 1, O: 3 }, 3200, "rare", "Boric acid is a mild antiseptic and a common ant and cockroach killer."),
+  compound("hydrogen-bromide", "Hydrogen Bromide", "HBr", { H: 1, Br: 1 }, 2000, "common", "Hydrogen bromide dissolves in water to form strongly acidic hydrobromic acid."),
+  compound("phosgene", "Phosgene", "COCl₂", { C: 1, O: 1, Cl: 2 }, 3200, "rare", "Phosgene smells like fresh-cut hay but is a deadly gas once used as a chemical weapon."),
+  compound("aluminum-chloride", "Aluminum Chloride", "AlCl₃", { Al: 1, Cl: 3 }, 2900, "uncommon", "Aluminum chloride is a key catalyst in industry and the active salt in many antiperspirants."),
+  compound("calcium-fluoride", "Calcium Fluoride", "CaF₂", { Ca: 1, F: 2 }, 2600, "uncommon", "Calcium fluoride is the mineral fluorite, which glows under ultraviolet light."),
+  compound("sodium-fluoride", "Sodium Fluoride", "NaF", { Na: 1, F: 1 }, 2100, "common", "Sodium fluoride is added to toothpaste and water to help prevent cavities."),
+  compound("potassium-iodide", "Potassium Iodide", "KI", { K: 1, I: 1 }, 2400, "uncommon", "Potassium iodide is added to table salt and protects the thyroid during radiation events."),
+  compound("formic-acid", "Formic Acid", "CH₂O₂", { C: 1, H: 2, O: 2 }, 2800, "uncommon", "Formic acid is the sting in ant bites and nettle stings, named after the Latin for ant."),
+  compound("acetaldehyde", "Acetaldehyde", "C₂H₄O", { C: 2, H: 4, O: 1 }, 3000, "rare", "Acetaldehyde forms when the body breaks down alcohol and causes much of a hangover."),
+  compound("dinitrogen-tetroxide", "Dinitrogen Tetroxide", "N₂O₄", { N: 2, O: 4 }, 3100, "rare", "Dinitrogen tetroxide is a storable rocket oxidizer used on many spacecraft."),
+  compound("sulfur-hexafluoride", "Sulfur Hexafluoride", "SF₆", { S: 1, F: 6 }, 3400, "rare", "Sulfur hexafluoride is so dense it makes your voice sound deep and floats boats of foil."),
 ];
 
 export function compoundKey(elements: Record<string, number>): string {
@@ -228,6 +244,22 @@ export const COMPOUND_HINTS: Record<string, string> = {
   "potassium-chloride": "A salt used as a sodium-free substitute for people with high blood pressure.",
   "magnesium-sulfate": "Better known as Epsom salt, used in relaxing baths for sore muscles.",
   "calcium-sulfate": "The main ingredient in plaster, gypsum boards, and blackboard chalk.",
+  "ethane": "A two-carbon fuel gas hiding inside natural gas.",
+  "phosphoric-acid": "The tangy acid that sharpens the flavor of cola drinks.",
+  "potassium-hydroxide": "A caustic potassium base used to make soft soap.",
+  "sulfur-trioxide": "A reactive oxide that turns into sulfuric acid with water.",
+  "hydrazine": "A high-energy nitrogen fuel that powers rocket thrusters.",
+  "boric-acid": "A mild antiseptic powder also used to kill ants and roaches.",
+  "hydrogen-bromide": "A sharp hydrogen-halogen gas that makes a strong acid in water.",
+  "phosgene": "A hay-scented but deadly gas of carbon, oxygen, and chlorine.",
+  "aluminum-chloride": "An industrial catalyst and the salt in many antiperspirants.",
+  "calcium-fluoride": "The fluorite mineral that glows under ultraviolet light.",
+  "sodium-fluoride": "The cavity-fighting salt added to toothpaste and water.",
+  "potassium-iodide": "The thyroid-protecting salt added to iodized table salt.",
+  "formic-acid": "The simplest acid, found in the sting of ants and nettles.",
+  "acetaldehyde": "The molecule behind much of an alcohol hangover.",
+  "dinitrogen-tetroxide": "A storable rocket oxidizer paired with hydrazine fuels.",
+  "sulfur-hexafluoride": "A heavy gas that deepens your voice the opposite of helium.",
 };
 
 export const COMPOUND_STRUCTURES: Record<string, CompoundStructure> = {
