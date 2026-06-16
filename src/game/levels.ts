@@ -329,22 +329,28 @@ const LEVEL_SEEDS: LevelSeed[] = [
   },
 ];
 
+// A compound (molecule) challenge sits on every 5th level of the 100-stage map.
 export const MOLECULE_CHALLENGE_BY_LEVEL: Record<number, string> = {
-  5: "ammonium",
-  10: "water",
+  5: "water",
+  10: "ammonia",
   15: "carbon-dioxide",
-  20: "hydrogen-sulfide",
-  25: "ethanol",
-  30: "carbonic-acid",
-  35: "magnesium-chloride",
-  40: "sulfuric-acid",
-  45: "calcium-carbonate",
-  50: "aluminum-oxide",
-  55: "calcium-sulfate",
-  60: "urea",
+  20: "methane",
+  25: "hydrogen-sulfide",
+  30: "sodium-chloride",
+  35: "ethanol",
+  40: "carbonic-acid",
+  45: "magnesium-chloride",
+  50: "sulfuric-acid",
+  55: "calcium-carbonate",
+  60: "nitric-acid",
+  65: "aluminum-oxide",
+  70: "calcium-sulfate",
+  75: "iron-oxide",
+  80: "titanium-dioxide",
+  85: "zinc-oxide",
+  90: "urea",
+  95: "ammonium-nitrate",
 };
-
-const SPECIAL_LEVEL_IDS = new Set([21, 41, 65]);
 
 function makeAtomLevel(seed: LevelSeed, id: number, atomStage: number): Level {
   const target = seed.targetElement;
