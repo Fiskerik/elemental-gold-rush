@@ -10,6 +10,37 @@ declare global {
   }
 }
 
+function installNativeDiagnostics() {
+  const writeDiagnostic = (kind: string, detail: unknown) => {
+    try {
+      const message =
+        detail instanceof Error
+          ? `${detail.name}: ${detail.message}\n${detail.stack ?? ""}`
+          : typeof detail === "string"
+            ? detail
+            : JSON.stringify(detail);
+      const entry = {
+        at: new Date().toISOString(),
+        kind,
+        message,
+      };
+      const key = "atomic-fusion-native-diagnostics";
+      const previous = JSON.parse(window.localStorage.getItem(key) ?? "[]") as unknown[];
+      window.localStorage.setItem(key, JSON.stringify([...previous.slice(-9), entry]));
+      console.error(`[native-diagnostic:${kind}]`, message);
+    } catch {
+      console.error(`[native-diagnostic:${kind}]`, detail);
+    }
+  };
+
+  window.addEventListener("error", (event) => {
+    writeDiagnostic("error", event.error ?? event.message);
+  });
+  window.addEventListener("unhandledrejection", (event) => {
+    writeDiagnostic("unhandledrejection", event.reason);
+  });
+}
+
 function getStoredTheme(): "dark" | "light" {
   try {
     const raw = window.localStorage.getItem("elemental-gold-rush");
@@ -24,6 +55,7 @@ const storedTheme = getStoredTheme();
 document.documentElement.classList.add(storedTheme === "light" ? "theme-light" : "theme-dark");
 document.documentElement.classList.add("platform-native");
 document.documentElement.style.colorScheme = storedTheme;
+installNativeDiagnostics();
 
 const rootElement = document.getElementById("root");
 

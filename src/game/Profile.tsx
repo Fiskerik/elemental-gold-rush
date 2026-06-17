@@ -669,6 +669,7 @@ const profileNameRow: React.CSSProperties = {
   gridTemplateColumns: "minmax(0, 1fr) auto",
   alignItems: "end",
   gap: 10,
+  marginBottom: 18,
 };
 
 const profileNameLabel: React.CSSProperties = {

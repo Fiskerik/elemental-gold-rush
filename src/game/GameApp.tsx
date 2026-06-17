@@ -378,7 +378,7 @@ function DailyBoardNamePrompt({
   onCancel: () => void;
   onStart: () => void;
 }) {
-  const normalizedName = normalizePlayerDisplayName(value);
+  const hasName = value.trim().length > 0;
   return (
     <div
       role="dialog"
@@ -392,7 +392,6 @@ function DailyBoardNamePrompt({
         placeItems: "center",
         padding: 20,
         background: "rgba(0,0,0,0.72)",
-        backdropFilter: "blur(6px)",
       }}
     >
       <form
@@ -416,22 +415,27 @@ function DailyBoardNamePrompt({
         </div>
         <h2 style={{ margin: "6px 0 12px", fontSize: 23 }}>Display name</h2>
         <input
-          autoFocus
+          type="text"
           value={value}
           onChange={(event) => onChange(event.target.value)}
           maxLength={18}
           placeholder={DEFAULT_PLAYER_DISPLAY_NAME}
           aria-label="Display name"
+          autoCapitalize="words"
+          autoComplete="off"
+          autoCorrect="off"
+          enterKeyHint="done"
+          spellCheck={false}
           style={promptNameInput}
         />
         <div style={{ display: "grid", gap: 8, marginTop: 14 }}>
           <button
             type="submit"
-            disabled={!normalizedName}
+            disabled={!hasName}
             style={{
               ...promptPrimaryBtn,
-              opacity: normalizedName ? 1 : 0.55,
-              cursor: normalizedName ? "pointer" : "not-allowed",
+              opacity: hasName ? 1 : 0.55,
+              cursor: hasName ? "pointer" : "not-allowed",
             }}
           >
             Start Daily Board
@@ -449,13 +453,14 @@ const promptNameInput: CSSProperties = {
   width: "100%",
   boxSizing: "border-box",
   border: "1px solid var(--border)",
-  borderRadius: 12,
+  borderRadius: 14,
   padding: "12px 14px",
   background: "var(--surface)",
   color: "var(--foreground)",
   fontFamily: "inherit",
-  fontSize: 15,
+  fontSize: 16,
   fontWeight: 850,
+  lineHeight: 1.2,
   textAlign: "center",
 };
 
