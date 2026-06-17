@@ -56,6 +56,7 @@ export interface MergeEvent {
   y: number;
   stabilizedIsotope?: boolean;
   shimmerFusion?: boolean;
+  fusionJumpConsumed?: boolean;
   scoreGained: number;
 }
 
@@ -66,6 +67,7 @@ export interface MergeResult {
   scoreGained: number;
   levelComplete: boolean;
   finalBallId: number | null;
+  fusionJumpConsumed: boolean;
 }
 
 function resolveAdjacentMerges(
@@ -94,6 +96,7 @@ function resolveAdjacentMerges(
   let chainDepth = 0;
   let survivorId: number | null = initialSurvivorId;
   let jumpAvailable = fusionJump;
+  let fusionJumpConsumed = false;
 
   let changed = true;
   while (changed) {
@@ -128,13 +131,15 @@ function resolveAdjacentMerges(
     }
     if (best) {
       const { s, a } = best;
-      const mergeStep = jumpAvailable ? Math.max(2, Math.floor(options.fusionJumpStep ?? 2)) : 1;
+      const useFusionJump = jumpAvailable;
+      const mergeStep = useFusionJump ? Math.max(2, Math.floor(options.fusionJumpStep ?? 2)) : 1;
       const sourceAtomicNumber = list[s].atom;
       const participantMultiplier = Math.max(1, list[s].scoreMultiplier ?? 1, list[a].scoreMultiplier ?? 1);
       const stabilizedIsotope =
         (list[s].unstableShots ?? 0) > 0 || (list[a].unstableShots ?? 0) > 0;
       const next = Math.min(maxElement, sourceAtomicNumber + mergeStep);
       jumpAvailable = false;
+      if (useFusionJump) fusionJumpConsumed = true;
       const shimmerFusion = Boolean(list[s].shimmer || list[a].shimmer);
       const survivor = {
         ...list[s],
@@ -159,6 +164,7 @@ function resolveAdjacentMerges(
         y: list[newS].y,
         stabilizedIsotope,
         shimmerFusion,
+        fusionJumpConsumed: useFusionJump,
         scoreGained: mergeScore,
       });
       score += mergeScore;
@@ -177,6 +183,7 @@ function resolveAdjacentMerges(
     scoreGained: score - initialScore,
     levelComplete,
     finalBallId: survivorId,
+    fusionJumpConsumed,
   };
 }
 

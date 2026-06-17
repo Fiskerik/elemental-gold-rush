@@ -186,6 +186,7 @@ interface ProgressState {
   unlockedLevel: number; // highest level unlocked (1-based)
   highestElement: number; // highest atomic number ever reached
   totalScore: number;
+  highestSingleShotScore: number;
   goldCoins: number;
   discoveredElements: number[]; // atomic numbers seen
   discoveredCompounds: string[];
@@ -238,6 +239,7 @@ interface ProgressState {
   unlockLockedElementsForCoins: (coinCost: number) => boolean;
   unlockLockedCompoundsForCoins: (coinCost: number) => boolean;
   addScore: (n: number) => void;
+  recordSingleShotScore: (score: number) => void;
   spendScore: (cost: number) => boolean;
   spendGoldCoins: (cost: number) => boolean;
   skipLevelForCoins: (levelId: number, coinCost: number) => boolean;
@@ -286,6 +288,7 @@ export const useProgress = create<ProgressState>()(
       unlockedLevel: 1,
       highestElement: 1,
       totalScore: 0,
+      highestSingleShotScore: 0,
       goldCoins: 0,
       discoveredElements: [1],
       discoveredCompounds: [],
@@ -507,6 +510,13 @@ export const useProgress = create<ProgressState>()(
         return unlocked;
       },
       addScore: (n) => set((s) => ({ totalScore: s.totalScore + Math.max(0, Math.floor(n)) })),
+      recordSingleShotScore: (score) =>
+        set((s) => ({
+          highestSingleShotScore: Math.max(
+            s.highestSingleShotScore,
+            Math.max(0, Math.floor(score)),
+          ),
+        })),
       spendScore: (cost) => {
         let spent = false;
         set((s) => {
@@ -756,6 +766,7 @@ export const useProgress = create<ProgressState>()(
           unlockedLevel: 1,
           highestElement: 1,
           totalScore: 0,
+          highestSingleShotScore: 0,
           goldCoins: s.goldCoins,
           discoveredElements: [1],
           discoveredCompounds: [],
@@ -808,6 +819,8 @@ export const useProgress = create<ProgressState>()(
         return {
           ...current,
           ...persistedState,
+          highestSingleShotScore:
+            persistedState?.highestSingleShotScore ?? current.highestSingleShotScore,
           dailyQuestDate: persistedState?.dailyQuestDate ?? current.dailyQuestDate,
           dailyQuests: persistedState?.dailyQuests ?? current.dailyQuests,
           dailyStreak: persistedState?.dailyStreak ?? current.dailyStreak,

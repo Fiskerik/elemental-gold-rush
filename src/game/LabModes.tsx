@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Atom, CalendarDays, Clock, Eye, FlaskConical, LockKeyhole, Map, Orbit, RotateCcw, Shield, Sparkles, type LucideIcon } from "lucide-react";
 import { LEVELS, MAX_LEVEL } from "./levels";
 import { GAME_MODES, GameModeId, getUnlockedGameModes } from "./challenges";
@@ -12,7 +12,7 @@ import {
 } from "./store";
 import { useIsTabletLayout } from "./responsive";
 import { PowerUpBadge } from "./PowerUpLibrary";
-import { POWER_UP_UNLOCK_LEVELS } from "./powerUps";
+import { POWER_UPS, POWER_UP_UNLOCK_LEVELS } from "./powerUps";
 import { t } from "./localization";
 
 interface Props {
@@ -47,8 +47,34 @@ export function LabModes({ onBack, onStart }: Props) {
     ),
   );
   const [selectedUpgradeId, setSelectedUpgradeId] = useState<LabUpgradeId | null>(null);
+  const [infoPowerUpId, setInfoPowerUpId] = useState<LabUpgradeId | null>(null);
+  const infoPressTimerRef = useRef<number | null>(null);
   const activeUpgradeId = selectedUpgradeId && discoveredUpgradeIds.includes(selectedUpgradeId) ? selectedUpgradeId : discoveredUpgradeIds[0] ?? null;
+  const infoPowerUp = infoPowerUpId
+    ? POWER_UPS.find((powerUp) => powerUp.icon === infoPowerUpId)
+    : null;
   const tr = (text: string) => t(text, appLanguage);
+
+  function clearInfoPressTimer() {
+    if (infoPressTimerRef.current != null) window.clearTimeout(infoPressTimerRef.current);
+    infoPressTimerRef.current = null;
+  }
+
+  function powerUpInfoHandlers(id: LabUpgradeId) {
+    return {
+      onPointerDown: () => {
+        clearInfoPressTimer();
+        infoPressTimerRef.current = window.setTimeout(() => setInfoPowerUpId(id), 520);
+      },
+      onPointerUp: clearInfoPressTimer,
+      onPointerLeave: clearInfoPressTimer,
+      onContextMenu: (event: React.MouseEvent) => {
+        event.preventDefault();
+        clearInfoPressTimer();
+        setInfoPowerUpId(id);
+      },
+    };
+  }
 
   function startDailyRound() {
     refreshDailyFeatures();
@@ -154,7 +180,13 @@ export function LabModes({ onBack, onStart }: Props) {
               const active = activeUpgradeId === id;
               const levelLabel = level >= 5 ? "Lvl 5 - Max" : `Lvl ${level}/5`;
               return (
-                <button key={id} type="button" onClick={() => setSelectedUpgradeId(id)} style={{ ...upgradePickerTile, ...(active ? upgradePickerTileActive : null) }}>
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setSelectedUpgradeId(id)}
+                  {...powerUpInfoHandlers(id)}
+                  style={{ ...upgradePickerTile, ...(active ? upgradePickerTileActive : null) }}
+                >
                   <PowerUpBadge icon={id} size={30} />
                   <span style={{ marginTop: 6, fontWeight: 900, fontSize: 11, lineHeight: 1.1 }}>{tr(meta.name)}</span>
                   <span
@@ -177,6 +209,30 @@ export function LabModes({ onBack, onStart }: Props) {
             })}
           </div>
         </section>
+        {infoPowerUp && (
+          <div
+            role="dialog"
+            aria-modal="true"
+            style={infoOverlay}
+            onClick={() => setInfoPowerUpId(null)}
+          >
+            <div style={infoCard} onClick={(event) => event.stopPropagation()}>
+              <div style={iconWrap}>
+                <PowerUpBadge icon={infoPowerUp.icon} size={42} />
+              </div>
+              <h2 style={{ margin: "10px 0 6px", fontSize: 20 }}>{tr(infoPowerUp.name)}</h2>
+              <p style={{ margin: "0 0 8px", color: "var(--muted-foreground)", fontSize: 13, lineHeight: 1.45 }}>
+                {tr(infoPowerUp.effect)}
+              </p>
+              <div style={{ color: "var(--accent)", fontSize: 11, fontWeight: 900, marginBottom: 12 }}>
+                {tr(`Obtained: ${infoPowerUp.unlock}`)}
+              </div>
+              <button type="button" onClick={() => setInfoPowerUpId(null)} style={startBtn}>
+                {tr("Got it")}
+              </button>
+            </div>
+          </div>
+        )}
         <div style={{ display: "grid", gridTemplateColumns: isTabletLayout ? "1fr 1fr" : "1fr", gap: isTabletLayout ? 16 : 12 }}>
           {GAME_MODES.map((mode) => {
             const bossId = isBossMode(mode.id) ? mode.id : null;
@@ -531,4 +587,26 @@ const dailyChoiceHint: React.CSSProperties = {
   color: "var(--muted-foreground)",
   fontSize: 11,
   lineHeight: 1.35,
+};
+
+const infoOverlay: React.CSSProperties = {
+  position: "fixed",
+  inset: 0,
+  zIndex: 80,
+  display: "grid",
+  placeItems: "center",
+  padding: 18,
+  background: "rgba(0,0,0,0.62)",
+  backdropFilter: "blur(6px)",
+};
+
+const infoCard: React.CSSProperties = {
+  width: "100%",
+  maxWidth: 340,
+  padding: 18,
+  borderRadius: 16,
+  background: "var(--surface-elevated)",
+  border: "1px solid var(--border)",
+  boxShadow: "0 18px 50px rgba(0,0,0,0.48)",
+  textAlign: "center",
 };

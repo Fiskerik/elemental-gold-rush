@@ -5,6 +5,7 @@ import { ELEMENTS } from "./elements";
 import {
   LEVELS,
   MOLECULE_CHALLENGE_BY_LEVEL,
+  getCompoundChallengeKind,
   getLevelById,
   getNextLevel,
   type PowerUpStageId,
@@ -54,7 +55,7 @@ import { PowerUpBadge } from "./PowerUpLibrary";
 import { POWER_UP_UNLOCK_LEVELS } from "./powerUps";
 import { DAILY_FEATURE_REWARD_COINS, hashDailySeed } from "./dailyFeatures";
 import { getTodayQuestDate } from "./quests";
-import { showInterstitialIfReady } from "./ads";
+import { showInterstitialIfReady, showRewardedForCoin } from "./ads";
 import { useIsTabletLayout } from "./responsive";
 import { ElementalBossBoard } from "./ElementalBossBoard";
 import { PeriodicGuardianBoard } from "./PeriodicGuardianBoard";
@@ -96,8 +97,6 @@ const STONE_MAX_HP = 8;
 const SPAWN_FLOOR_INTERVAL_MS = 60 * 1000;
 const SHUFFLE_COUNT = 4;
 const SHUFFLE_LIMIT = 3;
-const SHUFFLE_OFFSET_MIN = 4;
-const SHUFFLE_OFFSET_MAX = 10;
 const GAMMA_SHOT_INTERVAL = 40;
 const GAMMA_RADIUS_MULT = 3.5;
 const COMPOUND_REGEN_MS = 5 * 60 * 1000;
@@ -132,7 +131,10 @@ const POWER_UP_CLEAR_DELAY_MS = 2000;
 const DAILY_COMPOUND_GRID_COLS = 10;
 const DAILY_COMPOUND_GRID_ROWS = 15;
 const TIME_STAR_LIMIT_SEC = 5 * 60;
-const TARGET_BAND_QUEUE_CHANCE = 0.15;
+const TARGET_BAND_QUEUE_CHANCE = 0.1;
+const TARGET_BAND_OFFSET_MIN = 2;
+const TARGET_BAND_OFFSET_MAX = 12;
+const TARGET_BAND_PRESPAWN_COUNT = 2;
 
 function mergeComboCueDelay(index: number): number {
   return index * MERGE_COMBO_SOUND_STEP_MS;
@@ -178,6 +180,8 @@ interface SavedRunSnapshot {
   pendingStone: boolean;
   noMergeStreak: number;
   stoneSpawnCount: number;
+  dangerReliefPct?: number;
+  gameOverContinueUsed?: boolean;
   spawnFloorIndex: number;
   continuingPastTarget: boolean;
   continueStartedElapsedMs: number | null;
@@ -716,7 +720,10 @@ type DailyCompoundCell = {
 };
 
 function DailyCompoundGridBoard({
+  levelId,
   secretCompoundId,
+  onWin,
+  onMap,
   onExit,
 }: Props & { secretCompoundId: string }) {
  const {
@@ -727,9 +734,16 @@ function DailyCompoundGridBoard({
     compoundCounts,
     recordCompoundDiscovery,
     addScore,
+    setLevelStars,
+    unlockLevel,
+    recordLevelRun,
+    reportQuestProgress,
     completeSecretCompound,
     recordGameAttemptForAd,
   } = useProgress();
+  const isCampaignSearchFind =
+    getCompoundChallengeKind(levelId) === "search-find" &&
+    MOLECULE_CHALLENGE_BY_LEVEL[levelId] === secretCompoundId;
   const compound = useMemo(
     () => COMPOUNDS.find((item) => item.id === secretCompoundId) ?? null,
     [secretCompoundId],
@@ -762,8 +776,15 @@ function DailyCompoundGridBoard({
 
   const secretAtoms = useMemo(() => (compound ? atomsForCompound(compound) : []), [compound]);
   const cells = useMemo(
-    () => createDailyCompoundGrid(secretAtoms, DAILY_COMPOUND_GRID_COLS, DAILY_COMPOUND_GRID_ROWS, secretCompoundId),
-    [secretAtoms, secretCompoundId],
+    () =>
+      createDailyCompoundGrid(
+        secretAtoms,
+        DAILY_COMPOUND_GRID_COLS,
+        DAILY_COMPOUND_GRID_ROWS,
+        secretCompoundId,
+        isCampaignSearchFind ? `campaign-${levelId}` : getTodayQuestDate(),
+      ),
+    [secretAtoms, secretCompoundId, isCampaignSearchFind, levelId],
   );
   const selectedCells = useMemo(
     () => cells.filter((cell) => selectedIds.has(cell.id)),
@@ -829,6 +850,7 @@ function DailyCompoundGridBoard({
     if (compoundKey(selectedCounts) !== compoundKey(compound.elements)) {
       const nextWrong = wrongGuesses + 1;
       setWrongGuesses(nextWrong);
+      setSelectedIds(new Set(revealedIds));
       setMessage(
         nextWrong % 3 === 0
           ? "Not the compound. An optional hint is now available."
@@ -841,6 +863,7 @@ function DailyCompoundGridBoard({
     if (!isLinkedCompoundSelection(selectedCells, secretAtoms, DAILY_COMPOUND_GRID_COLS)) {
       const nextWrong = wrongGuesses + 1;
       setWrongGuesses(nextWrong);
+      setSelectedIds(new Set(revealedIds));
       setMessage(
         nextWrong % 3 === 0
           ? "Those atoms match the formula, but not the hidden compound. An optional hint is available."
@@ -855,8 +878,17 @@ function DailyCompoundGridBoard({
     const count = wasNew ? 1 : Math.max(1, compoundCounts[compound.id] ?? 1);
     if (wasNew) recordCompoundDiscovery(compound.id);
     addScore(score);
-    recordGameAttemptForAd();
-    const awarded = completeSecretCompound([compound.id], score);
+    let awarded = false;
+    if (isCampaignSearchFind) {
+      const stars = 3;
+      setLevelStars(levelId, stars);
+      unlockLevel(getNextLevel(levelId)?.id ?? levelId + 1);
+      recordLevelRun(levelId, { score, shots: wrongGuesses + 1, powerUpsUsed: 0, won: true });
+      reportQuestProgress({ levelCleared: true, starsEarned: stars });
+    } else {
+      recordGameAttemptForAd();
+      awarded = completeSecretCompound([compound.id], score);
+    }
     const formedIds = selectedCells.map((cell) => cell.id);
     setRevealedIds(new Set(formedIds));
     setSelectedIds(new Set(formedIds));
@@ -1013,8 +1045,19 @@ function DailyCompoundGridBoard({
               {result.wasNew ? "Added to collection" : `Collection count ${result.count}`}
               {result.awarded ? ` - Daily reward +${DAILY_FEATURE_REWARD_COINS} coins` : ""}
             </div>
-            <button type="button" onClick={onExit} style={{ ...modalBtn, width: "100%" }}>
-              Back to Menu
+            <button
+              type="button"
+              onClick={() => {
+                if (isCampaignSearchFind) {
+                  if (onMap) onMap();
+                  else onWin(getNextLevel(levelId)?.id ?? null);
+                  return;
+                }
+                onExit();
+              }}
+              style={{ ...modalBtn, width: "100%" }}
+            >
+              {isCampaignSearchFind ? "Map" : "Back to Menu"}
             </button>
           </div>
         </Modal>
@@ -1028,10 +1071,11 @@ function createDailyCompoundGrid(
   cols: number,
   rows: number,
   compoundId: string,
+  seedKey = getTodayQuestDate(),
 ): DailyCompoundCell[] {
   const count = cols * rows;
   const highest = Math.max(...secretAtoms, 1);
-  const rng = createSeededRng(hashDailySeed(`daily-compound-grid-${getTodayQuestDate()}-${compoundId}-${cols}x${rows}`));
+  const rng = createSeededRng(hashDailySeed(`daily-compound-grid-${seedKey}-${compoundId}-${cols}x${rows}`));
   const cells: DailyCompoundCell[] = Array.from({ length: count }, (_, id) => ({
     id,
     atom: 1 + Math.floor(rng() * highest),
@@ -1155,6 +1199,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     recordCompoundDiscovery,
     goldCoins,
     spendGoldCoins,
+    recordSingleShotScore,
     reportQuestProgress,
     setBestCombo,
     setLevelStars,
@@ -1282,6 +1327,10 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
   const [busy, setBusy] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [gameOver, setGameOver] = useState(false);
+  const [gameOverContinueOpen, setGameOverContinueOpen] = useState(false);
+  const [gameOverContinueUsed, setGameOverContinueUsed] = useState(false);
+  const [gameOverContinueMessage, setGameOverContinueMessage] = useState("");
+  const [gameOverContinueBusy, setGameOverContinueBusy] = useState(false);
   const [won, setWon] = useState(false);
   const [discoveryEl, setDiscoveryEl] = useState<number | null>(null);
   const [discoveryCompound, setDiscoveryCompound] = useState<{
@@ -1341,6 +1390,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
   const [stoneHitIds, setStoneHitIds] = useState<Set<number>>(new Set());
   const [pendingStone, setPendingStone] = useState(false);
   const [stoneSpawnCount, setStoneSpawnCount] = useState(0);
+  const [dangerReliefPct, setDangerReliefPct] = useState(0);
 
   // === Combo bar for Grab power-up ===
   // Every successful merge counts toward the current streak (shimmer atoms
@@ -1493,9 +1543,14 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
   const [spawnFloorIndex, setSpawnFloorIndex] = useState(0);
 
   function generateShuffleAtoms(): number[] {
-    const hi = Math.max(2, level.targetElement - SHUFFLE_OFFSET_MIN);
-    const lo = Math.max(1, level.targetElement - SHUFFLE_OFFSET_MAX);
-    return Array.from({ length: SHUFFLE_COUNT }, () => randomAvailableElement(hi, lo));
+    const highAtoms = Array.from({ length: TARGET_BAND_PRESPAWN_COUNT }, () =>
+      randomTargetBandElement(),
+    );
+    const otherAtoms = Array.from(
+      { length: Math.max(0, SHUFFLE_COUNT - highAtoms.length) },
+      () => randomDiscoveredElementOutsideTargetBand(),
+    );
+    return shuffleDailyAtoms([...highAtoms, ...otherAtoms], `shuffle-start-${level.id}-${target}`);
   }
 
   const target = level.targetElement;
@@ -1816,6 +1871,8 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       pendingStone,
       noMergeStreak,
       stoneSpawnCount,
+      dangerReliefPct,
+      gameOverContinueUsed,
       spawnFloorIndex,
       continuingPastTarget,
       continueStartedElapsedMs,
@@ -1844,6 +1901,10 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     setPaused(false);
     setSettingsOpen(false);
     setGameOver(false);
+    setGameOverContinueOpen(false);
+    setGameOverContinueUsed(false);
+    setGameOverContinueMessage("");
+    setGameOverContinueBusy(false);
     setWon(false);
     setWinChoice(null);
     setContinueClaimPromptOpen(false);
@@ -1852,6 +1913,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     setInventoryPickerOpen(false);
     setConfirmAction(null);
     dailyTargetClearTriggeredRef.current = false;
+    setDangerReliefPct(0);
     setRestartNonce((nonce) => nonce + 1);
   }
 
@@ -1886,6 +1948,10 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
         setRunBestCombo(saved.runBestCombo);
         setEarnedStars(saved.earnedStars);
         setGameOver(false);
+        setGameOverContinueOpen(false);
+        setGameOverContinueUsed(Boolean(saved.gameOverContinueUsed));
+        setGameOverContinueMessage("");
+        setGameOverContinueBusy(false);
         setWon(false);
         setSettingsOpen(false);
         setDiscoveryEl(null);
@@ -1918,6 +1984,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
         setStoneHitIds(new Set());
         setPendingStone(saved.pendingStone);
         setStoneSpawnCount(saved.stoneSpawnCount);
+        setDangerReliefPct(Math.max(0, saved.dangerReliefPct ?? 0));
         setGravityCharges(saved.gravityCharges);
         setGravityMergeProgress(0);
         setEmissionCharges(saved.emissionCharges);
@@ -2016,7 +2083,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       if (i < initialPlannedCount) return atom;
       if (isPowerUpStage || initialBlank[i] || initialEGun[i]) return atom;
       if (initialShimmer[i]) return generateQueueAtom(dynamicMaxQueue(initialBalls.length), initialBalls, true);
-      if (shouldSpawnTargetBandQueueAtom()) return randomAvailableElement(target - 2, target - 5);
+      if (shouldSpawnTargetBandQueueAtom()) return randomTargetBandElement();
       return Math.min(queueSpawnCap(), Math.max(atom, queueFloorFromBoard(initialBalls)));
     });
     const initialUnstable = resolvedInitialQueue.map(
@@ -2051,6 +2118,10 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     setRunBestCombo(0);
     setEarnedStars(0);
     setGameOver(false);
+    setGameOverContinueOpen(false);
+    setGameOverContinueUsed(false);
+    setGameOverContinueMessage("");
+    setGameOverContinueBusy(false);
     setWon(false);
     setSettingsOpen(false);
     setDiscoveryEl(null);
@@ -2099,6 +2170,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     setStoneHitIds(new Set());
     setPendingStone(false);
     setStoneSpawnCount(0);
+    setDangerReliefPct(0);
     setGravityCharges((powerUpStage === "gravity" ? 1 : 0) + initialLabCharge("gravity", 3));
     setGravityMergeProgress(0);
     setEmissionCharges((powerUpStage === "emission" ? 1 : 0) + initialLabCharge("emission", 2));
@@ -2195,13 +2267,33 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
 
   // Tick the run timer every second while the level is active.
   useEffect(() => {
-    if (gameOver || won || paused || settingsOpen || inventoryPickerOpen || playStylePromptOpen || confirmAction) return;
+    if (
+      gameOver ||
+      gameOverContinueOpen ||
+      won ||
+      paused ||
+      settingsOpen ||
+      inventoryPickerOpen ||
+      playStylePromptOpen ||
+      confirmAction
+    )
+      return;
     const id = setInterval(() => {
       // Use delta accumulation so paused time doesn't advance powerup timers.
       setElapsedMs((m) => m + 500);
     }, 500);
     return () => clearInterval(id);
-  }, [gameOver, won, levelId, paused, settingsOpen, inventoryPickerOpen, playStylePromptOpen, confirmAction]);
+  }, [
+    gameOver,
+    gameOverContinueOpen,
+    won,
+    levelId,
+    paused,
+    settingsOpen,
+    inventoryPickerOpen,
+    playStylePromptOpen,
+    confirmAction,
+  ]);
 
   useEffect(() => {
     if (mode !== "gold-rush-timer" || gameOver || won) return;
@@ -2254,6 +2346,29 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     const min = Math.max(1, Math.min(118, Math.floor(minElement)));
     const max = Math.max(min, Math.min(118, Math.floor(maxElement)));
     return min + Math.floor(dailyRandom() * (max - min + 1));
+  }
+
+  function targetBandMin(): number {
+    return Math.max(1, target - TARGET_BAND_OFFSET_MAX);
+  }
+
+  function targetBandMax(): number {
+    return Math.max(1, target - TARGET_BAND_OFFSET_MIN);
+  }
+
+  function randomTargetBandElement(): number {
+    return randomAvailableElement(targetBandMax(), targetBandMin());
+  }
+
+  function randomDiscoveredElementOutsideTargetBand(): number {
+    const low = targetBandMin();
+    const high = targetBandMax();
+    const pool = discoveredElements.filter(
+      (atom) => atom >= 1 && atom < target && (atom < low || atom > high),
+    );
+    const fallbackPool = discoveredElements.filter((atom) => atom >= 1 && atom < target);
+    const source = pool.length > 0 ? pool : fallbackPool.length > 0 ? fallbackPool : [1];
+    return source[Math.floor(dailyRandom() * source.length)] ?? 1;
   }
 
   function currentQueueDecay(): number {
@@ -2315,7 +2430,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       return randomAvailableElement(highestRecipeAtom, 1);
     }
     if (shouldSpawnTargetBandQueueAtom()) {
-      return randomAvailableElement(target - 2, target - 5);
+      return randomTargetBandElement();
     }
     const effectiveMax = Math.max(minElement, maxElement);
     if (forceUniform) return randomAvailableElement(effectiveMax, minElement);
@@ -2614,6 +2729,69 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     feedback({ type: "game-over" });
   }
 
+  function canOfferGameOverContinue() {
+    return !isMoleculeChallenge && !isPowerUpStage && !gameOverContinueUsed;
+  }
+
+  function handleDangerLineGameOver(finalScore = score, finalShots = shots, finalHighest = highest) {
+    if (canOfferGameOverContinue()) {
+      setGameOverContinueOpen(true);
+      setGameOverContinueMessage("");
+      setGameOverContinueBusy(false);
+      setBusy(false);
+      feedback({ type: "game-over" });
+      return;
+    }
+    trackGameOver(levelId, finalScore, finalShots, finalHighest, mode);
+    setGameOver(true);
+    feedback({ type: "game-over" });
+  }
+
+  function applyGameOverContinue() {
+    setGameOverContinueUsed(true);
+    setGameOverContinueOpen(false);
+    setGameOverContinueMessage("");
+    setGameOverContinueBusy(false);
+    setDangerReliefPct((relief) => Math.min(0.75, relief + dangerZonePct * 0.5));
+    setNoMergeStreak(0);
+    setPendingStone(false);
+    setBusy(false);
+    dangerFeedbackStateRef.current = "safe";
+    spawnPopup("CONTINUE RUN");
+    haptic([20, 35, 20]);
+  }
+
+  function showFinalGameOverResults() {
+    setGameOverContinueOpen(false);
+    setGameOverContinueBusy(false);
+    setGameOverContinueMessage("");
+    trackGameOver(levelId, score, shots, highest, mode);
+    setGameOver(true);
+  }
+
+  function continueGameOverWithCoins() {
+    if (gameOverContinueBusy) return;
+    if (!spendGoldCoins(5)) {
+      setGameOverContinueMessage("Need 5 gold coins.");
+      haptic(12);
+      return;
+    }
+    applyGameOverContinue();
+  }
+
+  async function continueGameOverWithRewardedAd() {
+    if (gameOverContinueBusy) return;
+    setGameOverContinueBusy(true);
+    setGameOverContinueMessage("Loading rewarded ad...");
+    const result = await showRewardedForCoin(hasProPack);
+    if (result.rewarded) {
+      applyGameOverContinue();
+      return;
+    }
+    setGameOverContinueBusy(false);
+    setGameOverContinueMessage(result.reason ?? "Rewarded ad not completed or not available yet.");
+  }
+
   useEffect(() => {
     return () => {
       if (stageClearTimeoutRef.current !== null) {
@@ -2794,13 +2972,14 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       : 0;
   const survivalPressurePct = mode === "survival" ? Math.floor(elapsedMs / 60_000) * 0.05 : 0;
   const pendingStonePressure = pendingStone ? 1 : 0;
-  const dangerZonePct = Math.min(
+  const dangerZoneBasePct = Math.min(
     0.85,
     0.2 +
       (stoneSpawnCount + pendingStonePressure) * 0.1 +
       continuePressureSteps * 0.03 +
       survivalPressurePct,
   );
+  const dangerZonePct = Math.max(0.1, dangerZoneBasePct - dangerReliefPct);
   const dangerY = Math.max(TOP_PAD + ballSize, boardH * (1 - dangerZonePct));
 
   const geo: Geo = useMemo(
@@ -3455,7 +3634,18 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
   }
 
   function shoot() {
-    if (busy || gameOver || won || inventoryPickerOpen || paused || settingsOpen || playStylePromptOpen || confirmAction) return;
+    if (
+      busy ||
+      gameOver ||
+      gameOverContinueOpen ||
+      won ||
+      inventoryPickerOpen ||
+      paused ||
+      settingsOpen ||
+      playStylePromptOpen ||
+      confirmAction
+    )
+      return;
     primeAudio();
     if (musicEnabled) startAmbientMusic(ambientMusicTheme);
     trackShot(levelId, pendingStone ? -1 : currentIsEGun ? 0 : current, aimDeg, mode);
@@ -3581,6 +3771,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       points: stoneBonus,
       powerUp: stoneBonus > 0 ? "E-Gun, Overcharge" : "E-Gun",
     });
+    if (stoneBonus > 0) recordSingleShotScore(stoneBonus);
     if (stoneBonus > 0 && !isPowerUpStage) {
       setScore((currentScore) => currentScore + stoneBonus);
       addScore(stoneBonus);
@@ -3610,9 +3801,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       return;
     }
     if (checkGameOver(updatedWithEffects, geo)) {
-      trackGameOver(levelId, score, nextShots, highest, mode);
-      setGameOver(true);
-      feedback({ type: "game-over" });
+      handleDangerLineGameOver(score, nextShots, highest);
     }
     setBusy(false);
   }
@@ -3684,6 +3873,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
         stoneBonus > 0 ? "Stone break" : null,
       ].filter(Boolean).join(", "),
     });
+    if (gained + stoneBonus > 0) recordSingleShotScore(gained + stoneBonus);
 
     if (powerUpStage === "gamma" && hitIds.size > 0) {
       completePowerUpStageAfterDelay("gamma", nextScore);
@@ -3691,9 +3881,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     }
 
     if (checkGameOver(updated, geo)) {
-      trackGameOver(levelId, score, nextShots, highest, mode);
-      setGameOver(true);
-      feedback({ type: "game-over" });
+      handleDangerLineGameOver(nextScore, nextShots, highest);
     }
     setBusy(false);
   }
@@ -3867,8 +4055,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       setTimeout(() => {
         setBalls((prev) => {
           if (checkGameOver(prev, geo)) {
-            setGameOver(true);
-            feedback({ type: "game-over" });
+            handleDangerLineGameOver(score, shots, highest);
           }
           return prev;
         });
@@ -4206,7 +4393,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       },
     );
     consumeEmissionBoostShot();
-    if (fusionJumpArmed && result.merges.length > 0) {
+    if (fusionJumpArmed && result.fusionJumpConsumed) {
       setFusionJumpArmed(false);
       if (pendingReversiblePowerUp === "fusion-jump") setPendingReversiblePowerUp(null);
       // Visual cue — burst ring at the impact point.
@@ -4349,7 +4536,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       pendingReversiblePowerUp === "emission" ? "Emission" : null,
       shimmerHit ? "Shimmer" : null,
       result.merges.some((merge) => merge.stabilizedIsotope) ? "Isotope ×2" : null,
-      fusionJumpArmed ? "Fusion Jump" : null,
+      result.fusionJumpConsumed ? "Fusion Jump" : null,
       pendingReversiblePowerUp === "catalyst" || catalystShotsRemaining > 0 ? "Catalyst Aura" : null,
       currentIsBlank ? "Blank Atom" : null,
       impactStoneBonus > 0 || mergeStoneBonus > 0 ? "Stone break" : null,
@@ -4364,6 +4551,9 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       powerUp: shotPowerUps.join(", ") || undefined,
       merges: result.merges,
     });
+    if (gained + mergeStoneBonus + impactStoneBonus > 0) {
+      recordSingleShotScore(gained + mergeStoneBonus + impactStoneBonus);
+    }
     if (!isPowerUpStage) {
       setScore(nextScore);
       addScore(gained + impactStoneBonus);
@@ -4376,7 +4566,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       maxChainDepth: result.merges.length,
     });
 
-    const fusionJumpResolved = shotPowerUps.includes("Fusion Jump") && result.merges.length > 0;
+    const fusionJumpResolved = result.fusionJumpConsumed;
     const catalystResolved =
       shotPowerUps.includes("Catalyst Aura") && result.merges.length >= 2;
     const powerUpStageResolved =
@@ -4436,9 +4626,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
           feedback({ type: "milestone", atomicNumber: firstDiscovery });
         }
         if (checkGameOver(result.balls, geo)) {
-          trackGameOver(levelId, nextScore, nextShots, nextHighest, mode);
-          setGameOver(true);
-          feedback({ type: "game-over" });
+          handleDangerLineGameOver(nextScore, nextShots, nextHighest);
         }
         setBusy(false);
       },
@@ -4608,7 +4796,14 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
 
   function triggerFusionJumpPowerUp() {
     if (cancelPendingPowerUp("fusion-jump")) return;
-    if (busy || gameOver || won || fusionJumpCharges <= 0 || pendingReversiblePowerUp) return;
+    if (
+      busy ||
+      gameOver ||
+      won ||
+      fusionJumpCharges <= 0 ||
+      (pendingReversiblePowerUp && pendingReversiblePowerUp !== "catalyst")
+    )
+      return;
     setPendingReversiblePowerUp("fusion-jump");
     setFusionJumpCharges((g) => Math.max(0, g - 1));
     runPowerUpsUsedRef.current += 1;
@@ -4841,7 +5036,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
       won ||
       catalystCharges <= 0 ||
       catalystShotsRemaining > 0 ||
-      pendingReversiblePowerUp
+      (pendingReversiblePowerUp && pendingReversiblePowerUp !== "fusion-jump")
     )
       return;
     setPendingReversiblePowerUp("catalyst");
@@ -5091,8 +5286,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
           feedback({ type: "milestone", atomicNumber: firstDiscovery });
         }
         if (checkGameOver(result.balls, geo)) {
-          setGameOver(true);
-          feedback({ type: "game-over" });
+          handleDangerLineGameOver(score + gained, shots, nextHighest);
         }
         setBusy(false);
       },
@@ -5428,7 +5622,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
 
   // preview trajectory (recomputed every render based on aimDeg)
   const previewPath = useMemo(() => {
-    if (busy || gameOver || won) return [];
+    if (busy || gameOver || gameOverContinueOpen || won) return [];
     if (currentIsEGun && !pendingStone) {
       const r = castStraightRay(aimDeg);
       return r?.path ?? [];
@@ -5436,7 +5630,7 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
     const r = castRay(aimDeg);
     return r?.path ?? [];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [aimDeg, balls, busy, gameOver, won, boardW, boardH, cellSize, currentIsEGun, pendingStone]);
+  }, [aimDeg, balls, busy, gameOver, gameOverContinueOpen, won, boardW, boardH, cellSize, currentIsEGun, pendingStone]);
 
   const eGunPreviewHitIds = useMemo(() => {
     if (!currentIsEGun || pendingStone || previewPath.length < 2) return new Set<number>();
@@ -6596,7 +6790,9 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
                 )}
                 disabled={
                   busy ||
-                  (pendingReversiblePowerUp !== "fusion-jump" && pendingReversiblePowerUp != null)
+                  (pendingReversiblePowerUp !== "fusion-jump" &&
+                    pendingReversiblePowerUp !== "catalyst" &&
+                    pendingReversiblePowerUp != null)
                 }
                 style={{
                   ...powerUpIconBtn,
@@ -6634,7 +6830,8 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
                   (pendingReversiblePowerUp !== "catalyst" &&
                     (catalystCharges <= 0 ||
                       catalystShotsRemaining > 0 ||
-                      pendingReversiblePowerUp != null))
+                      (pendingReversiblePowerUp != null &&
+                        pendingReversiblePowerUp !== "fusion-jump")))
                 }
                 style={{
                   ...powerUpIconBtn,
@@ -7055,6 +7252,18 @@ function StandardGameBoard({ levelId, onExit, onWin, onMap = onExit, mode = "cam
             onMain={handleWonMain}
             onNext={handleWonMap}
             nextLabel="Map"
+          />
+        )}
+        {gameOverContinueOpen && !won && !gameOver && (
+          <GameOverContinueModal
+            score={score}
+            shots={shots}
+            coins={goldCoins}
+            busy={gameOverContinueBusy}
+            message={gameOverContinueMessage}
+            onCoinContinue={continueGameOverWithCoins}
+            onAdContinue={continueGameOverWithRewardedAd}
+            onResults={showFinalGameOverResults}
           />
         )}
         {gameOver && !won && (
@@ -8000,6 +8209,113 @@ function MergeAtomFormula({
         </span>
       )}
     </span>
+  );
+}
+
+function GameOverContinueModal({
+  score,
+  shots,
+  coins,
+  busy,
+  message,
+  onCoinContinue,
+  onAdContinue,
+  onResults,
+}: {
+  score: number;
+  shots: number;
+  coins: number;
+  busy: boolean;
+  message: string;
+  onCoinContinue: () => void;
+  onAdContinue: () => void;
+  onResults: () => void;
+}) {
+  const canPay = coins >= 5 && !busy;
+  return (
+    <Modal>
+      <div
+        style={{
+          fontSize: 12,
+          letterSpacing: 3,
+          color: "var(--destructive)",
+          fontWeight: 800,
+          marginBottom: 8,
+        }}
+      >
+        GAME OVER
+      </div>
+      <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 6 }}>Continue this run?</div>
+      <p
+        style={{
+          fontSize: 13,
+          color: "var(--muted-foreground)",
+          lineHeight: 1.5,
+          margin: "0 0 14px",
+        }}
+      >
+        Continue once to lower the danger bar by half and reset the stone streak.
+      </p>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+        <ResultStat label="Score" value={formatScore(score)} color="var(--accent)" />
+        <ResultStat label="Shots" value={`${shots}`} color="var(--foreground)" />
+      </div>
+      {message && (
+        <div
+          role="status"
+          style={{
+            marginBottom: 10,
+            color: "var(--muted-foreground)",
+            fontSize: 12,
+            fontWeight: 800,
+          }}
+        >
+          {message}
+        </div>
+      )}
+      <div style={{ display: "grid", gap: 8 }}>
+        <button
+          type="button"
+          onClick={onCoinContinue}
+          disabled={!canPay}
+          style={{
+            ...modalBtn,
+            opacity: canPay ? 1 : 0.55,
+            cursor: canPay ? "pointer" : "not-allowed",
+          }}
+        >
+          Continue run - 5 coins
+        </button>
+        <button
+          type="button"
+          onClick={onAdContinue}
+          disabled={busy}
+          style={{
+            ...modalBtn,
+            background: "var(--surface-high)",
+            color: "var(--foreground)",
+            opacity: busy ? 0.65 : 1,
+            cursor: busy ? "wait" : "pointer",
+          }}
+        >
+          {busy ? "Loading ad..." : "Watch ad to continue"}
+        </button>
+        <button
+          type="button"
+          onClick={onResults}
+          disabled={busy}
+          style={{
+            ...modalBtn,
+            background: "var(--surface)",
+            color: "var(--foreground)",
+            border: "1px solid var(--border)",
+            opacity: busy ? 0.65 : 1,
+          }}
+        >
+          Results
+        </button>
+      </div>
+    </Modal>
   );
 }
 

@@ -4,6 +4,7 @@ import { useProgress } from "./store";
 import { ElementBall } from "./ElementBall";
 import { BADGES, BADGE_GROUPS } from "./badges";
 import { COMPOUNDS, getCompoundHint, type CompoundDefinition } from "./compounds";
+import { getCompoundCollectionDetails } from "./compoundDetails";
 import { MoleculeVisual } from "./MoleculeVisual";
 import { useIsTabletLayout } from "./responsive";
 import { getElementCollectionDetails } from "./elementDetails";
@@ -30,6 +31,12 @@ export function Collection({ onBack }: { onBack: () => void }) {
   const earned = new Set(earnedBadges);
   const el = selected ? ELEMENTS[selected - 1] : null;
   const elementDetails = el ? getElementCollectionDetails(el) : null;
+  const selectedCompoundUnlocked = selectedCompound
+    ? foundCompounds.has(selectedCompound.id)
+    : false;
+  const selectedCompoundDetails = selectedCompound
+    ? getCompoundCollectionDetails(selectedCompound)
+    : null;
   const lockedElementCount = ELEMENTS.length - discoveredElements.length;
   const lockedCompoundCount = COMPOUNDS.length - discoveredCompounds.length;
 
@@ -52,8 +59,18 @@ export function Collection({ onBack }: { onBack: () => void }) {
   }
 
   return (
-    <div className="app-shell" style={{ padding: isTabletLayout ? 24 : 16, paddingBottom: isTabletLayout ? 40 : 32 }}>
-      <div style={{ position: "relative", zIndex: 1, maxWidth: isTabletLayout ? 980 : 600, margin: "0 auto" }}>
+    <div
+      className="app-shell"
+      style={{ padding: isTabletLayout ? 24 : 16, paddingBottom: isTabletLayout ? 40 : 32 }}
+    >
+      <div
+        style={{
+          position: "relative",
+          zIndex: 1,
+          maxWidth: isTabletLayout ? 980 : 600,
+          margin: "0 auto",
+        }}
+      >
         <div style={{ display: "flex", alignItems: "center", marginBottom: 16, gap: 12 }}>
           <button
             onClick={onBack}
@@ -249,11 +266,20 @@ export function Collection({ onBack }: { onBack: () => void }) {
                     <span style={{ display: "block", fontSize: 12, fontWeight: 900 }}>
                       {unlocked ? compound.name : "Unknown"}
                     </span>
-                    <span style={{ display: "block", fontSize: 11, color: "var(--muted-foreground)" }}>
+                    <span
+                      style={{ display: "block", fontSize: 11, color: "var(--muted-foreground)" }}
+                    >
                       {unlocked ? compound.formula : getCompoundHint(compound)}
                     </span>
                     {unlocked && (
-                      <span style={{ display: "block", fontSize: 10, color: "var(--accent)", marginTop: 2 }}>
+                      <span
+                        style={{
+                          display: "block",
+                          fontSize: 10,
+                          color: "var(--accent)",
+                          marginTop: 2,
+                        }}
+                      >
                         {`Found x${foundCount}`}
                       </span>
                     )}
@@ -382,7 +408,6 @@ export function Collection({ onBack }: { onBack: () => void }) {
             })}
           </div>
         </div>
-
       </div>
 
       {el && (
@@ -411,6 +436,8 @@ export function Collection({ onBack }: { onBack: () => void }) {
               width: "100%",
               animation: "pop-in 240ms ease-out",
               position: "relative",
+              maxHeight: "calc(100vh - 48px)",
+              overflowY: "auto",
             }}
           >
             <button
@@ -461,20 +488,36 @@ export function Collection({ onBack }: { onBack: () => void }) {
                     }}
                   />
                   <div>
-                    <div style={{ fontSize: 11, color: "var(--muted-foreground)", fontWeight: 800 }}>
+                    <div
+                      style={{ fontSize: 11, color: "var(--muted-foreground)", fontWeight: 800 }}
+                    >
                       {tr("MATERIAL SAMPLE")}
                     </div>
-                    <div style={{ fontSize: 12, lineHeight: 1.45 }}>{tr(elementDetails.sample)}</div>
+                    <div style={{ fontSize: 12, lineHeight: 1.45 }}>
+                      {tr(elementDetails.sample)}
+                    </div>
                   </div>
                 </div>
                 <p style={{ fontSize: 13, lineHeight: 1.55, margin: 0 }}>{tr(el.fact)}</p>
                 <div style={elementPropertyGrid}>
                   <ElementProperty label={tr("Molar mass")} value={elementDetails.molarMass} />
                   <ElementProperty label={tr("Phase")} value={tr(elementDetails.phase)} />
-                  <ElementProperty label={tr("Melting point")} value={elementDetails.meltingPoint ?? tr("Varies / not listed")} />
-                  <ElementProperty label={tr("Boiling point")} value={elementDetails.boilingPoint ?? tr("Varies / not listed")} />
-                  <ElementProperty label={tr("Density")} value={elementDetails.density ?? tr("Data not listed")} />
-                  <ElementProperty label={tr("Period / group")} value={`${el.period} / ${el.group ?? "-"}`} />
+                  <ElementProperty
+                    label={tr("Melting point")}
+                    value={elementDetails.meltingPoint ?? tr("Varies / not listed")}
+                  />
+                  <ElementProperty
+                    label={tr("Boiling point")}
+                    value={elementDetails.boilingPoint ?? tr("Varies / not listed")}
+                  />
+                  <ElementProperty
+                    label={tr("Density")}
+                    value={elementDetails.density ?? tr("Data not listed")}
+                  />
+                  <ElementProperty
+                    label={tr("Period / group")}
+                    value={`${el.period} / ${el.group ?? "-"}`}
+                  />
                 </div>
                 <div style={elementInfoBlock}>
                   <strong>{tr("Uses")}</strong>
@@ -545,26 +588,83 @@ export function Collection({ onBack }: { onBack: () => void }) {
               X
             </button>
             <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
-              <MoleculeVisual compound={selectedCompound} size={104} locked={!foundCompounds.has(selectedCompound.id)} />
+              <MoleculeVisual
+                compound={selectedCompound}
+                size={104}
+                locked={!selectedCompoundUnlocked}
+              />
             </div>
             <div style={{ fontSize: 24, fontWeight: 900, textAlign: "center" }}>
-              {foundCompounds.has(selectedCompound.id) ? selectedCompound.name : tr("Unknown Compound")}
+              {selectedCompoundUnlocked ? selectedCompound.name : tr("Unknown Compound")}
             </div>
-            <div style={{ fontSize: 16, fontWeight: 900, color: "var(--accent)", textAlign: "center", marginBottom: 12 }}>
-              {foundCompounds.has(selectedCompound.id) ? selectedCompound.formula : "???"}
+            <div
+              style={{
+                fontSize: 16,
+                fontWeight: 900,
+                color: "var(--accent)",
+                textAlign: "center",
+                marginBottom: 12,
+              }}
+            >
+              {selectedCompoundUnlocked ? selectedCompound.formula : "???"}
             </div>
-            {foundCompounds.has(selectedCompound.id) && (
-              <div style={{ fontSize: 12, color: "var(--accent)", textAlign: "center", marginBottom: 10 }}>
-                {tr(`Found ${compoundCounts[selectedCompound.id] ?? 1} time${
-                  (compoundCounts[selectedCompound.id] ?? 1) === 1 ? "" : "s"
-                }`)}
+            {selectedCompoundUnlocked && (
+              <div
+                style={{
+                  fontSize: 12,
+                  color: "var(--accent)",
+                  textAlign: "center",
+                  marginBottom: 10,
+                }}
+              >
+                {tr(
+                  `Found ${compoundCounts[selectedCompound.id] ?? 1} time${
+                    (compoundCounts[selectedCompound.id] ?? 1) === 1 ? "" : "s"
+                  }`,
+                )}
               </div>
             )}
-            <p style={{ fontSize: 13, lineHeight: 1.55, margin: 0, color: "var(--foreground)" }}>
-              {foundCompounds.has(selectedCompound.id)
-                ? selectedCompound.fact
-                : getCompoundHint(selectedCompound)}
-            </p>
+            {selectedCompoundUnlocked && selectedCompoundDetails ? (
+              <div style={{ display: "grid", gap: 12 }}>
+                <p
+                  style={{ fontSize: 13, lineHeight: 1.55, margin: 0, color: "var(--foreground)" }}
+                >
+                  {tr(selectedCompound.fact)}
+                </p>
+                <div style={elementPropertyGrid}>
+                  <ElementProperty
+                    label={tr("Molar mass")}
+                    value={selectedCompoundDetails.molarMass}
+                  />
+                  <ElementProperty label={tr("Atoms")} value={selectedCompoundDetails.atomCount} />
+                  <ElementProperty label={tr("Rarity")} value={tr(selectedCompound.rarity)} />
+                  <ElementProperty
+                    label={tr("Bonus score")}
+                    value={selectedCompound.bonusScore.toLocaleString()}
+                  />
+                </div>
+                <div style={elementInfoBlock}>
+                  <strong>{tr("Composition")}</strong>
+                  <span>{selectedCompoundDetails.composition}</span>
+                </div>
+                <div style={elementInfoBlock}>
+                  <strong>{tr("Element types")}</strong>
+                  <span>{selectedCompoundDetails.elementTypes}</span>
+                </div>
+                <div style={elementInfoBlock}>
+                  <strong>{tr("Use case")}</strong>
+                  <span>{tr(selectedCompoundDetails.useCase)}</span>
+                </div>
+                <div style={elementInfoBlock}>
+                  <strong>{tr("Chemistry note")}</strong>
+                  <span>{tr(selectedCompoundDetails.chemistryNote)}</span>
+                </div>
+              </div>
+            ) : (
+              <p style={{ fontSize: 13, lineHeight: 1.55, margin: 0, color: "var(--foreground)" }}>
+                {getCompoundHint(selectedCompound)}
+              </p>
+            )}
           </div>
         </div>
       )}

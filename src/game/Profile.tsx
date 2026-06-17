@@ -30,6 +30,7 @@ export function Profile({ onBack }: Props) {
     unlockedLevel,
     highestElement,
     totalScore,
+    highestSingleShotScore,
     goldCoins,
     discoveredElements,
     dailyStreak,
@@ -203,6 +204,7 @@ export function Profile({ onBack }: Props) {
           }}
         >
           <ProfileStat icon={Trophy} label={tr("Total Score")} value={exactScore(totalScore)} sub={tr("career")} />
+          <ProfileStat icon={Zap} label={tr("Highest score on a single shot")} value={exactScore(highestSingleShotScore)} sub={tr("best shot")} />
           <ProfileStat icon={Coins} label={tr("Gold Coins")} value={`${goldCoins}`} sub={tr("shop currency")} />
           <ProfileStat
             icon={CalendarDays}

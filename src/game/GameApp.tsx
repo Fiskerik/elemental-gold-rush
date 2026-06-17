@@ -13,7 +13,7 @@ import { LabModes } from "@/game/LabModes";
 import { GameLibrary } from "@/game/GameLibrary";
 import { Profile } from "@/game/Profile";
 import { GameModeId } from "@/game/challenges";
-import { getLevelById } from "@/game/levels";
+import { MOLECULE_CHALLENGE_BY_LEVEL, getCompoundChallengeKind, getLevelById } from "@/game/levels";
 import { useProgress } from "@/game/store";
 import { useDomLocalization } from "@/game/useDomLocalization";
 
@@ -79,7 +79,7 @@ export function GameApp() {
       setResumePrompt(saved);
       return;
     }
-    setScreen({ name: "game", levelId: getLevelById(unlockedLevel)?.id ?? 1, mode: "campaign" });
+    startCampaignLevel(getLevelById(unlockedLevel)?.id ?? 1);
   }
 
   function startDailyChallenge() {
@@ -97,6 +97,17 @@ export function GameApp() {
       levelId: getLevelById(unlockedLevel)?.id ?? 1,
       mode: "campaign",
       secretCompoundId: secretCompound.compoundId,
+    });
+  }
+
+  function startCampaignLevel(levelId: number) {
+    const compoundId = MOLECULE_CHALLENGE_BY_LEVEL[levelId];
+    setScreen({
+      name: "game",
+      levelId,
+      mode: "campaign",
+      secretCompoundId:
+        compoundId && getCompoundChallengeKind(levelId) === "search-find" ? compoundId : undefined,
     });
   }
 
@@ -145,7 +156,7 @@ export function GameApp() {
     case "levels":
       return (
         <LevelSelect
-          onPick={(id) => setScreen({ name: "game", levelId: id, mode: "campaign" })}
+          onPick={startCampaignLevel}
           onBack={() => setScreen({ name: "menu" })}
         />
       );
@@ -161,14 +172,20 @@ export function GameApp() {
           onMap={() => setScreen({ name: "levels" })}
           onWin={(nextId) => {
             setGameRunNonce((nonce) => nonce + 1);
-            if (nextId)
-              setScreen({
-                name: "game",
-                levelId: nextId,
-                mode: screen.mode ?? "campaign",
-                secretCompoundId: nextId === screen.levelId ? screen.secretCompoundId : undefined,
-              });
-            else setScreen({ name: "menu" });
+            if (!nextId) {
+              setScreen({ name: "menu" });
+              return;
+            }
+            if ((screen.mode ?? "campaign") === "campaign") {
+              startCampaignLevel(nextId);
+              return;
+            }
+            setScreen({
+              name: "game",
+              levelId: nextId,
+              mode: screen.mode ?? "campaign",
+              secretCompoundId: nextId === screen.levelId ? screen.secretCompoundId : undefined,
+            });
           }}
         />
       );

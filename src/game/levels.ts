@@ -342,6 +342,17 @@ export const MOLECULE_CHALLENGE_BY_LEVEL: Record<number, string> = {
   60: "urea",
 };
 
+export type CompoundChallengeKind = "formation" | "search-find";
+
+export function getCompoundChallengeKind(levelId: number): CompoundChallengeKind | null {
+  const challengeIds = Object.keys(MOLECULE_CHALLENGE_BY_LEVEL)
+    .map(Number)
+    .sort((a, b) => a - b);
+  const index = challengeIds.indexOf(levelId);
+  if (index < 0) return null;
+  return index % 2 === 1 ? "search-find" : "formation";
+}
+
 const SPECIAL_LEVEL_IDS = new Set([21, 41, 65]);
 
 function makeAtomLevel(seed: LevelSeed, id: number, atomStage: number): Level {

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
-import { Eye, Orbit, Sparkles } from "lucide-react";
-import { LEVELS, MOLECULE_CHALLENGE_BY_LEVEL } from "./levels";
+import { Eye, Orbit, Search, Sparkles } from "lucide-react";
+import { LEVELS, MOLECULE_CHALLENGE_BY_LEVEL, getCompoundChallengeKind } from "./levels";
 import { ELEMENTS } from "./elements";
 import { useProgress, type LevelStats } from "./store";
 import { ElementBall } from "./ElementBall";
@@ -64,6 +64,7 @@ export function LevelSelect({
 
   const selected = selectedId != null ? LEVELS.find((l) => l.id === selectedId) : null;
   const selectedChallenge = selected ? getMoleculeChallenge(selected.id) : null;
+  const selectedCompoundKind = selected ? getCompoundChallengeKind(selected.id) : null;
   const selectedStats = selectedId != null ? levelStats[selectedId] : undefined;
   const selectedStars = selectedId != null ? (levelStars[selectedId] ?? 0) : 0;
   const canSkipLevel =
@@ -184,6 +185,7 @@ export function LevelSelect({
               const isCurrent = lvl.id === unlockedLevel && !locked;
               const challenge = getMoleculeChallenge(lvl.id);
               const isChallenge = challenge != null;
+              const compoundKind = getCompoundChallengeKind(lvl.id);
               const isPowerUpStage = lvl.powerUpStage != null;
               const isBossStage = Boolean(lvl.specialStage);
               return (
@@ -235,7 +237,7 @@ export function LevelSelect({
                     ) : isPowerUpStage && lvl.powerUpStage ? (
                       <PowerUpMapNode powerUp={lvl.powerUpStage} />
                     ) : isChallenge && challenge ? (
-                      <ChallengeMapNode compound={challenge} />
+                      <ChallengeMapNode compound={challenge} kind={compoundKind ?? "formation"} />
                     ) : locked ? (
                       <div style={{ fontSize: 22 }}>🔒</div>
                     ) : (
@@ -378,7 +380,11 @@ export function LevelSelect({
                       boxShadow: "0 0 18px var(--accent-glow)",
                     }}
                   >
-                    <MoleculeVisual compound={selectedChallenge} size={46} />
+                    {selectedCompoundKind === "search-find" ? (
+                      <Search size={32} color="var(--accent)" strokeWidth={2.8} />
+                    ) : (
+                      <MoleculeVisual compound={selectedChallenge} size={46} />
+                    )}
                   </div>
                 ) : (
                   <ElementBall atomicNumber={selected.targetElement} size={56} glow />
@@ -407,7 +413,9 @@ export function LevelSelect({
                   lineHeight: 1.4,
                 }}
               >
-                {selected.description}
+                {selectedCompoundKind === "search-find"
+                  ? "Search the board grid and mark the hidden compound atoms."
+                  : selected.description}
               </p>
 
               {!selected.powerUpStage && selectedStats && selectedStats.attempts > 0 && (
@@ -508,7 +516,14 @@ export function LevelSelect({
   );
 }
 
-function ChallengeMapNode({ compound }: { compound: CompoundDefinition }) {
+function ChallengeMapNode({
+  compound,
+  kind,
+}: {
+  compound: CompoundDefinition;
+  kind: NonNullable<ReturnType<typeof getCompoundChallengeKind>>;
+}) {
+  const isSearchFind = kind === "search-find";
   return (
     <div
       aria-hidden="true"
@@ -519,11 +534,19 @@ function ChallengeMapNode({ compound }: { compound: CompoundDefinition }) {
         display: "grid",
         placeItems: "center",
         background:
-          "linear-gradient(135deg, color-mix(in oklch, var(--accent) 28%, var(--surface)), var(--surface-high))",
-        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.28)",
+          isSearchFind
+            ? "linear-gradient(135deg, color-mix(in oklch, var(--primary) 32%, var(--surface)), color-mix(in oklch, var(--accent) 18%, var(--surface-high)))"
+            : "linear-gradient(135deg, color-mix(in oklch, var(--accent) 28%, var(--surface)), var(--surface-high))",
+        boxShadow: isSearchFind
+          ? "inset 0 1px 0 rgba(255,255,255,0.28), 0 0 12px var(--primary-glow)"
+          : "inset 0 1px 0 rgba(255,255,255,0.28)",
       }}
     >
-      <MoleculeVisual compound={compound} size={34} />
+      {isSearchFind ? (
+        <Search size={25} color="var(--foreground)" strokeWidth={2.7} />
+      ) : (
+        <MoleculeVisual compound={compound} size={34} />
+      )}
     </div>
   );
 }
