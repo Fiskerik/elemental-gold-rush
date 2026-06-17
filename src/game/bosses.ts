@@ -31,7 +31,7 @@ export interface BossConfig {
 export const BOSSES: Record<BossId, BossConfig> = {
   "elemental-boss": {
     id: "elemental-boss",
-    levelId: 21,
+    levelId: 31,
     name: "Elemental Boss",
     shortLabel: "Eye Tyrant",
     maxHealth: 20,
@@ -53,7 +53,7 @@ export const BOSSES: Record<BossId, BossConfig> = {
   },
   "periodic-guardian": {
     id: "periodic-guardian",
-    levelId: 41,
+    levelId: 61,
     name: "The Periodic Guardian",
     shortLabel: "Guardian",
     maxHealth: 20,
@@ -75,7 +75,7 @@ export const BOSSES: Record<BossId, BossConfig> = {
   },
   "nucleus-core": {
     id: "nucleus-core",
-    levelId: 65,
+    levelId: 100,
     name: "The Nucleus",
     shortLabel: "Magnetic Core",
     maxHealth: 13,

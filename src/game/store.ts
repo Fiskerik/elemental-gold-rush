@@ -693,15 +693,24 @@ export const useProgress = create<ProgressState>()(
       grantProPack: () =>
         set((s) => {
           const shouldGrantStarter = !s.proStarterCoinsGranted;
+          const normalizedLevels = normalizeLabUpgradeLevels(s.labUpgradeLevels);
+          // Refund the coins spent on any power-up already upgraded to Level 1,
+          // since the Pro Lab Pack now grants that first level for free.
+          const refundCoins = shouldGrantStarter
+            ? LAB_UPGRADE_IDS.reduce(
+                (sum, id) => sum + ((normalizedLevels[id] ?? 0) >= 1 ? LAB_UPGRADE_COSTS[0] : 0),
+                0,
+              )
+            : 0;
           const { levels: labUpgradeLevels, changed: grantedUpgrade } = grantUnlockedProStarterUpgrades(
-            normalizeLabUpgradeLevels(s.labUpgradeLevels),
+            normalizedLevels,
             s.unlockedLevel,
           );
           if (s.hasProPack && s.proStarterCoinsGranted && !grantedUpgrade) return s;
           return {
             hasProPack: true,
             proStarterCoinsGranted: true,
-            goldCoins: s.goldCoins + (shouldGrantStarter ? 100 : 0),
+            goldCoins: s.goldCoins + (shouldGrantStarter ? 100 + refundCoins : 0),
             labUpgradeLevels,
           };
         }),
