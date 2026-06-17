@@ -12,6 +12,7 @@ import { Shop } from "@/game/Shop";
 import { LabModes } from "@/game/LabModes";
 import { GameLibrary } from "@/game/GameLibrary";
 import { Profile } from "@/game/Profile";
+import { Leaderboard } from "@/game/DailyCompoundLeaderboard";
 import { GameModeId } from "@/game/challenges";
 import { MOLECULE_CHALLENGE_BY_LEVEL, getCompoundChallengeKind, getLevelById } from "@/game/levels";
 import { useProgress } from "@/game/store";
@@ -20,12 +21,19 @@ import { useDomLocalization } from "@/game/useDomLocalization";
 type Screen =
   | { name: "menu" }
   | { name: "levels" }
-  | { name: "game"; levelId: number; mode?: GameModeId; resumeSavedRun?: boolean; secretCompoundId?: string }
+  | {
+      name: "game";
+      levelId: number;
+      mode?: GameModeId;
+      resumeSavedRun?: boolean;
+      secretCompoundId?: string;
+    }
   | { name: "collection" }
   | { name: "shop" }
   | { name: "lab" }
   | { name: "library" }
   | { name: "profile" }
+  | { name: "leaderboard" }
   | { name: "settings" };
 
 export function GameApp() {
@@ -124,6 +132,7 @@ export function GameApp() {
             onLab={() => setScreen({ name: "lab" })}
             onLibrary={() => setScreen({ name: "library" })}
             onProfile={() => setScreen({ name: "profile" })}
+            onLeaderboard={() => setScreen({ name: "leaderboard" })}
             onDailyChallenge={startDailyChallenge}
             onSecretCompound={startSecretCompound}
           />
@@ -154,12 +163,7 @@ export function GameApp() {
         </>
       );
     case "levels":
-      return (
-        <LevelSelect
-          onPick={startCampaignLevel}
-          onBack={() => setScreen({ name: "menu" })}
-        />
-      );
+      return <LevelSelect onPick={startCampaignLevel} onBack={() => setScreen({ name: "menu" })} />;
     case "game":
       return (
         <GameBoard
@@ -206,6 +210,8 @@ export function GameApp() {
       return <GameLibrary onBack={() => setScreen({ name: "menu" })} />;
     case "profile":
       return <Profile onBack={() => setScreen({ name: "menu" })} />;
+    case "leaderboard":
+      return <Leaderboard onBack={() => setScreen({ name: "menu" })} />;
     case "settings":
       return <Settings onBack={() => setScreen({ name: "menu" })} />;
   }

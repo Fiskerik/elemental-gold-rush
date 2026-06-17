@@ -1,6 +1,7 @@
+import { useState } from "react";
 import { ELEMENTS } from "./elements";
 import { getLevelById, MAX_LEVEL } from "./levels";
-import { useProgress } from "./store";
+import { useProgress, type CoinTransaction } from "./store";
 import { useIsTabletLayout } from "./responsive";
 import { SUPPORTED_LANGUAGES, t, toIntlLocale, type AppLanguage } from "./localization";
 import { COMPOUNDS } from "./compounds";
@@ -26,12 +27,15 @@ interface Props {
 
 export function Profile({ onBack }: Props) {
   const isTabletLayout = useIsTabletLayout();
+  const [transactionsOpen, setTransactionsOpen] = useState(false);
   const {
     unlockedLevel,
     highestElement,
     totalScore,
     highestSingleShotScore,
+    highestSingleShotScoreDate,
     goldCoins,
+    coinTransactions,
     discoveredElements,
     dailyStreak,
     claimedDailyReward,
@@ -80,6 +84,22 @@ export function Profile({ onBack }: Props) {
   const unlockedBossCount = bossIds.filter((id) => unlockedLevel >= BOSSES[id].levelId).length;
   const defeatedBossCount = bossIds.filter((id) => (levelStats[BOSSES[id].levelId]?.bestShots ?? null) != null).length;
   const exactScore = (score: number) => numberFormatter.format(Math.max(0, Math.floor(score)));
+  const formatDate = (value: string | null) =>
+    value
+      ? new Date(value).toLocaleDateString(intlLocale, {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        })
+      : tr("no record yet");
+  const formatDateTime = (value: string) =>
+    new Date(value).toLocaleString(intlLocale, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
 
   return (
     <div
@@ -204,8 +224,12 @@ export function Profile({ onBack }: Props) {
           }}
         >
           <ProfileStat icon={Trophy} label={tr("Total Score")} value={exactScore(totalScore)} sub={tr("career")} />
-          <ProfileStat icon={Zap} label={tr("Highest score on a single shot")} value={exactScore(highestSingleShotScore)} sub={tr("best shot")} />
-          <ProfileStat icon={Coins} label={tr("Gold Coins")} value={`${goldCoins}`} sub={tr("shop currency")} />
+          <ProfileStat icon={Zap} label={tr("Best Shot")} value={exactScore(highestSingleShotScore)} sub={formatDate(highestSingleShotScoreDate)} />
+          <CoinProfileStat
+            value={`${goldCoins}`}
+            sub={tr("shop currency")}
+            onTransactions={() => setTransactionsOpen(true)}
+          />
           <ProfileStat
             icon={CalendarDays}
             label={tr("Daily Streak")}
@@ -281,6 +305,14 @@ export function Profile({ onBack }: Props) {
           </label>
         </section>
 
+        {transactionsOpen && (
+          <CoinTransactionsModal
+            transactions={coinTransactions}
+            formatDateTime={formatDateTime}
+            onClose={() => setTransactionsOpen(false)}
+          />
+        )}
+
       </div>
     </div>
   );
@@ -331,6 +363,103 @@ function ProfileStat({ icon: Icon, label, value, sub }: { icon?: LucideIcon; lab
         {value}
       </div>
       <div style={{ fontSize: 11, color: "var(--muted-foreground)" }}>{sub}</div>
+    </div>
+  );
+}
+
+function CoinProfileStat({
+  value,
+  sub,
+  onTransactions,
+}: {
+  value: string;
+  sub: string;
+  onTransactions: () => void;
+}) {
+  return (
+    <div style={statCard}>
+      <div style={statIcon}>
+        <Coins size={18} aria-hidden="true" />
+      </div>
+      <div
+        style={{
+          fontSize: 10,
+          letterSpacing: 1.5,
+          color: "var(--muted-foreground)",
+          fontWeight: 800,
+        }}
+      >
+        GOLD COINS
+      </div>
+      <div
+        style={{
+          fontSize: value.length > 9 ? 16 : value.length > 6 ? 20 : 24,
+          color: "var(--primary)",
+          fontWeight: 900,
+          marginTop: 3,
+          lineHeight: 1.1,
+          wordBreak: "break-word",
+        }}
+      >
+        {value}
+      </div>
+      <div style={{ fontSize: 11, color: "var(--muted-foreground)" }}>{sub}</div>
+      <button type="button" onClick={onTransactions} style={transactionButton}>
+        Transactions
+      </button>
+    </div>
+  );
+}
+
+function CoinTransactionsModal({
+  transactions,
+  formatDateTime,
+  onClose,
+}: {
+  transactions: CoinTransaction[];
+  formatDateTime: (value: string) => string;
+  onClose: () => void;
+}) {
+  const rows = [...transactions].reverse();
+  return (
+    <div style={transactionOverlay} role="dialog" aria-modal="true" aria-label="Gold coin transactions">
+      <div style={transactionModal}>
+        <div style={transactionHeader}>
+          <div>
+            <div style={sectionHeading}>GOLD COINS</div>
+            <h2 style={{ margin: 0, fontSize: 22 }}>Transactions</h2>
+          </div>
+          <button type="button" onClick={onClose} style={transactionCloseButton}>
+            Close
+          </button>
+        </div>
+        <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
+          {rows.length === 0 ? (
+            <div style={emptyTransactions}>No coin transactions recorded yet.</div>
+          ) : (
+            rows.map((transaction) => (
+              <div key={transaction.id} style={transactionRow}>
+                <div style={{ minWidth: 0 }}>
+                  <strong>{transaction.reason}</strong>
+                  <div style={transactionMeta}>{formatDateTime(transaction.at)}</div>
+                  <div style={transactionMeta}>{`Balance ${transaction.balanceAfter}`}</div>
+                </div>
+                <strong
+                  style={{
+                    ...transactionAmount,
+                    color:
+                      transaction.amount > 0
+                        ? "var(--success, var(--accent))"
+                        : "var(--destructive)",
+                  }}
+                >
+                  {transaction.amount > 0 ? `+${transaction.amount}` : transaction.amount}
+                </strong>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -521,6 +650,89 @@ const sectionHeading: React.CSSProperties = {
   color: "var(--accent)",
   fontWeight: 900,
   marginBottom: 8,
+};
+
+const transactionButton: React.CSSProperties = {
+  marginTop: 10,
+  width: "100%",
+  minHeight: 32,
+  border: "1px solid color-mix(in oklch, var(--accent) 48%, var(--border))",
+  borderRadius: 10,
+  background: "color-mix(in oklch, var(--accent) 18%, var(--surface))",
+  color: "var(--foreground)",
+  fontSize: 11,
+  fontWeight: 900,
+  cursor: "pointer",
+};
+
+const transactionOverlay: React.CSSProperties = {
+  position: "fixed",
+  inset: 0,
+  zIndex: 50,
+  display: "grid",
+  placeItems: "center",
+  padding: 18,
+  background: "rgba(0, 0, 0, 0.58)",
+  backdropFilter: "blur(10px)",
+};
+
+const transactionModal: React.CSSProperties = {
+  width: "min(520px, 100%)",
+  maxHeight: "min(680px, 86dvh)",
+  overflowY: "auto",
+  border: "1px solid var(--border)",
+  borderRadius: 18,
+  background: "var(--surface-elevated)",
+  padding: 16,
+  boxShadow: "0 24px 70px rgba(0,0,0,0.48)",
+};
+
+const transactionHeader: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 12,
+};
+
+const transactionCloseButton: React.CSSProperties = {
+  border: "1px solid var(--border)",
+  borderRadius: 10,
+  padding: "8px 10px",
+  background: "var(--surface)",
+  color: "var(--foreground)",
+  fontWeight: 850,
+  cursor: "pointer",
+};
+
+const emptyTransactions: React.CSSProperties = {
+  border: "1px solid var(--border)",
+  borderRadius: 12,
+  padding: 14,
+  color: "var(--muted-foreground)",
+  fontSize: 13,
+  textAlign: "center",
+};
+
+const transactionRow: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "minmax(0, 1fr) auto",
+  alignItems: "center",
+  gap: 12,
+  border: "1px solid var(--border)",
+  borderRadius: 12,
+  background: "var(--surface)",
+  padding: "10px 12px",
+};
+
+const transactionMeta: React.CSSProperties = {
+  marginTop: 3,
+  color: "var(--muted-foreground)",
+  fontSize: 11,
+};
+
+const transactionAmount: React.CSSProperties = {
+  fontSize: 17,
+  fontWeight: 950,
 };
 
 const recordRow: React.CSSProperties = {

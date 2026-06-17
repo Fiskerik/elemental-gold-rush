@@ -17,7 +17,13 @@ import {
   User,
   type LucideIcon,
 } from "lucide-react";
-import { LEVELS, MAX_LEVEL, MOLECULE_CHALLENGE_BY_LEVEL, getLevelById, type PowerUpStageId } from "./levels";
+import {
+  LEVELS,
+  MAX_LEVEL,
+  MOLECULE_CHALLENGE_BY_LEVEL,
+  getLevelById,
+  type PowerUpStageId,
+} from "./levels";
 import { useProgress } from "./store";
 import { formatScore } from "./logic";
 import { ELEMENTS } from "./elements";
@@ -31,6 +37,7 @@ import { getWeeklyPlayBonusView } from "./weeklyBonus";
 import { useIsTabletLayout } from "./responsive";
 import { DAILY_FEATURE_REWARD_COINS } from "./dailyFeatures";
 import { t } from "./localization";
+import { PodiumMark } from "./DailyCompoundLeaderboard";
 
 const POWER_UP_STAGE_LABELS: Record<PowerUpStageId, string> = {
   shimmer: "Merge the shimmering queued atom",
@@ -57,6 +64,7 @@ interface Props {
   onLab: () => void;
   onLibrary: () => void;
   onProfile: () => void;
+  onLeaderboard: () => void;
   onDailyChallenge: () => void;
   onSecretCompound: () => void;
 }
@@ -95,6 +103,7 @@ export function MainMenu({
   onLab,
   onLibrary,
   onProfile,
+  onLeaderboard,
   onDailyChallenge,
   onSecretCompound,
 }: Props) {
@@ -199,8 +208,6 @@ export function MainMenu({
     showDailyRewardToast(`+${dailyRewardAmount} gold coins claimed`);
   }
 
-
-
   function handleSecretCompoundPress() {
     revealSecretCompound();
     onSecretCompound();
@@ -212,7 +219,7 @@ export function MainMenu({
     try {
       const result = await showRewardedForCoin(hasProPack);
       if (result.rewarded) {
-        grantGoldCoins(1);
+        grantGoldCoins(1, "Rewarded ad");
         reportQuestProgress({ adsWatched: 1 });
         showRewardedAdMessage("");
         showDailyRewardToast("+1 gold coin");
@@ -231,11 +238,16 @@ export function MainMenu({
     const result = claimWeeklyPlayBonus();
     if (!result) return;
     const bonusText = result.bonusAwarded > 0 ? ` (+${result.bonusAwarded} streak bonus)` : "";
-    showDailyRewardToast(`+${result.coinsAwarded} gold coin${result.coinsAwarded === 1 ? "" : "s"}${bonusText}`);
+    showDailyRewardToast(
+      `+${result.coinsAwarded} gold coin${result.coinsAwarded === 1 ? "" : "s"}${bonusText}`,
+    );
   }
 
   return (
-    <div className="app-shell" style={{ padding: isTabletLayout ? 28 : 20, paddingTop: isTabletLayout ? 30 : 26 }}>
+    <div
+      className="app-shell"
+      style={{ padding: isTabletLayout ? 28 : 20, paddingTop: isTabletLayout ? 30 : 26 }}
+    >
       <div
         style={{
           position: "relative",
@@ -261,7 +273,9 @@ export function MainMenu({
             <SettingsIcon size={18} aria-hidden="true" />
           </button>
           <div style={{ textAlign: "center", minWidth: 0 }}>
-            <div className="gold-text" style={brandTitle}>Atomic Fusion Rush</div>
+            <div className="gold-text" style={brandTitle}>
+              Atomic Fusion Rush
+            </div>
             <div style={brandSubline}>{`Level ${unlockedLevel} of ${MAX_LEVEL}`}</div>
             {hasProPack && <div style={proActiveChip}>PRO LAB ACTIVE</div>}
           </div>
@@ -290,16 +304,28 @@ export function MainMenu({
                 {nextRunGoal.text}
               </div>
             </div>
-            <button
-              onClick={() => {
-                trackMenuAction("levels");
-                onLevels();
-              }}
-              style={chooseLevelBtn}
-            >
-              <Layers size={16} aria-hidden="true" />
-              Map
-            </button>
+            <div style={playPanelActions}>
+              <button
+                onClick={() => {
+                  trackMenuAction("leaderboard");
+                  onLeaderboard();
+                }}
+                style={{ ...chooseLevelBtn, paddingInline: 9 }}
+                aria-label="Open leaderboard"
+              >
+                <PodiumMark size={20} />
+              </button>
+              <button
+                onClick={() => {
+                  trackMenuAction("levels");
+                  onLevels();
+                }}
+                style={chooseLevelBtn}
+              >
+                <Layers size={16} aria-hidden="true" />
+                Map
+              </button>
+            </div>
           </div>
           <button
             onClick={() => {
@@ -322,34 +348,55 @@ export function MainMenu({
           </button>
           <div style={dailyFeatureGrid}>
             <button type="button" onClick={onDailyChallenge} style={dailyFeatureBtn}>
-              <span style={dailyFeatureIcon}><Trophy size={18} aria-hidden="true" /></span>
+              <span style={dailyFeatureIcon}>
+                <Trophy size={18} aria-hidden="true" />
+              </span>
               <span style={dailyFeatureText}>
                 <strong style={dailyFeatureTextStrong}>{tr("Daily Challenge")}</strong>
-                <small>{tr(dailyChallenge.completed ? "Cleared today" : `Reward +${DAILY_FEATURE_REWARD_COINS}`)}</small>
-              </span>
-              <span style={dailyFeatureReward}>
-                {dailyChallenge.completed ? <CheckCircle2 size={18} aria-label="Completed" /> : <DailyGoldReward />}
-              </span>
-            </button>
-            <button type="button" onClick={handleSecretCompoundPress} style={dailyFeatureBtn}>
-              <span style={dailyFeatureIcon}><CircleQuestionMark size={18} aria-hidden="true" /></span>
-              <span style={dailyFeatureText}>
-                <strong style={dailyFeatureTextStrong}>{tr("Secret Compound")}</strong>
                 <small>
-                  {tr(secretCompound.completed
-                    ? "Synthesized"
-                    : secretCompound.revealed
-                      ? "Clue unlocked"
-                      : `Reveal clue +${DAILY_FEATURE_REWARD_COINS}`)}
+                  {tr(
+                    dailyChallenge.completed
+                      ? "Cleared today"
+                      : `Reward +${DAILY_FEATURE_REWARD_COINS}`,
+                  )}
                 </small>
               </span>
               <span style={dailyFeatureReward}>
-                {secretCompound.completed ? <CheckCircle2 size={18} aria-label="Completed" /> : <DailyGoldReward />}
+                {dailyChallenge.completed ? (
+                  <CheckCircle2 size={18} aria-label="Completed" />
+                ) : (
+                  <DailyGoldReward />
+                )}
+              </span>
+            </button>
+            <button type="button" onClick={handleSecretCompoundPress} style={dailyFeatureBtn}>
+              <span style={dailyFeatureIcon}>
+                <CircleQuestionMark size={18} aria-hidden="true" />
+              </span>
+              <span style={dailyFeatureText}>
+                <strong style={dailyFeatureTextStrong}>{tr("Secret Compound")}</strong>
+                <small>
+                  {tr(
+                    secretCompound.completed
+                      ? "Synthesized"
+                      : secretCompound.revealed
+                        ? "Clue unlocked"
+                        : `Reveal clue +${DAILY_FEATURE_REWARD_COINS}`,
+                  )}
+                </small>
+              </span>
+              <span style={dailyFeatureReward}>
+                {secretCompound.completed ? (
+                  <CheckCircle2 size={18} aria-label="Completed" />
+                ) : (
+                  <DailyGoldReward />
+                )}
               </span>
             </button>
           </div>
           <button
             type="button"
+            className="ad-shine-btn"
             onClick={handleRewardedCoin}
             disabled={rewardedAdBusy}
             style={{
@@ -363,7 +410,8 @@ export function MainMenu({
               {rewardedAdBusy ? "Loading ad..." : "Free coins"}
             </span>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-              <GoldCoinIcon size={14} />+1
+              <GoldCoinIcon size={14} />
+              +1
             </span>
           </button>
           {rewardedAdMessage && (
@@ -427,74 +475,79 @@ export function MainMenu({
         </nav>
 
         <section style={weeklyBonusCard}>
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
-              <div>
-                <div style={sectionLabel}>PLAY A GAME A DAY</div>
-                <div style={{ fontSize: 12, color: "var(--muted-foreground)", marginTop: 2 }}>
-                  {`Streak ${weeklyBonus.currentStreak} - ${weeklyBonus.cycleProgress}/7 toward +5`}
-                </div>
-              </div>
-              <div style={weeklyBonusPill}>
-                {weeklyBonus.todayClaimed
-                  ? `Today +${weeklyBonus.coinsEarnedToday}`
-                  : "Play today +1"}
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
+            <div>
+              <div style={sectionLabel}>PLAY A GAME A DAY</div>
+              <div style={{ fontSize: 12, color: "var(--muted-foreground)", marginTop: 2 }}>
+                {`Streak ${weeklyBonus.currentStreak} - ${weeklyBonus.cycleProgress}/7 toward +5`}
               </div>
             </div>
-            <div style={weeklyBonusTrack} aria-label={`${weeklyBonus.cycleProgress} of 7 streak days claimed`}>
-              <span
+            <div style={weeklyBonusPill}>
+              {weeklyBonus.todayClaimed
+                ? `Today +${weeklyBonus.coinsEarnedToday}`
+                : "Play today +1"}
+            </div>
+          </div>
+          <div
+            style={weeklyBonusTrack}
+            aria-label={`${weeklyBonus.cycleProgress} of 7 streak days claimed`}
+          >
+            <span
+              style={{
+                ...weeklyBonusFill,
+                width: `${Math.max(4, (weeklyBonus.cycleProgress / 7) * 100)}%`,
+              }}
+            />
+          </div>
+          <div style={weeklyDayGrid}>
+            {weeklyBonus.days.map((day) => (
+              <button
+                key={day.index}
+                type="button"
+                onClick={
+                  day.isToday && !weeklyBonus.todayClaimed ? handleWeeklyDayClaim : undefined
+                }
+                disabled={!(day.isToday && !weeklyBonus.todayClaimed)}
                 style={{
-                  ...weeklyBonusFill,
-                  width: `${Math.max(4, (weeklyBonus.cycleProgress / 7) * 100)}%`,
+                  ...weeklyDayCell,
+                  borderColor: day.claimed
+                    ? "var(--accent)"
+                    : day.isToday
+                      ? "var(--primary)"
+                      : "var(--border)",
+                  color: day.claimed ? "var(--foreground)" : "var(--muted-foreground)",
+                  cursor: day.isToday && !weeklyBonus.todayClaimed ? "pointer" : "default",
+                  background:
+                    day.isToday && !weeklyBonus.todayClaimed
+                      ? "linear-gradient(135deg, color-mix(in oklch, var(--primary) 30%, var(--surface)), var(--surface))"
+                      : "var(--surface)",
+                  boxShadow:
+                    day.isToday && !weeklyBonus.todayClaimed
+                      ? "0 0 14px color-mix(in oklch, var(--primary) 50%, transparent)"
+                      : undefined,
+                  fontFamily: "inherit",
                 }}
-              />
-            </div>
-            <div style={weeklyDayGrid}>
-              {weeklyBonus.days.map((day) => (
-                <button
-                  key={day.index}
-                  type="button"
-                  onClick={day.isToday && !weeklyBonus.todayClaimed ? handleWeeklyDayClaim : undefined}
-                  disabled={!(day.isToday && !weeklyBonus.todayClaimed)}
-                  style={{
-                    ...weeklyDayCell,
-                    borderColor: day.claimed
-                      ? "var(--accent)"
-                      : day.isToday
-                        ? "var(--primary)"
-                        : "var(--border)",
-                    color: day.claimed ? "var(--foreground)" : "var(--muted-foreground)",
-                    cursor: day.isToday && !weeklyBonus.todayClaimed ? "pointer" : "default",
-                    background:
-                      day.isToday && !weeklyBonus.todayClaimed
-                        ? "linear-gradient(135deg, color-mix(in oklch, var(--primary) 30%, var(--surface)), var(--surface))"
-                        : "var(--surface)",
-                    boxShadow:
-                      day.isToday && !weeklyBonus.todayClaimed
-                        ? "0 0 14px color-mix(in oklch, var(--primary) 50%, transparent)"
-                        : undefined,
-                    fontFamily: "inherit",
-                  }}
-                >
-                  <span>{day.label}</span>
-                  <strong style={weeklyReward}>
-                    <GoldCoinIcon size={12} />
-                    {day.index === 7 && <span>x5</span>}
-                  </strong>
-                  <small>
-                    {day.claimed
-                      ? "Claimed"
-                      : day.isToday
-                        ? weeklyBonus.todayClaimed
-                          ? "Today"
-                          : "Claim"
-                        : "Next"}
-                  </small>
-                </button>
-              ))}
-            </div>
-            <div style={{ fontSize: 10, color: "var(--muted-foreground)", lineHeight: 1.35 }}>
-              {`1 coin each day you play. ${weeklyBonus.nextRewardText}.`}
-            </div>
+              >
+                <span>{day.label}</span>
+                <strong style={weeklyReward}>
+                  <GoldCoinIcon size={12} />
+                  {day.index === 7 && <span>x5</span>}
+                </strong>
+                <small>
+                  {day.claimed
+                    ? "Claimed"
+                    : day.isToday
+                      ? weeklyBonus.todayClaimed
+                        ? "Today"
+                        : "Claim"
+                      : "Next"}
+                </small>
+              </button>
+            ))}
+          </div>
+          <div style={{ fontSize: 10, color: "var(--muted-foreground)", lineHeight: 1.35 }}>
+            {`1 coin each day you play. ${weeklyBonus.nextRewardText}.`}
+          </div>
         </section>
 
         <section style={{ ...dailyPanel, padding: isTabletLayout ? 18 : dailyPanel.padding }}>
@@ -504,16 +557,35 @@ export function MainMenu({
               <span>{dailyRewardToast.text}</span>
             </div>
           )}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+            }}
+          >
             <div>
               <div style={sectionLabel}>DAILY LAB</div>
               <div style={{ fontSize: 12, color: "var(--muted-foreground)" }}>
                 {`Streak ${dailyStreak} - ${completedDailyQuests}/${dailyQuests.length} quests`}
               </div>
               <div style={{ fontSize: 11, color: "var(--muted-foreground)", marginTop: 2 }}>
-                {tr(hasProPack ? "Pro daily quests include bonus gold." : "Complete 4 daily tasks to claim +3.")}
+                {tr(
+                  hasProPack
+                    ? "Pro daily quests include bonus gold."
+                    : "Complete 4 daily tasks to claim +3.",
+                )}
               </div>
-              <div style={{ fontSize: 10, color: "var(--accent)", marginTop: 4, fontWeight: 800, letterSpacing: 0.6 }}>
+              <div
+                style={{
+                  fontSize: 10,
+                  color: "var(--accent)",
+                  marginTop: 4,
+                  fontWeight: 800,
+                  letterSpacing: 0.6,
+                }}
+              >
                 {`Resets in ${resetCountdown}`}
               </div>
             </div>
@@ -537,14 +609,19 @@ export function MainMenu({
                 {claimedDailyReward ? "Claimed" : "Claim"}
               </button>
               <div style={weeklyBonusPill}>
-                {weeklyBonus.todayClaimed ? `Today +${weeklyBonus.coinsEarnedToday}` : "Play today +1"}
+                {weeklyBonus.todayClaimed
+                  ? `Today +${weeklyBonus.coinsEarnedToday}`
+                  : "Play today +1"}
               </div>
             </div>
           </div>
         </section>
 
         <section style={{ ...dailyPanel, padding: isTabletLayout ? 18 : dailyPanel.padding }}>
-          <div style={dailyQuestClaimTrack} aria-label={`${Math.min(completedDailyQuests, 4)} of 4 daily quest completions`}>
+          <div
+            style={dailyQuestClaimTrack}
+            aria-label={`${Math.min(completedDailyQuests, 4)} of 4 daily quest completions`}
+          >
             {Array.from({ length: 4 }, (_, index) => (
               <span
                 key={index}
@@ -569,7 +646,9 @@ export function MainMenu({
                 >
                   <QuestIcon type={quest.type} completed={quest.completed} />
                 </span>
-                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <span
+                  style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                >
                   {tr(quest.title)}
                 </span>
                 <span style={questProgressWrap} aria-label={`${quest.progress} of ${quest.target}`}>
@@ -590,7 +669,6 @@ export function MainMenu({
             ))}
           </div>
         </section>
-
       </div>
     </div>
   );
@@ -611,7 +689,7 @@ function QuestIcon({ type, completed }: { type: string; completed: boolean }) {
     single_game_score: Trophy,
     combo_reactions: Layers,
   };
-  const Icon = completed ? CheckCircle2 : iconMap[type] ?? FlaskConical;
+  const Icon = completed ? CheckCircle2 : (iconMap[type] ?? FlaskConical);
   return <Icon size={15} strokeWidth={2.4} aria-hidden="true" />;
 }
 
@@ -722,7 +800,8 @@ const chooseLevelBtn: CSSProperties = {
   border: "1px solid color-mix(in oklch, var(--primary) 45%, var(--border))",
   borderRadius: 12,
   padding: "9px 10px",
-  background: "linear-gradient(135deg, color-mix(in oklch, var(--primary) 35%, var(--surface)), color-mix(in oklch, var(--accent) 25%, var(--surface)))",
+  background:
+    "linear-gradient(135deg, color-mix(in oklch, var(--primary) 35%, var(--surface)), color-mix(in oklch, var(--accent) 25%, var(--surface)))",
   color: "var(--foreground)",
   fontSize: 12,
   fontWeight: 900,
@@ -753,13 +832,19 @@ const progressFill: CSSProperties = {
   background: "linear-gradient(90deg, var(--primary), var(--accent))",
 };
 
-
-
 const dailyFeatureGrid: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
   gap: 10,
   marginTop: 10,
+};
+
+const playPanelActions: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "flex-end",
+  gap: 8,
+  flexShrink: 0,
 };
 
 const dailyFeatureBtn: CSSProperties = {
@@ -771,7 +856,8 @@ const dailyFeatureBtn: CSSProperties = {
   border: "1px solid color-mix(in oklch, var(--primary) 45%, var(--border))",
   borderRadius: 13,
   padding: "10px 9px",
-  background: "linear-gradient(135deg, color-mix(in oklch, var(--primary) 24%, var(--surface)), var(--surface))",
+  background:
+    "linear-gradient(135deg, color-mix(in oklch, var(--primary) 24%, var(--surface)), var(--surface))",
   color: "var(--foreground)",
   cursor: "pointer",
   textAlign: "left",
@@ -825,7 +911,8 @@ const rewardedAdBtn: CSSProperties = {
   borderRadius: 13,
   padding: "10px 12px",
   marginTop: 10,
-  background: "linear-gradient(135deg, color-mix(in oklch, var(--accent) 22%, var(--surface)), var(--surface))",
+  background:
+    "linear-gradient(135deg, color-mix(in oklch, var(--accent) 22%, var(--surface)), var(--surface))",
   color: "var(--foreground)",
   fontWeight: 900,
   fontSize: 12,
@@ -1097,7 +1184,8 @@ function NavPill({
         background: tones[tone],
         color: "var(--foreground)",
         padding: "10px 8px",
-        boxShadow: "0 2px 12px rgba(0,0,0,0.2), 0 0 12px color-mix(in oklch, var(--primary) 30%, transparent)",
+        boxShadow:
+          "0 2px 12px rgba(0,0,0,0.2), 0 0 12px color-mix(in oklch, var(--primary) 30%, transparent)",
         cursor: "pointer",
       }}
     >

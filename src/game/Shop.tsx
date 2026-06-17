@@ -257,7 +257,7 @@ export function Shop({ onBack }: { onBack: () => void }) {
         "App Store did not respond in time. Try again.",
       );
       if (result.coins > 0) {
-        grantGoldCoins(result.coins);
+        grantGoldCoins(result.coins, "App Store coin pack");
         setMessage(
           `${result.coins} gold coin${result.coins === 1 ? "" : "s"} added from App Store purchase.`,
         );
@@ -281,7 +281,7 @@ export function Shop({ onBack }: { onBack: () => void }) {
     try {
       const result = await showRewardedForCoin(hasProPack);
       if (result.rewarded) {
-        grantGoldCoins(1);
+        grantGoldCoins(1, "Rewarded ad");
         reportQuestProgress({ adsWatched: 1 });
         setMessage("Reward complete: +1 gold coin.");
         showCoinToast("+1 gold coin");
@@ -641,6 +641,7 @@ export function Shop({ onBack }: { onBack: () => void }) {
           </p>
           <button
             type="button"
+            className="ad-shine-btn"
             onClick={handleRewardedCoin}
             disabled={appStorePurchaseBusy}
             style={{

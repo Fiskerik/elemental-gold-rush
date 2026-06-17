@@ -1,0 +1,273 @@
+import { getTodayQuestDate } from "./quests";
+import {
+  isGameCenterAvailable,
+  loadDailyCompoundGameCenterLeaderboard,
+  submitDailyCompoundGameCenterScore,
+  type GameCenterLeaderboardEntry,
+} from "./gameCenter";
+
+export type LeaderboardScope = "global" | "local";
+
+export interface LeaderboardEntry {
+  id: string;
+  rank: number;
+  countryCode: string;
+  flag: string;
+  name: string;
+  score: number;
+  shots: number;
+  isPlayer?: boolean;
+}
+
+export interface LeaderboardBoard {
+  entries: LeaderboardEntry[];
+  player: LeaderboardEntry;
+  countryCode: string;
+  source: "game-center" | "local";
+  status?: string;
+}
+
+interface DailyCompoundRunRecord {
+  id: string;
+  date: string;
+  weekKey: string;
+  score: number;
+  shots: number;
+  countryCode: string;
+  name: string;
+  recordedAt: number;
+}
+
+const DAILY_COMPOUND_LEADERBOARD_STORAGE_KEY = "elemental-gold-rush-daily-compound-runs";
+
+const SEEDED_NAMES = [
+  ["SE", "Astrid"],
+  ["US", "Nova"],
+  ["DE", "Klara"],
+  ["GB", "Morgan"],
+  ["JP", "Hana"],
+  ["FR", "Luc"],
+  ["BR", "Lia"],
+  ["CA", "Rowan"],
+  ["AU", "Mika"],
+  ["IN", "Asha"],
+  ["NO", "Sven"],
+  ["ES", "Iris"],
+  ["IT", "Enzo"],
+  ["NL", "Mila"],
+  ["DK", "Freja"],
+] as const;
+
+function normalizeCountryCode(value: string | undefined): string {
+  const upper = (value ?? "").trim().toUpperCase();
+  return /^[A-Z]{2}$/.test(upper) ? upper : "US";
+}
+
+export function inferPlayerCountryCode(): string {
+  if (typeof navigator === "undefined") return "US";
+  const locale = navigator.languages?.[0] ?? navigator.language ?? "";
+  const region = locale.split("-")[1] ?? "";
+  return normalizeCountryCode(region);
+}
+
+export function countryFlag(countryCode: string): string {
+  const normalized = normalizeCountryCode(countryCode);
+  return Array.from(normalized)
+    .map((char) => String.fromCodePoint(0x1f1e6 + char.charCodeAt(0) - 65))
+    .join("");
+}
+
+function startOfIsoWeek(date: Date): Date {
+  const copy = new Date(date);
+  const day = copy.getDay() || 7;
+  copy.setHours(0, 0, 0, 0);
+  copy.setDate(copy.getDate() - day + 1);
+  return copy;
+}
+
+export function getWeekKey(date = new Date()): string {
+  const monday = startOfIsoWeek(date);
+  return monday.toISOString().slice(0, 10);
+}
+
+function readRecords(): DailyCompoundRunRecord[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(DAILY_COMPOUND_LEADERBOARD_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as Partial<DailyCompoundRunRecord>[];
+    return parsed
+      .map((record) => ({
+        id: String(record.id ?? ""),
+        date: String(record.date ?? ""),
+        weekKey: String(record.weekKey ?? ""),
+        score: Math.max(0, Math.floor(record.score ?? 0)),
+        shots: Math.max(0, Math.floor(record.shots ?? 0)),
+        countryCode: normalizeCountryCode(record.countryCode),
+        name: String(record.name ?? "You"),
+        recordedAt: Math.max(0, Math.floor(record.recordedAt ?? 0)),
+      }))
+      .filter((record) => record.id && record.date && record.weekKey);
+  } catch {
+    return [];
+  }
+}
+
+function writeRecords(records: DailyCompoundRunRecord[]): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(
+    DAILY_COMPOUND_LEADERBOARD_STORAGE_KEY,
+    JSON.stringify(records.slice(-60)),
+  );
+}
+
+function recordDailyCompoundLeaderboardRun(score: number, shots: number): void {
+  const normalizedScore = Math.max(0, Math.floor(score));
+  if (normalizedScore <= 0) return;
+  const today = getTodayQuestDate();
+  const now = Date.now();
+  const countryCode = inferPlayerCountryCode();
+  const records = readRecords();
+  records.push({
+    id: `${today}-${now}`,
+    date: today,
+    weekKey: getWeekKey(new Date(`${today}T12:00:00`)),
+    score: normalizedScore,
+    shots: Math.max(1, Math.floor(shots)),
+    countryCode,
+    name: "You",
+    recordedAt: now,
+  });
+  writeRecords(records);
+}
+
+export function submitDailyCompoundLeaderboardScore(score: number, shots: number): void {
+  recordDailyCompoundLeaderboardRun(score, shots);
+  if (!isGameCenterAvailable()) return;
+  void submitDailyCompoundGameCenterScore(score, shots).catch((error) => {
+    console.warn("Game Center score submit failed", error);
+  });
+}
+
+function seededNumber(seed: string): number {
+  let hash = 2166136261;
+  for (let index = 0; index < seed.length; index += 1) {
+    hash ^= seed.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return Math.abs(hash >>> 0);
+}
+
+function seededEntries(scope: LeaderboardScope, countryCode: string): LeaderboardEntry[] {
+  const today = getTodayQuestDate();
+  const rows = Array.from({ length: scope === "local" ? 10 : 18 }, (_, index) => {
+    const [seedCountry, name] = SEEDED_NAMES[index % SEEDED_NAMES.length];
+    const rowCountry = scope === "local" ? countryCode : seedCountry;
+    const variance = seededNumber(`daily-${scope}-${today}-${index}-${rowCountry}`);
+    const score = Math.max(250, 26000 - index * 1150 + (variance % 900));
+    const shots = 1 + (variance % 6);
+    return {
+      id: `seed-daily-${scope}-${index}`,
+      rank: 0,
+      countryCode: rowCountry,
+      flag: countryFlag(rowCountry),
+      name,
+      score,
+      shots,
+    };
+  });
+  return rows;
+}
+
+function playerEntry(): LeaderboardEntry {
+  const today = getTodayQuestDate();
+  const records = readRecords();
+  const countryCode = inferPlayerCountryCode();
+  const todaysBest = records
+    .filter((record) => record.date === today)
+    .sort((a, b) => b.score - a.score || a.shots - b.shots)[0];
+  return {
+    id: "player",
+    rank: 0,
+    countryCode,
+    flag: countryFlag(countryCode),
+    name: "You",
+    score: todaysBest?.score ?? 0,
+    shots: todaysBest?.shots ?? 0,
+    isPlayer: true,
+  };
+}
+
+export function getDailyCompoundLeaderboard(scope: LeaderboardScope): LeaderboardBoard {
+  const countryCode = inferPlayerCountryCode();
+  const player = playerEntry();
+  const entries = [...seededEntries(scope, countryCode), player]
+    .filter((entry) => scope === "global" || entry.countryCode === countryCode)
+    .sort((a, b) => b.score - a.score || a.shots - b.shots || a.name.localeCompare(b.name))
+    .map((entry, index) => ({ ...entry, rank: index + 1 }));
+  return {
+    entries: entries.slice(0, 20),
+    player: entries.find((entry) => entry.isPlayer) ?? { ...player, rank: 0 },
+    countryCode,
+    source: "local",
+  };
+}
+
+function entryId(entry: GameCenterLeaderboardEntry): string {
+  return entry.gamePlayerId ?? entry.teamPlayerId ?? entry.alias ?? entry.playerName ?? "unknown";
+}
+
+function mapGameCenterEntry(
+  entry: GameCenterLeaderboardEntry,
+  scope: LeaderboardScope,
+  countryCode: string,
+  localEntry?: GameCenterLeaderboardEntry | null,
+): LeaderboardEntry {
+  const localId = localEntry ? entryId(localEntry) : "";
+  const id = entryId(entry);
+  return {
+    id: `${scope}-${id}-${entry.rank}`,
+    rank: entry.rank,
+    countryCode,
+    flag: scope === "local" ? countryFlag(countryCode) : "🌐",
+    name: entry.playerName || entry.alias || "Player",
+    score: Math.max(0, Math.floor(entry.score ?? 0)),
+    shots: Math.max(0, Math.floor(entry.context ?? 0)),
+    isPlayer: Boolean(localId && id === localId),
+  };
+}
+
+export async function loadDailyCompoundLeaderboard(
+  scope: LeaderboardScope,
+): Promise<LeaderboardBoard> {
+  const countryCode = inferPlayerCountryCode();
+  if (!isGameCenterAvailable()) {
+    return getDailyCompoundLeaderboard(scope);
+  }
+
+  try {
+    const result = await loadDailyCompoundGameCenterLeaderboard(scope);
+    const entries = result.entries.map((entry) =>
+      mapGameCenterEntry(entry, scope, countryCode, result.localPlayer),
+    );
+    const localPlayer = result.localPlayer
+      ? mapGameCenterEntry(result.localPlayer, scope, countryCode, result.localPlayer)
+      : undefined;
+    return {
+      entries,
+      player: localPlayer ??
+        entries.find((entry) => entry.isPlayer) ?? {
+          ...playerEntry(),
+          rank: 0,
+        },
+      countryCode,
+      source: "game-center",
+    };
+  } catch (error) {
+    console.warn("Game Center leaderboard fetch failed", error);
+    return {
+      ...getDailyCompoundLeaderboard(scope),
+      status: "Game Center unavailable - showing device scores",
+    };
+  }
+}

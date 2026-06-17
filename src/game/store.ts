@@ -150,6 +150,14 @@ export interface LevelStats {
   stars: number;
 }
 
+export interface CoinTransaction {
+  id: string;
+  at: string;
+  amount: number;
+  balanceAfter: number;
+  reason: string;
+}
+
 export const emptyLevelStats = (): LevelStats => ({
   attempts: 0,
   fails: 0,
@@ -159,6 +167,44 @@ export const emptyLevelStats = (): LevelStats => ({
   totalScore: 0,
   stars: 0,
 });
+
+const MAX_COIN_TRANSACTIONS = 80;
+
+function appendCoinTransaction(
+  transactions: CoinTransaction[] | undefined,
+  amount: number,
+  balanceAfter: number,
+  reason: string,
+): CoinTransaction[] {
+  const normalizedAmount = Math.floor(amount);
+  if (normalizedAmount === 0) return transactions ?? [];
+  return [
+    ...(transactions ?? []),
+    {
+      id: `${Date.now()}-${Math.abs(normalizedAmount)}-${Math.random().toString(36).slice(2, 8)}`,
+      at: new Date().toISOString(),
+      amount: normalizedAmount,
+      balanceAfter,
+      reason,
+    },
+  ].slice(-MAX_COIN_TRANSACTIONS);
+}
+
+function normalizeCoinTransactions(
+  transactions: Partial<CoinTransaction>[] | undefined,
+): CoinTransaction[] {
+  if (!transactions) return [];
+  return transactions
+    .map((transaction) => ({
+      id: String(transaction.id ?? ""),
+      at: String(transaction.at ?? ""),
+      amount: Math.floor(transaction.amount ?? 0),
+      balanceAfter: Math.max(0, Math.floor(transaction.balanceAfter ?? 0)),
+      reason: String(transaction.reason ?? "Gold coins"),
+    }))
+    .filter((transaction) => transaction.id && transaction.at && transaction.amount !== 0)
+    .slice(-MAX_COIN_TRANSACTIONS);
+}
 
 function normalizeLevelStatsRecord(
   stats: Record<number, Partial<LevelStats>> | undefined,
@@ -187,7 +233,9 @@ interface ProgressState {
   highestElement: number; // highest atomic number ever reached
   totalScore: number;
   highestSingleShotScore: number;
+  highestSingleShotScoreDate: string | null;
   goldCoins: number;
+  coinTransactions: CoinTransaction[];
   discoveredElements: number[]; // atomic numbers seen
   discoveredCompounds: string[];
   compoundCounts: Record<string, number>;
@@ -241,10 +289,10 @@ interface ProgressState {
   addScore: (n: number) => void;
   recordSingleShotScore: (score: number) => void;
   spendScore: (cost: number) => boolean;
-  spendGoldCoins: (cost: number) => boolean;
+  spendGoldCoins: (cost: number, reason?: string) => boolean;
   skipLevelForCoins: (levelId: number, coinCost: number) => boolean;
   buyGoldCoins: (coins: number, pointCost: number) => boolean;
-  grantGoldCoins: (coins: number) => void;
+  grantGoldCoins: (coins: number, reason?: string) => void;
   setHighestElement: (n: number) => void;
   refreshDailyLab: () => void;
   claimWeeklyPlayBonus: () => { coinsAwarded: number; bonusAwarded: number } | null;
@@ -289,7 +337,9 @@ export const useProgress = create<ProgressState>()(
       highestElement: 1,
       totalScore: 0,
       highestSingleShotScore: 0,
+      highestSingleShotScoreDate: null,
       goldCoins: 0,
+      coinTransactions: [],
       discoveredElements: [1],
       discoveredCompounds: [],
       compoundCounts: {},
@@ -340,6 +390,8 @@ export const useProgress = create<ProgressState>()(
           const dailyChallenge = refreshDailyChallengeState(s.dailyChallenge);
           awarded = !dailyChallenge.rewardClaimed;
           const rewardCoins = s.hasProPack ? 5 : DAILY_FEATURE_REWARD_COINS;
+          const coinDelta = awarded ? rewardCoins : 0;
+          const balanceAfter = s.goldCoins + coinDelta;
           const nextChallenge = {
             ...dailyChallenge,
             completed: true,
@@ -350,7 +402,13 @@ export const useProgress = create<ProgressState>()(
             dailyChallenge: nextChallenge,
             dailyBoardRuns: s.dailyBoardRuns + 1,
             dailyBoardBestScore: Math.max(s.dailyBoardBestScore, nextChallenge.bestScore),
-            goldCoins: s.goldCoins + (awarded ? rewardCoins : 0),
+            goldCoins: balanceAfter,
+            coinTransactions: appendCoinTransaction(
+              s.coinTransactions,
+              coinDelta,
+              balanceAfter,
+              "Daily Challenge reward",
+            ),
           };
         });
         return awarded;
@@ -369,6 +427,8 @@ export const useProgress = create<ProgressState>()(
           awarded = !secretCompound.rewardClaimed;
           const scoredRun = typeof score === "number";
           const rewardCoins = s.hasProPack ? 5 : DAILY_FEATURE_REWARD_COINS;
+          const coinDelta = awarded ? rewardCoins : 0;
+          const balanceAfter = s.goldCoins + coinDelta;
           return {
             secretCompound: {
               ...secretCompound,
@@ -380,7 +440,13 @@ export const useProgress = create<ProgressState>()(
             dailyCompoundBestScore: scoredRun && awarded
               ? Math.max(s.dailyCompoundBestScore, Math.max(0, Math.floor(score)))
               : s.dailyCompoundBestScore,
-            goldCoins: s.goldCoins + (awarded ? rewardCoins : 0),
+            goldCoins: balanceAfter,
+            coinTransactions: appendCoinTransaction(
+              s.coinTransactions,
+              coinDelta,
+              balanceAfter,
+              "Daily Compound reward",
+            ),
             dailyQuests: applyQuestProgress(s.dailyQuests, { secretCompoundCleared: true }),
           };
         });
@@ -402,9 +468,16 @@ export const useProgress = create<ProgressState>()(
             s.dailyQuests,
             s.claimedDailyReward,
           );
+          const balanceAfter = s.goldCoins - cost;
           return {
             ...refreshed,
-            goldCoins: s.goldCoins - cost,
+            goldCoins: balanceAfter,
+            coinTransactions: appendCoinTransaction(
+              s.coinTransactions,
+              -cost,
+              balanceAfter,
+              `Lab upgrade: ${id}`,
+            ),
             labUpgradeLevels: { ...levels, [id]: current + 1 },
             dailyQuests: applyQuestProgress(refreshed.dailyQuests, { powerUpsUpgraded: 1 }),
           };
@@ -471,9 +544,16 @@ export const useProgress = create<ProgressState>()(
             s.dailyQuests,
             s.claimedDailyReward,
           );
+          const balanceAfter = s.goldCoins - normalizedCost;
           return {
             ...refreshed,
-            goldCoins: s.goldCoins - normalizedCost,
+            goldCoins: balanceAfter,
+            coinTransactions: appendCoinTransaction(
+              s.coinTransactions,
+              -normalizedCost,
+              balanceAfter,
+              "Collection elements unlock",
+            ),
             discoveredElements,
             earnedBadges: getEarnedBadgeIds(discoveredElements),
             dailyQuests: applyQuestProgress(refreshed.dailyQuests, { itemsPurchased: 1 }),
@@ -499,9 +579,16 @@ export const useProgress = create<ProgressState>()(
             s.dailyQuests,
             s.claimedDailyReward,
           );
+          const balanceAfter = s.goldCoins - normalizedCost;
           return {
             ...refreshed,
-            goldCoins: s.goldCoins - normalizedCost,
+            goldCoins: balanceAfter,
+            coinTransactions: appendCoinTransaction(
+              s.coinTransactions,
+              -normalizedCost,
+              balanceAfter,
+              "Collection compounds unlock",
+            ),
             discoveredCompounds: Array.from(current),
             compoundCounts,
             dailyQuests: applyQuestProgress(refreshed.dailyQuests, { itemsPurchased: 1 }),
@@ -511,12 +598,14 @@ export const useProgress = create<ProgressState>()(
       },
       addScore: (n) => set((s) => ({ totalScore: s.totalScore + Math.max(0, Math.floor(n)) })),
       recordSingleShotScore: (score) =>
-        set((s) => ({
-          highestSingleShotScore: Math.max(
-            s.highestSingleShotScore,
-            Math.max(0, Math.floor(score)),
-          ),
-        })),
+        set((s) => {
+          const normalizedScore = Math.max(0, Math.floor(score));
+          if (normalizedScore <= s.highestSingleShotScore) return s;
+          return {
+            highestSingleShotScore: normalizedScore,
+            highestSingleShotScoreDate: new Date().toISOString(),
+          };
+        }),
       spendScore: (cost) => {
         let spent = false;
         set((s) => {
@@ -527,13 +616,22 @@ export const useProgress = create<ProgressState>()(
         });
         return spent;
       },
-      spendGoldCoins: (cost) => {
+      spendGoldCoins: (cost, reason = "Gold coins spent") => {
         let spent = false;
         set((s) => {
           const normalizedCost = Math.max(0, Math.floor(cost));
           if (normalizedCost <= 0 || s.goldCoins < normalizedCost) return s;
           spent = true;
-          return { goldCoins: s.goldCoins - normalizedCost };
+          const balanceAfter = s.goldCoins - normalizedCost;
+          return {
+            goldCoins: balanceAfter,
+            coinTransactions: appendCoinTransaction(
+              s.coinTransactions,
+              -normalizedCost,
+              balanceAfter,
+              reason,
+            ),
+          };
         });
         return spent;
       },
@@ -546,8 +644,15 @@ export const useProgress = create<ProgressState>()(
           const canSkipCurrentLevel = normalizedLevel === s.unlockedLevel && (stats.fails ?? 0) > 0;
           if (!canSkipCurrentLevel || s.goldCoins < normalizedCost) return s;
           skipped = true;
+          const balanceAfter = s.goldCoins - normalizedCost;
           return {
-            goldCoins: s.goldCoins - normalizedCost,
+            goldCoins: balanceAfter,
+            coinTransactions: appendCoinTransaction(
+              s.coinTransactions,
+              -normalizedCost,
+              balanceAfter,
+              `Level ${normalizedLevel} skip`,
+            ),
             unlockedLevel: Math.max(s.unlockedLevel, normalizedLevel + 1),
           };
         });
@@ -560,17 +665,34 @@ export const useProgress = create<ProgressState>()(
           const normalizedCost = Math.max(0, Math.floor(pointCost));
           if (normalizedCoins <= 0 || s.totalScore < normalizedCost) return s;
           purchased = true;
+          const balanceAfter = s.goldCoins + normalizedCoins;
           return {
             totalScore: s.totalScore - normalizedCost,
-            goldCoins: s.goldCoins + normalizedCoins,
+            goldCoins: balanceAfter,
+            coinTransactions: appendCoinTransaction(
+              s.coinTransactions,
+              normalizedCoins,
+              balanceAfter,
+              "Score exchange",
+            ),
           };
         });
         return purchased;
       },
-      grantGoldCoins: (coins) =>
-        set((s) => ({
-          goldCoins: s.goldCoins + Math.max(0, Math.floor(coins)),
-        })),
+      grantGoldCoins: (coins, reason = "Gold coins added") =>
+        set((s) => {
+          const normalizedCoins = Math.max(0, Math.floor(coins));
+          const balanceAfter = s.goldCoins + normalizedCoins;
+          return {
+            goldCoins: balanceAfter,
+            coinTransactions: appendCoinTransaction(
+              s.coinTransactions,
+              normalizedCoins,
+              balanceAfter,
+              reason,
+            ),
+          };
+        }),
       setHighestElement: (n) => set((s) => ({ highestElement: Math.max(s.highestElement, n) })),
       refreshDailyLab: () =>
         set((s) => {
@@ -593,9 +715,16 @@ export const useProgress = create<ProgressState>()(
             coinsAwarded: weekly.coinsAwarded,
             bonusAwarded: weekly.bonusAwarded,
           };
+          const balanceAfter = s.goldCoins + weekly.coinsAwarded;
           return {
             weeklyPlayBonus: weekly.weeklyPlayBonus,
-            goldCoins: s.goldCoins + weekly.coinsAwarded,
+            goldCoins: balanceAfter,
+            coinTransactions: appendCoinTransaction(
+              s.coinTransactions,
+              weekly.coinsAwarded,
+              balanceAfter,
+              "Weekly streak reward",
+            ),
           };
         });
         return result;
@@ -622,11 +751,18 @@ export const useProgress = create<ProgressState>()(
           if (refreshed.claimedDailyReward || !areDailyQuestsComplete(refreshed.dailyQuests))
             return refreshed;
           const bonusCoins = s.hasProPack ? 10 : 3;
+          const balanceAfter = s.goldCoins + bonusCoins;
           return {
             ...refreshed,
             claimedDailyReward: true,
             dailyStreak: s.dailyStreak + 1,
-            goldCoins: s.goldCoins + bonusCoins,
+            goldCoins: balanceAfter,
+            coinTransactions: appendCoinTransaction(
+              s.coinTransactions,
+              bonusCoins,
+              balanceAfter,
+              "Daily Lab reward",
+            ),
           };
         }),
       setBestCombo: (combo) =>
@@ -707,10 +843,18 @@ export const useProgress = create<ProgressState>()(
             s.unlockedLevel,
           );
           if (s.hasProPack && s.proStarterCoinsGranted && !grantedUpgrade) return s;
+          const coinDelta = shouldGrantStarter ? 100 + refundCoins : 0;
+          const balanceAfter = s.goldCoins + coinDelta;
           return {
             hasProPack: true,
             proStarterCoinsGranted: true,
-            goldCoins: s.goldCoins + (shouldGrantStarter ? 100 + refundCoins : 0),
+            goldCoins: balanceAfter,
+            coinTransactions: appendCoinTransaction(
+              s.coinTransactions,
+              coinDelta,
+              balanceAfter,
+              "Pro Lab Pack coins",
+            ),
             labUpgradeLevels,
           };
         }),
@@ -750,9 +894,16 @@ export const useProgress = create<ProgressState>()(
             s.dailyQuests,
             s.claimedDailyReward,
           );
+          const balanceAfter = s.goldCoins - normalizedCost;
           return {
             ...refreshed,
-            goldCoins: s.goldCoins - normalizedCost,
+            goldCoins: balanceAfter,
+            coinTransactions: appendCoinTransaction(
+              s.coinTransactions,
+              -normalizedCost,
+              balanceAfter,
+              `Power-up: ${powerUp}`,
+            ),
             powerUpInventory: mergePowerUpInventory(s.powerUpInventory, { [powerUp]: 1 }),
             dailyQuests: applyQuestProgress(refreshed.dailyQuests, { itemsPurchased: 1 }),
           };
@@ -776,7 +927,9 @@ export const useProgress = create<ProgressState>()(
           highestElement: 1,
           totalScore: 0,
           highestSingleShotScore: 0,
+          highestSingleShotScoreDate: null,
           goldCoins: s.goldCoins,
+          coinTransactions: s.coinTransactions,
           discoveredElements: [1],
           discoveredCompounds: [],
           compoundCounts: {},
@@ -830,12 +983,15 @@ export const useProgress = create<ProgressState>()(
           ...persistedState,
           highestSingleShotScore:
             persistedState?.highestSingleShotScore ?? current.highestSingleShotScore,
+          highestSingleShotScoreDate:
+            persistedState?.highestSingleShotScoreDate ?? current.highestSingleShotScoreDate,
           dailyQuestDate: persistedState?.dailyQuestDate ?? current.dailyQuestDate,
           dailyQuests: persistedState?.dailyQuests ?? current.dailyQuests,
           dailyStreak: persistedState?.dailyStreak ?? current.dailyStreak,
           claimedDailyReward: persistedState?.claimedDailyReward ?? current.claimedDailyReward,
           weeklyPlayBonus: persistedState?.weeklyPlayBonus ?? current.weeklyPlayBonus,
           goldCoins: persistedState?.goldCoins ?? current.goldCoins,
+          coinTransactions: normalizeCoinTransactions(persistedState?.coinTransactions),
           soundEnabled: persistedState?.soundEnabled ?? current.soundEnabled,
           musicEnabled: persistedState?.musicEnabled ?? current.musicEnabled,
           hapticsEnabled: persistedState?.hapticsEnabled ?? current.hapticsEnabled,

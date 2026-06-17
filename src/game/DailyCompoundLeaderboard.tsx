@@ -1,0 +1,339 @@
+import { useEffect, useState, type CSSProperties } from "react";
+import {
+  countryFlag,
+  getDailyCompoundLeaderboard,
+  loadDailyCompoundLeaderboard,
+  type LeaderboardBoard,
+  type LeaderboardEntry,
+  type LeaderboardScope,
+} from "./leaderboard";
+import { formatScore } from "./logic";
+import { useIsTabletLayout } from "./responsive";
+
+export function Leaderboard({ onBack }: { onBack: () => void }) {
+  const isTabletLayout = useIsTabletLayout();
+  const [scope, setScope] = useState<LeaderboardScope>("global");
+  const [board, setBoard] = useState<LeaderboardBoard>(() => getDailyCompoundLeaderboard(scope));
+  const [loading, setLoading] = useState(false);
+  const playerRank = board.player.rank > 0 ? `#${board.player.rank}` : "-";
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    void loadDailyCompoundLeaderboard(scope)
+      .then((nextBoard) => {
+        if (!cancelled) setBoard(nextBoard);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [scope]);
+
+  return (
+    <div
+      className="app-shell"
+      style={{ padding: isTabletLayout ? 28 : 20, paddingTop: isTabletLayout ? 36 : 32 }}
+    >
+      <div style={{ position: "relative", zIndex: 1, maxWidth: 620, margin: "0 auto" }}>
+        <header style={headerRow}>
+          <button type="button" onClick={onBack} style={backButton}>
+            Back
+          </button>
+          <div style={{ minWidth: 0 }}>
+            <div style={kicker}>DAILY COMPOUND</div>
+            <h1 style={title}>Leaderboard</h1>
+          </div>
+          <PodiumMark />
+        </header>
+
+        <section style={summaryPanel}>
+          <div>
+            <div style={summaryLabel}>Your Rank</div>
+            <strong style={summaryValue}>{playerRank}</strong>
+          </div>
+          <div style={{ textAlign: "center" }}>
+            <div style={summaryLabel}>Score</div>
+            <strong style={summaryValue}>{formatScore(board.player.score)}</strong>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <div style={summaryLabel}>Country</div>
+            <strong style={summaryValue}>
+              {countryFlag(board.countryCode)} {board.countryCode}
+            </strong>
+          </div>
+        </section>
+
+        <div style={tabRow} role="tablist" aria-label="Leaderboard scope">
+          <SegmentButton active={scope === "global"} onClick={() => setScope("global")}>
+            Global
+          </SegmentButton>
+          <SegmentButton active={scope === "local"} onClick={() => setScope("local")}>
+            Local
+          </SegmentButton>
+        </div>
+
+        {(loading || board.status) && (
+          <div style={statusLine} role="status" aria-live="polite">
+            {loading ? "Loading Game Center..." : board.status}
+          </div>
+        )}
+
+        <section style={tablePanel} aria-label={`daily ${scope} leaderboard`}>
+          <div style={tableHeader}>
+            <span>Rank</span>
+            <span>Player</span>
+            <span style={{ textAlign: "right" }}>Score</span>
+            <span style={{ textAlign: "right" }}>Shots</span>
+          </div>
+          <div style={{ display: "grid", gap: 7 }}>
+            {board.entries.length > 0 ? (
+              board.entries.map((entry) => <LeaderboardRow key={entry.id} entry={entry} />)
+            ) : (
+              <div style={emptyRows}>No Game Center scores yet.</div>
+            )}
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+function LeaderboardRow({ entry }: { entry: LeaderboardEntry }) {
+  return (
+    <div
+      style={{
+        ...row,
+        borderColor: entry.isPlayer
+          ? "color-mix(in oklch, var(--accent) 65%, var(--border))"
+          : "var(--border)",
+        background: entry.isPlayer
+          ? "linear-gradient(135deg, color-mix(in oklch, var(--accent) 20%, var(--surface)), var(--surface-elevated))"
+          : "var(--surface)",
+      }}
+    >
+      <strong style={rankCell}>{entry.rank}</strong>
+      <span style={playerCell}>
+        <span aria-hidden="true">{entry.flag}</span>
+        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {entry.name}
+        </span>
+      </span>
+      <strong style={scoreCell}>{formatScore(entry.score)}</strong>
+      <span style={shotsCell}>{entry.shots}</span>
+    </div>
+  );
+}
+
+function SegmentButton({
+  active,
+  children,
+  onClick,
+}: {
+  active: boolean;
+  children: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      style={{
+        ...segmentButton,
+        background: active
+          ? "linear-gradient(135deg, var(--accent), var(--primary))"
+          : "var(--surface)",
+        color: active ? "var(--primary-foreground)" : "var(--foreground)",
+        borderColor: active ? "transparent" : "var(--border)",
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+export function PodiumMark({ size = 34 }: { size?: number }) {
+  return (
+    <span style={{ ...podiumMark, width: size, height: size }} aria-hidden="true">
+      <span style={{ ...podiumStep, height: "55%", left: "36%" }}>1</span>
+      <span style={{ ...podiumStep, height: "42%", left: "5%" }}>2</span>
+      <span style={{ ...podiumStep, height: "32%", left: "67%" }}>3</span>
+    </span>
+  );
+}
+
+const headerRow: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "auto minmax(0, 1fr) auto",
+  alignItems: "center",
+  gap: 12,
+  marginBottom: 16,
+};
+
+const backButton: CSSProperties = {
+  border: "1px solid var(--border)",
+  borderRadius: 10,
+  padding: "9px 12px",
+  background: "var(--surface)",
+  color: "var(--foreground)",
+  fontWeight: 850,
+  cursor: "pointer",
+};
+
+const kicker: CSSProperties = {
+  color: "var(--accent)",
+  fontSize: 10,
+  fontWeight: 900,
+  letterSpacing: 1.7,
+};
+
+const title: CSSProperties = {
+  margin: "2px 0 0",
+  fontSize: 28,
+  lineHeight: 1.05,
+  fontWeight: 950,
+};
+
+const summaryPanel: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+  gap: 8,
+  border: "1px solid color-mix(in oklch, var(--primary) 38%, var(--border))",
+  borderRadius: 16,
+  padding: 14,
+  background:
+    "linear-gradient(135deg, color-mix(in oklch, var(--primary) 18%, var(--surface-elevated)), var(--surface))",
+  boxShadow: "0 14px 34px rgba(0,0,0,0.28)",
+};
+
+const summaryLabel: CSSProperties = {
+  color: "var(--muted-foreground)",
+  fontSize: 10,
+  fontWeight: 850,
+  letterSpacing: 1.1,
+  textTransform: "uppercase",
+};
+
+const summaryValue: CSSProperties = {
+  display: "block",
+  marginTop: 4,
+  fontSize: 16,
+  fontWeight: 950,
+};
+
+const tabRow: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+  gap: 8,
+  marginTop: 12,
+};
+
+const statusLine: CSSProperties = {
+  marginTop: 10,
+  color: "var(--muted-foreground)",
+  fontSize: 12,
+  fontWeight: 800,
+  textAlign: "center",
+};
+
+const segmentButton: CSSProperties = {
+  minHeight: 40,
+  border: "1px solid var(--border)",
+  borderRadius: 12,
+  fontFamily: "inherit",
+  fontSize: 13,
+  fontWeight: 950,
+  cursor: "pointer",
+};
+
+const tablePanel: CSSProperties = {
+  marginTop: 14,
+  border: "1px solid var(--border)",
+  borderRadius: 16,
+  background: "var(--surface-elevated)",
+  padding: 10,
+};
+
+const tableHeader: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "52px minmax(0, 1fr) 82px 48px",
+  gap: 8,
+  color: "var(--muted-foreground)",
+  fontSize: 10,
+  fontWeight: 900,
+  letterSpacing: 1.1,
+  padding: "2px 8px 8px",
+  textTransform: "uppercase",
+};
+
+const row: CSSProperties = {
+  minHeight: 48,
+  display: "grid",
+  gridTemplateColumns: "52px minmax(0, 1fr) 82px 48px",
+  alignItems: "center",
+  gap: 8,
+  border: "1px solid var(--border)",
+  borderRadius: 11,
+  padding: "0 8px",
+};
+
+const emptyRows: CSSProperties = {
+  border: "1px solid var(--border)",
+  borderRadius: 11,
+  color: "var(--muted-foreground)",
+  fontSize: 13,
+  fontWeight: 800,
+  padding: 14,
+  textAlign: "center",
+};
+
+const rankCell: CSSProperties = {
+  color: "var(--accent)",
+  fontSize: 16,
+};
+
+const playerCell: CSSProperties = {
+  minWidth: 0,
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 8,
+  fontWeight: 850,
+};
+
+const scoreCell: CSSProperties = {
+  textAlign: "right",
+  fontSize: 13,
+};
+
+const shotsCell: CSSProperties = {
+  color: "var(--muted-foreground)",
+  fontSize: 13,
+  fontWeight: 850,
+  textAlign: "right",
+};
+
+const podiumMark: CSSProperties = {
+  position: "relative",
+  display: "inline-block",
+  flex: "0 0 auto",
+};
+
+const podiumStep: CSSProperties = {
+  position: "absolute",
+  bottom: 0,
+  width: "29%",
+  border: "1px solid color-mix(in oklch, var(--accent) 70%, var(--border))",
+  borderRadius: "5px 5px 2px 2px",
+  background:
+    "linear-gradient(180deg, var(--accent), color-mix(in oklch, var(--primary) 42%, var(--accent)))",
+  color: "var(--primary-foreground)",
+  display: "grid",
+  placeItems: "center",
+  fontSize: 10,
+  fontWeight: 1000,
+  boxShadow: "0 0 12px var(--accent-glow)",
+};
