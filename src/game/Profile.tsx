@@ -279,17 +279,25 @@ export function Profile({ onBack }: Props) {
 
         <section style={card}>
           <div style={sectionHeading}>{tr("Display")}</div>
-          <div style={preferenceRow}>
-            <label style={{ ...nameLabel, minWidth: 0 }}>
-              <span style={{ fontSize: 13, fontWeight: 850 }}>{tr("Profile name")}</span>
+          <div style={profileNameRow}>
+            <label style={profileNameLabel}>
+              <span style={preferenceLabel}>{tr("Profile name")}</span>
               <input
                 value={nameDraft}
                 onChange={(event) => setNameDraft(event.target.value)}
-                onBlur={saveDisplayName}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.currentTarget.blur();
+                    saveDisplayName();
+                  }
+                }}
                 maxLength={18}
                 placeholder={DEFAULT_PLAYER_DISPLAY_NAME}
                 style={nameInput}
                 aria-label={tr("Profile name")}
+                autoCapitalize="words"
+                autoCorrect="off"
+                enterKeyHint="done"
               />
             </label>
             <button type="button" onClick={saveDisplayName} style={nameSaveButton}>
@@ -297,7 +305,7 @@ export function Profile({ onBack }: Props) {
             </button>
           </div>
           <div style={preferenceRow}>
-            <span style={{ fontSize: 13, fontWeight: 850 }}>{tr("Theme")}</span>
+            <span style={preferenceLabel}>{tr("Theme")}</span>
             <div style={{ display: "inline-grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
               {(["dark", "light"] as const).map((theme) => (
                 <button
@@ -317,7 +325,7 @@ export function Profile({ onBack }: Props) {
             </div>
           </div>
           <label style={{ ...preferenceRow, marginTop: 12 }}>
-            <span style={{ fontSize: 13, fontWeight: 850 }}>{tr("Language")}</span>
+            <span style={preferenceLabel}>{tr("Language")}</span>
             <select
               value={appLanguage}
               onChange={(event) => setAppLanguage(event.target.value as AppLanguage)}
@@ -650,34 +658,51 @@ const preferenceRow: React.CSSProperties = {
   gap: 12,
 };
 
-const nameLabel: React.CSSProperties = {
+const preferenceLabel: React.CSSProperties = {
+  fontSize: 13,
+  fontWeight: 850,
+  lineHeight: 1.15,
+};
+
+const profileNameRow: React.CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "auto minmax(120px, 1fr)",
-  alignItems: "center",
+  gridTemplateColumns: "minmax(0, 1fr) auto",
+  alignItems: "end",
   gap: 10,
-  flex: 1,
+};
+
+const profileNameLabel: React.CSSProperties = {
+  minWidth: 0,
+  display: "grid",
+  gap: 7,
 };
 
 const nameInput: React.CSSProperties = {
+  boxSizing: "border-box",
+  width: "100%",
   minWidth: 0,
+  minHeight: 46,
   border: "1px solid var(--border)",
-  borderRadius: 12,
-  padding: "9px 11px",
+  borderRadius: 14,
+  padding: "10px 12px",
   background: "var(--surface)",
   color: "var(--foreground)",
   fontFamily: "inherit",
-  fontSize: 13,
+  fontSize: 16,
   fontWeight: 850,
+  lineHeight: 1.2,
+  outline: "none",
 };
 
 const nameSaveButton: React.CSSProperties = {
+  minHeight: 46,
   border: "1px solid var(--primary)",
-  borderRadius: 12,
-  padding: "9px 12px",
+  borderRadius: 14,
+  padding: "10px 14px",
   background: "var(--primary)",
   color: "var(--primary-foreground)",
   fontFamily: "inherit",
-  fontSize: 12,
+  fontSize: 16,
   fontWeight: 950,
   cursor: "pointer",
 };
@@ -699,7 +724,7 @@ const languageSelect: React.CSSProperties = {
   padding: "8px 12px",
   background: "var(--surface)",
   color: "var(--foreground)",
-  fontSize: 13,
+  fontSize: 16,
   fontWeight: 800,
   fontFamily: "inherit",
   cursor: "pointer",
