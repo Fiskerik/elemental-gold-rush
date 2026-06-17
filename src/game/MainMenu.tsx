@@ -327,32 +327,13 @@ export function MainMenu({
               </button>
             </div>
           </div>
-          <button
-            onClick={() => {
-              trackMenuAction("continue");
-              onPlay();
-            }}
-            style={heroPlayBtn}
-          >
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-              <Play size={20} fill="currentColor" aria-hidden="true" />
-              Continue
-            </span>
-            {nextRunGoal.kind === "compound" ? (
-              <MoleculeVisual compound={nextRunGoal.compound} size={54} />
-            ) : nextRunGoal.kind === "powerup" ? (
-              <PowerUpBadge icon={nextRunGoal.powerUp} size={54} />
-            ) : (
-              <ElementBall atomicNumber={nextLevel?.targetElement ?? 1} size={54} glow />
-            )}
-          </button>
           <div style={dailyFeatureGrid}>
             <button type="button" onClick={onDailyChallenge} style={dailyFeatureBtn}>
               <span style={dailyFeatureIcon}>
                 <Trophy size={18} aria-hidden="true" />
               </span>
               <span style={dailyFeatureText}>
-                <strong style={dailyFeatureTextStrong}>{tr("Daily Challenge")}</strong>
+                <strong style={dailyFeatureTextStrong}>{tr("Daily Board")}</strong>
                 <small>
                   {tr(
                     dailyChallenge.completed
@@ -374,7 +355,7 @@ export function MainMenu({
                 <CircleQuestionMark size={18} aria-hidden="true" />
               </span>
               <span style={dailyFeatureText}>
-                <strong style={dailyFeatureTextStrong}>{tr("Secret Compound")}</strong>
+                <strong style={dailyFeatureTextStrong}>{tr("Daily Compound")}</strong>
                 <small>
                   {tr(
                     secretCompound.completed
@@ -394,6 +375,25 @@ export function MainMenu({
               </span>
             </button>
           </div>
+          <button
+            onClick={() => {
+              trackMenuAction("continue");
+              onPlay();
+            }}
+            style={heroPlayBtn}
+          >
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+              <Play size={20} fill="currentColor" aria-hidden="true" />
+              Continue
+            </span>
+            {nextRunGoal.kind === "compound" ? (
+              <MoleculeVisual compound={nextRunGoal.compound} size={54} />
+            ) : nextRunGoal.kind === "powerup" ? (
+              <PowerUpBadge icon={nextRunGoal.powerUp} size={54} />
+            ) : (
+              <ElementBall atomicNumber={nextLevel?.targetElement ?? 1} size={54} glow />
+            )}
+          </button>
           <button
             type="button"
             className="ad-shine-btn"

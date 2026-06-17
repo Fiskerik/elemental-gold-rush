@@ -54,7 +54,10 @@ import { useIsTabletLayout } from "./responsive";
 import { ElementalBossBoard } from "./ElementalBossBoard";
 import { PeriodicGuardianBoard } from "./PeriodicGuardianBoard";
 import { NucleusCoreBoard } from "./NucleusCoreBoard";
-import { submitDailyCompoundLeaderboardScore } from "./leaderboard";
+import {
+  submitDailyBoardLeaderboardScore,
+  submitDailyCompoundLeaderboardScore,
+} from "./leaderboard";
 
 interface Props {
   levelId: number;
@@ -152,6 +155,8 @@ interface SavedRunSnapshot {
   highest: number;
   shots: number;
   runBestCombo: number;
+  runMergeCount?: number;
+  runComboScore?: number;
   earnedStars: number;
   elapsedMs: number;
   grabs: number;
@@ -201,6 +206,14 @@ type ScorePopupFx = {
   points: number;
   chainDepth: number;
   isotope: boolean;
+};
+
+type GammaImpactFx = {
+  id: number;
+  x: number;
+  y: number;
+  radius: number;
+  hitCount: number;
 };
 
 type StageClearStats = {
@@ -1398,6 +1411,8 @@ function StandardGameBoard({
   const [highest, setHighest] = useState(1);
   const [shots, setShots] = useState(0);
   const [runBestCombo, setRunBestCombo] = useState(0);
+  const runMergeCountRef = useRef(0);
+  const runComboScoreRef = useRef(0);
   const [earnedStars, setEarnedStars] = useState(0);
   const [aimDeg, setAimDeg] = useState(0); // 0 = straight up, negative = left
   const [playStylePromptOpen, setPlayStylePromptOpen] = useState(!hasChosenShootingStyle);
@@ -1457,6 +1472,7 @@ function StandardGameBoard({
   >([]);
   const [mergeBurstFx, setMergeBurstFx] = useState<MergeBurstFx[]>([]);
   const [scorePopupFx, setScorePopupFx] = useState<ScorePopupFx[]>([]);
+  const [gammaImpactFx, setGammaImpactFx] = useState<GammaImpactFx | null>(null);
   const [mergePulseIds, setMergePulseIds] = useState<Set<number>>(new Set());
   const [formingCompoundIds, setFormingCompoundIds] = useState<Set<number>>(new Set());
 
@@ -1616,6 +1632,12 @@ function StandardGameBoard({
       if (next.length > 200) next.splice(0, next.length - 200);
       return next;
     });
+  }
+
+  function recordRunMergeStats(merges: MergeEvent[]) {
+    if (merges.length === 0) return;
+    runMergeCountRef.current += merges.length;
+    runComboScoreRef.current += merges.reduce((sum, merge) => sum + merge.scoreGained, 0);
   }
 
   // === Pre-level shuffle (lvl 10+) ===
@@ -1956,6 +1978,8 @@ function StandardGameBoard({
       highest,
       shots,
       runBestCombo,
+      runMergeCount: runMergeCountRef.current,
+      runComboScore: runComboScoreRef.current,
       earnedStars,
       elapsedMs,
       grabs,
@@ -2064,6 +2088,8 @@ function StandardGameBoard({
         setHighest(saved.highest);
         setShots(saved.shots);
         setRunBestCombo(saved.runBestCombo);
+        runMergeCountRef.current = saved.runMergeCount ?? 0;
+        runComboScoreRef.current = saved.runComboScore ?? 0;
         setEarnedStars(saved.earnedStars);
         setGameOver(false);
         setGameOverContinueOpen(false);
@@ -2077,6 +2103,7 @@ function StandardGameBoard({
         setWiggleIds(new Set());
         setProjectile(null);
         setGravityFxId(null);
+        setGammaImpactFx(null);
         setBusy(false);
         setAimDeg(0);
         setGrabs(saved.grabs);
@@ -2242,6 +2269,8 @@ function StandardGameBoard({
     setHighest(initialHighest);
     setShots(0);
     setRunBestCombo(0);
+    runMergeCountRef.current = 0;
+    runComboScoreRef.current = 0;
     setEarnedStars(0);
     setGameOver(false);
     setGameOverContinueOpen(false);
@@ -2255,6 +2284,7 @@ function StandardGameBoard({
     setWiggleIds(new Set());
     setProjectile(null);
     setGravityFxId(null);
+    setGammaImpactFx(null);
     setBusy(false);
     setAimDeg(0);
     setGrabs(powerUpStage === "grab" ? 1 : 0);
@@ -2807,6 +2837,25 @@ function StandardGameBoard({
     if (stageClearTimeoutRef.current !== null) {
       window.clearTimeout(stageClearTimeoutRef.current);
     }
+    const finalStats =
+      mode === "daily-challenge" && !stats.compound
+        ? {
+            ...stats,
+            score: submitDailyBoardLeaderboardScore({
+              baseScore: stats.score,
+              shots: stats.shots,
+              elapsedMs: Date.now() - startTimeRef.current,
+              powerUpsUsed: runPowerUpsUsedRef.current,
+              bestCombo: stats.bestCombo,
+              mergeCount: runMergeCountRef.current,
+              comboScore: runComboScoreRef.current,
+            }),
+          }
+        : stats;
+    if (finalStats.score !== stats.score) {
+      setScore(finalStats.score);
+      addScore(Math.max(0, finalStats.score - stats.score));
+    }
     commitRunDiscoveries();
     // Record the cleared run immediately so campaign-map stats update
     // even if the player exits before the result modal is dismissed.
@@ -2816,19 +2865,19 @@ function StandardGameBoard({
         recordGameAttemptForAd();
       } else {
         recordLevelRun(levelId, {
-          score: stats.score,
-          shots: stats.shots,
+          score: finalStats.score,
+          shots: finalStats.shots,
           powerUpsUsed: runPowerUpsUsedRef.current,
           won: true,
         });
       }
     }
     if (mode === "daily-challenge") {
-      const awarded = completeDailyChallenge(stats.score);
+      const awarded = completeDailyChallenge(finalStats.score);
       if (awarded) spawnPopup(`Daily reward +${dailyFeatureRewardAmount} coins`);
     }
-    const completedCompoundIds = stats.compound
-      ? [...formedCompoundsThisRun, stats.compound.id]
+    const completedCompoundIds = finalStats.compound
+      ? [...formedCompoundsThisRun, finalStats.compound.id]
       : formedCompoundsThisRun;
     const secretAwarded = completeSecretCompound(completedCompoundIds);
     if (secretAwarded) spawnPopup(`Secret compound +${dailyFeatureRewardAmount} coins`);
@@ -2841,8 +2890,8 @@ function StandardGameBoard({
       stageClearTimeoutRef.current = null;
       return;
     }
-    setStageClearFx(stats);
-    spawnPopup(stats.compound ? "COMPOUND FORMED" : "TARGET FORMED");
+    setStageClearFx(finalStats);
+    spawnPopup(finalStats.compound ? "COMPOUND FORMED" : "TARGET FORMED");
     stageClearTimeoutRef.current = window.setTimeout(() => {
       setStageClearFx(null);
       // Small extra beat so the fade-out of the animation completes before
@@ -2850,7 +2899,7 @@ function StandardGameBoard({
       if (mode === "daily-challenge") {
         setWon(true);
       } else {
-        setWinChoice(stats);
+        setWinChoice(finalStats);
       }
       setBusy(false);
       stageClearTimeoutRef.current = null;
@@ -3971,6 +4020,18 @@ function StandardGameBoard({
       }
     }
     const nextShots = shots + 1;
+    const gammaFxId = nextFxId();
+    setGammaImpactFx({
+      id: gammaFxId,
+      x: ix,
+      y: iy,
+      radius,
+      hitCount: hitIds.size,
+    });
+    window.setTimeout(
+      () => setGammaImpactFx((fx) => (fx?.id === gammaFxId ? null : fx)),
+      820,
+    );
     setShots(nextShots);
     applyShotMilestones(nextShots);
     consumeEmissionBoostShot();
@@ -4722,6 +4783,7 @@ function StandardGameBoard({
     const shimmerHit = currentIsShimmer && result.merges.length > 0;
     const grabAdd = result.merges.length * (shimmerHit ? activeShimmerGrabSteps : 1);
     if (result.merges.length > 0) {
+      recordRunMergeStats(result.merges);
       const comboLabel = getComboLabel(result.merges.length);
       if (comboLabel) spawnPopup(comboLabel);
       showMergeJuice(result.merges, result.balls, result.finalBallId, level.scoreMultiplier);
@@ -5493,6 +5555,7 @@ function StandardGameBoard({
       merges: result.merges,
     });
     if (result.merges.length > 0) {
+      recordRunMergeStats(result.merges);
       showMergeJuice(result.merges, result.balls, result.finalBallId, level.scoreMultiplier);
       grantPowerUpsForMerges(result.merges.length);
       setRunBestCombo((best) => Math.max(best, result.merges.length));
@@ -5708,6 +5771,7 @@ function StandardGameBoard({
     setBalls(result.balls.map((b) => (b.stoneHp != null ? b : { ...b, r: radiusFor(b.atom) })));
     setHighlightId(result.finalBallId);
     if (grabEnabled && result.merges.length > 0) {
+      recordRunMergeStats(result.merges);
       const comboLabel = getComboLabel(result.merges.length);
       if (comboLabel) spawnPopup(comboLabel);
       showMergeJuice(result.merges, result.balls, result.finalBallId, level.scoreMultiplier);
@@ -6690,6 +6754,40 @@ function StandardGameBoard({
                   key={i}
                   className="gravity-fx-stream"
                   style={{ left: `${10 + i * 10}%`, animationDelay: `${i * 45}ms` }}
+                />
+              ))}
+            </div>
+          )}
+
+          {gammaImpactFx && (
+            <div
+              className="gamma-impact-fx"
+              style={
+                {
+                  position: "absolute",
+                  left: gammaImpactFx.x,
+                  top: gammaImpactFx.y,
+                  width: gammaImpactFx.radius * 2,
+                  height: gammaImpactFx.radius * 2,
+                  zIndex: 8,
+                  pointerEvents: "none",
+                  "--gamma-hit-count": gammaImpactFx.hitCount,
+                } as React.CSSProperties & Record<"--gamma-hit-count", number>
+              }
+            >
+              <span className="gamma-impact-core">☢</span>
+              <span className="gamma-impact-ring gamma-impact-ring-a" />
+              <span className="gamma-impact-ring gamma-impact-ring-b" />
+              {Array.from({ length: 10 }, (_, index) => (
+                <span
+                  key={index}
+                  className="gamma-impact-spark"
+                  style={
+                    {
+                      animationDelay: `${index * 18}ms`,
+                      "--spark-rotation": `${index * 36}deg`,
+                    } as React.CSSProperties & Record<"--spark-rotation", string>
+                  }
                 />
               ))}
             </div>

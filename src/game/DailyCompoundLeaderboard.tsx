@@ -1,10 +1,11 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import {
   countryFlag,
-  getDailyCompoundLeaderboard,
-  loadDailyCompoundLeaderboard,
+  getDailyLeaderboard,
+  loadDailyLeaderboard,
   type LeaderboardBoard,
   type LeaderboardEntry,
+  type LeaderboardKind,
   type LeaderboardScope,
 } from "./leaderboard";
 import { formatScore } from "./logic";
@@ -12,15 +13,17 @@ import { useIsTabletLayout } from "./responsive";
 
 export function Leaderboard({ onBack }: { onBack: () => void }) {
   const isTabletLayout = useIsTabletLayout();
+  const [kind, setKind] = useState<LeaderboardKind>("daily-board");
   const [scope, setScope] = useState<LeaderboardScope>("global");
-  const [board, setBoard] = useState<LeaderboardBoard>(() => getDailyCompoundLeaderboard(scope));
+  const [board, setBoard] = useState<LeaderboardBoard>(() => getDailyLeaderboard(kind, scope));
   const [loading, setLoading] = useState(false);
   const playerRank = board.player.rank > 0 ? `#${board.player.rank}` : "-";
+  const leaderboardLabel = kind === "daily-board" ? "Daily Board" : "Daily Compound";
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    void loadDailyCompoundLeaderboard(scope)
+    void loadDailyLeaderboard(kind, scope)
       .then((nextBoard) => {
         if (!cancelled) setBoard(nextBoard);
       })
@@ -30,7 +33,7 @@ export function Leaderboard({ onBack }: { onBack: () => void }) {
     return () => {
       cancelled = true;
     };
-  }, [scope]);
+  }, [kind, scope]);
 
   return (
     <div
@@ -43,7 +46,7 @@ export function Leaderboard({ onBack }: { onBack: () => void }) {
             Back
           </button>
           <div style={{ minWidth: 0 }}>
-            <div style={kicker}>DAILY COMPOUND</div>
+            <div style={kicker}>{leaderboardLabel.toUpperCase()}</div>
             <h1 style={title}>Leaderboard</h1>
           </div>
           <PodiumMark />
@@ -66,6 +69,18 @@ export function Leaderboard({ onBack }: { onBack: () => void }) {
           </div>
         </section>
 
+        <div style={kindTabRow} role="tablist" aria-label="Leaderboard type">
+          <SegmentButton active={kind === "daily-board"} onClick={() => setKind("daily-board")}>
+            Daily Board
+          </SegmentButton>
+          <SegmentButton
+            active={kind === "daily-compound"}
+            onClick={() => setKind("daily-compound")}
+          >
+            Daily Compound
+          </SegmentButton>
+        </div>
+
         <div style={tabRow} role="tablist" aria-label="Leaderboard scope">
           <SegmentButton active={scope === "global"} onClick={() => setScope("global")}>
             Global
@@ -81,7 +96,7 @@ export function Leaderboard({ onBack }: { onBack: () => void }) {
           </div>
         )}
 
-        <section style={tablePanel} aria-label={`daily ${scope} leaderboard`}>
+        <section style={tablePanel} aria-label={`${leaderboardLabel} ${scope} leaderboard`}>
           <div style={tableHeader}>
             <span>Rank</span>
             <span>Player</span>
@@ -159,9 +174,10 @@ function SegmentButton({
 export function PodiumMark({ size = 34 }: { size?: number }) {
   return (
     <span style={{ ...podiumMark, width: size, height: size }} aria-hidden="true">
-      <span style={{ ...podiumStep, height: "55%", left: "36%" }}>1</span>
-      <span style={{ ...podiumStep, height: "42%", left: "5%" }}>2</span>
-      <span style={{ ...podiumStep, height: "32%", left: "67%" }}>3</span>
+      <span style={podiumBase} />
+      <span style={{ ...podiumStep, height: "58%", left: "34%", zIndex: 3 }}>1</span>
+      <span style={{ ...podiumStep, height: "43%", left: "6%", zIndex: 2 }}>2</span>
+      <span style={{ ...podiumStep, height: "34%", left: "64%", zIndex: 1 }}>3</span>
     </span>
   );
 }
@@ -230,6 +246,11 @@ const tabRow: CSSProperties = {
   gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
   gap: 8,
   marginTop: 12,
+};
+
+const kindTabRow: CSSProperties = {
+  ...tabRow,
+  marginTop: 14,
 };
 
 const statusLine: CSSProperties = {
@@ -320,20 +341,32 @@ const podiumMark: CSSProperties = {
   position: "relative",
   display: "inline-block",
   flex: "0 0 auto",
+  filter: "drop-shadow(0 8px 12px rgba(0, 0, 0, 0.34))",
+};
+
+const podiumBase: CSSProperties = {
+  position: "absolute",
+  left: "2%",
+  right: "2%",
+  bottom: 0,
+  height: "13%",
+  borderRadius: "3px",
+  background: "color-mix(in oklch, var(--primary) 44%, var(--surface-high))",
+  border: "1px solid color-mix(in oklch, var(--accent) 28%, var(--border))",
 };
 
 const podiumStep: CSSProperties = {
   position: "absolute",
-  bottom: 0,
-  width: "29%",
-  border: "1px solid color-mix(in oklch, var(--accent) 70%, var(--border))",
-  borderRadius: "5px 5px 2px 2px",
+  bottom: "11%",
+  width: "30%",
+  border: "1px solid color-mix(in oklch, var(--accent) 54%, var(--border))",
+  borderRadius: "4px 4px 2px 2px",
   background:
-    "linear-gradient(180deg, var(--accent), color-mix(in oklch, var(--primary) 42%, var(--accent)))",
+    "linear-gradient(180deg, color-mix(in oklch, white 24%, var(--accent)), color-mix(in oklch, var(--primary) 54%, var(--accent)))",
   color: "var(--primary-foreground)",
   display: "grid",
   placeItems: "center",
   fontSize: 10,
   fontWeight: 1000,
-  boxShadow: "0 0 12px var(--accent-glow)",
+  boxShadow: "inset 0 -8px 10px rgba(0, 0, 0, 0.16), 0 0 8px var(--accent-glow)",
 };
