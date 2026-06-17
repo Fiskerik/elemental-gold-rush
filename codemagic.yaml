@@ -109,7 +109,34 @@ workflows:
           xcrun agvtool new-version -all "$BUILD_NO"
       - name: Set up iOS signing
         script: |
-          xcode-project use-profiles
+          xcode-project use-profiles --project ios/App/App.xcodeproj
+      - name: Verify iOS Game Center signing entitlement
+        script: |
+          echo "Checking installed App Store provisioning profiles for Game Center entitlement..."
+          FOUND_PROFILE_WITH_GAME_CENTER=false
+          for PROFILE in "$HOME"/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision; do
+            [ -f "$PROFILE" ] || continue
+            PROFILE_PLIST="$(mktemp)"
+            security cms -D -i "$PROFILE" > "$PROFILE_PLIST"
+            APP_ID=$(/usr/libexec/PlistBuddy -c "Print :Entitlements:application-identifier" "$PROFILE_PLIST" 2>/dev/null || true)
+            PROFILE_NAME=$(/usr/libexec/PlistBuddy -c "Print :Name" "$PROFILE_PLIST" 2>/dev/null || true)
+            HAS_GAME_CENTER=$(/usr/libexec/PlistBuddy -c "Print :Entitlements:com.apple.developer.game-center" "$PROFILE_PLIST" 2>/dev/null || true)
+            echo "Profile: ${PROFILE_NAME:-unknown} | App ID: ${APP_ID:-unknown} | Game Center: ${HAS_GAME_CENTER:-missing}"
+            case "$APP_ID" in
+              *".$BUNDLE_ID")
+                if [ "$HAS_GAME_CENTER" = "true" ]; then
+                  FOUND_PROFILE_WITH_GAME_CENTER=true
+                fi
+                ;;
+            esac
+            rm -f "$PROFILE_PLIST"
+          done
+
+          if [ "$FOUND_PROFILE_WITH_GAME_CENTER" != "true" ]; then
+            echo "ERROR: No installed App Store provisioning profile for $BUNDLE_ID includes com.apple.developer.game-center."
+            echo "Regenerate the App Store distribution provisioning profile in Apple Developer Certificates, Identifiers & Profiles, then fetch/upload that new .mobileprovision in Codemagic."
+            exit 1
+          fi
       - name: Build IPA
         script: |
           xcode-project build-ipa \
