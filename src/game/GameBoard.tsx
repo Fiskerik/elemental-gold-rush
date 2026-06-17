@@ -933,7 +933,7 @@ function DailyCompoundGridBoard({
 
   if (!compound) {
     return (
-      <div style={dailyCompoundShell}>
+      <div className="daily-compound-shell" style={dailyCompoundShell}>
         <div style={dailyCompoundMissingCard}>
           <h2 style={{ margin: "0 0 8px" }}>Daily compound unavailable</h2>
           <p style={{ color: "var(--muted-foreground)", margin: "0 0 14px" }}>
@@ -948,7 +948,7 @@ function DailyCompoundGridBoard({
   }
 
   return (
-    <div style={dailyCompoundShell}>
+    <div className="daily-compound-shell" style={dailyCompoundShell}>
       <div style={dailyCompoundHeader}>
         <button type="button" onClick={onExit} style={dailyCompoundExitBtn}>
           Exit
@@ -6053,7 +6053,7 @@ function StandardGameBoard({
 
   return (
     <div
-      className="app-shell"
+      className="app-shell game-board-shell"
       style={{
         display: "flex",
         flexDirection: "column",
@@ -9443,7 +9443,10 @@ const dailyCompoundShell: React.CSSProperties = {
   display: "grid",
   gridTemplateRows: "auto minmax(0, 1fr) auto",
   gap: 10,
-  padding: 12,
+  paddingTop: "calc(env(safe-area-inset-top, 0px) + 12px)",
+  paddingRight: "calc(env(safe-area-inset-right, 0px) + 12px)",
+  paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 12px)",
+  paddingLeft: "calc(env(safe-area-inset-left, 0px) + 12px)",
   boxSizing: "border-box",
   background:
     "radial-gradient(circle at 20% 12%, oklch(0.36 0.08 250 / 0.26), transparent 34%), radial-gradient(circle at 82% 82%, oklch(0.5 0.11 145 / 0.18), transparent 36%), var(--background)",

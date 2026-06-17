@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ELEMENTS } from "./elements";
 import { getLevelById, MAX_LEVEL } from "./levels";
-import { useProgress, type CoinTransaction } from "./store";
+import { DEFAULT_PLAYER_DISPLAY_NAME, useProgress, type CoinTransaction } from "./store";
 import { useIsTabletLayout } from "./responsive";
 import { SUPPORTED_LANGUAGES, t, toIntlLocale, type AppLanguage } from "./localization";
 import { COMPOUNDS } from "./compounds";
@@ -55,7 +55,11 @@ export function Profile({ onBack }: Props) {
     appLanguage,
     setAppTheme,
     setAppLanguage,
+    playerDisplayName,
+    setPlayerDisplayName,
   } = useProgress();
+  const [nameDraft, setNameDraft] = useState(playerDisplayName);
+  const displayName = playerDisplayName || DEFAULT_PLAYER_DISPLAY_NAME;
   const tr = (text: string) => t(text, appLanguage);
   const intlLocale = toIntlLocale(appLanguage);
   const numberFormatter = new Intl.NumberFormat(intlLocale);
@@ -101,6 +105,14 @@ export function Profile({ onBack }: Props) {
       minute: "2-digit",
     });
 
+  useEffect(() => {
+    setNameDraft(playerDisplayName);
+  }, [playerDisplayName]);
+
+  function saveDisplayName() {
+    setPlayerDisplayName(nameDraft);
+  }
+
   return (
     <div
       className="app-shell"
@@ -131,7 +143,7 @@ export function Profile({ onBack }: Props) {
               PLAYER PROFILE
             </div>
             <h1 className="gold-text" style={{ margin: "4px 0", fontSize: 34 }}>
-              Fusion Rush Chemist
+              {displayName}
             </h1>
             <p style={{ margin: 0, color: "var(--muted-foreground)", fontSize: 13 }}>
               {`${tr(hasProPack ? "Pro Lab active" : "Free Lab")} • ${tr("Level")} ${unlockedLevel} / ${MAX_LEVEL}`}
@@ -267,6 +279,23 @@ export function Profile({ onBack }: Props) {
 
         <section style={card}>
           <div style={sectionHeading}>{tr("Display")}</div>
+          <div style={preferenceRow}>
+            <label style={{ ...nameLabel, minWidth: 0 }}>
+              <span style={{ fontSize: 13, fontWeight: 850 }}>{tr("Profile name")}</span>
+              <input
+                value={nameDraft}
+                onChange={(event) => setNameDraft(event.target.value)}
+                onBlur={saveDisplayName}
+                maxLength={18}
+                placeholder={DEFAULT_PLAYER_DISPLAY_NAME}
+                style={nameInput}
+                aria-label={tr("Profile name")}
+              />
+            </label>
+            <button type="button" onClick={saveDisplayName} style={nameSaveButton}>
+              {tr("Save")}
+            </button>
+          </div>
           <div style={preferenceRow}>
             <span style={{ fontSize: 13, fontWeight: 850 }}>{tr("Theme")}</span>
             <div style={{ display: "inline-grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
@@ -619,6 +648,38 @@ const preferenceRow: React.CSSProperties = {
   alignItems: "center",
   justifyContent: "space-between",
   gap: 12,
+};
+
+const nameLabel: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "auto minmax(120px, 1fr)",
+  alignItems: "center",
+  gap: 10,
+  flex: 1,
+};
+
+const nameInput: React.CSSProperties = {
+  minWidth: 0,
+  border: "1px solid var(--border)",
+  borderRadius: 12,
+  padding: "9px 11px",
+  background: "var(--surface)",
+  color: "var(--foreground)",
+  fontFamily: "inherit",
+  fontSize: 13,
+  fontWeight: 850,
+};
+
+const nameSaveButton: React.CSSProperties = {
+  border: "1px solid var(--primary)",
+  borderRadius: 12,
+  padding: "9px 12px",
+  background: "var(--primary)",
+  color: "var(--primary-foreground)",
+  fontFamily: "inherit",
+  fontSize: 12,
+  fontWeight: 950,
+  cursor: "pointer",
 };
 
 const themeChoiceButton: React.CSSProperties = {

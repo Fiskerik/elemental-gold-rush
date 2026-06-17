@@ -270,6 +270,18 @@
   min-height: auto;
   overflow-y: visible;
 }
+.platform-native .game-board-shell {
+  padding-top: max(56px, calc(env(safe-area-inset-top, 0px) + 12px)) !important;
+  padding-left: max(12px, calc(env(safe-area-inset-left, 0px) + 12px));
+  padding-right: max(12px, calc(env(safe-area-inset-right, 0px) + 12px));
+  padding-bottom: max(12px, calc(env(safe-area-inset-bottom, 0px) + 12px)) !important;
+}
+.platform-native .daily-compound-shell {
+  padding-top: max(56px, calc(env(safe-area-inset-top, 0px) + 12px)) !important;
+  padding-left: max(12px, calc(env(safe-area-inset-left, 0px) + 12px)) !important;
+  padding-right: max(12px, calc(env(safe-area-inset-right, 0px) + 12px)) !important;
+  padding-bottom: max(12px, calc(env(safe-area-inset-bottom, 0px) + 12px)) !important;
+}
 
 @media (min-width: 768px) {
   .app-shell {

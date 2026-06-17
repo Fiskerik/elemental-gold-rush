@@ -37,7 +37,7 @@ createRoot(rootElement).render(<RouterProvider router={router} />);
 
 if (Capacitor.getPlatform() === "ios") {
   void StatusBar.setOverlaysWebView({ overlay: false }).catch(() => {});
-  void StatusBar.setStyle({ style: storedTheme === "light" ? Style.Dark : Style.Light }).catch(
+  void StatusBar.setStyle({ style: storedTheme === "light" ? Style.Light : Style.Dark }).catch(
     () => {},
   );
   void StatusBar.setBackgroundColor({

@@ -1,4 +1,5 @@
 import { getTodayQuestDate } from "./quests";
+import { DEFAULT_PLAYER_DISPLAY_NAME, useProgress } from "./store";
 import {
   type GameCenterLeaderboardKind,
   isGameCenterAvailable,
@@ -142,6 +143,10 @@ function writeRecords(records: DailyCompoundRunRecord[]): void {
   );
 }
 
+function getPlayerDisplayName(): string {
+  return useProgress.getState().playerDisplayName || DEFAULT_PLAYER_DISPLAY_NAME;
+}
+
 function clamp01(value: number): number {
   return Math.max(0, Math.min(1, value));
 }
@@ -186,7 +191,7 @@ function recordDailyLeaderboardRun(kind: LeaderboardKind, score: number, shots: 
     score: normalizedScore,
     shots: Math.max(1, Math.floor(shots)),
     countryCode,
-    name: "You",
+    name: getPlayerDisplayName(),
     recordedAt: now,
   });
   writeRecords(records);
@@ -261,7 +266,7 @@ function playerEntry(kind: LeaderboardKind): LeaderboardEntry {
     rank: 0,
     countryCode,
     flag: countryFlag(countryCode),
-    name: "You",
+    name: todaysBest?.name || getPlayerDisplayName(),
     score: todaysBest?.score ?? 0,
     shots: todaysBest?.shots ?? 0,
     isPlayer: true,
@@ -302,15 +307,16 @@ function mapGameCenterEntry(
 ): LeaderboardEntry {
   const localId = localEntry ? entryId(localEntry) : "";
   const id = entryId(entry);
+  const isPlayer = Boolean(localId && id === localId);
   return {
     id: `${scope}-${id}-${entry.rank}`,
     rank: entry.rank,
     countryCode,
     flag: scope === "local" ? countryFlag(countryCode) : "🌐",
-    name: entry.playerName || entry.alias || "Player",
+    name: isPlayer ? getPlayerDisplayName() : entry.playerName || entry.alias || "Player",
     score: Math.max(0, Math.floor(entry.score ?? 0)),
     shots: Math.max(0, Math.floor(entry.context ?? 0)),
-    isPlayer: Boolean(localId && id === localId),
+    isPlayer,
   };
 }
 

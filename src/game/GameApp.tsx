@@ -15,7 +15,7 @@ import { Profile } from "@/game/Profile";
 import { Leaderboard } from "@/game/DailyCompoundLeaderboard";
 import { GameModeId } from "@/game/challenges";
 import { MOLECULE_CHALLENGE_BY_LEVEL, getCompoundChallengeKind, getLevelById } from "@/game/levels";
-import { useProgress } from "@/game/store";
+import { DEFAULT_PLAYER_DISPLAY_NAME, normalizePlayerDisplayName, useProgress } from "@/game/store";
 import { useDomLocalization } from "@/game/useDomLocalization";
 
 type Screen =
@@ -43,10 +43,13 @@ export function GameApp() {
   const soundVolume = useProgress((s) => s.soundVolume);
   const musicVolume = useProgress((s) => s.musicVolume);
   const refreshDailyFeatures = useProgress((s) => s.refreshDailyFeatures);
+  const setPlayerDisplayName = useProgress((s) => s.setPlayerDisplayName);
   const [screen, setScreen] = useState<Screen>({ name: "menu" });
   const [gameRunNonce, setGameRunNonce] = useState(0);
   const [showLaunchScreen, setShowLaunchScreen] = useState(true);
   const [resumePrompt, setResumePrompt] = useState<ReturnType<typeof getSavedRunSummary>>(null);
+  const [dailyNamePromptOpen, setDailyNamePromptOpen] = useState(false);
+  const [dailyNameDraft, setDailyNameDraft] = useState("");
 
   useDomLocalization(appLanguage);
 
@@ -64,7 +67,8 @@ export function GameApp() {
     root.classList.toggle("theme-dark", appTheme === "dark");
     root.style.colorScheme = appTheme;
     if (Capacitor.getPlatform() === "ios") {
-      void StatusBar.setStyle({ style: appTheme === "light" ? Style.Dark : Style.Light }).catch(
+      void StatusBar.setOverlaysWebView({ overlay: false }).catch(() => {});
+      void StatusBar.setStyle({ style: appTheme === "light" ? Style.Light : Style.Dark }).catch(
         () => {},
       );
       void StatusBar.setBackgroundColor({
@@ -91,6 +95,21 @@ export function GameApp() {
   }
 
   function startDailyChallenge() {
+    refreshDailyFeatures();
+    if (!useProgress.getState().playerDisplayName) {
+      setDailyNameDraft("");
+      setDailyNamePromptOpen(true);
+      return;
+    }
+    const dailyChallenge = useProgress.getState().dailyChallenge;
+    setScreen({ name: "game", levelId: dailyChallenge.levelId, mode: "daily-challenge" });
+  }
+
+  function startDailyChallengeAfterName() {
+    const normalizedName = normalizePlayerDisplayName(dailyNameDraft);
+    if (!normalizedName) return;
+    setPlayerDisplayName(normalizedName);
+    setDailyNamePromptOpen(false);
     refreshDailyFeatures();
     const dailyChallenge = useProgress.getState().dailyChallenge;
     setScreen({ name: "game", levelId: dailyChallenge.levelId, mode: "daily-challenge" });
@@ -158,6 +177,14 @@ export function GameApp() {
                 setResumePrompt(null);
               }}
               onCancel={() => setResumePrompt(null)}
+            />
+          )}
+          {dailyNamePromptOpen && (
+            <DailyBoardNamePrompt
+              value={dailyNameDraft}
+              onChange={setDailyNameDraft}
+              onCancel={() => setDailyNamePromptOpen(false)}
+              onStart={startDailyChallengeAfterName}
             />
           )}
         </>
@@ -339,6 +366,98 @@ function ResumeRunPrompt({
     </div>
   );
 }
+
+function DailyBoardNamePrompt({
+  value,
+  onChange,
+  onCancel,
+  onStart,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  onCancel: () => void;
+  onStart: () => void;
+}) {
+  const normalizedName = normalizePlayerDisplayName(value);
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Choose display name"
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 2000,
+        display: "grid",
+        placeItems: "center",
+        padding: 20,
+        background: "rgba(0,0,0,0.72)",
+        backdropFilter: "blur(6px)",
+      }}
+    >
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          onStart();
+        }}
+        style={{
+          width: "100%",
+          maxWidth: 360,
+          padding: 20,
+          borderRadius: 16,
+          border: "1px solid var(--border)",
+          background: "var(--surface-elevated)",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+          textAlign: "center",
+        }}
+      >
+        <div style={{ fontSize: 11, letterSpacing: 3, color: "var(--accent)", fontWeight: 800 }}>
+          DAILY BOARD
+        </div>
+        <h2 style={{ margin: "6px 0 12px", fontSize: 23 }}>Display name</h2>
+        <input
+          autoFocus
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          maxLength={18}
+          placeholder={DEFAULT_PLAYER_DISPLAY_NAME}
+          aria-label="Display name"
+          style={promptNameInput}
+        />
+        <div style={{ display: "grid", gap: 8, marginTop: 14 }}>
+          <button
+            type="submit"
+            disabled={!normalizedName}
+            style={{
+              ...promptPrimaryBtn,
+              opacity: normalizedName ? 1 : 0.55,
+              cursor: normalizedName ? "pointer" : "not-allowed",
+            }}
+          >
+            Start Daily Board
+          </button>
+          <button type="button" onClick={onCancel} style={promptGhostBtn}>
+            Cancel
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+const promptNameInput: CSSProperties = {
+  width: "100%",
+  boxSizing: "border-box",
+  border: "1px solid var(--border)",
+  borderRadius: 12,
+  padding: "12px 14px",
+  background: "var(--surface)",
+  color: "var(--foreground)",
+  fontFamily: "inherit",
+  fontSize: 15,
+  fontWeight: 850,
+  textAlign: "center",
+};
 
 const promptPrimaryBtn: CSSProperties = {
   border: "none",

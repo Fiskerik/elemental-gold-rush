@@ -107,6 +107,15 @@ function normalizeLabUpgradeEnabled(enabled: Partial<Record<LabUpgradeId, boolea
 }
 
 export type AppTheme = "dark" | "light";
+export const DEFAULT_PLAYER_DISPLAY_NAME = "Fusion Rush Chemist";
+
+export function normalizePlayerDisplayName(value: string | undefined): string {
+  return (value ?? "")
+    .replace(/\s+/g, " ")
+    .replace(/[^\p{L}\p{N} _.-]/gu, "")
+    .trim()
+    .slice(0, 18);
+}
 
 export const emptyPowerUpInventory = (): PowerUpInventory => ({
   transmute: 0,
@@ -229,6 +238,7 @@ function normalizeLevelStatsRecord(
 }
 
 interface ProgressState {
+  playerDisplayName: string;
   unlockedLevel: number; // highest level unlocked (1-based)
   highestElement: number; // highest atomic number ever reached
   totalScore: number;
@@ -319,6 +329,7 @@ interface ProgressState {
   setMusicVolume: (volume: number) => void;
   setAppTheme: (theme: AppTheme) => void;
   setAppLanguage: (language: AppLanguage) => void;
+  setPlayerDisplayName: (name: string) => void;
   toggleAppTheme: () => void;
   setShootingStyle: (style: "hold" | "press") => void;
   reset: () => void;
@@ -333,6 +344,7 @@ const initialSecretCompound = createSecretCompound(initialQuestDate);
 export const useProgress = create<ProgressState>()(
   persist(
     (set) => ({
+      playerDisplayName: "",
       unlockedLevel: 1,
       highestElement: 1,
       totalScore: 0,
@@ -919,10 +931,12 @@ export const useProgress = create<ProgressState>()(
         set(() => ({ musicVolume: Math.max(0, Math.min(100, Math.round(volume))) })),
       setAppTheme: (theme) => set({ appTheme: theme }),
       setAppLanguage: (language) => set({ appLanguage: normalizeLanguage(language) }),
+      setPlayerDisplayName: (name) => set({ playerDisplayName: normalizePlayerDisplayName(name) }),
       toggleAppTheme: () => set((s) => ({ appTheme: s.appTheme === "dark" ? "light" : "dark" })),
       setShootingStyle: (style) => set({ shootingStyle: style, hasChosenShootingStyle: true }),
       reset: () =>
         set((s) => ({
+          playerDisplayName: s.playerDisplayName,
           unlockedLevel: 1,
           highestElement: 1,
           totalScore: 0,
@@ -981,6 +995,7 @@ export const useProgress = create<ProgressState>()(
         return {
           ...current,
           ...persistedState,
+          playerDisplayName: normalizePlayerDisplayName(persistedState?.playerDisplayName),
           highestSingleShotScore:
             persistedState?.highestSingleShotScore ?? current.highestSingleShotScore,
           highestSingleShotScoreDate:
