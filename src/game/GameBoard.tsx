@@ -4023,9 +4023,9 @@ function StandardGameBoard({
     const gammaFxId = nextFxId();
     setGammaImpactFx({
       id: gammaFxId,
-      x: ix,
-      y: iy,
-      radius,
+      x: end.x,
+      y: end.y,
+      radius: eGunR * 2,
       hitCount: hitIds.size,
     });
     window.setTimeout(

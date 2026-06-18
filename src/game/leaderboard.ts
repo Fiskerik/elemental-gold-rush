@@ -121,7 +121,7 @@ function readRecords(): DailyCompoundRunRecord[] {
     return parsed
       .map((record) => ({
         id: String(record.id ?? ""),
-        kind: record.kind === "daily-board" ? "daily-board" : "daily-compound",
+        kind: (record.kind === "daily-board" ? "daily-board" : "daily-compound") as LeaderboardKind,
         date: String(record.date ?? ""),
         weekKey: String(record.weekKey ?? ""),
         score: Math.max(0, Math.floor(record.score ?? 0)),
