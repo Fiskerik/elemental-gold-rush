@@ -1,10 +1,10 @@
 import type { CSSProperties, ReactNode } from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { StatusBar, Style } from "@capacitor/status-bar";
 import { Coins } from "lucide-react";
 import { MainMenu } from "@/game/MainMenu";
-import { requestAppReview } from "@/game/appReview";
+import { openAppStoreReview } from "@/game/appReview";
 import { clearSavedRun, GameBoard, getSavedRunSummary } from "@/game/GameBoard";
 import { setMusicVolume, setSfxVolume } from "@/game/audio";
 import { LevelSelect } from "@/game/LevelSelect";
@@ -17,7 +17,7 @@ import { Profile } from "@/game/Profile";
 import { Leaderboard } from "@/game/DailyCompoundLeaderboard";
 import { GameModeId } from "@/game/challenges";
 import { MOLECULE_CHALLENGE_BY_LEVEL, getCompoundChallengeKind, getLevelById } from "@/game/levels";
-import { DEFAULT_PLAYER_DISPLAY_NAME, normalizePlayerDisplayName, useProgress } from "@/game/store";
+import { useProgress } from "@/game/store";
 import { useDomLocalization } from "@/game/useDomLocalization";
 
 type Screen =
@@ -48,14 +48,12 @@ export function GameApp() {
   const appReviewMilestonePromptSeen = useProgress((s) => s.appReviewMilestonePromptSeen);
   const appReviewMilestoneRewardClaimed = useProgress((s) => s.appReviewMilestoneRewardClaimed);
   const refreshDailyFeatures = useProgress((s) => s.refreshDailyFeatures);
-  const setPlayerDisplayName = useProgress((s) => s.setPlayerDisplayName);
   const markAppReviewMilestonePromptSeen = useProgress((s) => s.markAppReviewMilestonePromptSeen);
   const claimAppReviewMilestoneReward = useProgress((s) => s.claimAppReviewMilestoneReward);
   const [screen, setScreen] = useState<Screen>({ name: "menu" });
   const [gameRunNonce, setGameRunNonce] = useState(0);
   const [showLaunchScreen, setShowLaunchScreen] = useState(true);
   const [resumePrompt, setResumePrompt] = useState<ReturnType<typeof getSavedRunSummary>>(null);
-  const [dailyNamePromptOpen, setDailyNamePromptOpen] = useState(false);
   const [appReviewMilestonePromptOpen, setAppReviewMilestonePromptOpen] = useState(false);
   const [appReviewRequested, setAppReviewRequested] = useState(false);
   const pendingGameStartRef = useRef<(() => void) | null>(null);
@@ -95,14 +93,14 @@ export function GameApp() {
   if (showLaunchScreen) return <LaunchScreen />;
 
   const shouldShowAppReviewMilestone =
-    completedGameCount >= 5 && !appReviewMilestonePromptSeen && !appReviewMilestoneRewardClaimed;
+    completedGameCount >= 4 && !appReviewMilestonePromptSeen && !appReviewMilestoneRewardClaimed;
 
   const appReviewMilestonePrompt = appReviewMilestonePromptOpen ? (
     <AppReviewMilestonePrompt
       reviewRequested={appReviewRequested}
       onRate={() => {
         setAppReviewRequested(true);
-        void requestAppReview();
+        void openAppStoreReview();
       }}
       onClaim={() => {
         continuePendingGameStart();
@@ -152,22 +150,6 @@ export function GameApp() {
   }
 
   function startDailyChallenge() {
-    refreshDailyFeatures();
-    if (!useProgress.getState().playerDisplayName) {
-      setDailyNamePromptOpen(true);
-      return;
-    }
-    const dailyChallenge = useProgress.getState().dailyChallenge;
-    startGameWithAppReviewMilestone(() =>
-      setScreen({ name: "game", levelId: dailyChallenge.levelId, mode: "daily-challenge" }),
-    );
-  }
-
-  function startDailyChallengeAfterName(name: string) {
-    const normalizedName = normalizePlayerDisplayName(name);
-    if (!normalizedName) return;
-    setPlayerDisplayName(normalizedName);
-    setDailyNamePromptOpen(false);
     refreshDailyFeatures();
     const dailyChallenge = useProgress.getState().dailyChallenge;
     startGameWithAppReviewMilestone(() =>
@@ -248,12 +230,6 @@ export function GameApp() {
                 });
               }}
               onCancel={() => setResumePrompt(null)}
-            />
-          )}
-          {dailyNamePromptOpen && (
-            <DailyBoardNamePrompt
-              onCancel={() => setDailyNamePromptOpen(false)}
-              onStart={startDailyChallengeAfterName}
             />
           )}
         </>,
@@ -498,7 +474,7 @@ function AppReviewMilestonePrompt({
         </p>
         <div style={{ display: "grid", gap: 8 }}>
           <button type="button" onClick={onRate} style={promptSecondaryBtn}>
-            {reviewRequested ? "Rating prompt opened" : "Rate App"}
+            {reviewRequested ? "App Store opened" : "Rate App"}
           </button>
           <button type="button" onClick={onClaim} style={promptPrimaryBtn}>
             Continue
@@ -512,90 +488,6 @@ function AppReviewMilestonePrompt({
   );
 }
 
-function DailyBoardNamePrompt({
-  onCancel,
-  onStart,
-}: {
-  onCancel: () => void;
-  onStart: (value: string) => void;
-}) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const submitName = useCallback(() => {
-    const value = inputRef.current?.value ?? "";
-    inputRef.current?.blur();
-    window.setTimeout(() => onStart(value), 0);
-  }, [onStart]);
-
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="Choose display name"
-      data-no-localize="true"
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 2000,
-        display: "grid",
-        placeItems: "center",
-        padding: 20,
-        background: "rgba(0,0,0,0.72)",
-      }}
-    >
-      <form
-        onSubmit={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          submitName();
-        }}
-        style={{
-          width: "100%",
-          maxWidth: 360,
-          padding: 20,
-          borderRadius: 16,
-          border: "1px solid var(--border)",
-          background: "var(--surface-elevated)",
-          boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
-          textAlign: "center",
-        }}
-      >
-        <div style={{ fontSize: 11, letterSpacing: 3, color: "var(--accent)", fontWeight: 800 }}>
-          DAILY BOARD
-        </div>
-        <h2 style={{ margin: "6px 0 12px", fontSize: 23 }}>Display name</h2>
-        <input
-          ref={inputRef}
-          type="text"
-          maxLength={18}
-          placeholder={DEFAULT_PLAYER_DISPLAY_NAME}
-          aria-label="Display name"
-          data-no-localize="true"
-          autoCapitalize="words"
-          autoComplete="off"
-          autoCorrect="off"
-          enterKeyHint="done"
-          spellCheck={false}
-          onKeyDown={(event) => {
-            if (event.key !== "Enter") return;
-            event.preventDefault();
-            event.stopPropagation();
-            submitName();
-          }}
-          style={promptNameInput}
-        />
-        <div style={{ display: "grid", gap: 8, marginTop: 14 }}>
-          <button type="submit" style={promptPrimaryBtn}>
-            Start Daily Board
-          </button>
-          <button type="button" onClick={onCancel} style={promptGhostBtn}>
-            Cancel
-          </button>
-        </div>
-      </form>
-    </div>
-  );
-}
-
 function CoinAmount({ amount, suffix }: { amount: number; suffix: string }) {
   return (
     <span style={coinAmount}>
@@ -604,21 +496,6 @@ function CoinAmount({ amount, suffix }: { amount: number; suffix: string }) {
     </span>
   );
 }
-
-const promptNameInput: CSSProperties = {
-  width: "100%",
-  boxSizing: "border-box",
-  border: "1px solid var(--border)",
-  borderRadius: 14,
-  padding: "12px 14px",
-  background: "var(--surface)",
-  color: "var(--foreground)",
-  fontFamily: "inherit",
-  fontSize: 16,
-  fontWeight: 850,
-  lineHeight: 1.2,
-  textAlign: "center",
-};
 
 const promptPrimaryBtn: CSSProperties = {
   border: "none",

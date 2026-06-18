@@ -1,4 +1,4 @@
-import { memo, useCallback, useRef, useState } from "react";
+import { useState } from "react";
 import { ELEMENTS } from "./elements";
 import { getLevelById, MAX_LEVEL } from "./levels";
 import { DEFAULT_PLAYER_DISPLAY_NAME, useProgress, type CoinTransaction } from "./store";
@@ -62,10 +62,8 @@ export function Profile({ onBack }: Props) {
     appLanguage,
     setAppTheme,
     setAppLanguage,
-    playerDisplayName,
-    setPlayerDisplayName,
   } = useProgress();
-  const displayName = playerDisplayName || DEFAULT_PLAYER_DISPLAY_NAME;
+  const displayName = DEFAULT_PLAYER_DISPLAY_NAME;
   const tr = (text: string) => t(text, appLanguage);
   const intlLocale = toIntlLocale(appLanguage);
   const numberFormatter = new Intl.NumberFormat(intlLocale);
@@ -362,11 +360,12 @@ export function Profile({ onBack }: Props) {
 
         <section style={card}>
           <div style={sectionHeading}>{tr("Display")}</div>
-          <ProfileNameEditor
-            appLanguage={appLanguage}
-            playerDisplayName={playerDisplayName}
-            setPlayerDisplayName={setPlayerDisplayName}
-          />
+          <div style={{ ...preferenceRow, marginBottom: 18 }}>
+            <span style={preferenceLabel}>{tr("Profile name")}</span>
+            <strong data-no-localize="true" style={profileNameValue}>
+              {DEFAULT_PLAYER_DISPLAY_NAME}
+            </strong>
+          </div>
           <div style={preferenceRow}>
             <span style={preferenceLabel}>{tr("Theme")}</span>
             <div style={{ display: "inline-grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
@@ -416,57 +415,6 @@ export function Profile({ onBack }: Props) {
     </div>
   );
 }
-
-const ProfileNameEditor = memo(function ProfileNameEditor({
-  appLanguage,
-  playerDisplayName,
-  setPlayerDisplayName,
-}: {
-  appLanguage: AppLanguage;
-  playerDisplayName: string;
-  setPlayerDisplayName: (value: string) => void;
-}) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const tr = (text: string) => t(text, appLanguage);
-
-  const saveDisplayName = useCallback(() => {
-    const value = inputRef.current?.value ?? "";
-    inputRef.current?.blur();
-    window.setTimeout(() => setPlayerDisplayName(value), 0);
-  }, [setPlayerDisplayName]);
-
-  return (
-    <div style={profileNameRow}>
-      <label style={profileNameLabel}>
-        <span style={preferenceLabel}>{tr("Profile name")}</span>
-        <input
-          key={playerDisplayName}
-          ref={inputRef}
-          defaultValue={playerDisplayName}
-          onKeyDown={(event) => {
-            if (event.key !== "Enter") return;
-            event.preventDefault();
-            event.stopPropagation();
-            saveDisplayName();
-          }}
-          maxLength={18}
-          placeholder={DEFAULT_PLAYER_DISPLAY_NAME}
-          style={nameInput}
-          aria-label={tr("Profile name")}
-          data-no-localize="true"
-          autoCapitalize="words"
-          autoComplete="off"
-          autoCorrect="off"
-          enterKeyHint="done"
-          spellCheck={false}
-        />
-      </label>
-      <button type="button" onClick={saveDisplayName} style={nameSaveButton}>
-        {tr("Save")}
-      </button>
-    </div>
-  );
-});
 
 function DailyBoardBadgeIcon({ id }: { id: DailyBoardLeaderboardAchievementId }) {
   switch (id) {
@@ -917,48 +865,10 @@ const preferenceLabel: React.CSSProperties = {
   lineHeight: 1.15,
 };
 
-const profileNameRow: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "minmax(0, 1fr) auto",
-  alignItems: "end",
-  gap: 10,
-  marginBottom: 18,
-};
-
-const profileNameLabel: React.CSSProperties = {
-  minWidth: 0,
-  display: "grid",
-  gap: 7,
-};
-
-const nameInput: React.CSSProperties = {
-  boxSizing: "border-box",
-  width: "100%",
-  minWidth: 0,
-  minHeight: 46,
-  border: "1px solid var(--border)",
-  borderRadius: 14,
-  padding: "10px 12px",
-  background: "var(--surface)",
+const profileNameValue: React.CSSProperties = {
   color: "var(--foreground)",
-  fontFamily: "inherit",
-  fontSize: 16,
-  fontWeight: 850,
-  lineHeight: 1.2,
-  outline: "none",
-};
-
-const nameSaveButton: React.CSSProperties = {
-  minHeight: 46,
-  border: "1px solid var(--primary)",
-  borderRadius: 14,
-  padding: "10px 14px",
-  background: "var(--primary)",
-  color: "var(--primary-foreground)",
-  fontFamily: "inherit",
   fontSize: 16,
   fontWeight: 950,
-  cursor: "pointer",
 };
 
 const themeChoiceButton: React.CSSProperties = {

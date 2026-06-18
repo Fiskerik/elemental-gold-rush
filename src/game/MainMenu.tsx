@@ -11,6 +11,7 @@ import {
   ShoppingBag,
   Sparkles,
   Star,
+  StarHalf,
   Settings as SettingsIcon,
   CircleQuestionMark,
   Trophy,
@@ -38,6 +39,8 @@ import { useIsTabletLayout } from "./responsive";
 import { DAILY_FEATURE_REWARD_COINS } from "./dailyFeatures";
 import { t } from "./localization";
 import { PodiumMark } from "./DailyCompoundLeaderboard";
+import { openAppStoreReview } from "./appReview";
+import { toast } from "sonner";
 
 const POWER_UP_STAGE_LABELS: Record<PowerUpStageId, string> = {
   shimmer: "Merge the shimmering queued atom",
@@ -243,6 +246,16 @@ export function MainMenu({
     );
   }
 
+  function handleRateApp() {
+    toast("Enjoying Atomic Fusion Rush?", {
+      description: "A quick App Store rating helps the game grow.",
+      action: {
+        label: "Rate App",
+        onClick: () => void openAppStoreReview(),
+      },
+    });
+  }
+
   return (
     <div
       className="app-shell"
@@ -305,6 +318,13 @@ export function MainMenu({
               </div>
             </div>
             <div style={playPanelActions}>
+              <button
+                onClick={handleRateApp}
+                style={{ ...chooseLevelBtn, paddingInline: 9 }}
+                aria-label="Rate app"
+              >
+                <StarHalf size={18} aria-hidden="true" />
+              </button>
               <button
                 onClick={() => {
                   trackMenuAction("leaderboard");
