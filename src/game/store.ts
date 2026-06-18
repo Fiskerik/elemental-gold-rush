@@ -2,6 +2,12 @@ import { create } from "zustand";
 import { GameModeId } from "./challenges";
 import { persist } from "zustand/middleware";
 import { getEarnedBadgeIds } from "./badges";
+import {
+  emptyDailyBoardLeaderboardAchievementCounts,
+  getDailyBoardLeaderboardAchievementIds,
+  normalizeDailyBoardLeaderboardAchievementCounts,
+  type DailyBoardLeaderboardAchievementCounts,
+} from "./leaderboardAchievements";
 import { DEFAULT_LANGUAGE, normalizeLanguage, type AppLanguage } from "./localization";
 import {
   DailyQuest,
@@ -178,6 +184,7 @@ export const emptyLevelStats = (): LevelStats => ({
 });
 
 const MAX_COIN_TRANSACTIONS = 80;
+const MAX_LEADERBOARD_ACHIEVEMENT_RECORDS = 160;
 
 function appendCoinTransaction(
   transactions: CoinTransaction[] | undefined,
@@ -286,6 +293,8 @@ interface ProgressState {
   dailyBoardBestScore: number;
   dailyCompoundRuns: number;
   dailyCompoundBestScore: number;
+  dailyBoardLeaderboardAchievementCounts: DailyBoardLeaderboardAchievementCounts;
+  dailyBoardLeaderboardAchievementRecords: string[];
   markTipSeen: (id: string) => void;
   refreshDailyFeatures: () => void;
   completeDailyChallenge: (score: number) => boolean;
@@ -321,6 +330,11 @@ interface ProgressState {
     run: { score: number; shots: number; powerUpsUsed: number; won: boolean },
   ) => void;
   setChallengeBestScore: (mode: GameModeId, score: number) => void;
+  recordDailyBoardLeaderboardPlacement: (
+    rank: number,
+    totalPlayerCount: number,
+    date?: string,
+  ) => void;
   grantProPack: () => void;
   recordGameAttemptForAd: () => void;
   markInterstitialShown: () => void;
@@ -397,6 +411,8 @@ export const useProgress = create<ProgressState>()(
       dailyBoardBestScore: 0,
       dailyCompoundRuns: 0,
       dailyCompoundBestScore: 0,
+      dailyBoardLeaderboardAchievementCounts: emptyDailyBoardLeaderboardAchievementCounts(),
+      dailyBoardLeaderboardAchievementRecords: [],
       markTipSeen: (id) =>
         set((s) => (s.seenTips.includes(id) ? s : { seenTips: [...s.seenTips, id] })),
       refreshDailyFeatures: () =>
@@ -871,6 +887,31 @@ export const useProgress = create<ProgressState>()(
             [mode]: Math.max(s.challengeBestScores[mode] ?? 0, score),
           },
         })),
+      recordDailyBoardLeaderboardPlacement: (rank, totalPlayerCount, date = getTodayQuestDate()) =>
+        set((s) => {
+          const achievementIds = getDailyBoardLeaderboardAchievementIds(rank, totalPlayerCount);
+          if (achievementIds.length === 0) return s;
+
+          const existingRecords = new Set(s.dailyBoardLeaderboardAchievementRecords);
+          const newRecords = achievementIds
+            .map((id) => `${date}:${id}`)
+            .filter((recordKey) => !existingRecords.has(recordKey));
+          if (newRecords.length === 0) return s;
+
+          const counts = { ...s.dailyBoardLeaderboardAchievementCounts };
+          for (const recordKey of newRecords) {
+            const id = recordKey.split(":")[1] as keyof DailyBoardLeaderboardAchievementCounts;
+            counts[id] = (counts[id] ?? 0) + 1;
+          }
+
+          return {
+            dailyBoardLeaderboardAchievementCounts: counts,
+            dailyBoardLeaderboardAchievementRecords: [
+              ...s.dailyBoardLeaderboardAchievementRecords,
+              ...newRecords,
+            ].slice(-MAX_LEADERBOARD_ACHIEVEMENT_RECORDS),
+          };
+        }),
       grantProPack: () =>
         set((s) => {
           const shouldGrantStarter = !s.proStarterCoinsGranted;
@@ -1017,6 +1058,8 @@ export const useProgress = create<ProgressState>()(
           dailyBoardBestScore: 0,
           dailyCompoundRuns: 0,
           dailyCompoundBestScore: 0,
+          dailyBoardLeaderboardAchievementCounts: s.dailyBoardLeaderboardAchievementCounts,
+          dailyBoardLeaderboardAchievementRecords: s.dailyBoardLeaderboardAchievementRecords,
         })),
     }),
     {
@@ -1089,6 +1132,14 @@ export const useProgress = create<ProgressState>()(
           dailyCompoundRuns: persistedState?.dailyCompoundRuns ?? current.dailyCompoundRuns,
           dailyCompoundBestScore:
             persistedState?.dailyCompoundBestScore ?? current.dailyCompoundBestScore,
+          dailyBoardLeaderboardAchievementCounts: normalizeDailyBoardLeaderboardAchievementCounts(
+            persistedState?.dailyBoardLeaderboardAchievementCounts,
+          ),
+          dailyBoardLeaderboardAchievementRecords: (
+            persistedState?.dailyBoardLeaderboardAchievementRecords ?? []
+          )
+            .map(String)
+            .slice(-MAX_LEADERBOARD_ACHIEVEMENT_RECORDS),
         } as ProgressState;
       },
     },

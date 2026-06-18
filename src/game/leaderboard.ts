@@ -36,6 +36,7 @@ export interface LeaderboardBoard {
   entries: LeaderboardEntry[];
   player: LeaderboardEntry;
   countryCode: string;
+  totalPlayerCount: number;
   source: "game-center" | "local";
   status?: string;
 }
@@ -291,6 +292,7 @@ export function getDailyLeaderboard(
     entries: entries.slice(0, 20),
     player: entries.find((entry) => entry.isPlayer) ?? { ...player, rank: 0 },
     countryCode,
+    totalPlayerCount: entries.length,
     source: "local",
   };
 }
@@ -351,6 +353,7 @@ export async function loadDailyLeaderboard(
           rank: 0,
         },
       countryCode,
+      totalPlayerCount: Math.max(result.totalPlayerCount, entries.length),
       source: "game-center",
     };
   } catch (error) {
