@@ -1,4 +1,5 @@
 import { Capacitor } from "@capacitor/core";
+import { Keyboard, KeyboardResize, KeyboardStyle } from "@capacitor/keyboard";
 import { StatusBar, Style } from "@capacitor/status-bar";
 import { createRoot } from "react-dom/client";
 import { RouterProvider } from "@tanstack/react-router";
@@ -68,6 +69,10 @@ const router = getRouter();
 createRoot(rootElement).render(<RouterProvider router={router} />);
 
 if (Capacitor.getPlatform() === "ios") {
+  void Keyboard.setResizeMode({ mode: KeyboardResize.Body }).catch(() => {});
+  void Keyboard.setStyle({ style: KeyboardStyle.Default }).catch(() => {});
+  void Keyboard.setAccessoryBarVisible({ isVisible: false }).catch(() => {});
+  void Keyboard.setScroll({ isDisabled: false }).catch(() => {});
   void StatusBar.setOverlaysWebView({ overlay: false }).catch(() => {});
   void StatusBar.setStyle({ style: storedTheme === "light" ? Style.Light : Style.Dark }).catch(
     () => {},

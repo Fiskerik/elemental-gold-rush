@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { StatusBar, Style } from "@capacitor/status-bar";
 import { Coins } from "lucide-react";
@@ -520,6 +520,12 @@ function DailyBoardNamePrompt({
   onStart: (value: string) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const submitName = useCallback(() => {
+    const value = inputRef.current?.value ?? "";
+    inputRef.current?.blur();
+    window.setTimeout(() => onStart(value), 0);
+  }, [onStart]);
+
   return (
     <div
       role="dialog"
@@ -539,7 +545,8 @@ function DailyBoardNamePrompt({
       <form
         onSubmit={(event) => {
           event.preventDefault();
-          onStart(inputRef.current?.value ?? "");
+          event.stopPropagation();
+          submitName();
         }}
         style={{
           width: "100%",
@@ -568,13 +575,16 @@ function DailyBoardNamePrompt({
           autoCorrect="off"
           enterKeyHint="done"
           spellCheck={false}
+          onKeyDown={(event) => {
+            if (event.key !== "Enter") return;
+            event.preventDefault();
+            event.stopPropagation();
+            submitName();
+          }}
           style={promptNameInput}
         />
         <div style={{ display: "grid", gap: 8, marginTop: 14 }}>
-          <button
-            type="submit"
-            style={promptPrimaryBtn}
-          >
+          <button type="submit" style={promptPrimaryBtn}>
             Start Daily Board
           </button>
           <button type="button" onClick={onCancel} style={promptGhostBtn}>

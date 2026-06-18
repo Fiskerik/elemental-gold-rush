@@ -1,4 +1,5 @@
-import type { CapacitorConfig } from '@capacitor/cli';
+import type { CapacitorConfig } from "@capacitor/cli";
+import { KeyboardResize, KeyboardStyle } from "@capacitor/keyboard";
 
 const config: CapacitorConfig = {
   appId: "com.eaconsulting.atomicfusion",
@@ -12,6 +13,10 @@ const config: CapacitorConfig = {
     scrollEnabled: true,
   },
   plugins: {
+    Keyboard: {
+      resize: KeyboardResize.Body,
+      style: KeyboardStyle.Default,
+    },
     SplashScreen: {
       launchShowDuration: 1200,
       backgroundColor: "#0A0A1A",

@@ -1,4 +1,4 @@
-import { memo, useEffect, useState } from "react";
+import { memo, useCallback, useRef, useState } from "react";
 import { ELEMENTS } from "./elements";
 import { getLevelById, MAX_LEVEL } from "./levels";
 import { DEFAULT_PLAYER_DISPLAY_NAME, useProgress, type CoinTransaction } from "./store";
@@ -426,29 +426,28 @@ const ProfileNameEditor = memo(function ProfileNameEditor({
   playerDisplayName: string;
   setPlayerDisplayName: (value: string) => void;
 }) {
-  const [nameDraft, setNameDraft] = useState(playerDisplayName);
+  const inputRef = useRef<HTMLInputElement>(null);
   const tr = (text: string) => t(text, appLanguage);
 
-  useEffect(() => {
-    setNameDraft(playerDisplayName);
-  }, [playerDisplayName]);
-
-  function saveDisplayName() {
-    setPlayerDisplayName(nameDraft);
-  }
+  const saveDisplayName = useCallback(() => {
+    const value = inputRef.current?.value ?? "";
+    inputRef.current?.blur();
+    window.setTimeout(() => setPlayerDisplayName(value), 0);
+  }, [setPlayerDisplayName]);
 
   return (
     <div style={profileNameRow}>
       <label style={profileNameLabel}>
         <span style={preferenceLabel}>{tr("Profile name")}</span>
         <input
-          value={nameDraft}
-          onChange={(event) => setNameDraft(event.target.value)}
+          key={playerDisplayName}
+          ref={inputRef}
+          defaultValue={playerDisplayName}
           onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              event.currentTarget.blur();
-              setPlayerDisplayName(event.currentTarget.value);
-            }
+            if (event.key !== "Enter") return;
+            event.preventDefault();
+            event.stopPropagation();
+            saveDisplayName();
           }}
           maxLength={18}
           placeholder={DEFAULT_PLAYER_DISPLAY_NAME}
@@ -456,8 +455,10 @@ const ProfileNameEditor = memo(function ProfileNameEditor({
           aria-label={tr("Profile name")}
           data-no-localize="true"
           autoCapitalize="words"
+          autoComplete="off"
           autoCorrect="off"
           enterKeyHint="done"
+          spellCheck={false}
         />
       </label>
       <button type="button" onClick={saveDisplayName} style={nameSaveButton}>
