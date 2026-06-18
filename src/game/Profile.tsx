@@ -1,4 +1,4 @@
-import { memo, useCallback, useRef, useState } from "react";
+import { useState } from "react";
 import { ELEMENTS } from "./elements";
 import { getLevelById, MAX_LEVEL } from "./levels";
 import { DEFAULT_PLAYER_DISPLAY_NAME, useProgress, type CoinTransaction } from "./store";
@@ -62,10 +62,8 @@ export function Profile({ onBack }: Props) {
     appLanguage,
     setAppTheme,
     setAppLanguage,
-    playerDisplayName,
-    setPlayerDisplayName,
   } = useProgress();
-  const displayName = playerDisplayName || DEFAULT_PLAYER_DISPLAY_NAME;
+  const displayName = DEFAULT_PLAYER_DISPLAY_NAME;
   const tr = (text: string) => t(text, appLanguage);
   const intlLocale = toIntlLocale(appLanguage);
   const numberFormatter = new Intl.NumberFormat(intlLocale);
