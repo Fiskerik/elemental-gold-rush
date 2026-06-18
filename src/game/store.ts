@@ -113,7 +113,7 @@ function normalizeLabUpgradeEnabled(enabled: Partial<Record<LabUpgradeId, boolea
 }
 
 export type AppTheme = "dark" | "light";
-export const DEFAULT_PLAYER_DISPLAY_NAME = "Fusion Rush Chemist";
+export const DEFAULT_PLAYER_DISPLAY_NAME = "You";
 
 export function normalizePlayerDisplayName(value: string | undefined): string {
   return (value ?? "")
@@ -1010,7 +1010,7 @@ export const useProgress = create<ProgressState>()(
       setShootingStyle: (style) => set({ shootingStyle: style, hasChosenShootingStyle: true }),
       reset: () =>
         set((s) => ({
-          playerDisplayName: s.playerDisplayName,
+          playerDisplayName: "",
           unlockedLevel: 1,
           highestElement: 1,
           totalScore: 0,
@@ -1074,7 +1074,7 @@ export const useProgress = create<ProgressState>()(
         return {
           ...current,
           ...persistedState,
-          playerDisplayName: normalizePlayerDisplayName(persistedState?.playerDisplayName),
+          playerDisplayName: "",
           highestSingleShotScore:
             persistedState?.highestSingleShotScore ?? current.highestSingleShotScore,
           highestSingleShotScoreDate:
