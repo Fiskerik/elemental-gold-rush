@@ -93,7 +93,7 @@ export function GameApp() {
   if (showLaunchScreen) return <LaunchScreen />;
 
   const shouldShowAppReviewMilestone =
-    completedGameCount >= 5 && !appReviewMilestonePromptSeen && !appReviewMilestoneRewardClaimed;
+    completedGameCount >= 4 && !appReviewMilestonePromptSeen && !appReviewMilestoneRewardClaimed;
 
   const appReviewMilestonePrompt = appReviewMilestonePromptOpen ? (
     <AppReviewMilestonePrompt
@@ -474,7 +474,7 @@ function AppReviewMilestonePrompt({
         </p>
         <div style={{ display: "grid", gap: 8 }}>
           <button type="button" onClick={onRate} style={promptSecondaryBtn}>
-            {reviewRequested ? "Rating prompt opened" : "Rate App"}
+            {reviewRequested ? "App Store opened" : "Rate App"}
           </button>
           <button type="button" onClick={onClaim} style={promptPrimaryBtn}>
             Continue

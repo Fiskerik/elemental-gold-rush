@@ -32,7 +32,7 @@ public class AppReviewPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func openAppStoreReview(_ call: CAPPluginCall) {
         DispatchQueue.main.async {
-            guard let url = URL(string: self.appStoreReviewUrl), UIApplication.shared.canOpenURL(url) else {
+            guard let url = URL(string: self.appStoreReviewUrl) else {
                 call.resolve(["opened": false])
                 return
             }
