@@ -360,11 +360,12 @@ export function Profile({ onBack }: Props) {
 
         <section style={card}>
           <div style={sectionHeading}>{tr("Display")}</div>
-          <ProfileNameEditor
-            appLanguage={appLanguage}
-            playerDisplayName={playerDisplayName}
-            setPlayerDisplayName={setPlayerDisplayName}
-          />
+          <div style={{ ...preferenceRow, marginBottom: 18 }}>
+            <span style={preferenceLabel}>{tr("Profile name")}</span>
+            <strong data-no-localize="true" style={profileNameValue}>
+              {DEFAULT_PLAYER_DISPLAY_NAME}
+            </strong>
+          </div>
           <div style={preferenceRow}>
             <span style={preferenceLabel}>{tr("Theme")}</span>
             <div style={{ display: "inline-grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
@@ -414,57 +415,6 @@ export function Profile({ onBack }: Props) {
     </div>
   );
 }
-
-const ProfileNameEditor = memo(function ProfileNameEditor({
-  appLanguage,
-  playerDisplayName,
-  setPlayerDisplayName,
-}: {
-  appLanguage: AppLanguage;
-  playerDisplayName: string;
-  setPlayerDisplayName: (value: string) => void;
-}) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const tr = (text: string) => t(text, appLanguage);
-
-  const saveDisplayName = useCallback(() => {
-    const value = inputRef.current?.value ?? "";
-    inputRef.current?.blur();
-    window.setTimeout(() => setPlayerDisplayName(value), 0);
-  }, [setPlayerDisplayName]);
-
-  return (
-    <div style={profileNameRow}>
-      <label style={profileNameLabel}>
-        <span style={preferenceLabel}>{tr("Profile name")}</span>
-        <input
-          key={playerDisplayName}
-          ref={inputRef}
-          defaultValue={playerDisplayName}
-          onKeyDown={(event) => {
-            if (event.key !== "Enter") return;
-            event.preventDefault();
-            event.stopPropagation();
-            saveDisplayName();
-          }}
-          maxLength={18}
-          placeholder={DEFAULT_PLAYER_DISPLAY_NAME}
-          style={nameInput}
-          aria-label={tr("Profile name")}
-          data-no-localize="true"
-          autoCapitalize="words"
-          autoComplete="off"
-          autoCorrect="off"
-          enterKeyHint="done"
-          spellCheck={false}
-        />
-      </label>
-      <button type="button" onClick={saveDisplayName} style={nameSaveButton}>
-        {tr("Save")}
-      </button>
-    </div>
-  );
-});
 
 function DailyBoardBadgeIcon({ id }: { id: DailyBoardLeaderboardAchievementId }) {
   switch (id) {
