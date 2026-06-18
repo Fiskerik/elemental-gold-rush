@@ -134,6 +134,21 @@ export function useDomLocalization(language: AppLanguage) {
       }
     }
 
+    function isEditableTarget(target: EventTarget | null): target is Element {
+      if (!(target instanceof Element)) return false;
+      const tag = target.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
+      return target.closest("[contenteditable=''],[contenteditable='true']") != null;
+    }
+
+    function getLocalizationScope(target: Element): Node {
+      return (
+        target.closest("[data-localization-scope], [role='dialog'], section, main") ??
+        target.parentElement ??
+        root
+      );
+    }
+
     restoreKnownNodes();
     document.documentElement.lang = toIntlLocale(language);
     document.documentElement.dir = getLanguageDirection(language);
@@ -174,6 +189,10 @@ export function useDomLocalization(language: AppLanguage) {
     }
 
     const observer = new MutationObserver((mutations) => {
+      if (isEditableTarget(document.activeElement)) {
+        stopObserving();
+        return;
+      }
       for (const mutation of mutations) {
         if (mutation.type === "characterData" && mutation.target.nodeType === Node.TEXT_NODE) {
           queueLocalization(mutation.target);
@@ -217,30 +236,27 @@ export function useDomLocalization(language: AppLanguage) {
     // On iOS WKWebView a subtree characterData MutationObserver makes every
     // keystroke in a focused field extremely expensive, hanging the app. Pause
     // the observer while an editable element is focused, then resume on blur.
-    function isEditableTarget(target: EventTarget | null): boolean {
-      if (!(target instanceof Element)) return false;
-      const tag = target.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
-      return target.closest("[contenteditable=''],[contenteditable='true']") != null;
-    }
-
+    // The observer callback also guards document.activeElement so missed or
+    // delayed WKWebView focus events cannot leave the subtree observer active.
     function handleFocusIn(event: FocusEvent) {
       if (isEditableTarget(event.target)) stopObserving();
     }
     function handleFocusOut(event: FocusEvent) {
-      if (!isEditableTarget(event.target)) return;
+      const target = event.target;
+      if (!isEditableTarget(target)) return;
+      const scope = getLocalizationScope(target);
       // Resume after the focus change settles, then re-localize any new content.
       window.setTimeout(() => {
         if (!isEditableTarget(document.activeElement)) {
           startObserving();
-          localizeTree(root);
+          localizeTree(scope);
         }
       }, 0);
     }
 
-    startObserving();
     document.addEventListener("focusin", handleFocusIn);
     document.addEventListener("focusout", handleFocusOut);
+    if (!isEditableTarget(document.activeElement)) startObserving();
 
     return () => {
       document.removeEventListener("focusin", handleFocusIn);

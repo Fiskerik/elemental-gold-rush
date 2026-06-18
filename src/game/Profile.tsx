@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import { ELEMENTS } from "./elements";
 import { getLevelById, MAX_LEVEL } from "./levels";
 import { DEFAULT_PLAYER_DISPLAY_NAME, useProgress, type CoinTransaction } from "./store";
@@ -65,7 +65,6 @@ export function Profile({ onBack }: Props) {
     playerDisplayName,
     setPlayerDisplayName,
   } = useProgress();
-  const [nameDraft, setNameDraft] = useState(playerDisplayName);
   const displayName = playerDisplayName || DEFAULT_PLAYER_DISPLAY_NAME;
   const tr = (text: string) => t(text, appLanguage);
   const intlLocale = toIntlLocale(appLanguage);
@@ -73,27 +72,34 @@ export function Profile({ onBack }: Props) {
   const highestEl = ELEMENTS[highestElement - 1];
   const totalStars = Object.values(levelStars).reduce((sum, stars) => sum + stars, 0);
   const perfectLevels = Object.values(levelStars).filter((stars) => stars >= 3).length;
-  const bestChallengeEntry = Object.entries(challengeBestScores).reduce<{ mode: string; score: number } | null>(
-    (best, [mode, score]) => {
-      const safeScore = score ?? 0;
-      if (!best || safeScore > best.score) return { mode, score: safeScore };
-      return best;
-    },
-    null,
-  );
-  const bestLevelScoreEntry = Object.entries(levelStats).reduce<{ levelId: number; score: number } | null>(
-    (best, [levelId, stats]) => {
-      if (!best || stats.maxScore > best.score) return { levelId: Number(levelId), score: stats.maxScore };
-      return best;
-    },
-    null,
-  );
-  const bestLevelScoreLevel = bestLevelScoreEntry ? getLevelById(bestLevelScoreEntry.levelId) : null;
+  const bestChallengeEntry = Object.entries(challengeBestScores).reduce<{
+    mode: string;
+    score: number;
+  } | null>((best, [mode, score]) => {
+    const safeScore = score ?? 0;
+    if (!best || safeScore > best.score) return { mode, score: safeScore };
+    return best;
+  }, null);
+  const bestLevelScoreEntry = Object.entries(levelStats).reduce<{
+    levelId: number;
+    score: number;
+  } | null>((best, [levelId, stats]) => {
+    if (!best || stats.maxScore > best.score)
+      return { levelId: Number(levelId), score: stats.maxScore };
+    return best;
+  }, null);
+  const bestLevelScoreLevel = bestLevelScoreEntry
+    ? getLevelById(bestLevelScoreEntry.levelId)
+    : null;
   const completionPercent = Math.round((discoveredElements.length / ELEMENTS.length) * 100);
-  const compoundPercent = Math.round((discoveredCompounds.length / Math.max(1, COMPOUNDS.length)) * 100);
+  const compoundPercent = Math.round(
+    (discoveredCompounds.length / Math.max(1, COMPOUNDS.length)) * 100,
+  );
   const bossIds = Object.keys(BOSSES) as BossId[];
   const unlockedBossCount = bossIds.filter((id) => unlockedLevel >= BOSSES[id].levelId).length;
-  const defeatedBossCount = bossIds.filter((id) => (levelStats[BOSSES[id].levelId]?.bestShots ?? null) != null).length;
+  const defeatedBossCount = bossIds.filter(
+    (id) => (levelStats[BOSSES[id].levelId]?.bestShots ?? null) != null,
+  ).length;
   const exactScore = (score: number) => numberFormatter.format(Math.max(0, Math.floor(score)));
   const formatDate = (value: string | null) =>
     value
@@ -111,14 +117,6 @@ export function Profile({ onBack }: Props) {
       hour: "2-digit",
       minute: "2-digit",
     });
-
-  useEffect(() => {
-    setNameDraft(playerDisplayName);
-  }, [playerDisplayName]);
-
-  function saveDisplayName() {
-    setPlayerDisplayName(nameDraft);
-  }
 
   return (
     <div
@@ -167,7 +165,11 @@ export function Profile({ onBack }: Props) {
           </div>
         </header>
         <section style={heroMetricGrid}>
-          <HeroMetric icon={Atom} label={tr("Highest Atom")} value={`${highestEl?.symbol ?? "H"} #${highestElement}`} />
+          <HeroMetric
+            icon={Atom}
+            label={tr("Highest Atom")}
+            value={`${highestEl?.symbol ?? "H"} #${highestElement}`}
+          />
           <HeroMetric icon={BadgeCheck} label={tr("Badges")} value={`${earnedBadges.length}`} />
           <HeroMetric icon={Trophy} label={tr("Stars")} value={`${totalStars}`} />
         </section>
@@ -212,10 +214,24 @@ export function Profile({ onBack }: Props) {
               icon={Zap}
               label={tr("Best challenge score")}
               value={bestChallengeEntry ? exactScore(bestChallengeEntry.score) : "0"}
-              sub={bestChallengeEntry ? bestChallengeEntry.mode.replaceAll("-", " ") : tr("no record yet")}
+              sub={
+                bestChallengeEntry
+                  ? bestChallengeEntry.mode.replaceAll("-", " ")
+                  : tr("no record yet")
+              }
             />
-            <RecordRow icon={Atom} label={tr("Atoms unlocked")} value={`${discoveredElements.length}/${ELEMENTS.length}`} sub={`${completionPercent}%`} />
-            <RecordRow icon={FlaskConical} label={tr("Compounds unlocked")} value={`${discoveredCompounds.length}/${COMPOUNDS.length}`} sub={`${compoundPercent}%`} />
+            <RecordRow
+              icon={Atom}
+              label={tr("Atoms unlocked")}
+              value={`${discoveredElements.length}/${ELEMENTS.length}`}
+              sub={`${completionPercent}%`}
+            />
+            <RecordRow
+              icon={FlaskConical}
+              label={tr("Compounds unlocked")}
+              value={`${discoveredCompounds.length}/${COMPOUNDS.length}`}
+              sub={`${compoundPercent}%`}
+            />
             <RecordRow
               icon={CalendarDays}
               label={tr("Daily Board")}
@@ -228,9 +244,22 @@ export function Profile({ onBack }: Props) {
               value={exactScore(dailyCompoundBestScore)}
               sub={`${dailyCompoundRuns} ${tr("played all time")}`}
             />
-            <RecordRow icon={Orbit} label={tr("Bosses unlocked")} value={`${unlockedBossCount}/${bossIds.length}`} sub={tr(`${defeatedBossCount} defeated`)} />
-            <RecordRow icon={BadgeCheck} label={tr("Badges earned")} value={`${earnedBadges.length}`} />
-            <RecordRow icon={Medal} label={tr("Campaign levels unlocked")} value={`${unlockedLevel}/${MAX_LEVEL}`} />
+            <RecordRow
+              icon={Orbit}
+              label={tr("Bosses unlocked")}
+              value={`${unlockedBossCount}/${bossIds.length}`}
+              sub={tr(`${defeatedBossCount} defeated`)}
+            />
+            <RecordRow
+              icon={BadgeCheck}
+              label={tr("Badges earned")}
+              value={`${earnedBadges.length}`}
+            />
+            <RecordRow
+              icon={Medal}
+              label={tr("Campaign levels unlocked")}
+              value={`${unlockedLevel}/${MAX_LEVEL}`}
+            />
           </div>
         </section>
 
@@ -247,7 +276,11 @@ export function Profile({ onBack }: Props) {
                   <div>
                     <strong>{boss.name}</strong>
                     <div style={{ color: "var(--muted-foreground)", fontSize: 11 }}>
-                      {unlocked ? (defeated ? tr("Defeated") : tr("Unlocked")) : `${tr("Unlocks at level")} ${boss.levelId}`}
+                      {unlocked
+                        ? defeated
+                          ? tr("Defeated")
+                          : tr("Unlocked")
+                        : `${tr("Unlocks at level")} ${boss.levelId}`}
                     </div>
                   </div>
                   <div style={{ textAlign: "right", fontSize: 12 }}>
@@ -270,8 +303,18 @@ export function Profile({ onBack }: Props) {
               : grid.gridTemplateColumns,
           }}
         >
-          <ProfileStat icon={Trophy} label={tr("Total Score")} value={exactScore(totalScore)} sub={tr("career")} />
-          <ProfileStat icon={Zap} label={tr("Best Shot")} value={exactScore(highestSingleShotScore)} sub={formatDate(highestSingleShotScoreDate)} />
+          <ProfileStat
+            icon={Trophy}
+            label={tr("Total Score")}
+            value={exactScore(totalScore)}
+            sub={tr("career")}
+          />
+          <ProfileStat
+            icon={Zap}
+            label={tr("Best Shot")}
+            value={exactScore(highestSingleShotScore)}
+            sub={formatDate(highestSingleShotScoreDate)}
+          />
           <CoinProfileStat
             value={`${goldCoins}`}
             sub={tr("shop currency")}
@@ -309,37 +352,21 @@ export function Profile({ onBack }: Props) {
             value={`${discoveredElements.length}`}
             sub={tr(`${completionPercent}% found`)}
           />
-          <ProfileStat icon={Star} label={tr("Stars")} value={`${totalStars}`} sub={tr(`${perfectLevels} perfect`)} />
+          <ProfileStat
+            icon={Star}
+            label={tr("Stars")}
+            value={`${totalStars}`}
+            sub={tr(`${perfectLevels} perfect`)}
+          />
         </section>
 
         <section style={card}>
           <div style={sectionHeading}>{tr("Display")}</div>
-          <div style={profileNameRow}>
-            <label style={profileNameLabel}>
-              <span style={preferenceLabel}>{tr("Profile name")}</span>
-              <input
-                value={nameDraft}
-                onChange={(event) => setNameDraft(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.currentTarget.blur();
-                    saveDisplayName();
-                  }
-                }}
-                maxLength={18}
-                placeholder={DEFAULT_PLAYER_DISPLAY_NAME}
-                style={nameInput}
-                aria-label={tr("Profile name")}
-                data-no-localize="true"
-                autoCapitalize="words"
-                autoCorrect="off"
-                enterKeyHint="done"
-              />
-            </label>
-            <button type="button" onClick={saveDisplayName} style={nameSaveButton}>
-              {tr("Save")}
-            </button>
-          </div>
+          <ProfileNameEditor
+            appLanguage={appLanguage}
+            playerDisplayName={playerDisplayName}
+            setPlayerDisplayName={setPlayerDisplayName}
+          />
           <div style={preferenceRow}>
             <span style={preferenceLabel}>{tr("Theme")}</span>
             <div style={{ display: "inline-grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
@@ -385,11 +412,60 @@ export function Profile({ onBack }: Props) {
             onClose={() => setTransactionsOpen(false)}
           />
         )}
-
       </div>
     </div>
   );
 }
+
+const ProfileNameEditor = memo(function ProfileNameEditor({
+  appLanguage,
+  playerDisplayName,
+  setPlayerDisplayName,
+}: {
+  appLanguage: AppLanguage;
+  playerDisplayName: string;
+  setPlayerDisplayName: (value: string) => void;
+}) {
+  const [nameDraft, setNameDraft] = useState(playerDisplayName);
+  const tr = (text: string) => t(text, appLanguage);
+
+  useEffect(() => {
+    setNameDraft(playerDisplayName);
+  }, [playerDisplayName]);
+
+  function saveDisplayName() {
+    setPlayerDisplayName(nameDraft);
+  }
+
+  return (
+    <div style={profileNameRow}>
+      <label style={profileNameLabel}>
+        <span style={preferenceLabel}>{tr("Profile name")}</span>
+        <input
+          value={nameDraft}
+          onChange={(event) => setNameDraft(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.currentTarget.blur();
+              setPlayerDisplayName(event.currentTarget.value);
+            }
+          }}
+          maxLength={18}
+          placeholder={DEFAULT_PLAYER_DISPLAY_NAME}
+          style={nameInput}
+          aria-label={tr("Profile name")}
+          data-no-localize="true"
+          autoCapitalize="words"
+          autoCorrect="off"
+          enterKeyHint="done"
+        />
+      </label>
+      <button type="button" onClick={saveDisplayName} style={nameSaveButton}>
+        {tr("Save")}
+      </button>
+    </div>
+  );
+});
 
 function DailyBoardBadgeIcon({ id }: { id: DailyBoardLeaderboardAchievementId }) {
   switch (id) {
@@ -408,21 +484,45 @@ function DailyBoardBadgeIcon({ id }: { id: DailyBoardLeaderboardAchievementId })
   }
 }
 
-function HeroMetric({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }) {
+function HeroMetric({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: string;
+}) {
   return (
     <div style={heroMetric}>
       <span style={metricIconBubble}>
         <Icon size={16} aria-hidden="true" />
       </span>
       <span style={{ minWidth: 0, display: "grid", gap: 1 }}>
-        <strong style={{ fontSize: 13, lineHeight: 1.1, overflow: "hidden", textOverflow: "ellipsis" }}>{value}</strong>
-        <small style={{ color: "var(--muted-foreground)", fontSize: 10, lineHeight: 1.1 }}>{label}</small>
+        <strong
+          style={{ fontSize: 13, lineHeight: 1.1, overflow: "hidden", textOverflow: "ellipsis" }}
+        >
+          {value}
+        </strong>
+        <small style={{ color: "var(--muted-foreground)", fontSize: 10, lineHeight: 1.1 }}>
+          {label}
+        </small>
       </span>
     </div>
   );
 }
 
-function ProfileStat({ icon: Icon, label, value, sub }: { icon?: LucideIcon; label: string; value: string; sub: string }) {
+function ProfileStat({
+  icon: Icon,
+  label,
+  value,
+  sub,
+}: {
+  icon?: LucideIcon;
+  label: string;
+  value: string;
+  sub: string;
+}) {
   return (
     <div style={statCard}>
       {Icon && (
@@ -512,7 +612,12 @@ function CoinTransactionsModal({
 }) {
   const rows = [...transactions].reverse();
   return (
-    <div style={transactionOverlay} role="dialog" aria-modal="true" aria-label="Gold coin transactions">
+    <div
+      style={transactionOverlay}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Gold coin transactions"
+    >
       <div style={transactionModal}>
         <div style={transactionHeader}>
           <div>
@@ -554,7 +659,17 @@ function CoinTransactionsModal({
   );
 }
 
-function RecordRow({ icon: Icon, label, value, sub }: { icon?: LucideIcon; label: string; value: string; sub?: string }) {
+function RecordRow({
+  icon: Icon,
+  label,
+  value,
+  sub,
+}: {
+  icon?: LucideIcon;
+  label: string;
+  value: string;
+  sub?: string;
+}) {
   return (
     <div style={recordRow}>
       <span style={recordLabel}>
@@ -567,7 +682,18 @@ function RecordRow({ icon: Icon, label, value, sub }: { icon?: LucideIcon; label
       </span>
       <span style={{ textAlign: "right" }}>
         <strong>{value}</strong>
-        {sub && <span style={{ display: "block", color: "var(--muted-foreground)", fontSize: 11, marginTop: 2 }}>{sub}</span>}
+        {sub && (
+          <span
+            style={{
+              display: "block",
+              color: "var(--muted-foreground)",
+              fontSize: 11,
+              marginTop: 2,
+            }}
+          >
+            {sub}
+          </span>
+        )}
       </span>
     </div>
   );
