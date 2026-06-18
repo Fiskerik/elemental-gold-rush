@@ -865,48 +865,10 @@ const preferenceLabel: React.CSSProperties = {
   lineHeight: 1.15,
 };
 
-const profileNameRow: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "minmax(0, 1fr) auto",
-  alignItems: "end",
-  gap: 10,
-  marginBottom: 18,
-};
-
-const profileNameLabel: React.CSSProperties = {
-  minWidth: 0,
-  display: "grid",
-  gap: 7,
-};
-
-const nameInput: React.CSSProperties = {
-  boxSizing: "border-box",
-  width: "100%",
-  minWidth: 0,
-  minHeight: 46,
-  border: "1px solid var(--border)",
-  borderRadius: 14,
-  padding: "10px 12px",
-  background: "var(--surface)",
+const profileNameValue: React.CSSProperties = {
   color: "var(--foreground)",
-  fontFamily: "inherit",
-  fontSize: 16,
-  fontWeight: 850,
-  lineHeight: 1.2,
-  outline: "none",
-};
-
-const nameSaveButton: React.CSSProperties = {
-  minHeight: 46,
-  border: "1px solid var(--primary)",
-  borderRadius: 14,
-  padding: "10px 14px",
-  background: "var(--primary)",
-  color: "var(--primary-foreground)",
-  fontFamily: "inherit",
   fontSize: 16,
   fontWeight: 950,
-  cursor: "pointer",
 };
 
 const themeChoiceButton: React.CSSProperties = {
