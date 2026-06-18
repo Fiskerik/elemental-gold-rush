@@ -1,8 +1,9 @@
-import type { CSSProperties } from "react";
-import { useEffect, useState } from "react";
+import type { CSSProperties, ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { StatusBar, Style } from "@capacitor/status-bar";
 import { MainMenu } from "@/game/MainMenu";
+import { requestAppReview } from "@/game/appReview";
 import { clearSavedRun, GameBoard, getSavedRunSummary } from "@/game/GameBoard";
 import { setMusicVolume, setSfxVolume } from "@/game/audio";
 import { LevelSelect } from "@/game/LevelSelect";
@@ -42,14 +43,22 @@ export function GameApp() {
   const appLanguage = useProgress((s) => s.appLanguage);
   const soundVolume = useProgress((s) => s.soundVolume);
   const musicVolume = useProgress((s) => s.musicVolume);
+  const completedGameCount = useProgress((s) => s.completedGameCount);
+  const appReviewMilestonePromptSeen = useProgress((s) => s.appReviewMilestonePromptSeen);
+  const appReviewMilestoneRewardClaimed = useProgress((s) => s.appReviewMilestoneRewardClaimed);
   const refreshDailyFeatures = useProgress((s) => s.refreshDailyFeatures);
   const setPlayerDisplayName = useProgress((s) => s.setPlayerDisplayName);
+  const markAppReviewMilestonePromptSeen = useProgress((s) => s.markAppReviewMilestonePromptSeen);
+  const claimAppReviewMilestoneReward = useProgress((s) => s.claimAppReviewMilestoneReward);
   const [screen, setScreen] = useState<Screen>({ name: "menu" });
   const [gameRunNonce, setGameRunNonce] = useState(0);
   const [showLaunchScreen, setShowLaunchScreen] = useState(true);
   const [resumePrompt, setResumePrompt] = useState<ReturnType<typeof getSavedRunSummary>>(null);
   const [dailyNamePromptOpen, setDailyNamePromptOpen] = useState(false);
   const [dailyNameDraft, setDailyNameDraft] = useState("");
+  const [appReviewMilestonePromptOpen, setAppReviewMilestonePromptOpen] = useState(false);
+  const [appReviewRequested, setAppReviewRequested] = useState(false);
+  const pendingGameStartRef = useRef<(() => void) | null>(null);
 
   useDomLocalization(appLanguage);
 
@@ -85,6 +94,54 @@ export function GameApp() {
 
   if (showLaunchScreen) return <LaunchScreen />;
 
+  const shouldShowAppReviewMilestone =
+    completedGameCount >= 5 && !appReviewMilestonePromptSeen && !appReviewMilestoneRewardClaimed;
+
+  const appReviewMilestonePrompt = appReviewMilestonePromptOpen ? (
+    <AppReviewMilestonePrompt
+      reviewRequested={appReviewRequested}
+      onRate={() => {
+        setAppReviewRequested(true);
+        void requestAppReview();
+      }}
+      onClaim={() => {
+        continuePendingGameStart();
+      }}
+      onSkip={() => {
+        markAppReviewMilestonePromptSeen();
+        continuePendingGameStart();
+      }}
+    />
+  ) : null;
+
+  function withGlobalModals(content: ReactNode) {
+    return (
+      <>
+        {content}
+        {appReviewMilestonePrompt}
+      </>
+    );
+  }
+
+  function continuePendingGameStart() {
+    const pendingGameStart = pendingGameStartRef.current;
+    pendingGameStartRef.current = null;
+    setAppReviewMilestonePromptOpen(false);
+    setAppReviewRequested(false);
+    pendingGameStart?.();
+  }
+
+  function startGameWithAppReviewMilestone(startGame: () => void) {
+    if (!shouldShowAppReviewMilestone) {
+      startGame();
+      return;
+    }
+    pendingGameStartRef.current = startGame;
+    setAppReviewRequested(false);
+    claimAppReviewMilestoneReward();
+    setAppReviewMilestonePromptOpen(true);
+  }
+
   function startCampaign() {
     const saved = getSavedRunSummary();
     if (saved) {
@@ -102,7 +159,9 @@ export function GameApp() {
       return;
     }
     const dailyChallenge = useProgress.getState().dailyChallenge;
-    setScreen({ name: "game", levelId: dailyChallenge.levelId, mode: "daily-challenge" });
+    startGameWithAppReviewMilestone(() =>
+      setScreen({ name: "game", levelId: dailyChallenge.levelId, mode: "daily-challenge" }),
+    );
   }
 
   function startDailyChallengeAfterName() {
@@ -112,35 +171,43 @@ export function GameApp() {
     setDailyNamePromptOpen(false);
     refreshDailyFeatures();
     const dailyChallenge = useProgress.getState().dailyChallenge;
-    setScreen({ name: "game", levelId: dailyChallenge.levelId, mode: "daily-challenge" });
+    startGameWithAppReviewMilestone(() =>
+      setScreen({ name: "game", levelId: dailyChallenge.levelId, mode: "daily-challenge" }),
+    );
   }
 
   function startSecretCompound() {
     refreshDailyFeatures();
-    const { secretCompound, revealSecretCompound } = useProgress.getState();
-    revealSecretCompound();
-    setScreen({
-      name: "game",
-      levelId: getLevelById(unlockedLevel)?.id ?? 1,
-      mode: "campaign",
-      secretCompoundId: secretCompound.compoundId,
+    startGameWithAppReviewMilestone(() => {
+      const { secretCompound, revealSecretCompound } = useProgress.getState();
+      revealSecretCompound();
+      setScreen({
+        name: "game",
+        levelId: getLevelById(unlockedLevel)?.id ?? 1,
+        mode: "campaign",
+        secretCompoundId: secretCompound.compoundId,
+      });
     });
   }
 
   function startCampaignLevel(levelId: number) {
-    const compoundId = MOLECULE_CHALLENGE_BY_LEVEL[levelId];
-    setScreen({
-      name: "game",
-      levelId,
-      mode: "campaign",
-      secretCompoundId:
-        compoundId && getCompoundChallengeKind(levelId) === "search-find" ? compoundId : undefined,
+    startGameWithAppReviewMilestone(() => {
+      const compoundId = MOLECULE_CHALLENGE_BY_LEVEL[levelId];
+      setScreen({
+        name: "game",
+        levelId,
+        mode: "campaign",
+        secretCompoundId:
+          compoundId && getCompoundChallengeKind(levelId) === "search-find"
+            ? compoundId
+            : undefined,
+      });
     });
   }
 
   switch (screen.name) {
     case "menu":
-      return (
+      return withGlobalModals(
         <>
           <MainMenu
             onPlay={startCampaign}
@@ -159,22 +226,27 @@ export function GameApp() {
             <ResumeRunPrompt
               saved={resumePrompt}
               onContinue={() => {
-                setScreen({
-                  name: "game",
-                  levelId: resumePrompt.levelId,
-                  mode: resumePrompt.mode,
-                  resumeSavedRun: true,
-                });
+                const savedRun = resumePrompt;
                 setResumePrompt(null);
+                startGameWithAppReviewMilestone(() => {
+                  setScreen({
+                    name: "game",
+                    levelId: savedRun.levelId,
+                    mode: savedRun.mode,
+                    resumeSavedRun: true,
+                  });
+                });
               }}
               onStartOver={() => {
                 clearSavedRun();
-                setScreen({
-                  name: "game",
-                  levelId: getLevelById(unlockedLevel)?.id ?? 1,
-                  mode: "campaign",
-                });
                 setResumePrompt(null);
+                startGameWithAppReviewMilestone(() => {
+                  setScreen({
+                    name: "game",
+                    levelId: getLevelById(unlockedLevel)?.id ?? 1,
+                    mode: "campaign",
+                  });
+                });
               }}
               onCancel={() => setResumePrompt(null)}
             />
@@ -187,12 +259,14 @@ export function GameApp() {
               onStart={startDailyChallengeAfterName}
             />
           )}
-        </>
+        </>,
       );
     case "levels":
-      return <LevelSelect onPick={startCampaignLevel} onBack={() => setScreen({ name: "menu" })} />;
+      return withGlobalModals(
+        <LevelSelect onPick={startCampaignLevel} onBack={() => setScreen({ name: "menu" })} />,
+      );
     case "game":
-      return (
+      return withGlobalModals(
         <GameBoard
           key={`${screen.mode ?? "campaign"}-${screen.levelId}-${screen.secretCompoundId ?? "standard"}-${screen.resumeSavedRun ? "resume" : "new"}-${gameRunNonce}`}
           levelId={screen.levelId}
@@ -211,36 +285,45 @@ export function GameApp() {
               startCampaignLevel(nextId);
               return;
             }
-            setScreen({
-              name: "game",
-              levelId: nextId,
-              mode: screen.mode ?? "campaign",
-              secretCompoundId: nextId === screen.levelId ? screen.secretCompoundId : undefined,
+            startGameWithAppReviewMilestone(() => {
+              setScreen({
+                name: "game",
+                levelId: nextId,
+                mode: screen.mode ?? "campaign",
+                secretCompoundId: nextId === screen.levelId ? screen.secretCompoundId : undefined,
+              });
             });
           }}
-        />
+        />,
       );
     case "collection":
-      return <Collection onBack={() => setScreen({ name: "menu" })} />;
+      return withGlobalModals(<Collection onBack={() => setScreen({ name: "menu" })} />);
     case "shop":
-      return <Shop onBack={() => setScreen({ name: "menu" })} />;
+      return withGlobalModals(<Shop onBack={() => setScreen({ name: "menu" })} />);
     case "lab":
-      return (
+      return withGlobalModals(
         <LabModes
           onBack={() => setScreen({ name: "menu" })}
           onStart={(mode, levelId, options) =>
-            setScreen({ name: "game", levelId, mode, secretCompoundId: options?.secretCompoundId })
+            startGameWithAppReviewMilestone(() =>
+              setScreen({
+                name: "game",
+                levelId,
+                mode,
+                secretCompoundId: options?.secretCompoundId,
+              }),
+            )
           }
-        />
+        />,
       );
     case "library":
-      return <GameLibrary onBack={() => setScreen({ name: "menu" })} />;
+      return withGlobalModals(<GameLibrary onBack={() => setScreen({ name: "menu" })} />);
     case "profile":
-      return <Profile onBack={() => setScreen({ name: "menu" })} />;
+      return withGlobalModals(<Profile onBack={() => setScreen({ name: "menu" })} />);
     case "leaderboard":
-      return <Leaderboard onBack={() => setScreen({ name: "menu" })} />;
+      return withGlobalModals(<Leaderboard onBack={() => setScreen({ name: "menu" })} />);
     case "settings":
-      return <Settings onBack={() => setScreen({ name: "menu" })} />;
+      return withGlobalModals(<Settings onBack={() => setScreen({ name: "menu" })} />);
   }
 }
 
@@ -360,6 +443,69 @@ function ResumeRunPrompt({
           </button>
           <button type="button" onClick={onCancel} style={promptGhostBtn}>
             Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AppReviewMilestonePrompt({
+  reviewRequested,
+  onRate,
+  onClaim,
+  onSkip,
+}: {
+  reviewRequested: boolean;
+  onRate: () => void;
+  onClaim: () => void;
+  onSkip: () => void;
+}) {
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Game 5 bonus"
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 2200,
+        display: "grid",
+        placeItems: "center",
+        padding: 20,
+        background: "rgba(0,0,0,0.72)",
+        backdropFilter: "blur(6px)",
+      }}
+    >
+      <div
+        style={{
+          width: "100%",
+          maxWidth: 360,
+          padding: 20,
+          borderRadius: 16,
+          border: "1px solid var(--border)",
+          background: "var(--surface-elevated)",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+          textAlign: "center",
+        }}
+      >
+        <div style={{ fontSize: 11, letterSpacing: 3, color: "var(--accent)", fontWeight: 800 }}>
+          MILESTONE BONUS
+        </div>
+        <h2 style={{ margin: "6px 0 8px", fontSize: 23 }}>+5 coins unlocked</h2>
+        <p style={{ margin: "0 0 16px", color: "var(--muted-foreground)", fontSize: 13 }}>
+          Your milestone bonus is in your wallet. If Atomic Fusion Rush is hitting the spot, a quick
+          App Store rating helps a lot.
+        </p>
+        <div style={{ display: "grid", gap: 8 }}>
+          <button type="button" onClick={onRate} style={promptSecondaryBtn}>
+            {reviewRequested ? "Rating prompt opened" : "Rate App"}
+          </button>
+          <button type="button" onClick={onClaim} style={promptPrimaryBtn}>
+            Continue
+          </button>
+          <button type="button" onClick={onSkip} style={promptGhostBtn}>
+            Not now
           </button>
         </div>
       </div>

@@ -272,7 +272,10 @@ interface ProgressState {
   hasProPack: boolean;
   proStarterCoinsGranted: boolean;
   clearedStageCount: number;
+  completedGameCount: number;
   clearedStagesSinceAd: number;
+  appReviewMilestonePromptSeen: boolean;
+  appReviewMilestoneRewardClaimed: boolean;
   powerUpInventory: PowerUpInventory;
   seenTips: string[];
   labUpgradeLevels: LabUpgradeLevels;
@@ -303,6 +306,8 @@ interface ProgressState {
   skipLevelForCoins: (levelId: number, coinCost: number) => boolean;
   buyGoldCoins: (coins: number, pointCost: number) => boolean;
   grantGoldCoins: (coins: number, reason?: string) => void;
+  markAppReviewMilestonePromptSeen: () => void;
+  claimAppReviewMilestoneReward: () => boolean;
   setHighestElement: (n: number) => void;
   refreshDailyLab: () => void;
   claimWeeklyPlayBonus: () => { coinsAwarded: number; bonusAwarded: number } | null;
@@ -378,7 +383,10 @@ export const useProgress = create<ProgressState>()(
       hasProPack: false,
       proStarterCoinsGranted: false,
       clearedStageCount: 0,
+      completedGameCount: 0,
       clearedStagesSinceAd: 0,
+      appReviewMilestonePromptSeen: false,
+      appReviewMilestoneRewardClaimed: false,
       powerUpInventory: emptyPowerUpInventory(),
       seenTips: [],
       labUpgradeLevels: emptyLabUpgradeLevels(),
@@ -414,6 +422,7 @@ export const useProgress = create<ProgressState>()(
             dailyChallenge: nextChallenge,
             dailyBoardRuns: s.dailyBoardRuns + 1,
             dailyBoardBestScore: Math.max(s.dailyBoardBestScore, nextChallenge.bestScore),
+            completedGameCount: s.completedGameCount + 1,
             goldCoins: balanceAfter,
             coinTransactions: appendCoinTransaction(
               s.coinTransactions,
@@ -705,6 +714,29 @@ export const useProgress = create<ProgressState>()(
             ),
           };
         }),
+      markAppReviewMilestonePromptSeen: () =>
+        set((s) => (s.appReviewMilestonePromptSeen ? s : { appReviewMilestonePromptSeen: true })),
+      claimAppReviewMilestoneReward: () => {
+        let claimed = false;
+        set((s) => {
+          if (s.appReviewMilestoneRewardClaimed) return s;
+          claimed = true;
+          const coinDelta = 5;
+          const balanceAfter = s.goldCoins + coinDelta;
+          return {
+            appReviewMilestonePromptSeen: true,
+            appReviewMilestoneRewardClaimed: true,
+            goldCoins: balanceAfter,
+            coinTransactions: appendCoinTransaction(
+              s.coinTransactions,
+              coinDelta,
+              balanceAfter,
+              "Game 5 bonus",
+            ),
+          };
+        });
+        return claimed;
+      },
       setHighestElement: (n) => set((s) => ({ highestElement: Math.max(s.highestElement, n) })),
       refreshDailyLab: () =>
         set((s) => {
@@ -813,6 +845,7 @@ export const useProgress = create<ProgressState>()(
           const attemptIncrement = 1;
           return {
             clearedStageCount: s.clearedStageCount + (run.won ? 1 : 0),
+            completedGameCount: s.completedGameCount + (run.won ? 1 : 0),
             clearedStagesSinceAd: s.clearedStagesSinceAd + attemptIncrement,
             levelStats: {
               ...s.levelStats,
@@ -970,7 +1003,10 @@ export const useProgress = create<ProgressState>()(
           hasProPack: false,
           proStarterCoinsGranted: false,
           clearedStageCount: 0,
+          completedGameCount: s.completedGameCount,
           clearedStagesSinceAd: 0,
+          appReviewMilestonePromptSeen: s.appReviewMilestonePromptSeen,
+          appReviewMilestoneRewardClaimed: s.appReviewMilestoneRewardClaimed,
           powerUpInventory: emptyPowerUpInventory(),
           seenTips: [],
           labUpgradeLevels: emptyLabUpgradeLevels(),
@@ -1028,8 +1064,19 @@ export const useProgress = create<ProgressState>()(
           proStarterCoinsGranted:
             persistedState?.proStarterCoinsGranted ?? current.proStarterCoinsGranted,
           clearedStageCount: persistedState?.clearedStageCount ?? current.clearedStageCount,
+          completedGameCount: Math.max(
+            persistedState?.completedGameCount ??
+              persistedState?.clearedStageCount ??
+              current.completedGameCount,
+            persistedState?.clearedStageCount ?? 0,
+          ),
           clearedStagesSinceAd:
             persistedState?.clearedStagesSinceAd ?? current.clearedStagesSinceAd,
+          appReviewMilestonePromptSeen:
+            persistedState?.appReviewMilestonePromptSeen ?? current.appReviewMilestonePromptSeen,
+          appReviewMilestoneRewardClaimed:
+            persistedState?.appReviewMilestoneRewardClaimed ??
+            current.appReviewMilestoneRewardClaimed,
           powerUpInventory: normalizePowerUpInventory(persistedState?.powerUpInventory),
           levelStats: normalizeLevelStatsRecord(persistedState?.levelStats),
           seenTips: persistedState?.seenTips ?? current.seenTips,
