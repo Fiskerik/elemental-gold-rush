@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import type { MouseEvent as ReactMouseEvent } from "react";
-import { Settings as SettingsIcon } from "lucide-react";
+import type { MouseEvent as ReactMouseEvent, ReactNode } from "react";
+import { Coins, Settings as SettingsIcon } from "lucide-react";
 import { ELEMENTS } from "./elements";
 import {
   LEVELS,
@@ -8700,8 +8700,8 @@ function GameOverContinueModal({
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
         <ResultStat label="Score" value={formatScore(score)} color="var(--accent)" />
         <ResultStat label="Shots" value={`${shots}`} color="var(--foreground)" />
-        <ResultStat label="Coins" value={`${coins}`} color="var(--accent)" />
-        <ResultStat label="Continue" value="5 coins" color="var(--foreground)" />
+        <ResultStat label="Coins" value={<CoinValue amount={coins} />} color="var(--accent)" />
+        <ResultStat label="Continue" value={<CoinValue amount={5} />} color="var(--foreground)" />
       </div>
       {message && (
         <div
@@ -8727,7 +8727,7 @@ function GameOverContinueModal({
             cursor: canPay ? "pointer" : "not-allowed",
           }}
         >
-          Continue run - 5 coins
+          <CoinContinueLabel />
         </button>
         <button
           type="button"
@@ -9289,7 +9289,28 @@ function StarRequirementRow({
   );
 }
 
-function ResultStat({ label, value, color }: { label: string; value: string; color: string }) {
+function CoinValue({ amount }: { amount: number }) {
+  return (
+    <span style={coinValue}>
+      <Coins size={16} aria-hidden="true" />
+      <span>{amount}</span>
+    </span>
+  );
+}
+
+function CoinContinueLabel() {
+  return (
+    <span style={coinContinueLabel}>
+      <span>Continue run</span>
+      <span style={coinContinueCost}>
+        <Coins size={15} aria-hidden="true" />
+        <span>5</span>
+      </span>
+    </span>
+  );
+}
+
+function ResultStat({ label, value, color }: { label: string; value: ReactNode; color: string }) {
   return (
     <div
       style={{
@@ -9590,6 +9611,26 @@ const modalBtn: React.CSSProperties = {
   fontSize: 14,
   cursor: "pointer",
   boxShadow: "0 4px 16px var(--primary-glow)",
+};
+
+const coinValue: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 4,
+};
+
+const coinContinueLabel: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 8,
+};
+
+const coinContinueCost: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 3,
 };
 
 const settingsCheckRow: React.CSSProperties = {

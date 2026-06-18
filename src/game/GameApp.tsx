@@ -2,6 +2,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { StatusBar, Style } from "@capacitor/status-bar";
+import { Coins } from "lucide-react";
 import { MainMenu } from "@/game/MainMenu";
 import { requestAppReview } from "@/game/appReview";
 import { clearSavedRun, GameBoard, getSavedRunSummary } from "@/game/GameBoard";
@@ -55,7 +56,6 @@ export function GameApp() {
   const [showLaunchScreen, setShowLaunchScreen] = useState(true);
   const [resumePrompt, setResumePrompt] = useState<ReturnType<typeof getSavedRunSummary>>(null);
   const [dailyNamePromptOpen, setDailyNamePromptOpen] = useState(false);
-  const [dailyNameDraft, setDailyNameDraft] = useState("");
   const [appReviewMilestonePromptOpen, setAppReviewMilestonePromptOpen] = useState(false);
   const [appReviewRequested, setAppReviewRequested] = useState(false);
   const pendingGameStartRef = useRef<(() => void) | null>(null);
@@ -154,7 +154,6 @@ export function GameApp() {
   function startDailyChallenge() {
     refreshDailyFeatures();
     if (!useProgress.getState().playerDisplayName) {
-      setDailyNameDraft("");
       setDailyNamePromptOpen(true);
       return;
     }
@@ -164,8 +163,8 @@ export function GameApp() {
     );
   }
 
-  function startDailyChallengeAfterName() {
-    const normalizedName = normalizePlayerDisplayName(dailyNameDraft);
+  function startDailyChallengeAfterName(name: string) {
+    const normalizedName = normalizePlayerDisplayName(name);
     if (!normalizedName) return;
     setPlayerDisplayName(normalizedName);
     setDailyNamePromptOpen(false);
@@ -253,8 +252,6 @@ export function GameApp() {
           )}
           {dailyNamePromptOpen && (
             <DailyBoardNamePrompt
-              value={dailyNameDraft}
-              onChange={setDailyNameDraft}
               onCancel={() => setDailyNamePromptOpen(false)}
               onStart={startDailyChallengeAfterName}
             />
@@ -492,7 +489,9 @@ function AppReviewMilestonePrompt({
         <div style={{ fontSize: 11, letterSpacing: 3, color: "var(--accent)", fontWeight: 800 }}>
           MILESTONE BONUS
         </div>
-        <h2 style={{ margin: "6px 0 8px", fontSize: 23 }}>+5 coins unlocked</h2>
+        <h2 style={{ margin: "6px 0 8px", fontSize: 23 }}>
+          <CoinAmount amount={5} suffix="coins unlocked" />
+        </h2>
         <p style={{ margin: "0 0 16px", color: "var(--muted-foreground)", fontSize: 13 }}>
           Your milestone bonus is in your wallet. If Atomic Fusion Rush is hitting the spot, a quick
           App Store rating helps a lot.
@@ -514,22 +513,19 @@ function AppReviewMilestonePrompt({
 }
 
 function DailyBoardNamePrompt({
-  value,
-  onChange,
   onCancel,
   onStart,
 }: {
-  value: string;
-  onChange: (value: string) => void;
   onCancel: () => void;
-  onStart: () => void;
+  onStart: (value: string) => void;
 }) {
-  const hasName = value.trim().length > 0;
+  const inputRef = useRef<HTMLInputElement>(null);
   return (
     <div
       role="dialog"
       aria-modal="true"
       aria-label="Choose display name"
+      data-no-localize="true"
       style={{
         position: "fixed",
         inset: 0,
@@ -543,7 +539,7 @@ function DailyBoardNamePrompt({
       <form
         onSubmit={(event) => {
           event.preventDefault();
-          onStart();
+          onStart(inputRef.current?.value ?? "");
         }}
         style={{
           width: "100%",
@@ -561,9 +557,8 @@ function DailyBoardNamePrompt({
         </div>
         <h2 style={{ margin: "6px 0 12px", fontSize: 23 }}>Display name</h2>
         <input
+          ref={inputRef}
           type="text"
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
           maxLength={18}
           placeholder={DEFAULT_PLAYER_DISPLAY_NAME}
           aria-label="Display name"
@@ -578,12 +573,7 @@ function DailyBoardNamePrompt({
         <div style={{ display: "grid", gap: 8, marginTop: 14 }}>
           <button
             type="submit"
-            disabled={!hasName}
-            style={{
-              ...promptPrimaryBtn,
-              opacity: hasName ? 1 : 0.55,
-              cursor: hasName ? "pointer" : "not-allowed",
-            }}
+            style={promptPrimaryBtn}
           >
             Start Daily Board
           </button>
@@ -593,6 +583,15 @@ function DailyBoardNamePrompt({
         </div>
       </form>
     </div>
+  );
+}
+
+function CoinAmount({ amount, suffix }: { amount: number; suffix: string }) {
+  return (
+    <span style={coinAmount}>
+      <Coins size={23} aria-hidden="true" />
+      <span>{`+${amount} ${suffix}`}</span>
+    </span>
   );
 }
 
@@ -639,4 +638,11 @@ const promptGhostBtn: CSSProperties = {
   color: "var(--muted-foreground)",
   fontWeight: 700,
   cursor: "pointer",
+};
+
+const coinAmount: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 7,
 };

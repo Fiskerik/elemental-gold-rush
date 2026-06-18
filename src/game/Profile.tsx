@@ -7,7 +7,12 @@ import { SUPPORTED_LANGUAGES, t, toIntlLocale, type AppLanguage } from "./locali
 import { COMPOUNDS } from "./compounds";
 import { BOSSES, type BossId } from "./bosses";
 import {
+  DAILY_BOARD_LEADERBOARD_ACHIEVEMENTS,
+  type DailyBoardLeaderboardAchievementId,
+} from "./leaderboardAchievements";
+import {
   Atom,
+  Award,
   BadgeCheck,
   CalendarDays,
   Coins,
@@ -15,6 +20,7 @@ import {
   FlaskConical,
   Medal,
   Orbit,
+  Percent,
   Star,
   Trophy,
   Zap,
@@ -51,6 +57,7 @@ export function Profile({ onBack }: Props) {
     dailyBoardBestScore,
     dailyCompoundRuns,
     dailyCompoundBestScore,
+    dailyBoardLeaderboardAchievementCounts,
     appTheme,
     appLanguage,
     setAppTheme,
@@ -163,6 +170,30 @@ export function Profile({ onBack }: Props) {
           <HeroMetric icon={Atom} label={tr("Highest Atom")} value={`${highestEl?.symbol ?? "H"} #${highestElement}`} />
           <HeroMetric icon={BadgeCheck} label={tr("Badges")} value={`${earnedBadges.length}`} />
           <HeroMetric icon={Trophy} label={tr("Stars")} value={`${totalStars}`} />
+        </section>
+        <section style={card} aria-label="Daily Board placement badges">
+          <div style={dailyBoardBadgeHeader}>
+            <div>
+              <div style={sectionHeading}>{tr("Daily Board Badges")}</div>
+              <div style={dailyBoardBadgeTitle}>{tr("Placement counters")}</div>
+            </div>
+            <span style={dailyBoardBadgeScope}>{tr("Global")}</span>
+          </div>
+          <div style={dailyBoardBadgeGrid}>
+            {DAILY_BOARD_LEADERBOARD_ACHIEVEMENTS.map((achievement) => (
+              <div key={achievement.id} style={dailyBoardBadgeCard} title={achievement.description}>
+                <span style={dailyBoardBadgeIcon}>
+                  <DailyBoardBadgeIcon id={achievement.id} />
+                </span>
+                <span style={{ minWidth: 0 }}>
+                  <strong style={dailyBoardBadgeName}>{tr(achievement.name)}</strong>
+                  <small style={dailyBoardBadgeCount}>
+                    {`${dailyBoardLeaderboardAchievementCounts[achievement.id] ?? 0}x ${tr("earned")}`}
+                  </small>
+                </span>
+              </div>
+            ))}
+          </div>
         </section>
         <section style={card}>
           <div style={sectionHeading}>{tr("Records")}</div>
@@ -358,6 +389,23 @@ export function Profile({ onBack }: Props) {
       </div>
     </div>
   );
+}
+
+function DailyBoardBadgeIcon({ id }: { id: DailyBoardLeaderboardAchievementId }) {
+  switch (id) {
+    case "daily-board-gold":
+      return <Crown size={18} aria-hidden="true" />;
+    case "daily-board-silver":
+      return <Medal size={18} aria-hidden="true" />;
+    case "daily-board-bronze":
+      return <Award size={18} aria-hidden="true" />;
+    case "daily-board-top-5":
+      return <Trophy size={18} aria-hidden="true" />;
+    case "daily-board-top-10":
+      return <Star size={18} aria-hidden="true" />;
+    case "daily-board-top-20":
+      return <Percent size={18} aria-hidden="true" />;
+  }
 }
 
 function HeroMetric({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }) {
@@ -654,6 +702,79 @@ const card: React.CSSProperties = {
   background: "var(--surface-elevated)",
   border: "1px solid var(--border)",
   marginBottom: 12,
+};
+
+const dailyBoardBadgeHeader: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 10,
+  marginBottom: 10,
+};
+
+const dailyBoardBadgeTitle: React.CSSProperties = {
+  marginTop: -4,
+  fontSize: 15,
+  fontWeight: 950,
+};
+
+const dailyBoardBadgeScope: React.CSSProperties = {
+  flex: "0 0 auto",
+  border: "1px solid color-mix(in oklch, var(--accent) 45%, var(--border))",
+  borderRadius: 999,
+  padding: "5px 8px",
+  color: "var(--accent)",
+  fontSize: 10,
+  fontWeight: 900,
+  letterSpacing: 1,
+  textTransform: "uppercase",
+};
+
+const dailyBoardBadgeGrid: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+  gap: 8,
+};
+
+const dailyBoardBadgeCard: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+  minWidth: 0,
+  minHeight: 54,
+  border: "1px solid var(--border)",
+  borderRadius: 12,
+  padding: 9,
+  background: "var(--surface)",
+};
+
+const dailyBoardBadgeIcon: React.CSSProperties = {
+  display: "grid",
+  placeItems: "center",
+  flex: "0 0 auto",
+  width: 34,
+  height: 34,
+  borderRadius: 12,
+  background: "linear-gradient(135deg, var(--accent), var(--primary))",
+  color: "var(--primary-foreground)",
+  boxShadow: "0 0 14px var(--primary-glow)",
+};
+
+const dailyBoardBadgeName: React.CSSProperties = {
+  display: "block",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+  fontSize: 12,
+  fontWeight: 900,
+};
+
+const dailyBoardBadgeCount: React.CSSProperties = {
+  display: "block",
+  marginTop: 2,
+  color: "var(--muted-foreground)",
+  fontSize: 10,
+  fontWeight: 800,
 };
 
 const preferenceRow: React.CSSProperties = {

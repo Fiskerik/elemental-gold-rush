@@ -8,7 +8,6 @@ import {
   type LeaderboardKind,
   type LeaderboardScope,
 } from "./leaderboard";
-import { DAILY_BOARD_LEADERBOARD_ACHIEVEMENTS } from "./leaderboardAchievements";
 import { formatScore } from "./logic";
 import { useIsTabletLayout } from "./responsive";
 import { useProgress } from "./store";
@@ -19,7 +18,6 @@ export function Leaderboard({ onBack }: { onBack: () => void }) {
   const [scope, setScope] = useState<LeaderboardScope>("global");
   const [board, setBoard] = useState<LeaderboardBoard>(() => getDailyLeaderboard(kind, scope));
   const [loading, setLoading] = useState(false);
-  const achievementCounts = useProgress((s) => s.dailyBoardLeaderboardAchievementCounts);
   const recordDailyBoardLeaderboardPlacement = useProgress(
     (s) => s.recordDailyBoardLeaderboardPlacement,
   );
@@ -106,31 +104,6 @@ export function Leaderboard({ onBack }: { onBack: () => void }) {
             Local
           </SegmentButton>
         </div>
-
-        {kind === "daily-board" && (
-          <section style={achievementPanel} aria-label="Daily Board achievements">
-            <div style={achievementHeader}>
-              <div>
-                <div style={summaryLabel}>Daily Board Badges</div>
-                <strong style={achievementTitle}>Placement counters</strong>
-              </div>
-              <span style={achievementScope}>Global</span>
-            </div>
-            <div style={achievementGrid}>
-              {DAILY_BOARD_LEADERBOARD_ACHIEVEMENTS.map((achievement) => (
-                <div key={achievement.id} style={achievementCard} title={achievement.description}>
-                  <span style={achievementIcon}>{achievement.icon}</span>
-                  <span style={{ minWidth: 0 }}>
-                    <strong style={achievementName}>{achievement.name}</strong>
-                    <small style={achievementCount}>
-                      {achievementCounts[achievement.id] ?? 0}x earned
-                    </small>
-                  </span>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
 
         {(loading || board.status) && (
           <div style={statusLine} role="status" aria-live="polite">
@@ -304,88 +277,6 @@ const statusLine: CSSProperties = {
   fontSize: 12,
   fontWeight: 800,
   textAlign: "center",
-};
-
-const achievementPanel: CSSProperties = {
-  marginTop: 12,
-  border: "1px solid var(--border)",
-  borderRadius: 16,
-  padding: 12,
-  background: "var(--surface)",
-};
-
-const achievementHeader: CSSProperties = {
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-  gap: 10,
-  marginBottom: 10,
-};
-
-const achievementTitle: CSSProperties = {
-  display: "block",
-  marginTop: 2,
-  fontSize: 14,
-  fontWeight: 950,
-};
-
-const achievementScope: CSSProperties = {
-  border: "1px solid color-mix(in oklch, var(--accent) 45%, var(--border))",
-  borderRadius: 999,
-  padding: "5px 8px",
-  color: "var(--accent)",
-  fontSize: 10,
-  fontWeight: 900,
-  letterSpacing: 1,
-  textTransform: "uppercase",
-};
-
-const achievementGrid: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-  gap: 8,
-};
-
-const achievementCard: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 8,
-  minWidth: 0,
-  minHeight: 52,
-  border: "1px solid var(--border)",
-  borderRadius: 12,
-  padding: 9,
-  background: "var(--surface-elevated)",
-};
-
-const achievementIcon: CSSProperties = {
-  display: "grid",
-  placeItems: "center",
-  flex: "0 0 auto",
-  width: 32,
-  height: 32,
-  borderRadius: 10,
-  background: "linear-gradient(135deg, var(--accent), var(--primary))",
-  color: "var(--primary-foreground)",
-  fontSize: 12,
-  fontWeight: 950,
-};
-
-const achievementName: CSSProperties = {
-  display: "block",
-  overflow: "hidden",
-  textOverflow: "ellipsis",
-  whiteSpace: "nowrap",
-  fontSize: 12,
-  fontWeight: 900,
-};
-
-const achievementCount: CSSProperties = {
-  display: "block",
-  marginTop: 2,
-  color: "var(--muted-foreground)",
-  fontSize: 10,
-  fontWeight: 800,
 };
 
 const segmentButton: CSSProperties = {
