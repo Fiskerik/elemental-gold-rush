@@ -189,16 +189,64 @@ export function useDomLocalization(language: AppLanguage) {
       }
     });
 
-    observer.observe(root, {
+    const observerOptions: MutationObserverInit = {
       attributeFilter: [...LOCALIZABLE_ATTRIBUTES],
       attributes: true,
       characterData: true,
       childList: true,
       subtree: true,
-    });
+    };
+
+    let observing = false;
+    function startObserving() {
+      if (observing) return;
+      observer.observe(root, observerOptions);
+      observing = true;
+    }
+    function stopObserving() {
+      if (!observing) return;
+      observer.disconnect();
+      observing = false;
+      if (animationFrameId != null) {
+        window.cancelAnimationFrame(animationFrameId);
+        animationFrameId = null;
+      }
+      pendingNodes.clear();
+    }
+
+    // On iOS WKWebView a subtree characterData MutationObserver makes every
+    // keystroke in a focused field extremely expensive, hanging the app. Pause
+    // the observer while an editable element is focused, then resume on blur.
+    function isEditableTarget(target: EventTarget | null): boolean {
+      if (!(target instanceof Element)) return false;
+      const tag = target.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
+      return target.closest("[contenteditable=''],[contenteditable='true']") != null;
+    }
+
+    function handleFocusIn(event: FocusEvent) {
+      if (isEditableTarget(event.target)) stopObserving();
+    }
+    function handleFocusOut(event: FocusEvent) {
+      if (!isEditableTarget(event.target)) return;
+      // Resume after the focus change settles, then re-localize any new content.
+      window.setTimeout(() => {
+        if (!isEditableTarget(document.activeElement)) {
+          startObserving();
+          localizeTree(root);
+        }
+      }, 0);
+    }
+
+    startObserving();
+    document.addEventListener("focusin", handleFocusIn);
+    document.addEventListener("focusout", handleFocusOut);
 
     return () => {
+      document.removeEventListener("focusin", handleFocusIn);
+      document.removeEventListener("focusout", handleFocusOut);
       observer.disconnect();
+      observing = false;
       if (animationFrameId != null) window.cancelAnimationFrame(animationFrameId);
       pendingNodes.clear();
       restoreKnownNodes();
