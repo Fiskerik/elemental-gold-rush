@@ -142,7 +142,11 @@ export function Profile({ onBack }: Props) {
             >
               PLAYER PROFILE
             </div>
-            <h1 className="gold-text" style={{ margin: "4px 0", fontSize: 34 }}>
+            <h1
+              className="gold-text"
+              style={{ margin: "4px 0", fontSize: 34 }}
+              data-no-localize="true"
+            >
               {displayName}
             </h1>
             <p style={{ margin: 0, color: "var(--muted-foreground)", fontSize: 13 }}>
@@ -295,6 +299,7 @@ export function Profile({ onBack }: Props) {
                 placeholder={DEFAULT_PLAYER_DISPLAY_NAME}
                 style={nameInput}
                 aria-label={tr("Profile name")}
+                data-no-localize="true"
                 autoCapitalize="words"
                 autoCorrect="off"
                 enterKeyHint="done"

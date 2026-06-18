@@ -132,7 +132,10 @@ function LeaderboardRow({ entry }: { entry: LeaderboardEntry }) {
       <strong style={rankCell}>{entry.rank}</strong>
       <span style={playerCell}>
         <span aria-hidden="true">{entry.flag}</span>
-        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        <span
+          style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+          data-no-localize="true"
+        >
           {entry.name}
         </span>
       </span>

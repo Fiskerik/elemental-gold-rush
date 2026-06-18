@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import {
+  DEFAULT_LANGUAGE,
   getLanguageDirection,
   toIntlLocale,
   translateText,
@@ -16,6 +17,16 @@ const SKIP_TAGS = new Set([
   "STYLE",
   "TEXTAREA",
 ]);
+
+const SKIP_SELECTOR = [
+  "[data-no-localize]",
+  "[contenteditable='']",
+  "[contenteditable='true']",
+  "input",
+  "option",
+  "select",
+  "textarea",
+].join(",");
 
 const LOCALIZABLE_ATTRIBUTES = ["aria-label", "title", "placeholder", "alt"] as const;
 type LocalizableAttribute = (typeof LOCALIZABLE_ATTRIBUTES)[number];
@@ -52,7 +63,12 @@ export function useDomLocalization(language: AppLanguage) {
     function shouldSkipElement(element: Element | null): boolean {
       if (!element) return true;
       if (SKIP_TAGS.has(element.tagName)) return true;
-      return Boolean(element.closest("[data-no-localize]"));
+      return Boolean(element.closest(SKIP_SELECTOR));
+    }
+
+    function shouldSkipNode(node: Node): boolean {
+      if (node.nodeType === Node.TEXT_NODE) return shouldSkipElement(node.parentElement);
+      return !(node instanceof Element) || shouldSkipElement(node);
     }
 
     function localizeTextNode(node: Text) {
@@ -96,41 +112,79 @@ export function useDomLocalization(language: AppLanguage) {
       }
     }
 
+    function localizeElementAttributes(start: Element) {
+      localizeAttributes(start);
+      for (const element of start.querySelectorAll(`*:not(${SKIP_SELECTOR})`)) {
+        localizeAttributes(element);
+      }
+    }
+
     function localizeTree(start: Node) {
       if (start.nodeType === Node.TEXT_NODE) {
         localizeTextNode(start as Text);
         return;
       }
       if (!(start instanceof Element) || shouldSkipElement(start)) return;
-      localizeAttributes(start);
+      localizeElementAttributes(start);
       const walker = document.createTreeWalker(start, NodeFilter.SHOW_TEXT);
       let current = walker.nextNode();
       while (current) {
         localizeTextNode(current as Text);
         current = walker.nextNode();
       }
-      for (const element of start.querySelectorAll("*")) {
-        localizeAttributes(element);
-      }
     }
 
     restoreKnownNodes();
     document.documentElement.lang = toIntlLocale(language);
     document.documentElement.dir = getLanguageDirection(language);
+    if (language === DEFAULT_LANGUAGE) return;
+
     localizeTree(root);
+
+    const pendingNodes = new Set<Node>();
+    let animationFrameId: number | null = null;
+
+    function flushPendingNodes() {
+      animationFrameId = null;
+      const nodes = Array.from(pendingNodes);
+      pendingNodes.clear();
+      for (const node of nodes) {
+        if (node.nodeType === Node.TEXT_NODE) {
+          if (node.parentElement?.isConnected) localizeTextNode(node as Text);
+          continue;
+        }
+        if (node instanceof Element && node.isConnected) localizeTree(node);
+      }
+    }
+
+    function queueLocalization(node: Node) {
+      if (shouldSkipNode(node)) return;
+      for (let ancestor = node.parentNode; ancestor; ancestor = ancestor.parentNode) {
+        if (pendingNodes.has(ancestor)) return;
+      }
+      if (node instanceof Element) {
+        for (const pendingNode of pendingNodes) {
+          if (pendingNode !== node && node.contains(pendingNode)) pendingNodes.delete(pendingNode);
+        }
+      }
+      pendingNodes.add(node);
+      if (animationFrameId == null) {
+        animationFrameId = window.requestAnimationFrame(flushPendingNodes);
+      }
+    }
 
     const observer = new MutationObserver((mutations) => {
       for (const mutation of mutations) {
         if (mutation.type === "characterData" && mutation.target.nodeType === Node.TEXT_NODE) {
-          localizeTextNode(mutation.target as Text);
+          queueLocalization(mutation.target);
           continue;
         }
         if (mutation.type === "attributes" && mutation.target instanceof Element) {
-          localizeAttributes(mutation.target);
+          queueLocalization(mutation.target);
           continue;
         }
         for (const addedNode of mutation.addedNodes) {
-          localizeTree(addedNode);
+          queueLocalization(addedNode);
         }
       }
     });
@@ -145,6 +199,8 @@ export function useDomLocalization(language: AppLanguage) {
 
     return () => {
       observer.disconnect();
+      if (animationFrameId != null) window.cancelAnimationFrame(animationFrameId);
+      pendingNodes.clear();
       restoreKnownNodes();
     };
   }, [language]);

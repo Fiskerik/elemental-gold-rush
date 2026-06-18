@@ -421,6 +421,7 @@ function DailyBoardNamePrompt({
           maxLength={18}
           placeholder={DEFAULT_PLAYER_DISPLAY_NAME}
           aria-label="Display name"
+          data-no-localize="true"
           autoCapitalize="words"
           autoComplete="off"
           autoCorrect="off"
