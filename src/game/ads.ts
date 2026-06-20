@@ -218,7 +218,8 @@ export async function preloadRewarded(): Promise<void> {
       rewardedReady = true;
     } catch (error) {
       rewardedReady = false;
-      lastRewardedError = describeAdError(error) || "Rewarded ad failed to load.";
+      lastRewardedError =
+        `${describeAdError(error) || "Rewarded ad failed to load."} [${describeUnityConfig()}]`;
     } finally {
       rewardedLoading = false;
       rewardedLoadPromise = null;
