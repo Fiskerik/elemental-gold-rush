@@ -111,7 +111,12 @@ workflows:
       - name: Install CocoaPods
         script: |
           cd ios/App
-          pod install --repo-update
+          pod install --repo-update --clean-install
+          if ! grep -q "UnityAds" Podfile.lock; then
+            echo "ERROR: UnityAds was not installed by CocoaPods. Current Podfile:"
+            cat Podfile
+            exit 1
+          fi
       - name: Auto-increment iOS build number
         script: |
           cd ios/App
