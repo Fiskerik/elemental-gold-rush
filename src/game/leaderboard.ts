@@ -2,6 +2,7 @@ import { getTodayQuestDate } from "./quests";
 import { DEFAULT_PLAYER_DISPLAY_NAME, useProgress } from "./store";
 import {
   type GameCenterLeaderboardKind,
+  getLatestGameCenterDiagnostic,
   hasDailyGameCenterLeaderboardId,
   isGameCenterAvailable,
   loadDailyGameCenterLeaderboard,
@@ -321,6 +322,24 @@ function mapGameCenterEntry(
   };
 }
 
+function gameCenterDiagnosticStatus(kind: LeaderboardKind, fallback: string): string {
+  const diagnostic = getLatestGameCenterDiagnostic(kind);
+  if (!diagnostic) return fallback;
+  if (!diagnostic.ok) {
+    return `Game Center ${diagnostic.action} failed for ${diagnostic.leaderboardId ?? "leaderboard"}: ${diagnostic.error ?? "unknown error"}`;
+  }
+  if (diagnostic.action === "submit") {
+    if (diagnostic.verifiedScore && diagnostic.verifiedScore > 0) {
+      return `Game Center accepted score ${diagnostic.verifiedScore} on ${diagnostic.leaderboardId ?? "leaderboard"} - waiting for leaderboard rows`;
+    }
+    if (diagnostic.error) {
+      return `Game Center accepted submit, but verification failed: ${diagnostic.error}`;
+    }
+    return `Game Center accepted submit for ${diagnostic.leaderboardId ?? "leaderboard"}, but no score is visible yet`;
+  }
+  return fallback;
+}
+
 export async function loadDailyCompoundLeaderboard(
   scope: LeaderboardScope,
 ): Promise<LeaderboardBoard> {
@@ -358,7 +377,10 @@ export async function loadDailyLeaderboard(
     if (!hasGameCenterScores) {
       return {
         ...fallbackBoard,
-        status: "Game Center has no scores yet - showing device scores",
+        status: gameCenterDiagnosticStatus(
+          kind,
+          "Game Center has no visible scores yet - showing device scores",
+        ),
       };
     }
     return {
@@ -376,7 +398,7 @@ export async function loadDailyLeaderboard(
     console.warn("Game Center leaderboard fetch failed", error);
     return {
       ...fallbackBoard,
-      status: "Game Center unavailable - showing device scores",
+      status: gameCenterDiagnosticStatus(kind, "Game Center unavailable - showing device scores"),
     };
   }
 }
