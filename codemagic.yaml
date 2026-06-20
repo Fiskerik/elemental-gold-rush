@@ -19,7 +19,11 @@ workflows:
         VITE_REVENUECAT_IOS_API_KEY: "appl_wleIrbzZnDKaUaQgnbmYbTYVxfX"
         VITE_REVENUECAT_DEBUG_LOGS: "false"
         VITE_PURCHASE_DEBUG_UI: "false"
-        VITE_UNITY_ADS_TEST_MODE: "false"
+        # NOTE: Do NOT hard-code VITE_UNITY_ADS_TEST_MODE here. YAML `vars`
+        # override Codemagic UI group variables, so a value set here silently
+        # wins over the one you configure in the "Env variables" group. Leave it
+        # to the group (or set UNITY_ADS_TEST_MODE there); it defaults to false
+        # below when unset.
       xcode: latest
       cocoapods: default
       node: 22.16.0
