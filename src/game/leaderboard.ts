@@ -332,11 +332,21 @@ export async function loadDailyLeaderboard(
   scope: LeaderboardScope,
 ): Promise<LeaderboardBoard> {
   const countryCode = inferPlayerCountryCode();
+  const fallbackBoard = getDailyLeaderboard(kind, scope);
   if (!isGameCenterAvailable() || !hasDailyGameCenterLeaderboardId(kind, scope)) {
-    return getDailyLeaderboard(kind, scope);
+    return fallbackBoard;
   }
 
   try {
+    if (fallbackBoard.player.score > 0) {
+      await submitDailyGameCenterScore(
+        kind,
+        fallbackBoard.player.score,
+        fallbackBoard.player.shots,
+      ).catch((error) => {
+        console.warn("Game Center saved score retry failed", error);
+      });
+    }
     const result = await loadDailyGameCenterLeaderboard(kind, scope);
     const entries = result.entries.map((entry) =>
       mapGameCenterEntry(entry, scope, countryCode, result.localPlayer),
@@ -344,6 +354,13 @@ export async function loadDailyLeaderboard(
     const localPlayer = result.localPlayer
       ? mapGameCenterEntry(result.localPlayer, scope, countryCode, result.localPlayer)
       : undefined;
+    const hasGameCenterScores = entries.length > 0 || Boolean(localPlayer && localPlayer.score > 0);
+    if (!hasGameCenterScores) {
+      return {
+        ...fallbackBoard,
+        status: "Game Center has no scores yet - showing device scores",
+      };
+    }
     return {
       entries,
       player: localPlayer ??
@@ -358,7 +375,7 @@ export async function loadDailyLeaderboard(
   } catch (error) {
     console.warn("Game Center leaderboard fetch failed", error);
     return {
-      ...getDailyLeaderboard(kind, scope),
+      ...fallbackBoard,
       status: "Game Center unavailable - showing device scores",
     };
   }

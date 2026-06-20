@@ -6995,7 +6995,7 @@ function StandardGameBoard({
                 left: projectile.x - projShotSize / 2,
                 top: projectile.y - projShotSize / 2,
                 pointerEvents: "none",
-                zIndex: 4,
+                zIndex: 12,
               }}
             >
               {showCatalystShotRadius && (
@@ -7045,7 +7045,7 @@ function StandardGameBoard({
               position: "absolute",
               left: launcherX - projShotSize / 2,
               top: launcherY - projShotSize / 2,
-              zIndex: 2,
+              zIndex: 12,
               pointerEvents: shootingStyle === "press" ? "auto" : "none",
               cursor: shootingStyle === "press" ? "pointer" : undefined,
               transform: `rotate(${aimDeg}deg)`,

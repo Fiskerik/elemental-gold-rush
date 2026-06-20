@@ -380,7 +380,7 @@
 
 .game-board-surface {
   isolation: isolate;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .game-board-surface::before {
