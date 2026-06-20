@@ -241,10 +241,10 @@ export async function showInterstitialIfReady(hasProPack: boolean): Promise<bool
   interstitialReady = false;
   try {
     await UnityAdsNative.showInterstitial({ placementId: getInterstitialPlacementId() });
-    await preloadInterstitial();
+    void preloadInterstitial();
     return true;
   } catch {
-    await preloadInterstitial();
+    void preloadInterstitial();
     return false;
   }
 }
@@ -275,14 +275,14 @@ export async function showRewardedForCoin(_hasProPack: boolean): Promise<Rewarde
   rewardedReady = false;
   try {
     const result = await UnityAdsNative.showRewarded({ placementId: getRewardedPlacementId() });
-    await preloadRewarded();
+    void preloadRewarded();
     return result.completed
       ? { rewarded: true }
       : { rewarded: false, reason: "Rewarded ad was not completed." };
   } catch (error) {
     const reason = describeAdError(error) || "Rewarded ad could not be shown.";
     lastRewardedError = reason;
-    await preloadRewarded();
+    void preloadRewarded();
     return { rewarded: false, reason };
   }
 }
