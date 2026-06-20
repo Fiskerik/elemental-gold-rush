@@ -202,6 +202,10 @@ function recordDailyLeaderboardRun(kind: LeaderboardKind, score: number, shots: 
 export function submitDailyBoardLeaderboardScore(input: DailyBoardScoreInput): number {
   const leaderboardScore = calculateDailyBoardLeaderboardScore(input);
   recordDailyLeaderboardRun("daily-board", leaderboardScore, input.shots);
+  const globalBoard = getDailyLeaderboard("daily-board", "global");
+  useProgress
+    .getState()
+    .recordDailyBoardLeaderboardPlacement(globalBoard.player.rank, globalBoard.totalPlayerCount);
   if (isGameCenterAvailable()) {
     void submitDailyGameCenterScore("daily-board", leaderboardScore, input.shots).catch((error) => {
       console.warn("Game Center daily board score submit failed", error);
@@ -373,7 +377,12 @@ export async function loadDailyLeaderboard(
     const localPlayer = result.localPlayer
       ? mapGameCenterEntry(result.localPlayer, scope, countryCode, result.localPlayer)
       : undefined;
-    const hasGameCenterScores = entries.length > 0 || Boolean(localPlayer && localPlayer.score > 0);
+    const visibleEntries =
+      localPlayer && !entries.some((entry) => entry.isPlayer)
+        ? [localPlayer, ...entries].sort((a, b) => a.rank - b.rank)
+        : entries;
+    const hasGameCenterScores =
+      visibleEntries.length > 0 || Boolean(localPlayer && localPlayer.score > 0);
     if (!hasGameCenterScores) {
       return {
         ...fallbackBoard,
@@ -384,9 +393,9 @@ export async function loadDailyLeaderboard(
       };
     }
     return {
-      entries,
+      entries: visibleEntries,
       player: localPlayer ??
-        entries.find((entry) => entry.isPlayer) ?? {
+        visibleEntries.find((entry) => entry.isPlayer) ?? {
           ...playerEntry(kind),
           rank: 0,
         },

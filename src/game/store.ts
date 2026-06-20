@@ -437,6 +437,11 @@ export const useProgress = create<ProgressState>()(
       completeDailyChallenge: (score) => {
         let awarded = false;
         set((s) => {
+          const refreshed = refreshDailyQuests(
+            s.dailyQuestDate,
+            s.dailyQuests,
+            s.claimedDailyReward,
+          );
           const dailyChallenge = refreshDailyChallengeState(s.dailyChallenge);
           awarded = !dailyChallenge.rewardClaimed;
           const rewardCoins = s.hasProPack ? 5 : DAILY_FEATURE_REWARD_COINS;
@@ -449,10 +454,12 @@ export const useProgress = create<ProgressState>()(
             bestScore: Math.max(dailyChallenge.bestScore, Math.max(0, Math.floor(score))),
           };
           return {
+            ...refreshed,
             dailyChallenge: nextChallenge,
             dailyBoardRuns: s.dailyBoardRuns + 1,
             dailyBoardBestScore: Math.max(s.dailyBoardBestScore, nextChallenge.bestScore),
             completedGameCount: s.completedGameCount + 1,
+            dailyQuests: applyQuestProgress(refreshed.dailyQuests, { levelCleared: true }),
             goldCoins: balanceAfter,
             coinTransactions: appendCoinTransaction(
               s.coinTransactions,
