@@ -170,7 +170,9 @@ export async function initAds(hasProPack: boolean): Promise<void> {
     });
     initialized = true;
     initFailureReason = "";
-    await Promise.all([preloadInterstitial(), preloadRewarded()]);
+    // Do not preload both placements concurrently right after init. Two
+    // simultaneous Unity load calls can trigger internal load errors. Ads are
+    // loaded on demand inside showInterstitialIfReady / showRewardedForCoin.
   } catch (error) {
     initFailureReason = describeAdError(error) || "Unity Ads initialization failed.";
     console.warn(`[ads] Unity Ads initialization failed: ${initFailureReason}`);

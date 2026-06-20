@@ -26,10 +26,14 @@ target 'App' do
   capacitor_pods
   # Add your Pods here
   pod 'CapacitorFirebaseAnalytics/Analytics', :path => '../../node_modules/@capacitor-firebase/analytics'
-  # Retained for a future AdMob mediation reactivation; not initialized by the app right now.
-  pod 'GoogleMobileAdsMediationFacebook'
-  pod 'GoogleMobileAdsMediationUnity'
-  pod 'GoogleMobileAdsMediationAppLovin'
+  # Mediation adapters are DISABLED while running the direct UnityAds SDK.
+  # GoogleMobileAdsMediationUnity bundles its own copy of the Unity Ads SDK,
+  # and two Unity SDKs in one binary cause load error 1 ("unknown error").
+  # Re-enable these only if you switch back to AdMob mediation (and then
+  # remove the direct `pod 'UnityAds'` above to avoid the duplicate SDK).
+  # pod 'GoogleMobileAdsMediationFacebook'
+  # pod 'GoogleMobileAdsMediationUnity'
+  # pod 'GoogleMobileAdsMediationAppLovin'
 end
 
 post_install do |installer|
