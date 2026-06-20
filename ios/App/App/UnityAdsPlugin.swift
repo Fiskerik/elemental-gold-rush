@@ -73,7 +73,12 @@ public class UnityAdsPlugin: CAPPlugin, CAPBridgedPlugin, UnityAdsInitialization
         initializationStarted = false
         let calls = pendingInitializationCalls
         pendingInitializationCalls.removeAll()
-        calls.forEach { $0.reject(message, String(error.rawValue)) }
+        calls.forEach {
+            $0.reject(
+                "Unity Ads initialization failed (\(error.rawValue)): \(message)",
+                "UNITY_INIT_\(error.rawValue)"
+            )
+        }
     }
 
     public func unityAdsAdLoaded(_ placementId: String) {
@@ -83,12 +88,19 @@ public class UnityAdsPlugin: CAPPlugin, CAPBridgedPlugin, UnityAdsInitialization
     }
 
     public func unityAdsAdFailed(toLoad placementId: String, withError error: UnityAdsLoadError, withMessage message: String) {
+        NSLog("UnityAdsPlugin load failed placement=%@ error=%ld message=%@", placementId, error.rawValue, message)
         loadedPlacements.remove(placementId)
         let calls = pendingLoadCalls.removeValue(forKey: placementId) ?? []
-        calls.forEach { $0.reject(message, String(error.rawValue)) }
+        calls.forEach {
+            $0.reject(
+                "Unity Ads load failed for \(placementId) (\(error.rawValue)): \(message)",
+                "UNITY_LOAD_\(error.rawValue)"
+            )
+        }
     }
 
     public func unityAdsShowComplete(_ placementId: String, withFinish state: UnityAdsShowCompletionState) {
+        NSLog("UnityAdsPlugin show complete placement=%@ state=%ld", placementId, state.rawValue)
         loadedPlacements.remove(placementId)
         guard let call = pendingShowCalls.removeValue(forKey: placementId) else { return }
 
@@ -100,9 +112,13 @@ public class UnityAdsPlugin: CAPPlugin, CAPBridgedPlugin, UnityAdsInitialization
 
     @objc(unityAdsShowFailed:withError:withMessage:)
     public func unityAdsShowFailed(_ placementId: String, withError error: UnityAdsShowError, withMessage message: String) {
+        NSLog("UnityAdsPlugin show failed placement=%@ error=%ld message=%@", placementId, error.rawValue, message)
         loadedPlacements.remove(placementId)
         guard let call = pendingShowCalls.removeValue(forKey: placementId) else { return }
-        call.reject(message, String(error.rawValue))
+        call.reject(
+            "Unity Ads show failed for \(placementId) (\(error.rawValue)): \(message)",
+            "UNITY_SHOW_\(error.rawValue)"
+        )
     }
 
     public func unityAdsShowStart(_ placementId: String) {}
@@ -125,6 +141,7 @@ public class UnityAdsPlugin: CAPPlugin, CAPBridgedPlugin, UnityAdsInitialization
             return
         }
 
+        NSLog("UnityAdsPlugin loading placement=%@", placementId)
         pendingLoadCalls[placementId, default: []].append(call)
         if pendingLoadCalls[placementId]?.count == 1 {
             DispatchQueue.main.async {
@@ -158,6 +175,7 @@ public class UnityAdsPlugin: CAPPlugin, CAPBridgedPlugin, UnityAdsInitialization
                 return
             }
 
+            NSLog("UnityAdsPlugin showing placement=%@", placementId)
             UnityAds.show(viewController, placementId: placementId, showDelegate: self)
         }
     }

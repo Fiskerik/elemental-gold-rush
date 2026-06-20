@@ -120,12 +120,20 @@ function describeAdError(error: unknown): string {
   if (typeof error === "string") return error;
   if (!error || typeof error !== "object") return "";
 
-  const details = error as { code?: unknown; message?: unknown };
+  const details = error as {
+    code?: unknown;
+    error?: unknown;
+    errorMessage?: unknown;
+    message?: unknown;
+  };
   const code =
     typeof details.code === "number" || typeof details.code === "string"
       ? String(details.code)
       : "";
-  const message = typeof details.message === "string" ? details.message : "";
+  const message =
+    configuredEnvValue(details.message) ||
+    configuredEnvValue(details.errorMessage) ||
+    configuredEnvValue(details.error);
   return [code, message].filter(Boolean).join(": ");
 }
 
