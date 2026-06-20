@@ -228,9 +228,11 @@ export function MainMenu({
         showDailyRewardToast("+1 gold coin");
         return;
       }
-      showRewardedAdMessage("Loading failed - please try again in a moment");
+      showRewardedAdMessage(result.reason ?? "Loading failed - please try again in a moment");
     } catch (error) {
-      showRewardedAdMessage("Loading failed - please try again in a moment");
+      showRewardedAdMessage(
+        error instanceof Error ? error.message : "Loading failed - please try again in a moment",
+      );
     } finally {
       setRewardedAdBusy(false);
     }

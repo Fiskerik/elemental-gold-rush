@@ -7,7 +7,7 @@ public class UnityAdsPlugin: CAPPlugin, CAPBridgedPlugin, UnityAdsInitialization
     public let identifier = "UnityAdsPlugin"
     public let jsName = "UnityAdsPlugin"
     public let pluginMethods: [CAPPluginMethod] = [
-        CAPPluginMethod(name: "initialize", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "initializeAds", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "loadInterstitial", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "loadRewarded", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "showInterstitial", returnType: CAPPluginReturnPromise),
@@ -20,7 +20,7 @@ public class UnityAdsPlugin: CAPPlugin, CAPBridgedPlugin, UnityAdsInitialization
     private var loadedPlacements = Set<String>()
     private var initializationStarted = false
 
-    @objc func initialize(_ call: CAPPluginCall) {
+    @objc func initializeAds(_ call: CAPPluginCall) {
         guard let gameId = call.getString("gameId"), !gameId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             call.reject("Missing Unity Ads iOS game ID")
             return
@@ -40,6 +40,7 @@ public class UnityAdsPlugin: CAPPlugin, CAPBridgedPlugin, UnityAdsInitialization
         let testMode = call.getBool("testMode", false)
 
         DispatchQueue.main.async {
+            NSLog("UnityAdsPlugin initializing gameId=%@ testMode=%@", gameId, testMode ? "true" : "false")
             UnityAds.initialize(gameId, testMode: testMode, initializationDelegate: self)
         }
     }
@@ -61,12 +62,14 @@ public class UnityAdsPlugin: CAPPlugin, CAPBridgedPlugin, UnityAdsInitialization
     }
 
     public func initializationComplete() {
+        NSLog("UnityAdsPlugin initialization complete")
         let calls = pendingInitializationCalls
         pendingInitializationCalls.removeAll()
         calls.forEach { $0.resolve(["initialized": true]) }
     }
 
     public func initializationFailed(_ error: UnityAdsInitializationError, withMessage message: String) {
+        NSLog("UnityAdsPlugin initialization failed error=%ld message=%@", error.rawValue, message)
         initializationStarted = false
         let calls = pendingInitializationCalls
         pendingInitializationCalls.removeAll()

@@ -20,7 +20,7 @@ type UnityAdsShowResult = {
 };
 
 interface UnityAdsPlugin {
-  initialize(options: UnityAdsInitializeOptions): Promise<{ initialized: boolean }>;
+  initializeAds(options: UnityAdsInitializeOptions): Promise<{ initialized: boolean }>;
   loadInterstitial(options: UnityAdsPlacementOptions): Promise<{ loaded: boolean }>;
   loadRewarded(options: UnityAdsPlacementOptions): Promise<{ loaded: boolean }>;
   showInterstitial(options: UnityAdsPlacementOptions): Promise<UnityAdsShowResult>;
@@ -38,6 +38,7 @@ let interstitialReady = false;
 let interstitialLoading = false;
 let rewardedReady = false;
 let rewardedLoading = false;
+let initFailureReason = "";
 let lastRewardedError = "";
 let rewardedLoadPromise: Promise<void> | null = null;
 let interstitialLoadPromise: Promise<void> | null = null;
@@ -128,27 +129,43 @@ function describeAdError(error: unknown): string {
   return [code, message].filter(Boolean).join(": ");
 }
 
+function describeUnityConfig(): string {
+  return [
+    `gameId=${getUnityGameId() || "missing"}`,
+    `interstitial=${getInterstitialPlacementId()}`,
+    `rewarded=${getRewardedPlacementId()}`,
+    `testMode=${shouldUseUnityTestMode() ? "true" : "false"}`,
+  ].join(", ");
+}
+
 function isUnityAdsAvailable(): boolean {
   return Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios";
 }
 
 export async function initAds(hasProPack: boolean): Promise<void> {
-  if (hasProPack || initialized || initFailed || !isUnityAdsAvailable()) return;
+  if (hasProPack || initialized || !isUnityAdsAvailable()) return;
 
   const gameId = getUnityGameId();
   if (!gameId) {
     initFailed = true;
+    initFailureReason = "Unity Ads iOS game ID is missing from this build.";
     return;
   }
 
   try {
-    await UnityAdsNative.initialize({
+    initFailed = false;
+    initFailureReason = "";
+    console.info(`[ads] Initializing Unity Ads (${describeUnityConfig()})`);
+    await UnityAdsNative.initializeAds({
       gameId,
       testMode: shouldUseUnityTestMode(),
     });
     initialized = true;
+    initFailureReason = "";
     await Promise.all([preloadInterstitial(), preloadRewarded()]);
-  } catch {
+  } catch (error) {
+    initFailureReason = describeAdError(error) || "Unity Ads initialization failed.";
+    console.warn(`[ads] Unity Ads initialization failed: ${initFailureReason}`);
     initFailed = true;
     initialized = false;
   }
@@ -228,7 +245,10 @@ export async function showRewardedForCoin(_hasProPack: boolean): Promise<Rewarde
 
   if (!initialized) await initAds(false);
   if (initFailed) {
-    return { rewarded: false, reason: "Unity Ads could not initialize in this build." };
+    return {
+      rewarded: false,
+      reason: initFailureReason || "Unity Ads could not initialize in this build.",
+    };
   }
 
   if (!rewardedReady) {
