@@ -11,7 +11,7 @@ install! 'cocoapods', :disable_input_output_paths => true
 def capacitor_pods
   pod 'Capacitor', :path => '../../node_modules/@capacitor/ios'
   pod 'CapacitorCordova', :path => '../../node_modules/@capacitor/ios'
-  # Retained for a future AdMob reactivation; runtime ad calls currently use UnityAdsPlugin.
+  # Retained for a future AdMob reactivation; runtime ad calls currently use the LevelPlay bridge.
   pod 'CapacitorCommunityAdmob', :path => '../../node_modules/@capacitor-community/admob'
   pod 'CapacitorFirebaseAnalytics', :path => '../../node_modules/@capacitor-firebase/analytics'
   pod 'CapacitorHaptics', :path => '../../node_modules/@capacitor/haptics'
@@ -24,25 +24,19 @@ end
 target 'App' do
   capacitor_pods
   # Add your Pods here
-  # Pin UnityAds below 4.13 for reliable Swift module imports on current Xcode/CocoaPods builds.
-  pod 'UnityAds', '4.12.5'
+  pod 'IronSourceSDK', '9.4.0.0'
+  pod 'IronSourceUnityAdsAdapter', '5.5.0'
   pod 'CapacitorFirebaseAnalytics/Analytics', :path => '../../node_modules/@capacitor-firebase/analytics'
-  # Mediation adapters are DISABLED while running the direct UnityAds SDK.
-  # GoogleMobileAdsMediationUnity bundles its own copy of the Unity Ads SDK,
-  # and two Unity SDKs in one binary cause load error 1 ("unknown error").
-  # Re-enable these only if you switch back to AdMob mediation (and then
-  # remove the direct `pod 'UnityAds'` above to avoid the duplicate SDK).
-  # pod 'GoogleMobileAdsMediationFacebook'
-  # pod 'GoogleMobileAdsMediationUnity'
-  # pod 'GoogleMobileAdsMediationAppLovin'
+  # Additional LevelPlay network adapters can be added here when enabled in
+  # the LevelPlay dashboard.
 end
 
 post_install do |installer|
   assertDeploymentTarget(installer)
 
   # Xcode 26 enables "Explicitly Built Modules" by default, which cannot
-  # resolve the Swift module vended by UnityAds' static XCFramework. This
-  # surfaces as: "unable to resolve module dependency: 'UnityAds'".
+  # resolve some static XCFramework Swift modules consistently. This
+  # surfaces as "unable to resolve module dependency" during archive builds.
   # Disable explicit modules on every Pods target AND on the App target so
   # the classic implicit module build path is used.
   installer.pods_project.targets.each do |target|

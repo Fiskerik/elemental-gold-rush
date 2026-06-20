@@ -19,11 +19,9 @@ workflows:
         VITE_REVENUECAT_IOS_API_KEY: "appl_wleIrbzZnDKaUaQgnbmYbTYVxfX"
         VITE_REVENUECAT_DEBUG_LOGS: "false"
         VITE_PURCHASE_DEBUG_UI: "false"
-        # NOTE: Do NOT hard-code VITE_UNITY_ADS_TEST_MODE here. YAML `vars`
-        # override Codemagic UI group variables, so a value set here silently
-        # wins over the one you configure in the "Env variables" group. Leave it
-        # to the group (or set UNITY_ADS_TEST_MODE there); it defaults to false
-        # below when unset.
+        VITE_LEVELPLAY_IOS_APP_KEY: "26b8f239d"
+        VITE_LEVELPLAY_IOS_INTERSTITIAL_AD_UNIT_ID: "czf0jlk6mnbenyh0"
+        VITE_LEVELPLAY_IOS_REWARDED_AD_UNIT_ID: "g3kygieiv8izpje1"
       xcode: latest
       cocoapods: default
       node: 22.16.0
@@ -42,10 +40,9 @@ workflows:
           ADMOB_APP_ID="${VITE_ADMOB_IOS_APP_ID:-ca-app-pub-8854735603167656~9228353443}"
           ADMOB_INTERSTITIAL="${VITE_ADMOB_IOS_INTERSTITIAL_ID:-$ADMOB_IOS_INTERSTITIAL_ID}"
           ADMOB_REWARDED="${VITE_ADMOB_IOS_REWARDED_ID:-$ADMOB_IOS_REWARDED_ID}"
-          UNITY_GAME_ID="${VITE_UNITY_ADS_IOS_GAME_ID:-${UNITY_ADS_IOS_GAME_ID:-${VITE_UNITY_IOS_GAME_ID:-${UNITY_IOS_GAME_ID:-}}}}"
-          UNITY_INTERSTITIAL="${VITE_UNITY_ADS_IOS_INTERSTITIAL_ID:-${UNITY_ADS_IOS_INTERSTITIAL_ID:-${VITE_UNITY_ADS_IOS_INTERSTITIAL_PLACEMENT_ID:-${UNITY_ADS_IOS_INTERSTITIAL_PLACEMENT_ID:-Interstitial_iOS}}}}"
-          UNITY_REWARDED="${VITE_UNITY_ADS_IOS_REWARDED_ID:-${UNITY_ADS_IOS_REWARDED_ID:-${VITE_UNITY_ADS_IOS_REWARDED_PLACEMENT_ID:-${UNITY_ADS_IOS_REWARDED_PLACEMENT_ID:-Rewarded_iOS}}}}"
-          UNITY_TEST_MODE="false"
+          LEVELPLAY_APP_KEY="${VITE_LEVELPLAY_IOS_APP_KEY:-${LEVELPLAY_IOS_APP_KEY:-${VITE_LEVELPLAY_APP_KEY:-${LEVELPLAY_APP_KEY:-26b8f239d}}}}"
+          LEVELPLAY_INTERSTITIAL="${VITE_LEVELPLAY_IOS_INTERSTITIAL_AD_UNIT_ID:-${LEVELPLAY_IOS_INTERSTITIAL_AD_UNIT_ID:-${VITE_LEVELPLAY_INTERSTITIAL_AD_UNIT_ID:-${LEVELPLAY_INTERSTITIAL_AD_UNIT_ID:-czf0jlk6mnbenyh0}}}}"
+          LEVELPLAY_REWARDED="${VITE_LEVELPLAY_IOS_REWARDED_AD_UNIT_ID:-${LEVELPLAY_IOS_REWARDED_AD_UNIT_ID:-${VITE_LEVELPLAY_REWARDED_AD_UNIT_ID:-${LEVELPLAY_REWARDED_AD_UNIT_ID:-g3kygieiv8izpje1}}}}"
           PURCHASE_DEBUG_UI="${VITE_PURCHASE_DEBUG_UI:-false}"
           RC_DEBUG_LOGS="${VITE_REVENUECAT_DEBUG_LOGS:-false}"
 
@@ -59,10 +56,9 @@ workflows:
             printf 'VITE_ADMOB_IOS_APP_ID=%s\n' "$ADMOB_APP_ID"
             printf 'VITE_ADMOB_IOS_INTERSTITIAL_ID=%s\n' "$ADMOB_INTERSTITIAL"
             printf 'VITE_ADMOB_IOS_REWARDED_ID=%s\n' "$ADMOB_REWARDED"
-            printf 'VITE_UNITY_ADS_IOS_GAME_ID=%s\n' "$UNITY_GAME_ID"
-            printf 'VITE_UNITY_ADS_IOS_INTERSTITIAL_ID=%s\n' "$UNITY_INTERSTITIAL"
-            printf 'VITE_UNITY_ADS_IOS_REWARDED_ID=%s\n' "$UNITY_REWARDED"
-            printf 'VITE_UNITY_ADS_TEST_MODE=%s\n' "$UNITY_TEST_MODE"
+            printf 'VITE_LEVELPLAY_IOS_APP_KEY=%s\n' "$LEVELPLAY_APP_KEY"
+            printf 'VITE_LEVELPLAY_IOS_INTERSTITIAL_AD_UNIT_ID=%s\n' "$LEVELPLAY_INTERSTITIAL"
+            printf 'VITE_LEVELPLAY_IOS_REWARDED_AD_UNIT_ID=%s\n' "$LEVELPLAY_REWARDED"
           } > .env.production.local
 
           if [ -z "$RC_KEY" ]; then
@@ -70,8 +66,13 @@ workflows:
             exit 1
           fi
 
-          if [ -z "$UNITY_GAME_ID" ]; then
-            echo "ERROR: Unity Ads iOS game ID is missing. Set VITE_UNITY_ADS_IOS_GAME_ID or UNITY_ADS_IOS_GAME_ID in Codemagic."
+          if [ -z "$LEVELPLAY_APP_KEY" ]; then
+            echo "ERROR: LevelPlay iOS app key is missing. Set VITE_LEVELPLAY_IOS_APP_KEY or LEVELPLAY_IOS_APP_KEY in Codemagic."
+            exit 1
+          fi
+
+          if [ -z "$LEVELPLAY_REWARDED" ]; then
+            echo "ERROR: LevelPlay rewarded ad unit ID is missing. Set VITE_LEVELPLAY_IOS_REWARDED_AD_UNIT_ID or LEVELPLAY_IOS_REWARDED_AD_UNIT_ID in Codemagic."
             exit 1
           fi
       - name: Build web + sync Capacitor iOS
@@ -116,8 +117,8 @@ workflows:
         script: |
           cd ios/App
           pod install --repo-update --clean-install
-          if ! grep -q "UnityAds" Podfile.lock; then
-            echo "ERROR: UnityAds was not installed by CocoaPods. Current Podfile:"
+          if ! grep -q "IronSourceSDK" Podfile.lock; then
+            echo "ERROR: IronSourceSDK was not installed by CocoaPods. Current Podfile:"
             cat Podfile
             exit 1
           fi
