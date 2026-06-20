@@ -79,21 +79,19 @@ public class UnityAdsPlugin: CAPPlugin, CAPBridgedPlugin, UnityAdsInitialization
         calls.forEach { $0.resolve(["loaded": true]) }
     }
 
-    @objc(unityAdsAdFailedToLoad:withError:withMessage:)
-    public func unityAdsAdFailedToLoad(_ placementId: String, withError error: UnityAdsLoadError, withMessage message: String) {
+    public func unityAdsAdFailed(toLoad placementId: String, withError error: UnityAdsLoadError, withMessage message: String) {
         loadedPlacements.remove(placementId)
         let calls = pendingLoadCalls.removeValue(forKey: placementId) ?? []
         calls.forEach { $0.reject(message, String(error.rawValue)) }
     }
 
-    @objc(unityAdsShowComplete:withFinishState:)
-    public func unityAdsShowComplete(_ placementId: String, withFinishState state: UnityAdsShowCompletionState) {
+    public func unityAdsShowComplete(_ placementId: String, withFinish state: UnityAdsShowCompletionState) {
         loadedPlacements.remove(placementId)
         guard let call = pendingShowCalls.removeValue(forKey: placementId) else { return }
 
         call.resolve([
-            "completed": state == kUnityShowCompletionStateCompleted,
-            "skipped": state == kUnityShowCompletionStateSkipped
+            "completed": state.rawValue == 1,
+            "skipped": state.rawValue == 0
         ])
     }
 
