@@ -72,6 +72,7 @@ public class GameCenterPlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
 
+        NSLog("GameCenterPlugin submitting score=%ld context=%ld leaderboards=%@", score, context, leaderboardIDs.joined(separator: ","))
         GKLeaderboard.submitScore(
             score,
             context: context,

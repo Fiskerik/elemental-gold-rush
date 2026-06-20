@@ -6,7 +6,6 @@ import {
   type LeaderboardBoard,
   type LeaderboardEntry,
   type LeaderboardKind,
-  type LeaderboardScope,
 } from "./leaderboard";
 import { formatScore } from "./logic";
 import { useIsTabletLayout } from "./responsive";
@@ -15,7 +14,7 @@ import { useProgress } from "./store";
 export function Leaderboard({ onBack }: { onBack: () => void }) {
   const isTabletLayout = useIsTabletLayout();
   const [kind, setKind] = useState<LeaderboardKind>("daily-board");
-  const [scope, setScope] = useState<LeaderboardScope>("global");
+  const scope = "global";
   const [board, setBoard] = useState<LeaderboardBoard>(() => getDailyLeaderboard(kind, scope));
   const [loading, setLoading] = useState(false);
   const recordDailyBoardLeaderboardPlacement = useProgress(
@@ -37,7 +36,7 @@ export function Leaderboard({ onBack }: { onBack: () => void }) {
     return () => {
       cancelled = true;
     };
-  }, [kind, scope]);
+  }, [kind]);
 
   useEffect(() => {
     if (kind !== "daily-board" || scope !== "global") return;
@@ -93,15 +92,6 @@ export function Leaderboard({ onBack }: { onBack: () => void }) {
             onClick={() => setKind("daily-compound")}
           >
             Daily Compound
-          </SegmentButton>
-        </div>
-
-        <div style={tabRow} role="tablist" aria-label="Leaderboard scope">
-          <SegmentButton active={scope === "global"} onClick={() => setScope("global")}>
-            Global
-          </SegmentButton>
-          <SegmentButton active={scope === "local"} onClick={() => setScope("local")}>
-            Local
           </SegmentButton>
         </div>
 

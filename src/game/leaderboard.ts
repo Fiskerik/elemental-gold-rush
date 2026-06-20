@@ -2,6 +2,7 @@ import { getTodayQuestDate } from "./quests";
 import { DEFAULT_PLAYER_DISPLAY_NAME, useProgress } from "./store";
 import {
   type GameCenterLeaderboardKind,
+  hasDailyGameCenterLeaderboardId,
   isGameCenterAvailable,
   loadDailyGameCenterLeaderboard,
   submitDailyGameCenterScore,
@@ -138,10 +139,7 @@ function readRecords(): DailyCompoundRunRecord[] {
 
 function writeRecords(records: DailyCompoundRunRecord[]): void {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(
-    DAILY_LEADERBOARD_STORAGE_KEY,
-    JSON.stringify(records.slice(-60)),
-  );
+  window.localStorage.setItem(DAILY_LEADERBOARD_STORAGE_KEY, JSON.stringify(records.slice(-60)));
 }
 
 function getPlayerDisplayName(): string {
@@ -162,7 +160,9 @@ export function calculateDailyBoardLeaderboardScore(input: DailyBoardScoreInput)
   const comboScore = Math.max(0, Math.floor(input.comboScore));
 
   const timeRatio = clamp01(
-    1 - (elapsedMs - DAILY_BOARD_FAST_CLEAR_MS) / (DAILY_BOARD_SLOW_CLEAR_MS - DAILY_BOARD_FAST_CLEAR_MS),
+    1 -
+      (elapsedMs - DAILY_BOARD_FAST_CLEAR_MS) /
+        (DAILY_BOARD_SLOW_CLEAR_MS - DAILY_BOARD_FAST_CLEAR_MS),
   );
   const shotRatio = clamp01(
     1 - (shots - DAILY_BOARD_IDEAL_SHOTS) / (DAILY_BOARD_SOFT_SHOT_LIMIT - DAILY_BOARD_IDEAL_SHOTS),
@@ -240,8 +240,7 @@ function seededEntries(
       kind === "daily-board"
         ? Math.max(1200, 62000 - index * 2450 + (variance % 1800))
         : Math.max(250, 26000 - index * 1150 + (variance % 900));
-    const shots =
-      kind === "daily-board" ? 12 + ((variance + index) % 17) : 1 + (variance % 6);
+    const shots = kind === "daily-board" ? 12 + ((variance + index) % 17) : 1 + (variance % 6);
     return {
       id: `seed-daily-${kind}-${scope}-${index}`,
       rank: 0,
@@ -333,7 +332,7 @@ export async function loadDailyLeaderboard(
   scope: LeaderboardScope,
 ): Promise<LeaderboardBoard> {
   const countryCode = inferPlayerCountryCode();
-  if (!isGameCenterAvailable()) {
+  if (!isGameCenterAvailable() || !hasDailyGameCenterLeaderboardId(kind, scope)) {
     return getDailyLeaderboard(kind, scope);
   }
 

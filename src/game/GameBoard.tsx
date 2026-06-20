@@ -1275,9 +1275,11 @@ function StandardGameBoard({
     hasChosenShootingStyle,
     setShootingStyle,
     hasProPack,
+    boardTheme,
     clearedStagesSinceAd,
     markInterstitialShown,
   } = useProgress();
+  const activeBoardTheme = hasProPack ? boardTheme : "reactor";
   const progressionPowerUpLevel = Math.max(level.id, unlockedLevel);
   const shimmerEnabled = progressionPowerUpLevel >= SHIMMER_MIN_LEVEL;
   const grabEnabled = progressionPowerUpLevel >= GRAB_MIN_LEVEL;
@@ -4028,10 +4030,7 @@ function StandardGameBoard({
       radius: eGunR * 2,
       hitCount: hitIds.size,
     });
-    window.setTimeout(
-      () => setGammaImpactFx((fx) => (fx?.id === gammaFxId ? null : fx)),
-      820,
-    );
+    window.setTimeout(() => setGammaImpactFx((fx) => (fx?.id === gammaFxId ? null : fx)), 820);
     setShots(nextShots);
     applyShotMilestones(nextShots);
     consumeEmissionBoostShot();
@@ -6053,7 +6052,7 @@ function StandardGameBoard({
 
   return (
     <div
-      className="app-shell game-board-shell"
+      className={`app-shell game-board-shell board-theme-${activeBoardTheme}`}
       style={{
         display: "flex",
         flexDirection: "column",
@@ -6129,7 +6128,7 @@ function StandardGameBoard({
               style={{
                 fontSize: 11,
                 fontWeight: 700,
-                color: "var(--accent)",
+                color: "var(--game-meter-hot, var(--accent))",
                 marginTop: 2,
                 fontVariantNumeric: "tabular-nums",
               }}
@@ -6141,7 +6140,13 @@ function StandardGameBoard({
           </div>
           <div style={{ ...iconBtn, cursor: "default", minWidth: 74, textAlign: "right" }}>
             <div style={{ fontSize: 10, color: "var(--muted-foreground)" }}>SCORE</div>
-            <div style={{ fontSize: 14, fontWeight: 800, color: "var(--accent)" }}>
+            <div
+              style={{
+                fontSize: 14,
+                fontWeight: 800,
+                color: "var(--game-meter-hot, var(--accent))",
+              }}
+            >
               {formatScore(score)}
             </div>
             <div
@@ -6178,9 +6183,10 @@ function StandardGameBoard({
               flexWrap: "wrap",
               gap: 10,
               padding: "10px 12px",
-              background: "var(--surface)",
-              borderRadius: 12,
-              border: "1px solid var(--border)",
+              background: "var(--game-panel-bg, var(--surface))",
+              borderRadius: 10,
+              border: "1px solid var(--game-panel-border, var(--border))",
+              boxShadow: "var(--game-panel-shadow, none)",
               marginBottom: 10,
             }}
           >
@@ -6213,7 +6219,7 @@ function StandardGameBoard({
                     right: 0,
                     top: 8,
                     height: 6,
-                    background: "var(--surface-high)",
+                    background: "var(--game-meter-track, var(--surface-high))",
                     borderRadius: 3,
                     overflow: "hidden",
                   }}
@@ -6222,7 +6228,8 @@ function StandardGameBoard({
                     style={{
                       width: `${progressPct}%`,
                       height: "100%",
-                      background: "linear-gradient(90deg, var(--primary), var(--accent))",
+                      background:
+                        "var(--game-meter-fill, linear-gradient(90deg, var(--primary), var(--accent)))",
                       transition: "width 0.4s ease",
                     }}
                   />
@@ -6296,9 +6303,12 @@ function StandardGameBoard({
               alignItems: "center",
               gap: 10,
               padding: "8px 10px",
-              background: "color-mix(in oklch, var(--accent) 12%, var(--surface))",
+              background:
+                "var(--game-panel-accent-bg, color-mix(in oklch, var(--accent) 12%, var(--surface)))",
               borderRadius: 10,
-              border: "1px solid color-mix(in oklch, var(--accent) 45%, var(--border))",
+              border:
+                "1px solid var(--game-panel-accent-border, color-mix(in oklch, var(--accent) 45%, var(--border)))",
+              boxShadow: "var(--game-panel-shadow, none)",
               marginBottom: 10,
             }}
           >
@@ -6310,7 +6320,7 @@ function StandardGameBoard({
                 style={{
                   fontSize: 10,
                   letterSpacing: 1.5,
-                  color: "var(--accent)",
+                  color: "var(--game-meter-hot, var(--accent))",
                   fontWeight: 900,
                 }}
               >
@@ -6345,9 +6355,10 @@ function StandardGameBoard({
               alignItems: "center",
               gap: 8,
               padding: "6px 10px",
-              background: "var(--surface)",
+              background: "var(--game-panel-bg, var(--surface))",
               borderRadius: 10,
-              border: "1px solid var(--border)",
+              border: "1px solid var(--game-panel-border, var(--border))",
+              boxShadow: "var(--game-panel-shadow, none)",
               marginBottom: 10,
             }}
           >
@@ -6370,7 +6381,7 @@ function StandardGameBoard({
               <div
                 style={{
                   height: 6,
-                  background: "var(--surface-high)",
+                  background: "var(--game-meter-track, var(--surface-high))",
                   borderRadius: 3,
                   marginTop: 4,
                   overflow: "hidden",
@@ -6382,8 +6393,8 @@ function StandardGameBoard({
                     height: "100%",
                     background:
                       grabs > 0
-                        ? "linear-gradient(90deg, var(--accent), var(--success, var(--accent)))"
-                        : "linear-gradient(90deg, var(--primary), var(--accent))",
+                        ? "var(--game-meter-fill-ready, linear-gradient(90deg, var(--accent), var(--success, var(--accent))))"
+                        : "var(--game-meter-fill, linear-gradient(90deg, var(--primary), var(--accent)))",
                     transition: "width 0.4s ease",
                   }}
                 />
@@ -6464,13 +6475,14 @@ function StandardGameBoard({
           }
           style={{
             position: "relative",
-            background: "linear-gradient(180deg, oklch(0.18 0.05 275), oklch(0.13 0.04 275))",
-            borderRadius: 16,
-            border: "1px solid var(--border)",
+            background:
+              "var(--game-board-bg, linear-gradient(180deg, oklch(0.18 0.05 275), oklch(0.13 0.04 275)))",
+            borderRadius: 18,
+            border: "1px solid var(--game-board-border, var(--border))",
             padding: 4,
             flex: 1,
             minHeight: 360,
-            boxShadow: "inset 0 0 30px rgba(79, 195, 247, 0.08)",
+            boxShadow: "var(--game-board-shadow, inset 0 0 30px rgba(79, 195, 247, 0.08))",
             display: "flex",
             flexDirection: "column",
             touchAction: "none",
@@ -6494,8 +6506,8 @@ function StandardGameBoard({
               top: geo.dangerY,
               bottom: 4,
               background:
-                "linear-gradient(0deg, var(--danger-glow) 0%, oklch(0.72 0.22 25 / 0.16) 58%, transparent 100%)",
-              borderTop: "1px dashed var(--destructive)",
+                "var(--game-danger-zone, linear-gradient(0deg, var(--danger-glow) 0%, oklch(0.72 0.22 25 / 0.16) 58%, transparent 100%))",
+              borderTop: "1px solid var(--game-danger-line, var(--destructive))",
               borderRadius: 4,
               pointerEvents: "none",
               userSelect: "none",
@@ -6917,7 +6929,7 @@ function StandardGameBoard({
                   <polyline
                     points={previewPath.map((p) => `${p.x},${p.y}`).join(" ")}
                     fill="none"
-                    stroke="var(--primary)"
+                    stroke="var(--game-aim-color, var(--primary))"
                     strokeWidth={2}
                     strokeDasharray="4 6"
                     opacity={0.6}
@@ -6931,7 +6943,7 @@ function StandardGameBoard({
                         cy={last.y}
                         r={ballSize / 2.4}
                         fill="none"
-                        stroke="var(--accent)"
+                        stroke="var(--game-aim-target, var(--accent))"
                         strokeWidth={2}
                         opacity={0.7}
                       />
@@ -7090,9 +7102,10 @@ function StandardGameBoard({
           style={{
             marginTop: 10,
             padding: 10,
-            background: "var(--surface)",
-            borderRadius: 14,
-            border: "1px solid var(--border)",
+            background: "var(--game-panel-bg, var(--surface))",
+            borderRadius: 12,
+            border: "1px solid var(--game-panel-border, var(--border))",
+            boxShadow: "var(--game-panel-shadow, none)",
             display: "flex",
             flexDirection: "row",
             alignItems: "center",
@@ -7718,8 +7731,8 @@ const powerUpCount: React.CSSProperties = {
   height: 16,
   padding: "0 4px",
   borderRadius: 999,
-  background: "var(--surface)",
-  border: "1px solid var(--border)",
+  background: "var(--game-panel-bg, var(--surface))",
+  border: "1px solid var(--game-panel-border, var(--border))",
   color: "var(--foreground)",
   fontSize: 10,
   lineHeight: "14px",
@@ -7740,15 +7753,15 @@ const powerUpLevelPill: React.CSSProperties = {
   fontWeight: 900,
   letterSpacing: 0,
   color: "var(--primary-foreground)",
-  background: "linear-gradient(135deg, var(--accent), var(--primary))",
+  background: "var(--game-meter-fill, linear-gradient(135deg, var(--accent), var(--primary)))",
   border: "1px solid rgba(255,255,255,0.38)",
   boxShadow: "0 0 8px var(--accent-glow)",
   pointerEvents: "none",
 };
 
 const iconBtn: React.CSSProperties = {
-  background: "var(--surface)",
-  border: "1px solid var(--border)",
+  background: "var(--game-panel-bg, var(--surface))",
+  border: "1px solid var(--game-panel-border, var(--border))",
   color: "var(--foreground)",
   borderRadius: 10,
   padding: "6px 10px",
@@ -7756,6 +7769,7 @@ const iconBtn: React.CSSProperties = {
   fontWeight: 600,
   cursor: "pointer",
   minWidth: 64,
+  boxShadow: "var(--game-panel-shadow, none)",
 };
 
 function formatTime(ms: number): string {

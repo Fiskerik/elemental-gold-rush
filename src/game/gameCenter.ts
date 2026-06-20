@@ -49,13 +49,27 @@ interface GameCenterPlugin {
 const GameCenterNative = registerPlugin<GameCenterPlugin>("GameCenterPlugin");
 
 export const DAILY_BOARD_LEADERBOARD_IDS: Record<GameCenterLeaderboardScope, string> = {
-  global: "daily_leaderboard_global",
-  local: "daily_leaderboard_local",
+  global:
+    configuredEnvValue(
+      import.meta.env.VITE_GAME_CENTER_DAILY_BOARD_GLOBAL_LEADERBOARD_ID,
+      import.meta.env.VITE_DAILY_BOARD_GLOBAL_LEADERBOARD_ID,
+    ) || "daily_leaderboard_global",
+  local: configuredEnvValue(
+    import.meta.env.VITE_GAME_CENTER_DAILY_BOARD_LOCAL_LEADERBOARD_ID,
+    import.meta.env.VITE_DAILY_BOARD_LOCAL_LEADERBOARD_ID,
+  ),
 };
 
 export const DAILY_COMPOUND_LEADERBOARD_IDS: Record<GameCenterLeaderboardScope, string> = {
-  global: "daily_leaderboard_global",
-  local: "daily_leaderboard_local",
+  global:
+    configuredEnvValue(
+      import.meta.env.VITE_GAME_CENTER_DAILY_COMPOUND_GLOBAL_LEADERBOARD_ID,
+      import.meta.env.VITE_DAILY_COMPOUND_GLOBAL_LEADERBOARD_ID,
+    ) || "daily_leaderboard_local",
+  local: configuredEnvValue(
+    import.meta.env.VITE_GAME_CENTER_DAILY_COMPOUND_LOCAL_LEADERBOARD_ID,
+    import.meta.env.VITE_DAILY_COMPOUND_LOCAL_LEADERBOARD_ID,
+  ),
 };
 
 const DAILY_LEADERBOARD_IDS: Record<
@@ -68,6 +82,31 @@ const DAILY_LEADERBOARD_IDS: Record<
 
 export function isGameCenterAvailable(): boolean {
   return Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios";
+}
+
+function configuredEnvValue(...values: unknown[]): string {
+  for (const value of values) {
+    if (typeof value !== "string") continue;
+    const trimmed = value.trim();
+    if (trimmed && trimmed !== "undefined" && trimmed !== "null") return trimmed;
+  }
+  return "";
+}
+
+function uniqueLeaderboardIds(ids: string[]): string[] {
+  return Array.from(new Set(ids.map((id) => id.trim()).filter(Boolean)));
+}
+
+function getSubmitLeaderboardIds(kind: GameCenterLeaderboardKind): string[] {
+  const ids = DAILY_LEADERBOARD_IDS[kind];
+  return uniqueLeaderboardIds([ids.global]);
+}
+
+export function hasDailyGameCenterLeaderboardId(
+  kind: GameCenterLeaderboardKind,
+  scope: GameCenterLeaderboardScope,
+): boolean {
+  return Boolean(DAILY_LEADERBOARD_IDS[kind][scope]);
 }
 
 export async function authenticateGameCenter(): Promise<GameCenterPlayer> {
@@ -94,13 +133,26 @@ export async function submitDailyGameCenterScore(
   if (normalizedScore <= 0) return false;
   const normalizedShots = Math.max(0, Math.floor(shots));
   await authenticateGameCenter();
-  const ids = DAILY_LEADERBOARD_IDS[kind];
-  await GameCenterNative.submitScore({
-    leaderboardIds: [ids.global, ids.local],
-    score: normalizedScore,
-    context: normalizedShots,
-  });
-  return true;
+  const leaderboardIds = getSubmitLeaderboardIds(kind);
+  if (!leaderboardIds.length) return false;
+  const results = await Promise.allSettled(
+    leaderboardIds.map((leaderboardId) =>
+      GameCenterNative.submitScore({
+        leaderboardId,
+        score: normalizedScore,
+        context: normalizedShots,
+      }),
+    ),
+  );
+  const submittedIds = leaderboardIds.filter((_, index) => results[index]?.status === "fulfilled");
+  const failedIds = leaderboardIds.filter((_, index) => results[index]?.status === "rejected");
+  if (failedIds.length) {
+    console.warn("Game Center daily score submit failed for leaderboard IDs", failedIds, results);
+  }
+  if (submittedIds.length) {
+    console.info("Game Center daily score submitted", { kind, leaderboardIds: submittedIds });
+  }
+  return submittedIds.length > 0;
 }
 
 export async function loadDailyCompoundGameCenterLeaderboard(
@@ -114,8 +166,12 @@ export async function loadDailyGameCenterLeaderboard(
   scope: GameCenterLeaderboardScope,
 ): Promise<GameCenterLeaderboardResult> {
   await authenticateGameCenter();
+  const leaderboardId = DAILY_LEADERBOARD_IDS[kind][scope] || DAILY_LEADERBOARD_IDS[kind].global;
+  if (!leaderboardId) {
+    throw new Error(`Missing Game Center leaderboard ID for ${kind}/${scope}`);
+  }
   return GameCenterNative.loadLeaderboard({
-    leaderboardId: DAILY_LEADERBOARD_IDS[kind][scope],
+    leaderboardId,
     start: 1,
     length: 25,
     playerScope: "global",

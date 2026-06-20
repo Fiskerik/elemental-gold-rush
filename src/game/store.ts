@@ -98,7 +98,9 @@ export const emptyLabUpgradeLevels = (): LabUpgradeLevels =>
 export const emptyLabUpgradeEnabled = (): LabUpgradeEnabled =>
   Object.fromEntries(LAB_UPGRADE_IDS.map((id) => [id, true])) as LabUpgradeEnabled;
 
-function normalizeLabUpgradeLevels(levels: Partial<Record<LabUpgradeId, number>> | undefined): LabUpgradeLevels {
+function normalizeLabUpgradeLevels(
+  levels: Partial<Record<LabUpgradeId, number>> | undefined,
+): LabUpgradeLevels {
   const next = emptyLabUpgradeLevels();
   for (const id of LAB_UPGRADE_IDS) {
     next[id] = Math.max(0, Math.min(5, Math.floor(levels?.[id] ?? 0)));
@@ -106,13 +108,22 @@ function normalizeLabUpgradeLevels(levels: Partial<Record<LabUpgradeId, number>>
   return next;
 }
 
-function normalizeLabUpgradeEnabled(enabled: Partial<Record<LabUpgradeId, boolean>> | undefined): LabUpgradeEnabled {
+function normalizeLabUpgradeEnabled(
+  enabled: Partial<Record<LabUpgradeId, boolean>> | undefined,
+): LabUpgradeEnabled {
   const next = emptyLabUpgradeEnabled();
   for (const id of LAB_UPGRADE_IDS) next[id] = enabled?.[id] ?? true;
   return next;
 }
 
 export type AppTheme = "dark" | "light";
+export const BOARD_THEMES = ["reactor", "cryo", "forge"] as const;
+export type BoardTheme = (typeof BOARD_THEMES)[number];
+
+export function isBoardTheme(value: unknown): value is BoardTheme {
+  return typeof value === "string" && (BOARD_THEMES as readonly string[]).includes(value);
+}
+
 export const DEFAULT_PLAYER_DISPLAY_NAME = "You";
 
 export function normalizePlayerDisplayName(value: string | undefined): string {
@@ -262,6 +273,7 @@ interface ProgressState {
   soundVolume: number; // 0-100
   musicVolume: number; // 0-100
   appTheme: AppTheme;
+  boardTheme: BoardTheme;
   appLanguage: AppLanguage;
   shootingStyle: "hold" | "press";
   hasChosenShootingStyle: boolean;
@@ -347,6 +359,7 @@ interface ProgressState {
   setSoundVolume: (volume: number) => void;
   setMusicVolume: (volume: number) => void;
   setAppTheme: (theme: AppTheme) => void;
+  setBoardTheme: (theme: BoardTheme) => void;
   setAppLanguage: (language: AppLanguage) => void;
   setPlayerDisplayName: (name: string) => void;
   toggleAppTheme: () => void;
@@ -380,6 +393,7 @@ export const useProgress = create<ProgressState>()(
       soundVolume: 100,
       musicVolume: 100,
       appTheme: "dark",
+      boardTheme: "reactor",
       appLanguage: DEFAULT_LANGUAGE,
       shootingStyle: "hold",
       hasChosenShootingStyle: false,
@@ -474,9 +488,10 @@ export const useProgress = create<ProgressState>()(
               rewardClaimed: true,
             },
             dailyCompoundRuns: s.dailyCompoundRuns + (scoredRun ? 1 : 0),
-            dailyCompoundBestScore: scoredRun && awarded
-              ? Math.max(s.dailyCompoundBestScore, Math.max(0, Math.floor(score)))
-              : s.dailyCompoundBestScore,
+            dailyCompoundBestScore:
+              scoredRun && awarded
+                ? Math.max(s.dailyCompoundBestScore, Math.max(0, Math.floor(score)))
+                : s.dailyCompoundBestScore,
             goldCoins: balanceAfter,
             coinTransactions: appendCoinTransaction(
               s.coinTransactions,
@@ -528,24 +543,26 @@ export const useProgress = create<ProgressState>()(
             [id]: !(s.labUpgradeEnabled[id] ?? true),
           },
         })),
-      unlockLevel: (id) => set((s) => {
-        const unlockedLevel = Math.max(s.unlockedLevel, id);
-        if (!s.hasProPack) return { unlockedLevel };
-        const { levels: labUpgradeLevels } = grantUnlockedProStarterUpgrades(
-          normalizeLabUpgradeLevels(s.labUpgradeLevels),
-          unlockedLevel,
-        );
-        return { unlockedLevel, labUpgradeLevels };
-      }),
-      setUnlockedLevel: (id) => set((s) => {
-        const unlockedLevel = Math.max(1, Math.floor(id));
-        if (!s.hasProPack) return { unlockedLevel };
-        const { levels: labUpgradeLevels } = grantUnlockedProStarterUpgrades(
-          normalizeLabUpgradeLevels(s.labUpgradeLevels),
-          unlockedLevel,
-        );
-        return { unlockedLevel, labUpgradeLevels };
-      }),
+      unlockLevel: (id) =>
+        set((s) => {
+          const unlockedLevel = Math.max(s.unlockedLevel, id);
+          if (!s.hasProPack) return { unlockedLevel };
+          const { levels: labUpgradeLevels } = grantUnlockedProStarterUpgrades(
+            normalizeLabUpgradeLevels(s.labUpgradeLevels),
+            unlockedLevel,
+          );
+          return { unlockedLevel, labUpgradeLevels };
+        }),
+      setUnlockedLevel: (id) =>
+        set((s) => {
+          const unlockedLevel = Math.max(1, Math.floor(id));
+          if (!s.hasProPack) return { unlockedLevel };
+          const { levels: labUpgradeLevels } = grantUnlockedProStarterUpgrades(
+            normalizeLabUpgradeLevels(s.labUpgradeLevels),
+            unlockedLevel,
+          );
+          return { unlockedLevel, labUpgradeLevels };
+        }),
       recordDiscovery: (nums) =>
         set((s) => {
           const next = new Set(s.discoveredElements);
@@ -571,7 +588,9 @@ export const useProgress = create<ProgressState>()(
         set((s) => {
           const normalizedCost = Math.max(0, Math.floor(coinCost));
           const current = new Set(s.discoveredElements);
-          const locked = ELEMENTS.map((element) => element.atomicNumber).filter((atomicNumber) => !current.has(atomicNumber));
+          const locked = ELEMENTS.map((element) => element.atomicNumber).filter(
+            (atomicNumber) => !current.has(atomicNumber),
+          );
           if (locked.length === 0 || s.goldCoins < normalizedCost) return s;
           locked.forEach((atomicNumber) => current.add(atomicNumber));
           const discoveredElements = Array.from(current).sort((a, b) => a - b);
@@ -603,7 +622,9 @@ export const useProgress = create<ProgressState>()(
         set((s) => {
           const normalizedCost = Math.max(0, Math.floor(coinCost));
           const current = new Set(s.discoveredCompounds);
-          const locked = COMPOUNDS.map((compound) => compound.id).filter((compoundId) => !current.has(compoundId));
+          const locked = COMPOUNDS.map((compound) => compound.id).filter(
+            (compoundId) => !current.has(compoundId),
+          );
           if (locked.length === 0 || s.goldCoins < normalizedCost) return s;
           locked.forEach((compoundId) => current.add(compoundId));
           const compoundCounts = { ...s.compoundCounts };
@@ -924,10 +945,8 @@ export const useProgress = create<ProgressState>()(
                 0,
               )
             : 0;
-          const { levels: labUpgradeLevels, changed: grantedUpgrade } = grantUnlockedProStarterUpgrades(
-            normalizedLevels,
-            s.unlockedLevel,
-          );
+          const { levels: labUpgradeLevels, changed: grantedUpgrade } =
+            grantUnlockedProStarterUpgrades(normalizedLevels, s.unlockedLevel);
           if (s.hasProPack && s.proStarterCoinsGranted && !grantedUpgrade) return s;
           const coinDelta = shouldGrantStarter ? 100 + refundCoins : 0;
           const balanceAfter = s.goldCoins + coinDelta;
@@ -1004,6 +1023,11 @@ export const useProgress = create<ProgressState>()(
       setMusicVolume: (volume) =>
         set(() => ({ musicVolume: Math.max(0, Math.min(100, Math.round(volume))) })),
       setAppTheme: (theme) => set({ appTheme: theme }),
+      setBoardTheme: (theme) =>
+        set((s) => ({
+          boardTheme:
+            isBoardTheme(theme) && (theme === "reactor" || s.hasProPack) ? theme : "reactor",
+        })),
       setAppLanguage: (language) => set({ appLanguage: normalizeLanguage(language) }),
       setPlayerDisplayName: (name) => set({ playerDisplayName: normalizePlayerDisplayName(name) }),
       toggleAppTheme: () => set((s) => ({ appTheme: s.appTheme === "dark" ? "light" : "dark" })),
@@ -1027,6 +1051,7 @@ export const useProgress = create<ProgressState>()(
           soundVolume: 100,
           musicVolume: 100,
           appTheme: "dark",
+          boardTheme: "reactor",
           appLanguage: DEFAULT_LANGUAGE,
           shootingStyle: "hold",
           hasChosenShootingStyle: false,
@@ -1092,6 +1117,9 @@ export const useProgress = create<ProgressState>()(
           soundVolume: persistedState?.soundVolume ?? current.soundVolume,
           musicVolume: persistedState?.musicVolume ?? current.musicVolume,
           appTheme: persistedState?.appTheme === "light" ? "light" : "dark",
+          boardTheme: isBoardTheme(persistedState?.boardTheme)
+            ? persistedState.boardTheme
+            : current.boardTheme,
           appLanguage: normalizeLanguage(persistedState?.appLanguage),
           shootingStyle: persistedState?.shootingStyle ?? current.shootingStyle,
           hasChosenShootingStyle:
@@ -1125,8 +1153,12 @@ export const useProgress = create<ProgressState>()(
           seenTips: persistedState?.seenTips ?? current.seenTips,
           labUpgradeLevels: normalizeLabUpgradeLevels(persistedState?.labUpgradeLevels),
           labUpgradeEnabled: normalizeLabUpgradeEnabled(persistedState?.labUpgradeEnabled),
-          dailyChallenge: refreshDailyChallengeState(persistedState?.dailyChallenge ?? current.dailyChallenge),
-          secretCompound: refreshSecretCompoundState(persistedState?.secretCompound ?? current.secretCompound),
+          dailyChallenge: refreshDailyChallengeState(
+            persistedState?.dailyChallenge ?? current.dailyChallenge,
+          ),
+          secretCompound: refreshSecretCompoundState(
+            persistedState?.secretCompound ?? current.secretCompound,
+          ),
           dailyBoardRuns: persistedState?.dailyBoardRuns ?? current.dailyBoardRuns,
           dailyBoardBestScore: persistedState?.dailyBoardBestScore ?? current.dailyBoardBestScore,
           dailyCompoundRuns: persistedState?.dailyCompoundRuns ?? current.dailyCompoundRuns,
