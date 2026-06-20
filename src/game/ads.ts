@@ -105,6 +105,7 @@ function getRewardedPlacementId(): string {
 }
 
 function shouldUseUnityTestMode(): boolean {
+  if (import.meta.env.PROD) return false;
   return envFlagEnabled(
     firstConfiguredEnvValue(
       import.meta.env.VITE_UNITY_ADS_TEST_MODE,
@@ -218,8 +219,7 @@ export async function preloadRewarded(): Promise<void> {
       rewardedReady = true;
     } catch (error) {
       rewardedReady = false;
-      lastRewardedError =
-        `${describeAdError(error) || "Rewarded ad failed to load."} [${describeUnityConfig()}]`;
+      lastRewardedError = `${describeAdError(error) || "Rewarded ad failed to load."} [${describeUnityConfig()}]`;
     } finally {
       rewardedLoading = false;
       rewardedLoadPromise = null;
