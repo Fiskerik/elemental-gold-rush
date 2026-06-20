@@ -12,6 +12,7 @@
 		504EC3081FED79650016851F /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC3071FED79650016851F /* AppDelegate.swift */; };
 		AR1000020000000000000000 /* AppReviewPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = AR1000010000000000000000 /* AppReviewPlugin.swift */; };
 		GC1000020000000000000000 /* GameCenterPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = GC1000010000000000000000 /* GameCenterPlugin.swift */; };
+		UA1000020000000000000000 /* UnityAdsPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = UA1000010000000000000000 /* UnityAdsPlugin.swift */; };
 		FB0000000000000000000001 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = FB0000000000000000000002 /* GoogleService-Info.plist */; };
 		504EC30D1FED79650016851F /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30B1FED79650016851F /* Main.storyboard */; };
 		504EC30F1FED79650016851F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30E1FED79650016851F /* Assets.xcassets */; };
@@ -27,6 +28,7 @@
 		504EC3071FED79650016851F /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		AR1000010000000000000000 /* AppReviewPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppReviewPlugin.swift; sourceTree = "<group>"; };
 		GC1000010000000000000000 /* GameCenterPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameCenterPlugin.swift; sourceTree = "<group>"; };
+		UA1000010000000000000000 /* UnityAdsPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnityAdsPlugin.swift; sourceTree = "<group>"; };
 		GC1000030000000000000000 /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
 		504EC30C1FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		504EC30E1FED79650016851F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -84,6 +86,7 @@
 				504EC3071FED79650016851F /* AppDelegate.swift */,
 				AR1000010000000000000000 /* AppReviewPlugin.swift */,
 				GC1000010000000000000000 /* GameCenterPlugin.swift */,
+				UA1000010000000000000000 /* UnityAdsPlugin.swift */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
 				504EC30E1FED79650016851F /* Assets.xcassets */,
 				504EC3101FED79650016851F /* LaunchScreen.storyboard */,
@@ -229,6 +232,7 @@
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 				AR1000020000000000000000 /* AppReviewPlugin.swift in Sources */,
 				GC1000020000000000000000 /* GameCenterPlugin.swift in Sources */,
+				UA1000020000000000000000 /* UnityAdsPlugin.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

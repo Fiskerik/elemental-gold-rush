@@ -11,6 +11,7 @@ install! 'cocoapods', :disable_input_output_paths => true
 def capacitor_pods
   pod 'Capacitor', :path => '../../node_modules/@capacitor/ios'
   pod 'CapacitorCordova', :path => '../../node_modules/@capacitor/ios'
+  # Retained for a future AdMob reactivation; runtime ad calls currently use UnityAdsPlugin.
   pod 'CapacitorCommunityAdmob', :path => '../../node_modules/@capacitor-community/admob'
   pod 'CapacitorFirebaseAnalytics', :path => '../../node_modules/@capacitor-firebase/analytics'
   pod 'CapacitorHaptics', :path => '../../node_modules/@capacitor/haptics'
@@ -18,12 +19,14 @@ def capacitor_pods
   pod 'CapacitorSplashScreen', :path => '../../node_modules/@capacitor/splash-screen'
   pod 'CapacitorStatusBar', :path => '../../node_modules/@capacitor/status-bar'
   pod 'RevenuecatPurchasesCapacitor', :path => '../../node_modules/@revenuecat/purchases-capacitor'
+  pod 'UnityAds'
 end
 
 target 'App' do
   capacitor_pods
   # Add your Pods here
   pod 'CapacitorFirebaseAnalytics/Analytics', :path => '../../node_modules/@capacitor-firebase/analytics'
+  # Retained for a future AdMob mediation reactivation; not initialized by the app right now.
   pod 'GoogleMobileAdsMediationFacebook'
   pod 'GoogleMobileAdsMediationUnity'
   pod 'GoogleMobileAdsMediationAppLovin'

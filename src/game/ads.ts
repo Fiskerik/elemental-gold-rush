@@ -1,29 +1,46 @@
-import { Capacitor, type PluginListenerHandle } from "@capacitor/core";
-import {
-  AdMob,
-  InterstitialAdPluginEvents,
-  RewardAdPluginEvents,
-} from "@capacitor-community/admob";
+import { Capacitor, registerPlugin } from "@capacitor/core";
 
 export type RewardedAdResult = {
   rewarded: boolean;
   reason?: string;
 };
 
-const LIVE_IOS_INTERSTITIAL_ID = "ca-app-pub-8854735603167656/6238016576";
-const LIVE_IOS_REWARDED_ID = "ca-app-pub-8854735603167656/8761449585";
-const GOOGLE_IOS_TEST_INTERSTITIAL_ID = "ca-app-pub-3940256099942544/4411468910";
-const GOOGLE_IOS_TEST_REWARDED_ID = "ca-app-pub-3940256099942544/1712485313";
+type UnityAdsInitializeOptions = {
+  gameId: string;
+  testMode: boolean;
+};
+
+type UnityAdsPlacementOptions = {
+  placementId: string;
+};
+
+type UnityAdsShowResult = {
+  completed?: boolean;
+  skipped?: boolean;
+};
+
+interface UnityAdsPlugin {
+  initialize(options: UnityAdsInitializeOptions): Promise<{ initialized: boolean }>;
+  loadInterstitial(options: UnityAdsPlacementOptions): Promise<{ loaded: boolean }>;
+  loadRewarded(options: UnityAdsPlacementOptions): Promise<{ loaded: boolean }>;
+  showInterstitial(options: UnityAdsPlacementOptions): Promise<UnityAdsShowResult>;
+  showRewarded(options: UnityAdsPlacementOptions): Promise<UnityAdsShowResult>;
+}
+
+const UnityAdsNative = registerPlugin<UnityAdsPlugin>("UnityAdsPlugin");
+
+const DEFAULT_IOS_INTERSTITIAL_PLACEMENT_ID = "Interstitial_iOS";
+const DEFAULT_IOS_REWARDED_PLACEMENT_ID = "Rewarded_iOS";
 
 let initialized = false;
 let initFailed = false;
-let ready = false;
-let loading = false;
+let interstitialReady = false;
+let interstitialLoading = false;
 let rewardedReady = false;
 let rewardedLoading = false;
-let rewardedEarned = false;
 let lastRewardedError = "";
 let rewardedLoadPromise: Promise<void> | null = null;
+let interstitialLoadPromise: Promise<void> | null = null;
 
 function configuredEnvValue(value: unknown): string {
   if (typeof value !== "string") return "";
@@ -35,23 +52,66 @@ function envFlagEnabled(value: unknown): boolean {
   return typeof value === "string" && /^(1|true|yes|on)$/i.test(value.trim());
 }
 
-function shouldUseAdMobTestAds(): boolean {
-  return envFlagEnabled(import.meta.env.VITE_ADMOB_USE_TEST_ADS);
+function firstConfiguredEnvValue(...values: unknown[]): string {
+  for (const value of values) {
+    const configured = configuredEnvValue(value);
+    if (configured) return configured;
+  }
+  return "";
 }
 
-function getInterstitialId(): string {
-  if (shouldUseAdMobTestAds()) return GOOGLE_IOS_TEST_INTERSTITIAL_ID;
-  return configuredEnvValue(import.meta.env.VITE_ADMOB_IOS_INTERSTITIAL_ID) || LIVE_IOS_INTERSTITIAL_ID;
+function getUnityGameId(): string {
+  return firstConfiguredEnvValue(
+    import.meta.env.VITE_UNITY_ADS_IOS_GAME_ID,
+    import.meta.env.VITE_UNITY_ADS_GAME_ID,
+    import.meta.env.VITE_UNITYADS_IOS_GAME_ID,
+    import.meta.env.VITE_UNITYADS_GAME_ID,
+    import.meta.env.VITE_UNITY_IOS_GAME_ID,
+    import.meta.env.VITE_UNITY_GAME_ID,
+  );
 }
 
-function getRewardedId(): string {
-  if (shouldUseAdMobTestAds()) return GOOGLE_IOS_TEST_REWARDED_ID;
-  return configuredEnvValue(import.meta.env.VITE_ADMOB_IOS_REWARDED_ID) || LIVE_IOS_REWARDED_ID;
+function getInterstitialPlacementId(): string {
+  return (
+    firstConfiguredEnvValue(
+      import.meta.env.VITE_UNITY_ADS_IOS_INTERSTITIAL_ID,
+      import.meta.env.VITE_UNITY_ADS_IOS_INTERSTITIAL_PLACEMENT_ID,
+      import.meta.env.VITE_UNITY_ADS_INTERSTITIAL_ID,
+      import.meta.env.VITE_UNITY_ADS_INTERSTITIAL_PLACEMENT_ID,
+      import.meta.env.VITE_UNITYADS_IOS_INTERSTITIAL_ID,
+      import.meta.env.VITE_UNITYADS_INTERSTITIAL_ID,
+      import.meta.env.VITE_UNITY_IOS_INTERSTITIAL_ID,
+      import.meta.env.VITE_UNITY_INTERSTITIAL_ID,
+      import.meta.env.VITE_UNITY_INTERSTITIAL_PLACEMENT_ID,
+    ) || DEFAULT_IOS_INTERSTITIAL_PLACEMENT_ID
+  );
 }
 
-function shouldRequestTrackingAuthorization(): boolean {
-  const raw = configuredEnvValue(import.meta.env.VITE_ENABLE_ATT_TRACKING).toLowerCase();
-  return raw === "1" || raw === "true" || raw === "yes";
+function getRewardedPlacementId(): string {
+  return (
+    firstConfiguredEnvValue(
+      import.meta.env.VITE_UNITY_ADS_IOS_REWARDED_ID,
+      import.meta.env.VITE_UNITY_ADS_IOS_REWARDED_PLACEMENT_ID,
+      import.meta.env.VITE_UNITY_ADS_REWARDED_ID,
+      import.meta.env.VITE_UNITY_ADS_REWARDED_PLACEMENT_ID,
+      import.meta.env.VITE_UNITYADS_IOS_REWARDED_ID,
+      import.meta.env.VITE_UNITYADS_REWARDED_ID,
+      import.meta.env.VITE_UNITY_IOS_REWARDED_ID,
+      import.meta.env.VITE_UNITY_REWARDED_ID,
+      import.meta.env.VITE_UNITY_REWARDED_PLACEMENT_ID,
+    ) || DEFAULT_IOS_REWARDED_PLACEMENT_ID
+  );
+}
+
+function shouldUseUnityTestMode(): boolean {
+  return envFlagEnabled(
+    firstConfiguredEnvValue(
+      import.meta.env.VITE_UNITY_ADS_TEST_MODE,
+      import.meta.env.VITE_UNITYADS_TEST_MODE,
+      import.meta.env.VITE_UNITY_TEST_MODE,
+      import.meta.env.VITE_UNITY_ADS_IOS_TEST_MODE,
+    ),
+  );
 }
 
 function describeAdError(error: unknown): string {
@@ -60,144 +120,34 @@ function describeAdError(error: unknown): string {
   if (!error || typeof error !== "object") return "";
 
   const details = error as { code?: unknown; message?: unknown };
-  const code = typeof details.code === "number" || typeof details.code === "string" ? String(details.code) : "";
+  const code =
+    typeof details.code === "number" || typeof details.code === "string"
+      ? String(details.code)
+      : "";
   const message = typeof details.message === "string" ? details.message : "";
   return [code, message].filter(Boolean).join(": ");
 }
 
-async function addAdListener(
-  eventName: string,
-  listener: (payload?: unknown) => void,
-): Promise<PluginListenerHandle | null> {
-  const addListener = AdMob.addListener as unknown as (
-    eventName: string,
-    listenerFunc: (payload?: unknown) => void,
-  ) => Promise<PluginListenerHandle>;
-  return addListener(eventName, listener);
-}
-
-function removeAdListener(handle: PluginListenerHandle | null): void {
-  if (!handle?.remove) return;
-  void handle.remove().catch(() => {});
-}
-
-async function waitForRewardedCompletion(): Promise<RewardedAdResult> {
-  const handles: PluginListenerHandle[] = [];
-  let timeoutId: ReturnType<typeof setTimeout> | undefined;
-  let settled = false;
-
-  return new Promise<RewardedAdResult>((resolve) => {
-    const cleanup = () => {
-      if (timeoutId) clearTimeout(timeoutId);
-      handles.forEach(removeAdListener);
-    };
-
-    const finish = (result: RewardedAdResult) => {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      resolve(result);
-    };
-
-    void (async () => {
-      try {
-        const rewardedHandle = await addAdListener(RewardAdPluginEvents.Rewarded, () => {
-          rewardedEarned = true;
-          finish({ rewarded: true });
-        });
-        if (rewardedHandle) handles.push(rewardedHandle);
-
-        const failedHandle = await addAdListener(RewardAdPluginEvents.FailedToShow, (error) => {
-          const reason = describeAdError(error) || "Rewarded ad could not be shown.";
-          lastRewardedError = reason;
-          finish({ rewarded: false, reason });
-        });
-        if (failedHandle) handles.push(failedHandle);
-
-        const dismissedHandle = await addAdListener(RewardAdPluginEvents.Dismissed, () => {
-          finish({ rewarded: true });
-        });
-        if (dismissedHandle) handles.push(dismissedHandle);
-
-        const showedHandle = await addAdListener(RewardAdPluginEvents.Showed, () => {
-          lastRewardedError = "";
-        });
-        if (showedHandle) handles.push(showedHandle);
-
-        timeoutId = setTimeout(() => {
-          // Some mediated rewarded adapters never resolve the Capacitor call or
-          // emit the final reward/dismiss event. The ad was prepared and no
-          // native show failure arrived, so fail open and grant the opt-in coin.
-          finish({ rewarded: true });
-        }, 45_000);
-
-        await AdMob.showRewardVideoAd();
-        if (rewardedEarned) {
-          finish({ rewarded: true });
-          return;
-        }
-        // The native plugin resolves showRewardVideoAd only from the
-        // on-user-earned-reward handler. Some mediated networks provide a
-        // zero/empty reward payload, so a resolved call is still a valid reward.
-        finish({ rewarded: true });
-      } catch (error) {
-        const reason = describeAdError(error) || lastRewardedError || "Rewarded ad could not be shown.";
-        lastRewardedError = reason;
-        finish({ rewarded: false, reason });
-      }
-    })();
-  });
+function isUnityAdsAvailable(): boolean {
+  return Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios";
 }
 
 export async function initAds(hasProPack: boolean): Promise<void> {
-  if (hasProPack || initialized || initFailed || !Capacitor.isNativePlatform()) return;
+  if (hasProPack || initialized || initFailed || !isUnityAdsAvailable()) return;
+
+  const gameId = getUnityGameId();
+  if (!gameId) {
+    initFailed = true;
+    return;
+  }
+
   try {
-    await AdMob.initialize({
-      initializeForTesting: shouldUseAdMobTestAds() || !import.meta.env.PROD,
+    await UnityAdsNative.initialize({
+      gameId,
+      testMode: shouldUseUnityTestMode(),
     });
     initialized = true;
-
-    if (shouldRequestTrackingAuthorization()) {
-      try {
-        await AdMob.requestTrackingAuthorization();
-      } catch {
-        // ATT prompt availability depends on iOS version and prior user choice.
-      }
-    }
-
-    try {
-      await AdMob.requestConsentInfo();
-      await AdMob.showConsentForm();
-    } catch {
-      // Consent forms depend on the AdMob dashboard region/message setup.
-    }
-
-    await Promise.all([
-      addAdListener(InterstitialAdPluginEvents.Loaded, () => {
-        ready = true;
-        loading = false;
-      }),
-      addAdListener(InterstitialAdPluginEvents.FailedToLoad, () => {
-        ready = false;
-        loading = false;
-      }),
-      addAdListener(RewardAdPluginEvents.Loaded, () => {
-        rewardedReady = true;
-        rewardedLoading = false;
-        lastRewardedError = "";
-      }),
-      addAdListener(RewardAdPluginEvents.FailedToLoad, (error) => {
-        rewardedReady = false;
-        rewardedLoading = false;
-        lastRewardedError = describeAdError(error) || "Rewarded ad failed to load.";
-      }),
-      addAdListener(RewardAdPluginEvents.Rewarded, () => {
-        rewardedEarned = true;
-      }),
-    ]);
-
-    await preloadInterstitial();
-    await preloadRewarded();
+    await Promise.all([preloadInterstitial(), preloadRewarded()]);
   } catch {
     initFailed = true;
     initialized = false;
@@ -205,29 +155,39 @@ export async function initAds(hasProPack: boolean): Promise<void> {
 }
 
 export async function preloadInterstitial(): Promise<void> {
-  if (loading || ready || !Capacitor.isNativePlatform()) return;
-  loading = true;
-  try {
-    await AdMob.prepareInterstitial({ adId: getInterstitialId() });
-    ready = true;
-  } catch {
-    ready = false;
-  } finally {
-    loading = false;
+  if (interstitialReady || !isUnityAdsAvailable()) return;
+  if (interstitialLoading && interstitialLoadPromise) {
+    await interstitialLoadPromise;
+    return;
   }
+
+  interstitialLoading = true;
+  interstitialLoadPromise = (async () => {
+    try {
+      await UnityAdsNative.loadInterstitial({ placementId: getInterstitialPlacementId() });
+      interstitialReady = true;
+    } catch {
+      interstitialReady = false;
+    } finally {
+      interstitialLoading = false;
+      interstitialLoadPromise = null;
+    }
+  })();
+  await interstitialLoadPromise;
 }
 
 export async function preloadRewarded(): Promise<void> {
-  if (rewardedReady || !Capacitor.isNativePlatform()) return;
+  if (rewardedReady || !isUnityAdsAvailable()) return;
   if (rewardedLoading && rewardedLoadPromise) {
     await rewardedLoadPromise;
     return;
   }
+
   rewardedLoading = true;
   lastRewardedError = "";
   rewardedLoadPromise = (async () => {
     try {
-      await AdMob.prepareRewardVideoAd({ adId: getRewardedId() });
+      await UnityAdsNative.loadRewarded({ placementId: getRewardedPlacementId() });
       rewardedReady = true;
     } catch (error) {
       rewardedReady = false;
@@ -241,15 +201,18 @@ export async function preloadRewarded(): Promise<void> {
 }
 
 export async function showInterstitialIfReady(hasProPack: boolean): Promise<boolean> {
-  if (hasProPack || !Capacitor.isNativePlatform()) return false;
+  if (hasProPack || !isUnityAdsAvailable()) return false;
   if (!initialized) await initAds(false);
-  if (!ready) {
+  if (initFailed) return false;
+
+  if (!interstitialReady) {
     await preloadInterstitial();
-    if (!ready) return false;
+    if (!interstitialReady) return false;
   }
-  ready = false;
+
+  interstitialReady = false;
   try {
-    await AdMob.showInterstitial();
+    await UnityAdsNative.showInterstitial({ placementId: getInterstitialPlacementId() });
     await preloadInterstitial();
     return true;
   } catch {
@@ -259,13 +222,13 @@ export async function showInterstitialIfReady(hasProPack: boolean): Promise<bool
 }
 
 export async function showRewardedForCoin(_hasProPack: boolean): Promise<RewardedAdResult> {
-  if (!Capacitor.isNativePlatform()) {
+  if (!isUnityAdsAvailable()) {
     return { rewarded: false, reason: "Rewarded ads are available in the iPhone app." };
   }
 
   if (!initialized) await initAds(false);
   if (initFailed) {
-    return { rewarded: false, reason: "AdMob could not initialize in this build." };
+    return { rewarded: false, reason: "Unity Ads could not initialize in this build." };
   }
 
   if (!rewardedReady) {
@@ -278,10 +241,17 @@ export async function showRewardedForCoin(_hasProPack: boolean): Promise<Rewarde
     }
   }
 
-  rewardedEarned = false;
   rewardedReady = false;
-  const result = await waitForRewardedCompletion();
-  rewardedEarned = false;
-  await preloadRewarded();
-  return result;
+  try {
+    const result = await UnityAdsNative.showRewarded({ placementId: getRewardedPlacementId() });
+    await preloadRewarded();
+    return result.completed
+      ? { rewarded: true }
+      : { rewarded: false, reason: "Rewarded ad was not completed." };
+  } catch (error) {
+    const reason = describeAdError(error) || "Rewarded ad could not be shown.";
+    lastRewardedError = reason;
+    await preloadRewarded();
+    return { rewarded: false, reason };
+  }
 }
