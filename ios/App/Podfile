@@ -19,12 +19,13 @@ def capacitor_pods
   pod 'CapacitorSplashScreen', :path => '../../node_modules/@capacitor/splash-screen'
   pod 'CapacitorStatusBar', :path => '../../node_modules/@capacitor/status-bar'
   pod 'RevenuecatPurchasesCapacitor', :path => '../../node_modules/@revenuecat/purchases-capacitor'
-  pod 'UnityAds'
 end
 
 target 'App' do
   capacitor_pods
   # Add your Pods here
+  # Pin UnityAds below 4.13 for reliable Swift module imports on current Xcode/CocoaPods builds.
+  pod 'UnityAds', '4.12.5'
   pod 'CapacitorFirebaseAnalytics/Analytics', :path => '../../node_modules/@capacitor-firebase/analytics'
   # Mediation adapters are DISABLED while running the direct UnityAds SDK.
   # GoogleMobileAdsMediationUnity bundles its own copy of the Unity Ads SDK,
