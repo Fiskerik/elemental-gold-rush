@@ -38,4 +38,26 @@ end
 
 post_install do |installer|
   assertDeploymentTarget(installer)
+
+  # Xcode 26 enables "Explicitly Built Modules" by default, which cannot
+  # resolve the Swift module vended by UnityAds' static XCFramework. This
+  # surfaces as: "unable to resolve module dependency: 'UnityAds'".
+  # Disable explicit modules on every Pods target AND on the App target so
+  # the classic implicit module build path is used.
+  installer.pods_project.targets.each do |target|
+    target.build_configurations.each do |config|
+      config.build_settings['SWIFT_ENABLE_EXPLICIT_MODULES'] = 'NO'
+    end
+  end
+
+  installer.aggregate_targets.each do |aggregate_target|
+    user_project = aggregate_target.user_project
+    next if user_project.nil?
+    user_project.native_targets.each do |target|
+      target.build_configurations.each do |config|
+        config.build_settings['SWIFT_ENABLE_EXPLICIT_MODULES'] = 'NO'
+      end
+    end
+    user_project.save
+  end
 end
