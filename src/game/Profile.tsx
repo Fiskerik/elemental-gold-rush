@@ -7,6 +7,11 @@ import { SUPPORTED_LANGUAGES, t, toIntlLocale, type AppLanguage } from "./locali
 import { COMPOUNDS } from "./compounds";
 import { BOSSES, type BossId } from "./bosses";
 import {
+  authenticateGameCenter,
+  isGameCenterAvailable,
+  showGameCenterLeaderboards,
+} from "./gameCenter";
+import {
   DAILY_BOARD_LEADERBOARD_ACHIEVEMENTS,
   type DailyBoardLeaderboardAchievementId,
 } from "./leaderboardAchievements";
@@ -18,6 +23,7 @@ import {
   Coins,
   Crown,
   FlaskConical,
+  Gamepad2,
   Medal,
   Orbit,
   Percent,
@@ -34,6 +40,8 @@ interface Props {
 export function Profile({ onBack }: Props) {
   const isTabletLayout = useIsTabletLayout();
   const [transactionsOpen, setTransactionsOpen] = useState(false);
+  const [gameCenterBusy, setGameCenterBusy] = useState(false);
+  const [gameCenterStatus, setGameCenterStatus] = useState<string | null>(null);
   const {
     unlockedLevel,
     highestElement,
@@ -115,6 +123,49 @@ export function Profile({ onBack }: Props) {
       hour: "2-digit",
       minute: "2-digit",
     });
+  async function handleGameCenterSignIn() {
+    if (gameCenterBusy) return;
+    if (!isGameCenterAvailable()) {
+      setGameCenterStatus(tr("Game Center is available on iOS devices."));
+      return;
+    }
+    setGameCenterBusy(true);
+    setGameCenterStatus(tr("Opening Game Center..."));
+    try {
+      const player = await authenticateGameCenter();
+      setGameCenterStatus(
+        player.authenticated
+          ? `${tr("Signed in as")} ${player.displayName || player.alias || tr("Player")}`
+          : tr("Game Center sign-in was not completed."),
+      );
+    } catch (error) {
+      setGameCenterStatus(
+        error instanceof Error ? error.message : tr("Game Center sign-in failed."),
+      );
+    } finally {
+      setGameCenterBusy(false);
+    }
+  }
+
+  async function handleOpenGameCenter() {
+    if (gameCenterBusy) return;
+    if (!isGameCenterAvailable()) {
+      setGameCenterStatus(tr("Game Center is available on iOS devices."));
+      return;
+    }
+    setGameCenterBusy(true);
+    setGameCenterStatus(tr("Opening Game Center..."));
+    try {
+      const shown = await showGameCenterLeaderboards();
+      setGameCenterStatus(shown ? tr("Game Center opened.") : tr("Game Center did not open."));
+    } catch (error) {
+      setGameCenterStatus(
+        error instanceof Error ? error.message : tr("Game Center sign-in failed."),
+      );
+    } finally {
+      setGameCenterBusy(false);
+    }
+  }
 
   return (
     <div
@@ -170,6 +221,43 @@ export function Profile({ onBack }: Props) {
           />
           <HeroMetric icon={BadgeCheck} label={tr("Badges")} value={`${earnedBadges.length}`} />
           <HeroMetric icon={Trophy} label={tr("Stars")} value={`${totalStars}`} />
+        </section>
+        <section style={gameCenterCard}>
+          <div style={{ minWidth: 0 }}>
+            <div style={sectionHeading}>{tr("Game Center")}</div>
+            <div style={gameCenterCopy}>
+              {gameCenterStatus ??
+                tr("Sign in once to keep Daily Board and Daily Compound submissions connected.")}
+            </div>
+          </div>
+          <div style={gameCenterActions}>
+            <button
+              type="button"
+              onClick={handleGameCenterSignIn}
+              disabled={gameCenterBusy}
+              style={{
+                ...gameCenterButton,
+                opacity: gameCenterBusy ? 0.62 : 1,
+                cursor: gameCenterBusy ? "not-allowed" : "pointer",
+              }}
+            >
+              <Gamepad2 size={17} aria-hidden="true" />
+              {tr(gameCenterBusy ? "Signing in" : "Sign in")}
+            </button>
+            <button
+              type="button"
+              onClick={handleOpenGameCenter}
+              disabled={gameCenterBusy}
+              style={{
+                ...gameCenterButton,
+                ...gameCenterButtonSecondary,
+                opacity: gameCenterBusy ? 0.62 : 1,
+                cursor: gameCenterBusy ? "not-allowed" : "pointer",
+              }}
+            >
+              {tr("Open")}
+            </button>
+          </div>
         </section>
         <section style={card} aria-label="Daily Board placement badges">
           <div style={dailyBoardBadgeHeader}>
@@ -716,6 +804,56 @@ const heroMetric: React.CSSProperties = {
   background: "var(--surface)",
   border: "1px solid var(--border)",
   boxShadow: "0 8px 20px rgba(0,0,0,0.14)",
+};
+
+const gameCenterCard: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "minmax(0, 1fr) auto",
+  alignItems: "center",
+  gap: 12,
+  padding: 14,
+  borderRadius: 16,
+  background:
+    "linear-gradient(135deg, color-mix(in oklch, var(--primary) 18%, var(--surface)), var(--surface-elevated))",
+  border: "1px solid color-mix(in oklch, var(--primary) 44%, var(--border))",
+  marginBottom: 12,
+};
+
+const gameCenterCopy: React.CSSProperties = {
+  color: "var(--muted-foreground)",
+  fontSize: 12,
+  lineHeight: 1.35,
+};
+
+const gameCenterActions: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "flex-end",
+  gap: 8,
+  flexWrap: "wrap",
+};
+
+const gameCenterButton: React.CSSProperties = {
+  minHeight: 40,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 7,
+  border: "none",
+  borderRadius: 12,
+  padding: "9px 12px",
+  background: "linear-gradient(135deg, var(--accent), var(--primary))",
+  color: "var(--primary-foreground)",
+  fontFamily: "inherit",
+  fontSize: 12,
+  fontWeight: 950,
+  whiteSpace: "nowrap",
+};
+
+const gameCenterButtonSecondary: React.CSSProperties = {
+  background: "var(--surface-high)",
+  color: "var(--foreground)",
+  border: "1px solid var(--border)",
 };
 
 const metricIconBubble: React.CSSProperties = {

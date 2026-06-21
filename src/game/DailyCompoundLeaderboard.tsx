@@ -10,6 +10,7 @@ import {
 import { formatScore } from "./logic";
 import { useIsTabletLayout } from "./responsive";
 import { useProgress } from "./store";
+import { isGameCenterAvailable, showGameCenterLeaderboards } from "./gameCenter";
 
 export function Leaderboard({ onBack }: { onBack: () => void }) {
   const isTabletLayout = useIsTabletLayout();
@@ -17,6 +18,8 @@ export function Leaderboard({ onBack }: { onBack: () => void }) {
   const scope = "global";
   const [board, setBoard] = useState<LeaderboardBoard>(() => getDailyLeaderboard(kind, scope));
   const [loading, setLoading] = useState(false);
+  const [gameCenterBusy, setGameCenterBusy] = useState(false);
+  const [gameCenterMessage, setGameCenterMessage] = useState<string | null>(null);
   const recordDailyBoardLeaderboardPlacement = useProgress(
     (s) => s.recordDailyBoardLeaderboardPlacement,
   );
@@ -49,6 +52,24 @@ export function Leaderboard({ onBack }: { onBack: () => void }) {
     recordDailyBoardLeaderboardPlacement,
   ]);
 
+  async function handleOpenGameCenter() {
+    if (gameCenterBusy) return;
+    if (!isGameCenterAvailable()) {
+      setGameCenterMessage("Game Center is available on iOS devices.");
+      return;
+    }
+    setGameCenterBusy(true);
+    setGameCenterMessage(null);
+    try {
+      const shown = await showGameCenterLeaderboards(kind, scope);
+      if (!shown) setGameCenterMessage("Game Center did not open.");
+    } catch (error) {
+      setGameCenterMessage(error instanceof Error ? error.message : "Could not open Game Center.");
+    } finally {
+      setGameCenterBusy(false);
+    }
+  }
+
   return (
     <div
       className="app-shell"
@@ -72,8 +93,12 @@ export function Leaderboard({ onBack }: { onBack: () => void }) {
             <strong style={summaryValue}>{playerRank}</strong>
           </div>
           <div style={{ textAlign: "center" }}>
-            <div style={summaryLabel}>Score</div>
-            <strong style={summaryValue}>{formatScore(board.player.score)}</strong>
+            <div style={summaryLabel}>{kind === "daily-compound" ? "Seconds" : "Score"}</div>
+            <strong style={summaryValue}>
+              {kind === "daily-compound"
+                ? formatSeconds(board.player.score)
+                : formatScore(board.player.score)}
+            </strong>
           </div>
           <div style={{ textAlign: "right" }}>
             <div style={summaryLabel}>Country</div>
@@ -95,22 +120,39 @@ export function Leaderboard({ onBack }: { onBack: () => void }) {
           </SegmentButton>
         </div>
 
-        {(loading || board.status) && (
+        <button
+          type="button"
+          onClick={handleOpenGameCenter}
+          disabled={gameCenterBusy}
+          style={{
+            ...gameCenterButton,
+            opacity: gameCenterBusy ? 0.62 : 1,
+            cursor: gameCenterBusy ? "not-allowed" : "pointer",
+          }}
+        >
+          {gameCenterBusy ? "Opening Game Center..." : "Open Game Center"}
+        </button>
+
+        {(loading || board.status || gameCenterMessage) && (
           <div style={statusLine} role="status" aria-live="polite">
-            {loading ? "Loading Game Center..." : board.status}
+            {loading ? "Loading Game Center..." : (gameCenterMessage ?? board.status)}
           </div>
         )}
 
         <section style={tablePanel} aria-label={`${leaderboardLabel} ${scope} leaderboard`}>
-          <div style={tableHeader}>
+          <div style={{ ...tableHeader, gridTemplateColumns: leaderboardGridColumns(kind) }}>
             <span>Rank</span>
             <span>Player</span>
-            <span style={{ textAlign: "right" }}>Score</span>
-            <span style={{ textAlign: "right" }}>Shots</span>
+            <span style={{ textAlign: "right" }}>
+              {kind === "daily-compound" ? "Seconds" : "Score"}
+            </span>
+            {kind === "daily-board" && <span style={{ textAlign: "right" }}>Shots</span>}
           </div>
           <div style={{ display: "grid", gap: 7 }}>
             {board.entries.length > 0 ? (
-              board.entries.map((entry) => <LeaderboardRow key={entry.id} entry={entry} />)
+              board.entries.map((entry) => (
+                <LeaderboardRow key={entry.id} entry={entry} kind={kind} />
+              ))
             ) : (
               <div style={emptyRows}>No Game Center scores yet.</div>
             )}
@@ -121,11 +163,12 @@ export function Leaderboard({ onBack }: { onBack: () => void }) {
   );
 }
 
-function LeaderboardRow({ entry }: { entry: LeaderboardEntry }) {
+function LeaderboardRow({ entry, kind }: { entry: LeaderboardEntry; kind: LeaderboardKind }) {
   return (
     <div
       style={{
         ...row,
+        gridTemplateColumns: leaderboardGridColumns(kind),
         borderColor: entry.isPlayer
           ? "color-mix(in oklch, var(--accent) 65%, var(--border))"
           : "var(--border)",
@@ -144,10 +187,20 @@ function LeaderboardRow({ entry }: { entry: LeaderboardEntry }) {
           {entry.name}
         </span>
       </span>
-      <strong style={scoreCell}>{formatScore(entry.score)}</strong>
-      <span style={shotsCell}>{entry.shots}</span>
+      <strong style={scoreCell}>
+        {kind === "daily-compound" ? formatSeconds(entry.score) : formatScore(entry.score)}
+      </strong>
+      {kind === "daily-board" && <span style={shotsCell}>{entry.shots}</span>}
     </div>
   );
+}
+
+function leaderboardGridColumns(kind: LeaderboardKind): string {
+  return kind === "daily-compound" ? "52px minmax(0, 1fr) 92px" : "52px minmax(0, 1fr) 82px 48px";
+}
+
+function formatSeconds(seconds: number): string {
+  return `${Math.max(0, Math.floor(seconds))}s`;
 }
 
 function SegmentButton({
@@ -277,6 +330,20 @@ const segmentButton: CSSProperties = {
   fontSize: 13,
   fontWeight: 950,
   cursor: "pointer",
+};
+
+const gameCenterButton: CSSProperties = {
+  width: "100%",
+  minHeight: 42,
+  marginTop: 10,
+  border: "1px solid color-mix(in oklch, var(--accent) 55%, var(--border))",
+  borderRadius: 12,
+  background:
+    "linear-gradient(135deg, color-mix(in oklch, var(--accent) 25%, var(--surface)), color-mix(in oklch, var(--primary) 18%, var(--surface)))",
+  color: "var(--foreground)",
+  fontFamily: "inherit",
+  fontSize: 13,
+  fontWeight: 950,
 };
 
 const tablePanel: CSSProperties = {

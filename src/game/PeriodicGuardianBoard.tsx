@@ -3,7 +3,15 @@ import { ELEMENTS } from "./elements";
 import { BOSSES } from "./bosses";
 import { getLevelById, getNextLevel } from "./levels";
 import { trackGameOver, trackGameStart, trackLevelWin, trackShot } from "./analytics";
-import { playMergeSound, playShootSound, playWinSound, primeAudio, startAmbientMusic, stopAmbientMusic, vibrate } from "./audio";
+import {
+  playMergeSound,
+  playShootSound,
+  playWinSound,
+  primeAudio,
+  startAmbientMusic,
+  stopAmbientMusic,
+  vibrate,
+} from "./audio";
 import { useProgress } from "./store";
 import { useIsTabletLayout } from "./responsive";
 import type { GameModeId } from "./challenges";
@@ -222,7 +230,13 @@ function computeBossBattleScore({
   };
 }
 
-export function PeriodicGuardianBoard({ levelId, onExit, onWin, onMap = onExit, mode = "periodic-guardian" }: Props) {
+export function PeriodicGuardianBoard({
+  levelId,
+  onExit,
+  onWin,
+  onMap = onExit,
+  mode = "periodic-guardian",
+}: Props) {
   const config = BOSSES["periodic-guardian"];
   const level = getLevelById(levelId) ?? getLevelById(config.levelId);
   const nextLevel = getNextLevel(levelId);
@@ -239,7 +253,10 @@ export function PeriodicGuardianBoard({ levelId, onExit, onWin, onMap = onExit, 
   const lastPlayerActionRef = useRef(Date.now());
   const runRecordedRef = useRef(false);
   const [clock, setClock] = useState(() => Date.now());
-  const [arenaSize, setArenaSize] = useState({ width: isTabletLayout ? 860 : 380, height: isTabletLayout ? 700 : 580 });
+  const [arenaSize, setArenaSize] = useState({
+    width: isTabletLayout ? 860 : 380,
+    height: isTabletLayout ? 700 : 580,
+  });
   const [aimPoint, setAimPoint] = useState({ x: arenaSize.width * 0.5, y: 150 });
   const [queue, setQueue] = useState<QueueAtom[]>(() => makeInitialQueue(groupBagRef));
   const [attemptsUsed, setAttemptsUsed] = useState(0);
@@ -255,7 +272,9 @@ export function PeriodicGuardianBoard({ levelId, onExit, onWin, onMap = onExit, 
     addScore,
     challengeBestScores,
     incrementLevelAttempt,
+    musicEnabled,
     recordLevelRun,
+    reportQuestProgress,
     setChallengeBestScore,
     setLevelStars,
     unlockLevel,
@@ -269,7 +288,9 @@ export function PeriodicGuardianBoard({ levelId, onExit, onWin, onMap = onExit, 
     [arenaSize.height, arenaSize.width, isTabletLayout],
   );
 
-  const activeGroup = GROUP_ORDER[Math.floor((clock - clockStartRef.current) / PHASE_MS) % GROUP_ORDER.length] ?? "metals";
+  const activeGroup =
+    GROUP_ORDER[Math.floor((clock - clockStartRef.current) / PHASE_MS) % GROUP_ORDER.length] ??
+    "metals";
   const attemptsLeft = Math.max(0, config.maxShots - attemptsUsed);
   const healthPct = clamp(bossHealth / SUCCESS_TARGET, 0, 1);
   const idleRemainingMs = Math.max(0, IDLE_BEAM_MS - (clock - lastPlayerActionRef.current));
@@ -291,24 +312,31 @@ export function PeriodicGuardianBoard({ levelId, onExit, onWin, onMap = onExit, 
 
   const groupClosedMs = useMemo(
     () =>
-      GROUP_ORDER.reduce<Record<GuardianGroup, number>>((acc, group) => {
-        acc[group] = Math.max(0, (closedGroupsRef.current[group] ?? 0) - clock);
-        return acc;
-      }, {} as Record<GuardianGroup, number>),
+      GROUP_ORDER.reduce<Record<GuardianGroup, number>>(
+        (acc, group) => {
+          acc[group] = Math.max(0, (closedGroupsRef.current[group] ?? 0) - clock);
+          return acc;
+        },
+        {} as Record<GuardianGroup, number>,
+      ),
     [clock],
   );
 
   useEffect(() => {
     primeAudio();
-    startAmbientMusic("boss");
+    if (musicEnabled) startAmbientMusic("boss");
+    else stopAmbientMusic();
+    return () => {
+      stopAmbientMusic();
+    };
+  }, [musicEnabled]);
+
+  useEffect(() => {
     if (!runRecordedRef.current && level) {
       incrementLevelAttempt(level.id);
       trackGameStart(level.id, mode);
       runRecordedRef.current = true;
     }
-    return () => {
-      stopAmbientMusic();
-    };
   }, [incrementLevelAttempt, level, mode]);
 
   useEffect(() => {
@@ -379,21 +407,43 @@ export function PeriodicGuardianBoard({ levelId, onExit, onWin, onMap = onExit, 
   const finishRun = useCallback(
     (won: boolean, finalScore: number, finalAttempts: number) => {
       if (!level) return;
+      reportQuestProgress({ runScore: finalScore });
       if (won) {
         addScore(finalScore);
         setChallengeBestScore(mode, finalScore);
         const stars = finalAttempts <= 24 ? 3 : finalAttempts <= 34 ? 2 : 1;
         setLevelStars(level.id, stars);
         if (nextLevel) unlockLevel(nextLevel.id);
-        recordLevelRun(level.id, { score: finalScore, shots: finalAttempts, powerUpsUsed: 0, won: true });
+        reportQuestProgress({ levelCleared: true, runScore: finalScore, starsEarned: stars });
+        recordLevelRun(level.id, {
+          score: finalScore,
+          shots: finalAttempts,
+          powerUpsUsed: 0,
+          won: true,
+        });
         trackLevelWin(level.id, finalScore, finalAttempts, level.targetElement, mode);
       } else {
         setChallengeBestScore(mode, finalScore);
-        recordLevelRun(level.id, { score: finalScore, shots: finalAttempts, powerUpsUsed: 0, won: false });
+        recordLevelRun(level.id, {
+          score: finalScore,
+          shots: finalAttempts,
+          powerUpsUsed: 0,
+          won: false,
+        });
         trackGameOver(level.id, finalScore, finalAttempts, level.targetElement, mode);
       }
     },
-    [addScore, level, mode, nextLevel, recordLevelRun, setChallengeBestScore, setLevelStars, unlockLevel],
+    [
+      addScore,
+      level,
+      mode,
+      nextLevel,
+      recordLevelRun,
+      reportQuestProgress,
+      setChallengeBestScore,
+      setLevelStars,
+      unlockLevel,
+    ],
   );
 
   useEffect(() => {
@@ -418,7 +468,16 @@ export function PeriodicGuardianBoard({ levelId, onExit, onWin, onMap = onExit, 
     finishRun(true, finalScore, attemptsUsed);
     setScore(finalScore);
     setResult("win");
-  }, [attemptsUsed, bossHealth, challengeBestScores, config.maxShots, finishRun, mode, result, score]);
+  }, [
+    attemptsUsed,
+    bossHealth,
+    challengeBestScores,
+    config.maxShots,
+    finishRun,
+    mode,
+    result,
+    score,
+  ]);
 
   useEffect(() => {
     if (result || attemptsUsed < config.maxShots || successHits >= SUCCESS_TARGET) return;
@@ -443,11 +502,26 @@ export function PeriodicGuardianBoard({ levelId, onExit, onWin, onMap = onExit, 
       playShootSound();
 
       const direction = normalize(nextPoint.x - launcher.x, nextPoint.y - launcher.y);
-      const exit = rayExitPoint(launcher.x, launcher.y, direction.x, direction.y, arenaSize.width, arenaSize.height);
+      const exit = rayExitPoint(
+        launcher.x,
+        launcher.y,
+        direction.x,
+        direction.y,
+        arenaSize.width,
+        arenaSize.height,
+      );
       let nearest: { t: number; spot: WeakSpotPose } | null = null;
       for (const spot of weakSpots) {
         if (groupClosedMs[spot.group] > 0) continue;
-        const t = rayCircleHit(launcher.x, launcher.y, direction.x, direction.y, spot.x, spot.y, spot.radius);
+        const t = rayCircleHit(
+          launcher.x,
+          launcher.y,
+          direction.x,
+          direction.y,
+          spot.x,
+          spot.y,
+          spot.radius,
+        );
         if (t == null || t > exit.t) continue;
         if (!nearest || t < nearest.t) {
           nearest = { t, spot };
@@ -457,8 +531,13 @@ export function PeriodicGuardianBoard({ levelId, onExit, onWin, onMap = onExit, 
       const hitPoint = nearest
         ? { x: launcher.x + direction.x * nearest.t, y: launcher.y + direction.y * nearest.t }
         : { x: exit.x, y: exit.y };
-      const durationMs = Math.max(220, Math.min(720, (nearest ? nearest.t : exit.t) * 920 / PROJECTILE_SPEED));
-      const success = Boolean(nearest && nearest.spot.group === activeGroup && currentAtom.group === activeGroup);
+      const durationMs = Math.max(
+        220,
+        Math.min(720, ((nearest ? nearest.t : exit.t) * 920) / PROJECTILE_SPEED),
+      );
+      const success = Boolean(
+        nearest && nearest.spot.group === activeGroup && currentAtom.group === activeGroup,
+      );
       const targetGroup = nearest?.spot.group ?? null;
       const anim: ProjectileAnim = {
         startX: launcher.x,
@@ -476,13 +555,33 @@ export function PeriodicGuardianBoard({ levelId, onExit, onWin, onMap = onExit, 
       projectileRef.current = anim;
       setProjectile(anim);
       setAttemptsUsed((current) => current + 1);
-      trackShot(level?.id ?? config.levelId, currentAtom.atom, Math.atan2(direction.y, direction.x) * (180 / Math.PI), mode);
+      trackShot(
+        level?.id ?? config.levelId,
+        currentAtom.atom,
+        Math.atan2(direction.y, direction.x) * (180 / Math.PI),
+        mode,
+      );
       setQueue((current) => {
         const [, ...rest] = current;
         return [...rest, drawQueueAtom(groupBagRef)];
       });
     },
-    [activeGroup, arenaSize.height, arenaSize.width, attemptsUsed, config.levelId, config.maxShots, groupClosedMs, launcher.x, launcher.y, level?.id, mode, queueCurrent, result, weakSpots],
+    [
+      activeGroup,
+      arenaSize.height,
+      arenaSize.width,
+      attemptsUsed,
+      config.levelId,
+      config.maxShots,
+      groupClosedMs,
+      launcher.x,
+      launcher.y,
+      level?.id,
+      mode,
+      queueCurrent,
+      result,
+      weakSpots,
+    ],
   );
 
   useEffect(() => {
@@ -525,14 +624,29 @@ export function PeriodicGuardianBoard({ levelId, onExit, onWin, onMap = onExit, 
 
   const trajectory = useMemo(() => {
     const direction = normalize(aimPoint.x - launcher.x, aimPoint.y - launcher.y);
-    const exit = rayExitPoint(launcher.x, launcher.y, direction.x, direction.y, arenaSize.width, arenaSize.height);
+    const exit = rayExitPoint(
+      launcher.x,
+      launcher.y,
+      direction.x,
+      direction.y,
+      arenaSize.width,
+      arenaSize.height,
+    );
     let endX = exit.x;
     let endY = exit.y;
     let hitSpot: WeakSpotPose | null = null;
     let nearestT = Infinity;
     for (const spot of weakSpots) {
       if (groupClosedMs[spot.group] > 0) continue;
-      const t = rayCircleHit(launcher.x, launcher.y, direction.x, direction.y, spot.x, spot.y, spot.radius);
+      const t = rayCircleHit(
+        launcher.x,
+        launcher.y,
+        direction.x,
+        direction.y,
+        spot.x,
+        spot.y,
+        spot.radius,
+      );
       if (t == null || t > exit.t || t >= nearestT) continue;
       nearestT = t;
       endX = launcher.x + direction.x * t;
@@ -540,7 +654,16 @@ export function PeriodicGuardianBoard({ levelId, onExit, onWin, onMap = onExit, 
       hitSpot = spot;
     }
     return { endX, endY, hitSpot };
-  }, [aimPoint.x, aimPoint.y, arenaSize.height, arenaSize.width, groupClosedMs, launcher.x, launcher.y, weakSpots]);
+  }, [
+    aimPoint.x,
+    aimPoint.y,
+    arenaSize.height,
+    arenaSize.width,
+    groupClosedMs,
+    launcher.x,
+    launcher.y,
+    weakSpots,
+  ]);
 
   if (!level) return null;
 
@@ -554,7 +677,15 @@ export function PeriodicGuardianBoard({ levelId, onExit, onWin, onMap = onExit, 
       }}
     >
       <div style={{ width: "100%", maxWidth: isTabletLayout ? 980 : 520, margin: "0 auto" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 14 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 10,
+            marginBottom: 14,
+          }}
+        >
           <button
             type="button"
             onClick={onMap}
@@ -571,11 +702,20 @@ export function PeriodicGuardianBoard({ levelId, onExit, onWin, onMap = onExit, 
             ← Map
           </button>
           <div style={{ textAlign: "center", flex: 1 }}>
-            <div style={{ fontSize: 11, letterSpacing: 3, color: "var(--accent)", fontWeight: 900 }}>BOSS EXPERIMENT</div>
-            <div className="gold-text" style={{ fontSize: isTabletLayout ? 28 : 23, fontWeight: 900, marginTop: 2 }}>
+            <div
+              style={{ fontSize: 11, letterSpacing: 3, color: "var(--accent)", fontWeight: 900 }}
+            >
+              BOSS EXPERIMENT
+            </div>
+            <div
+              className="gold-text"
+              style={{ fontSize: isTabletLayout ? 28 : 23, fontWeight: 900, marginTop: 2 }}
+            >
               {config.name}
             </div>
-            <div style={{ color: "var(--muted-foreground)", fontSize: 12, marginTop: 2 }}>{level.name}</div>
+            <div style={{ color: "var(--muted-foreground)", fontSize: 12, marginTop: 2 }}>
+              {level.name}
+            </div>
           </div>
           <div
             style={{
@@ -587,7 +727,16 @@ export function PeriodicGuardianBoard({ levelId, onExit, onWin, onMap = onExit, 
               textAlign: "center",
             }}
           >
-            <div style={{ fontSize: 10, color: "var(--muted-foreground)", letterSpacing: 1.4, fontWeight: 800 }}>SHOTS</div>
+            <div
+              style={{
+                fontSize: 10,
+                color: "var(--muted-foreground)",
+                letterSpacing: 1.4,
+                fontWeight: 800,
+              }}
+            >
+              SHOTS
+            </div>
             <div style={{ fontSize: 22, fontWeight: 900 }}>{attemptsLeft}</div>
           </div>
         </div>
@@ -633,7 +782,13 @@ export function PeriodicGuardianBoard({ levelId, onExit, onWin, onMap = onExit, 
                 backdropFilter: "blur(8px)",
               }}
             >
-              <CompactBar label="Guardian" value={`${bossHealth}/${SUCCESS_TARGET}`} fillPercent={healthPct} fill="linear-gradient(90deg, var(--accent), #ff8b56)" shadow="0 0 16px var(--accent-glow)" />
+              <CompactBar
+                label="Guardian"
+                value={`${bossHealth}/${SUCCESS_TARGET}`}
+                fillPercent={healthPct}
+                fill="linear-gradient(90deg, var(--accent), #ff8b56)"
+                shadow="0 0 16px var(--accent-glow)"
+              />
             </div>
 
             <div
@@ -649,14 +804,31 @@ export function PeriodicGuardianBoard({ levelId, onExit, onWin, onMap = onExit, 
                 minWidth: isTabletLayout ? 180 : 142,
               }}
             >
-              <div style={{ fontSize: 10, letterSpacing: 1.6, color: "var(--muted-foreground)", fontWeight: 900 }}>
+              <div
+                style={{
+                  fontSize: 10,
+                  letterSpacing: 1.6,
+                  color: "var(--muted-foreground)",
+                  fontWeight: 900,
+                }}
+              >
                 CURRENT SHOT
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <GroupBall atom={queueCurrent.atom} group={queueCurrent.group} size={isTabletLayout ? 48 : 42} />
+                <GroupBall
+                  atom={queueCurrent.atom}
+                  group={queueCurrent.group}
+                  size={isTabletLayout ? 48 : 42}
+                />
                 <div style={{ display: "flex", gap: 6 }}>
                   {queue.slice(1).map((item, index) => (
-                    <GroupBall key={`${item.group}-${item.atom}-${index}`} atom={item.atom} group={item.group} size={isTabletLayout ? 26 : 24} compact />
+                    <GroupBall
+                      key={`${item.group}-${item.atom}-${index}`}
+                      atom={item.atom}
+                      group={item.group}
+                      size={isTabletLayout ? 26 : 24}
+                      compact
+                    />
                   ))}
                 </div>
               </div>
@@ -722,12 +894,13 @@ export function PeriodicGuardianBoard({ levelId, onExit, onWin, onMap = onExit, 
                 position: "absolute",
                 inset: "0 8% auto 8%",
                 height: "58%",
-                background: "repeating-linear-gradient(90deg, rgba(255,255,255,0.82) 0 9%, transparent 9% 16%)",
+                background:
+                  "repeating-linear-gradient(90deg, rgba(255,255,255,0.82) 0 9%, transparent 9% 16%)",
                 clipPath: "polygon(0 0, 100% 0, 94% 100%, 6% 100%)",
-              opacity: 0.72,
-            }}
-          />
-        </div>
+                opacity: 0.72,
+              }}
+            />
+          </div>
 
           <div
             aria-hidden="true"
@@ -785,10 +958,13 @@ export function PeriodicGuardianBoard({ levelId, onExit, onWin, onMap = onExit, 
                   background: closed
                     ? "linear-gradient(180deg, rgba(28,34,62,0.96), rgba(10,12,26,0.98))"
                     : active
-                    ? `radial-gradient(circle at 45% 40%, rgba(255,255,255,0.98), ${group.tint} 60%, rgba(18,22,40,0.95) 100%)`
-                    : "linear-gradient(180deg, rgba(28,34,62,0.96), rgba(10,12,26,0.98))",
-                  border: active ? "2px solid rgba(255,255,255,0.24)" : "2px solid rgba(112,122,168,0.24)",
-                  boxShadow: !closed && active ? `0 0 20px ${group.glow}` : "0 8px 18px rgba(0,0,0,0.26)",
+                      ? `radial-gradient(circle at 45% 40%, rgba(255,255,255,0.98), ${group.tint} 60%, rgba(18,22,40,0.95) 100%)`
+                      : "linear-gradient(180deg, rgba(28,34,62,0.96), rgba(10,12,26,0.98))",
+                  border: active
+                    ? "2px solid rgba(255,255,255,0.24)"
+                    : "2px solid rgba(112,122,168,0.24)",
+                  boxShadow:
+                    !closed && active ? `0 0 20px ${group.glow}` : "0 8px 18px rgba(0,0,0,0.26)",
                   zIndex: 3,
                 }}
               >
@@ -799,7 +975,8 @@ export function PeriodicGuardianBoard({ levelId, onExit, onWin, onMap = onExit, 
                         width: "75%",
                         height: Math.max(10, spot.radius * 0.28),
                         borderRadius: 999,
-                        background: "linear-gradient(180deg, rgba(188,193,220,0.7), rgba(62,68,98,0.68))",
+                        background:
+                          "linear-gradient(180deg, rgba(188,193,220,0.7), rgba(62,68,98,0.68))",
                       }}
                     />
                   </div>
@@ -830,7 +1007,14 @@ export function PeriodicGuardianBoard({ levelId, onExit, onWin, onMap = onExit, 
               <svg
                 viewBox={`0 0 ${arenaSize.width} ${arenaSize.height}`}
                 preserveAspectRatio="none"
-                style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 2 }}
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  width: "100%",
+                  height: "100%",
+                  pointerEvents: "none",
+                  zIndex: 2,
+                }}
               >
                 <defs>
                   <linearGradient id="guardianAimLine" x1="0%" y1="100%" x2="0%" y2="0%">
@@ -875,7 +1059,14 @@ export function PeriodicGuardianBoard({ levelId, onExit, onWin, onMap = onExit, 
                 viewBox={`0 0 ${arenaSize.width} ${arenaSize.height}`}
                 preserveAspectRatio="none"
                 className="guardian-e-beam"
-                style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 4 }}
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  width: "100%",
+                  height: "100%",
+                  pointerEvents: "none",
+                  zIndex: 4,
+                }}
               >
                 <defs>
                   <linearGradient id="guardianBeam" x1="50%" y1="0%" x2="50%" y2="100%">
@@ -950,14 +1141,19 @@ export function PeriodicGuardianBoard({ levelId, onExit, onWin, onMap = onExit, 
               height: isTabletLayout ? 68 : 60,
               borderRadius: "50%",
               border: "2px solid rgba(255,255,255,0.12)",
-              background: "radial-gradient(circle at 30% 30%, rgba(255,255,255,0.12), rgba(14,18,36,0.96))",
+              background:
+                "radial-gradient(circle at 30% 30%, rgba(255,255,255,0.12), rgba(14,18,36,0.96))",
               display: "grid",
               placeItems: "center",
               boxShadow: "0 0 18px rgba(0,0,0,0.35)",
               zIndex: 3,
             }}
           >
-            <GroupBall atom={queueCurrent.atom} group={queueCurrent.group} size={isTabletLayout ? 48 : 42} />
+            <GroupBall
+              atom={queueCurrent.atom}
+              group={queueCurrent.group}
+              size={isTabletLayout ? 48 : 42}
+            />
           </div>
 
           {result && (
@@ -1006,14 +1202,32 @@ export function PeriodicGuardianBoard({ levelId, onExit, onWin, onMap = onExit, 
                       : "Watch the phase cycle, keep the queue moving, and punish the active family next run."}
                   </div>
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10 }}>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+                    gap: 10,
+                  }}
+                >
                   <MetricCard label="Attempts" value={`${attemptsUsed}`} />
-                  <MetricCard label="Kill time" value={victorySummary ? formatDurationShort(victorySummary.clearTimeMs) : "--"} />
+                  <MetricCard
+                    label="Kill time"
+                    value={victorySummary ? formatDurationShort(victorySummary.clearTimeMs) : "--"}
+                  />
                   <MetricCard label="Score" value={`${score}`} />
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10 }}>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+                    gap: 10,
+                  }}
+                >
                   <MetricCard label="Hits" value={`${successHits}`} />
-                  <MetricCard label="Shot bonus" value={victorySummary ? `${victorySummary.shotBonus}` : "--"} />
+                  <MetricCard
+                    label="Shot bonus"
+                    value={victorySummary ? `${victorySummary.shotBonus}` : "--"}
+                  />
                   <MetricCard
                     label={victorySummary?.newBest ? "New best" : "Best score"}
                     value={`${Math.max(victorySummary?.finalScore ?? 0, challengeBestScores[mode] ?? 0)}`}
@@ -1086,7 +1300,13 @@ export function PeriodicGuardianBoard({ levelId, onExit, onWin, onMap = onExit, 
   );
 }
 
-function PeriodicBackdrop({ activeGroup, isTabletLayout }: { activeGroup: GuardianGroup; isTabletLayout: boolean }) {
+function PeriodicBackdrop({
+  activeGroup,
+  isTabletLayout,
+}: {
+  activeGroup: GuardianGroup;
+  isTabletLayout: boolean;
+}) {
   return (
     <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
       <div
@@ -1098,7 +1318,17 @@ function PeriodicBackdrop({ activeGroup, isTabletLayout }: { activeGroup: Guardi
           backgroundSize: isTabletLayout ? "38px 38px" : "30px 30px",
         }}
       />
-      <div style={{ position: "absolute", top: "30%", left: "10%", right: "10%", display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 18 }}>
+      <div
+        style={{
+          position: "absolute",
+          top: "30%",
+          left: "10%",
+          right: "10%",
+          display: "grid",
+          gridTemplateColumns: "repeat(3, 1fr)",
+          gap: 18,
+        }}
+      >
         {GROUP_ORDER.map((group) => {
           const info = GROUP_CONFIG[group];
           const active = group === activeGroup;
@@ -1109,7 +1339,9 @@ function PeriodicBackdrop({ activeGroup, isTabletLayout }: { activeGroup: Guardi
                 height: isTabletLayout ? 130 : 102,
                 borderRadius: 18,
                 border: "1px solid rgba(255,255,255,0.06)",
-                background: active ? `linear-gradient(180deg, color-mix(in srgb, ${info.tint} 22%, transparent), rgba(10,14,34,0.18))` : "rgba(255,255,255,0.02)",
+                background: active
+                  ? `linear-gradient(180deg, color-mix(in srgb, ${info.tint} 22%, transparent), rgba(10,14,34,0.18))`
+                  : "rgba(255,255,255,0.02)",
                 boxShadow: active ? `0 0 28px ${info.glow}` : "none",
                 opacity: active ? 1 : 0.45,
               }}
@@ -1150,11 +1382,24 @@ function GroupBall({
       }}
     >
       {!compact && (
-        <div style={{ position: "absolute", top: size * 0.1, fontSize: Math.max(8, size * 0.16), lineHeight: 1, opacity: 0.82 }}>
+        <div
+          style={{
+            position: "absolute",
+            top: size * 0.1,
+            fontSize: Math.max(8, size * 0.16),
+            lineHeight: 1,
+            opacity: 0.82,
+          }}
+        >
           {atom}
         </div>
       )}
-      <div style={{ fontSize: compact ? Math.max(10, size * 0.34) : Math.max(14, size * 0.38), lineHeight: 1 }}>
+      <div
+        style={{
+          fontSize: compact ? Math.max(10, size * 0.34) : Math.max(14, size * 0.38),
+          lineHeight: 1,
+        }}
+      >
         {element?.symbol ?? "?"}
       </div>
     </div>
@@ -1229,7 +1474,14 @@ function MetricCard({ label, value }: { label: string; value: string }) {
         justifyContent: "space-between",
       }}
     >
-      <div style={{ fontSize: 11, letterSpacing: 1.6, color: "var(--muted-foreground)", fontWeight: 800 }}>
+      <div
+        style={{
+          fontSize: 11,
+          letterSpacing: 1.6,
+          color: "var(--muted-foreground)",
+          fontWeight: 800,
+        }}
+      >
         {label.toUpperCase()}
       </div>
       <div style={{ fontSize: 22, fontWeight: 900, marginTop: 8, lineHeight: 1.05 }}>{value}</div>

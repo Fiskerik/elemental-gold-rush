@@ -3,13 +3,14 @@ import GameKit
 import UIKit
 
 @objc(GameCenterPlugin)
-public class GameCenterPlugin: CAPPlugin, CAPBridgedPlugin {
+public class GameCenterPlugin: CAPPlugin, CAPBridgedPlugin, GKGameCenterControllerDelegate {
     public let identifier = "GameCenterPlugin"
     public let jsName = "GameCenterPlugin"
     public let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "authenticate", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "submitScore", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "loadLeaderboard", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "loadLeaderboard", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "showLeaderboard", returnType: CAPPluginReturnPromise)
     ]
 
     private var pendingAuthCalls: [CAPPluginCall] = []
@@ -78,16 +79,42 @@ public class GameCenterPlugin: CAPPlugin, CAPBridgedPlugin {
             context: context,
             player: GKLocalPlayer.local,
             leaderboardIDs: leaderboardIDs
-        ) { error in
+        ) { [weak self] error in
+            guard let self = self else { return }
             if let error = error {
-                call.reject(error.localizedDescription)
+                NSLog("GameCenterPlugin submitScore failed: %@", error.localizedDescription)
+                self.reportLegacyScores(
+                    score: score,
+                    context: context,
+                    leaderboardIDs: leaderboardIDs
+                ) { legacyError in
+                    if let legacyError = legacyError {
+                        call.reject(
+                            "Game Center score submit failed: \(error.localizedDescription); legacy report failed: \(legacyError.localizedDescription)",
+                            nil,
+                            legacyError
+                        )
+                        return
+                    }
+
+                    self.resolveSubmittedScore(
+                        call,
+                        score: score,
+                        context: context,
+                        leaderboardIDs: leaderboardIDs,
+                        method: "legacy"
+                    )
+                }
                 return
             }
 
-            call.resolve([
-                "submitted": true,
-                "leaderboardIds": leaderboardIDs
-            ])
+            self.resolveSubmittedScore(
+                call,
+                score: score,
+                context: context,
+                leaderboardIDs: leaderboardIDs,
+                method: "modern"
+            )
         }
     }
 
@@ -136,6 +163,115 @@ public class GameCenterPlugin: CAPPlugin, CAPBridgedPlugin {
                     "localPlayer": self.entryPayload(localEntry) ?? NSNull(),
                     "entries": (entries ?? []).compactMap { self.entryPayload($0) }
                 ])
+            }
+        }
+    }
+
+    @objc func showLeaderboard(_ call: CAPPluginCall) {
+        guard GKLocalPlayer.local.isAuthenticated else {
+            call.reject("Game Center player is not authenticated")
+            return
+        }
+
+        let leaderboardID = call.getString("leaderboardId") ?? call.getString("leaderboardID")
+        let controller: GKGameCenterViewController
+        if let leaderboardID = leaderboardID, !leaderboardID.isEmpty {
+            controller = GKGameCenterViewController(
+                leaderboardID: leaderboardID,
+                playerScope: .global,
+                timeScope: .today
+            )
+        } else {
+            controller = GKGameCenterViewController(state: .leaderboards)
+        }
+        controller.gameCenterDelegate = self
+
+        DispatchQueue.main.async {
+            self.bridge?.viewController?.present(controller, animated: true) {
+                call.resolve(["shown": true])
+            }
+        }
+    }
+
+    public func gameCenterViewControllerDidFinish(_ gameCenterViewController: GKGameCenterViewController) {
+        gameCenterViewController.dismiss(animated: true)
+    }
+
+    private func reportLegacyScores(
+        score: Int,
+        context: Int,
+        leaderboardIDs: [String],
+        completion: @escaping (Error?) -> Void
+    ) {
+        let scores = leaderboardIDs.map { leaderboardID in
+            let scoreReporter = GKScore(leaderboardIdentifier: leaderboardID)
+            scoreReporter.value = Int64(score)
+            scoreReporter.context = UInt64(max(0, context))
+            return scoreReporter
+        }
+        GKScore.report(scores) { error in
+            if let error = error {
+                NSLog("GameCenterPlugin legacy GKScore.report failed: %@", error.localizedDescription)
+            } else {
+                NSLog("GameCenterPlugin legacy GKScore.report succeeded for %@", leaderboardIDs.joined(separator: ","))
+            }
+            completion(error)
+        }
+    }
+
+    private func resolveSubmittedScore(
+        _ call: CAPPluginCall,
+        score: Int,
+        context: Int,
+        leaderboardIDs: [String],
+        method: String
+    ) {
+        verifySubmittedScore(leaderboardID: leaderboardIDs.first ?? "") { verifiedEntry, totalPlayerCount, verifyError in
+            if let verifyError = verifyError {
+                NSLog("GameCenterPlugin submit verification failed: %@", verifyError.localizedDescription)
+            }
+            call.resolve([
+                "submitted": true,
+                "method": method,
+                "score": score,
+                "context": context,
+                "leaderboardIds": leaderboardIDs,
+                "verificationError": verifyError?.localizedDescription ?? NSNull(),
+                "verifiedLocalPlayer": self.entryPayload(verifiedEntry) ?? NSNull(),
+                "verifiedTotalPlayerCount": totalPlayerCount
+            ])
+        }
+    }
+
+    private func verifySubmittedScore(
+        leaderboardID: String,
+        completion: @escaping (GKLeaderboard.Entry?, Int, Error?) -> Void
+    ) {
+        guard !leaderboardID.isEmpty else {
+            completion(nil, 0, nil)
+            return
+        }
+        GKLeaderboard.loadLeaderboards(IDs: [leaderboardID]) { leaderboards, error in
+            if let error = error {
+                completion(nil, 0, error)
+                return
+            }
+
+            guard let leaderboard = leaderboards?.first else {
+                completion(nil, 0, NSError(
+                    domain: "GameCenterPlugin",
+                    code: 404,
+                    userInfo: [NSLocalizedDescriptionKey: "Leaderboard not found during submit verification"]
+                ))
+                return
+            }
+
+            leaderboard.loadEntries(
+                for: .global,
+                timeScope: .today,
+                range: NSRange(location: 1, length: 1)
+            ) { localEntry, _, totalPlayerCount, error in
+                completion(localEntry, totalPlayerCount, error)
             }
         }
     }

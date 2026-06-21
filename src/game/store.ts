@@ -9,6 +9,7 @@ import {
   type DailyBoardLeaderboardAchievementCounts,
 } from "./leaderboardAchievements";
 import { DEFAULT_LANGUAGE, normalizeLanguage, type AppLanguage } from "./localization";
+import { getNextLevel, MAX_LEVEL } from "./levels";
 import {
   DailyQuest,
   QuestProgressEvent,
@@ -255,6 +256,20 @@ function normalizeLevelStatsRecord(
   return next;
 }
 
+function inferUnlockedLevelFromStats(
+  currentUnlockedLevel: number,
+  levelStats: Record<number, LevelStats>,
+): number {
+  return Object.entries(levelStats).reduce(
+    (unlockedLevel, [levelId, stats]) => {
+      if ((stats.bestShots ?? null) == null && stats.stars <= 0) return unlockedLevel;
+      const id = Number(levelId);
+      return Math.max(unlockedLevel, getNextLevel(id)?.id ?? id);
+    },
+    Math.max(1, Math.min(MAX_LEVEL, Math.floor(currentUnlockedLevel))),
+  );
+}
+
 interface ProgressState {
   playerDisplayName: string;
   unlockedLevel: number; // highest level unlocked (1-based)
@@ -437,6 +452,11 @@ export const useProgress = create<ProgressState>()(
       completeDailyChallenge: (score) => {
         let awarded = false;
         set((s) => {
+          const refreshed = refreshDailyQuests(
+            s.dailyQuestDate,
+            s.dailyQuests,
+            s.claimedDailyReward,
+          );
           const dailyChallenge = refreshDailyChallengeState(s.dailyChallenge);
           awarded = !dailyChallenge.rewardClaimed;
           const rewardCoins = s.hasProPack ? 5 : DAILY_FEATURE_REWARD_COINS;
@@ -449,10 +469,15 @@ export const useProgress = create<ProgressState>()(
             bestScore: Math.max(dailyChallenge.bestScore, Math.max(0, Math.floor(score))),
           };
           return {
+            ...refreshed,
             dailyChallenge: nextChallenge,
             dailyBoardRuns: s.dailyBoardRuns + 1,
             dailyBoardBestScore: Math.max(s.dailyBoardBestScore, nextChallenge.bestScore),
             completedGameCount: s.completedGameCount + 1,
+            dailyQuests: applyQuestProgress(refreshed.dailyQuests, {
+              levelCleared: true,
+              runScore: nextChallenge.bestScore,
+            }),
             goldCoins: balanceAfter,
             coinTransactions: appendCoinTransaction(
               s.coinTransactions,
@@ -499,7 +524,10 @@ export const useProgress = create<ProgressState>()(
               balanceAfter,
               "Daily Compound reward",
             ),
-            dailyQuests: applyQuestProgress(s.dailyQuests, { secretCompoundCleared: true }),
+            dailyQuests: applyQuestProgress(s.dailyQuests, {
+              runScore: scoredRun ? Math.max(0, Math.floor(score)) : undefined,
+              secretCompoundCleared: true,
+            }),
           };
         });
         return awarded;
@@ -1096,9 +1124,15 @@ export const useProgress = create<ProgressState>()(
           ...Object.fromEntries((persistedState?.discoveredCompounds ?? []).map((id) => [id, 1])),
           ...(persistedState?.compoundCounts ?? {}),
         };
+        const levelStats = normalizeLevelStatsRecord(persistedState?.levelStats);
+        const unlockedLevel = inferUnlockedLevelFromStats(
+          persistedState?.unlockedLevel ?? current.unlockedLevel,
+          levelStats,
+        );
         return {
           ...current,
           ...persistedState,
+          unlockedLevel,
           playerDisplayName: "",
           highestSingleShotScore:
             persistedState?.highestSingleShotScore ?? current.highestSingleShotScore,
@@ -1149,7 +1183,7 @@ export const useProgress = create<ProgressState>()(
             persistedState?.appReviewMilestoneRewardClaimed ??
             current.appReviewMilestoneRewardClaimed,
           powerUpInventory: normalizePowerUpInventory(persistedState?.powerUpInventory),
-          levelStats: normalizeLevelStatsRecord(persistedState?.levelStats),
+          levelStats,
           seenTips: persistedState?.seenTips ?? current.seenTips,
           labUpgradeLevels: normalizeLabUpgradeLevels(persistedState?.labUpgradeLevels),
           labUpgradeEnabled: normalizeLabUpgradeEnabled(persistedState?.labUpgradeEnabled),
