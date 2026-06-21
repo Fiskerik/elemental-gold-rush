@@ -334,16 +334,18 @@ export function MainMenu({
                   <Star size={18} fill="currentColor" aria-hidden="true" />
                 </button>
               )}
-              <button
-                onClick={() => {
-                  trackMenuAction("leaderboard");
-                  onLeaderboard();
-                }}
-                style={{ ...chooseLevelBtn, paddingInline: 9 }}
-                aria-label="Open leaderboard"
-              >
-                <PodiumMark size={20} />
-              </button>
+              {isNativeIos && (
+                <button
+                  onClick={() => {
+                    trackMenuAction("leaderboard");
+                    onLeaderboard();
+                  }}
+                  style={{ ...chooseLevelBtn, paddingInline: 9 }}
+                  aria-label="Open leaderboard"
+                >
+                  <PodiumMark size={20} />
+                </button>
+              )}
               <button
                 onClick={() => {
                   trackMenuAction("levels");
