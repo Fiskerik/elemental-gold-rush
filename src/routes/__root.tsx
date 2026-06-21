@@ -132,6 +132,15 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
   useEffect(() => {
+    // Enable normal page scrolling on the web build. The Capacitor shell adds
+    // "platform-native" itself; everywhere else we mark the document as web so
+    // the `.platform-web` CSS (scrollable app-shell) applies.
+    if (typeof document !== "undefined") {
+      const root = document.documentElement;
+      if (!root.classList.contains("platform-native")) {
+        root.classList.add("platform-web");
+      }
+    }
     if (typeof window !== "undefined" && typeof (window as { __bootReady?: () => void }).__bootReady === "function") {
       (window as { __bootReady?: () => void }).__bootReady?.();
     }
