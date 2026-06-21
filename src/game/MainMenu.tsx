@@ -11,7 +11,6 @@ import {
   ShoppingBag,
   Sparkles,
   Star,
-  StarHalf,
   Settings as SettingsIcon,
   CircleQuestionMark,
   Trophy,
@@ -150,6 +149,7 @@ export function MainMenu({
   const [rewardedAdBusy, setRewardedAdBusy] = useState(false);
   const [rewardedAdMessage, setRewardedAdMessage] = useState<string | null>(null);
   const rewardedAdMessageTimeoutRef = useRef<number | null>(null);
+  const [ratePromptOpen, setRatePromptOpen] = useState(false);
 
   useEffect(() => {
     const id = window.setInterval(() => {
@@ -249,13 +249,15 @@ export function MainMenu({
   }
 
   function handleRateApp() {
-    toast("Enjoying Atomic Fusion Rush?", {
-      description: "A quick App Store rating helps the game grow.",
-      action: {
-        label: "Rate App",
-        onClick: () => void openAppStoreReview(),
-      },
-    });
+    setRatePromptOpen(true);
+  }
+
+  async function handleRateConfirm() {
+    setRatePromptOpen(false);
+    const opened = await openAppStoreReview();
+    if (!opened) {
+      toast("Could not open the App Store rating page.");
+    }
   }
 
   return (
@@ -322,10 +324,10 @@ export function MainMenu({
             <div style={playPanelActions}>
               <button
                 onClick={handleRateApp}
-                style={{ ...chooseLevelBtn, paddingInline: 9 }}
+                style={{ ...chooseLevelBtn, paddingInline: 9, color: "var(--accent)" }}
                 aria-label="Rate app"
               >
-                <StarHalf size={18} aria-hidden="true" />
+                <Star size={18} fill="currentColor" aria-hidden="true" />
               </button>
               <button
                 onClick={() => {
@@ -691,6 +693,37 @@ export function MainMenu({
             ))}
           </div>
         </section>
+        {ratePromptOpen && (
+          <div style={modalBackdrop} role="presentation" onClick={() => setRatePromptOpen(false)}>
+            <section
+              style={rateModal}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="rate-app-title"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div style={rateIconWrap}>
+                <Star size={34} fill="currentColor" aria-hidden="true" />
+              </div>
+              <h2 id="rate-app-title" style={rateTitle}>
+                Enjoying Atomic Fusion Rush?
+              </h2>
+              <p style={rateCopy}>A quick App Store rating helps the game grow.</p>
+              <div style={rateActions}>
+                <button
+                  type="button"
+                  onClick={() => setRatePromptOpen(false)}
+                  style={rateSecondaryBtn}
+                >
+                  Later
+                </button>
+                <button type="button" onClick={handleRateConfirm} style={ratePrimaryBtn}>
+                  Rate App
+                </button>
+              </div>
+            </section>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1166,6 +1199,87 @@ const questProgressFill: CSSProperties = {
   height: "100%",
   borderRadius: 999,
   background: "linear-gradient(90deg, var(--primary), var(--accent))",
+};
+
+const modalBackdrop: CSSProperties = {
+  position: "fixed",
+  inset: 0,
+  zIndex: 20,
+  display: "grid",
+  placeItems: "center",
+  padding: 22,
+  background: "rgba(0, 0, 0, 0.62)",
+  backdropFilter: "blur(5px)",
+};
+
+const rateModal: CSSProperties = {
+  width: "min(100%, 360px)",
+  display: "grid",
+  justifyItems: "center",
+  gap: 12,
+  padding: 22,
+  borderRadius: 18,
+  border: "1px solid color-mix(in oklch, var(--accent) 55%, var(--border))",
+  background:
+    "linear-gradient(145deg, color-mix(in oklch, var(--accent) 10%, var(--surface-elevated)), var(--surface))",
+  boxShadow: "0 22px 54px rgba(0,0,0,0.42)",
+  textAlign: "center",
+};
+
+const rateIconWrap: CSSProperties = {
+  width: 62,
+  height: 62,
+  display: "grid",
+  placeItems: "center",
+  borderRadius: 18,
+  color: "var(--accent)",
+  background: "color-mix(in oklch, var(--accent) 18%, var(--surface-high))",
+  border: "1px solid color-mix(in oklch, var(--accent) 62%, var(--border))",
+  boxShadow: "0 0 24px var(--accent-glow)",
+};
+
+const rateTitle: CSSProperties = {
+  margin: "2px 0 0",
+  fontSize: 22,
+  lineHeight: 1.1,
+  fontWeight: 950,
+};
+
+const rateCopy: CSSProperties = {
+  margin: 0,
+  color: "var(--muted-foreground)",
+  fontSize: 14,
+  lineHeight: 1.4,
+};
+
+const rateActions: CSSProperties = {
+  width: "100%",
+  display: "grid",
+  gridTemplateColumns: "1fr 1.2fr",
+  gap: 10,
+  marginTop: 4,
+};
+
+const rateSecondaryBtn: CSSProperties = {
+  border: "1px solid var(--border)",
+  borderRadius: 12,
+  padding: "12px 14px",
+  background: "var(--surface-high)",
+  color: "var(--foreground)",
+  fontFamily: "inherit",
+  fontWeight: 900,
+  cursor: "pointer",
+};
+
+const ratePrimaryBtn: CSSProperties = {
+  border: "none",
+  borderRadius: 12,
+  padding: "12px 14px",
+  background: "linear-gradient(135deg, var(--accent), var(--primary))",
+  color: "var(--primary-foreground)",
+  fontFamily: "inherit",
+  fontWeight: 950,
+  cursor: "pointer",
 };
 
 function NavPill({

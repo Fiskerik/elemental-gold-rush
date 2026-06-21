@@ -55,8 +55,10 @@ interface DailyCompoundRunRecord {
   recordedAt: number;
 }
 
-const DAILY_LEADERBOARD_STORAGE_KEY = "elemental-gold-rush-daily-runs-v2";
+const DAILY_LEADERBOARD_STORAGE_KEY = "elemental-gold-rush-daily-runs-v3";
+const LEGACY_DAILY_LEADERBOARD_STORAGE_KEY = "elemental-gold-rush-daily-runs-v2";
 const LEGACY_DAILY_COMPOUND_LEADERBOARD_STORAGE_KEY = "elemental-gold-rush-daily-compound-runs";
+const MAX_DAILY_COMPOUND_SECONDS = 24 * 60 * 60;
 const DAILY_BOARD_FAST_CLEAR_MS = 90_000;
 const DAILY_BOARD_SLOW_CLEAR_MS = 8 * 60_000;
 const DAILY_BOARD_IDEAL_SHOTS = 10;
@@ -117,6 +119,7 @@ function readRecords(): DailyCompoundRunRecord[] {
   try {
     const raw =
       window.localStorage.getItem(DAILY_LEADERBOARD_STORAGE_KEY) ??
+      window.localStorage.getItem(LEGACY_DAILY_LEADERBOARD_STORAGE_KEY) ??
       window.localStorage.getItem(LEGACY_DAILY_COMPOUND_LEADERBOARD_STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as Partial<DailyCompoundRunRecord>[];
@@ -132,7 +135,13 @@ function readRecords(): DailyCompoundRunRecord[] {
         name: String(record.name ?? "You"),
         recordedAt: Math.max(0, Math.floor(record.recordedAt ?? 0)),
       }))
-      .filter((record) => record.id && record.date && record.weekKey);
+      .filter((record) => {
+        if (!record.id || !record.date || !record.weekKey) return false;
+        if (record.kind === "daily-compound" && record.score > MAX_DAILY_COMPOUND_SECONDS) {
+          return false;
+        }
+        return true;
+      });
   } catch {
     return [];
   }
@@ -178,25 +187,43 @@ export function calculateDailyBoardLeaderboardScore(input: DailyBoardScoreInput)
   return Math.max(1, baseScore + timeBonus + shotBonus + comboBonus - powerUpPenalty);
 }
 
-function recordDailyLeaderboardRun(kind: LeaderboardKind, score: number, shots: number): void {
+function isBetterLeaderboardEntry(
+  kind: LeaderboardKind,
+  a: LeaderboardEntry,
+  b: LeaderboardEntry,
+): number {
+  if (kind === "daily-compound") {
+    return a.score - b.score || a.name.localeCompare(b.name);
+  }
+  return b.score - a.score || a.shots - b.shots || a.name.localeCompare(b.name);
+}
+
+function recordDailyLeaderboardRun(kind: LeaderboardKind, score: number, shots: number): boolean {
   const normalizedScore = Math.max(0, Math.floor(score));
-  if (normalizedScore <= 0) return;
+  if (normalizedScore <= 0) return false;
   const today = getTodayQuestDate();
   const now = Date.now();
   const countryCode = inferPlayerCountryCode();
   const records = readRecords();
+  if (
+    kind === "daily-compound" &&
+    records.some((record) => record.date === today && record.kind === kind)
+  ) {
+    return false;
+  }
   records.push({
     id: `${kind}-${today}-${now}`,
     kind,
     date: today,
     weekKey: getWeekKey(new Date(`${today}T12:00:00`)),
     score: normalizedScore,
-    shots: Math.max(1, Math.floor(shots)),
+    shots: kind === "daily-compound" ? 0 : Math.max(1, Math.floor(shots)),
     countryCode,
     name: getPlayerDisplayName(),
     recordedAt: now,
   });
   writeRecords(records);
+  return true;
 }
 
 export function submitDailyBoardLeaderboardScore(input: DailyBoardScoreInput): number {
@@ -215,9 +242,10 @@ export function submitDailyBoardLeaderboardScore(input: DailyBoardScoreInput): n
 }
 
 export function submitDailyCompoundLeaderboardScore(score: number, shots: number): void {
-  recordDailyLeaderboardRun("daily-compound", score, shots);
+  const didRecordFirstAttempt = recordDailyLeaderboardRun("daily-compound", score, 0);
+  if (!didRecordFirstAttempt) return;
   if (!isGameCenterAvailable()) return;
-  void submitDailyGameCenterScore("daily-compound", score, shots).catch((error) => {
+  void submitDailyGameCenterScore("daily-compound", score, 0).catch((error) => {
     console.warn("Game Center score submit failed", error);
   });
 }
@@ -244,8 +272,8 @@ function seededEntries(
     const score =
       kind === "daily-board"
         ? Math.max(1200, 62000 - index * 2450 + (variance % 1800))
-        : Math.max(250, 26000 - index * 1150 + (variance % 900));
-    const shots = kind === "daily-board" ? 12 + ((variance + index) % 17) : 1 + (variance % 6);
+        : Math.max(12, 28 + index * 7 + (variance % 9));
+    const shots = kind === "daily-board" ? 12 + ((variance + index) % 17) : 0;
     return {
       id: `seed-daily-${kind}-${scope}-${index}`,
       rank: 0,
@@ -265,7 +293,11 @@ function playerEntry(kind: LeaderboardKind): LeaderboardEntry {
   const countryCode = inferPlayerCountryCode();
   const todaysBest = records
     .filter((record) => record.date === today && record.kind === kind)
-    .sort((a, b) => b.score - a.score || a.shots - b.shots)[0];
+    .sort((a, b) =>
+      kind === "daily-compound"
+        ? a.recordedAt - b.recordedAt
+        : b.score - a.score || a.shots - b.shots,
+    )[0];
   return {
     id: "player",
     rank: 0,
@@ -290,7 +322,7 @@ export function getDailyLeaderboard(
   const player = playerEntry(kind);
   const entries = [...seededEntries(kind, scope, countryCode), player]
     .filter((entry) => scope === "global" || entry.countryCode === countryCode)
-    .sort((a, b) => b.score - a.score || a.shots - b.shots || a.name.localeCompare(b.name))
+    .sort((a, b) => isBetterLeaderboardEntry(kind, a, b))
     .map((entry, index) => ({ ...entry, rank: index + 1 }));
   return {
     entries: entries.slice(0, 20),

@@ -3,13 +3,14 @@ import GameKit
 import UIKit
 
 @objc(GameCenterPlugin)
-public class GameCenterPlugin: CAPPlugin, CAPBridgedPlugin {
+public class GameCenterPlugin: CAPPlugin, CAPBridgedPlugin, GKGameCenterControllerDelegate {
     public let identifier = "GameCenterPlugin"
     public let jsName = "GameCenterPlugin"
     public let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "authenticate", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "submitScore", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "loadLeaderboard", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "loadLeaderboard", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "showLeaderboard", returnType: CAPPluginReturnPromise)
     ]
 
     private var pendingAuthCalls: [CAPPluginCall] = []
@@ -164,6 +165,36 @@ public class GameCenterPlugin: CAPPlugin, CAPBridgedPlugin {
                 ])
             }
         }
+    }
+
+    @objc func showLeaderboard(_ call: CAPPluginCall) {
+        guard GKLocalPlayer.local.isAuthenticated else {
+            call.reject("Game Center player is not authenticated")
+            return
+        }
+
+        let leaderboardID = call.getString("leaderboardId") ?? call.getString("leaderboardID")
+        let controller: GKGameCenterViewController
+        if let leaderboardID = leaderboardID, !leaderboardID.isEmpty {
+            controller = GKGameCenterViewController(
+                leaderboardID: leaderboardID,
+                playerScope: .global,
+                timeScope: .today
+            )
+        } else {
+            controller = GKGameCenterViewController(state: .leaderboards)
+        }
+        controller.gameCenterDelegate = self
+
+        DispatchQueue.main.async {
+            self.bridge?.viewController?.present(controller, animated: true) {
+                call.resolve(["shown": true])
+            }
+        }
+    }
+
+    public func gameCenterViewControllerDidFinish(_ gameCenterViewController: GKGameCenterViewController) {
+        gameCenterViewController.dismiss(animated: true)
     }
 
     private func reportLegacyScores(

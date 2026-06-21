@@ -915,11 +915,11 @@ function DailyCompoundGridBoard({
       setLevelStars(levelId, stars);
       unlockLevel(getNextLevel(levelId)?.id ?? levelId + 1);
       recordLevelRun(levelId, { score, shots: attempts, powerUpsUsed: 0, won: true });
-      reportQuestProgress({ levelCleared: true, starsEarned: stars });
+      reportQuestProgress({ levelCleared: true, runScore: score, starsEarned: stars });
     } else {
       recordGameAttemptForAd();
       awarded = completeSecretCompound([compound.id], score);
-      submitDailyCompoundLeaderboardScore(score, attempts);
+      submitDailyCompoundLeaderboardScore(Math.max(1, elapsedSec), attempts);
     }
     const formedIds = selectedCells.map((cell) => cell.id);
     setRevealedIds(new Set(formedIds));
@@ -2858,6 +2858,7 @@ function StandardGameBoard({
       setScore(finalStats.score);
       addScore(Math.max(0, finalStats.score - stats.score));
     }
+    reportQuestProgress({ runScore: finalStats.score });
     commitRunDiscoveries();
     // Record the cleared run immediately so campaign-map stats update
     // even if the player exits before the result modal is dismissed.
@@ -2934,7 +2935,7 @@ function StandardGameBoard({
     addScore(CHALLENGE_CLEAR_SCORE);
     setEarnedStars(stars);
     setLevelStars(levelId, stars);
-    reportQuestProgress({ levelCleared: true, starsEarned: stars });
+    reportQuestProgress({ levelCleared: true, runScore: clearScore, starsEarned: stars });
     unlockLevel(getNextLevel(levelId)?.id ?? levelId + 1);
     trackLevelWin(levelId, clearScore, shots, highest, mode);
     beginStageClear({ stars, score: clearScore, shots, bestCombo: runBestCombo });
@@ -3849,6 +3850,7 @@ function StandardGameBoard({
   function damageStones(
     source: Board,
     damageById: Map<number, number>,
+    options: { reportQuestProgress?: boolean } = {},
   ): { balls: Board; bonus: number; hitIds: Set<number>; destroyedCount: number } {
     if (damageById.size === 0) {
       return { balls: source, bonus: 0, hitIds: new Set(), destroyedCount: 0 };
@@ -3873,7 +3875,7 @@ function StandardGameBoard({
         return { ...b, stoneHp: newHp, r: Math.max(initialR * 0.35, initialR * (newHp / maxHp)) };
       })
       .filter((b): b is Ball => b !== null);
-    if (destroyedCount > 0) {
+    if (destroyedCount > 0 && options.reportQuestProgress !== false) {
       reportQuestProgress({ stonesDestroyed: destroyedCount });
     }
     return { balls: ballsAfterDamage, bonus, hitIds, destroyedCount };
@@ -4085,7 +4087,7 @@ function StandardGameBoard({
       setEarnedStars(stars);
       if (mode === "campaign") {
         setLevelStars(levelId, stars);
-        reportQuestProgress({ levelCleared: true, starsEarned: stars });
+        reportQuestProgress({ levelCleared: true, runScore: score, starsEarned: stars });
         unlockLevel(getNextLevel(levelId)?.id ?? levelId + 1);
       }
       trackLevelWin(levelId, score, nextShots, nextHighest, mode);
@@ -4127,7 +4129,7 @@ function StandardGameBoard({
     });
     let stoneBonus = 0;
     if (gammaStoneDamage.size > 0) {
-      const damaged = damageStones(remaining, gammaStoneDamage);
+      const damaged = damageStones(remaining, gammaStoneDamage, { reportQuestProgress: false });
       remaining = damaged.balls;
       stoneBonus = damaged.bonus;
       if (damaged.bonus > 0)
@@ -4170,7 +4172,7 @@ function StandardGameBoard({
       powerUp: [
         "Gamma Bomb",
         clearedAtoms.some((atom) => atom.isotope) ? "Isotope x2" : null,
-        stoneBonus > 0 ? "Stone break" : null,
+        stoneBonus > 0 ? "Stone damage" : null,
       ]
         .filter(Boolean)
         .join(", "),
@@ -4919,7 +4921,7 @@ function StandardGameBoard({
           setEarnedStars(stars);
           if (mode === "campaign") {
             setLevelStars(levelId, stars);
-            reportQuestProgress({ levelCleared: true, starsEarned: stars });
+            reportQuestProgress({ levelCleared: true, runScore: nextScore, starsEarned: stars });
             unlockLevel(getNextLevel(levelId)?.id ?? levelId + 1);
           }
           // Offer a choice — claim the win or keep playing for score.
@@ -5304,7 +5306,10 @@ function StandardGameBoard({
         points: bonusScore,
         powerUp: isotopeBonus ? "Compound, Isotope x2" : "Compound",
       });
+      setNoMergeStreak(0);
       addGrabProgressSteps(1);
+      grantPowerUpsForMerges(1);
+      reportQuestProgress({ merges: 1, maxChainDepth: 1 });
       spawnPopup(`+${formatScore(bonusScore)}`);
       if (isotopeBonus) spawnPopup("ISOTOPE x2");
       const textFxId = Date.now();
@@ -5328,7 +5333,11 @@ function StandardGameBoard({
           unlockLevel(getNextLevel(levelId)?.id ?? levelId + 1);
         }
         if (mode !== "campaign") setChallengeBestScore(mode, score + bonusScore);
-        reportQuestProgress({ levelCleared: true, starsEarned: stars });
+        reportQuestProgress({
+          levelCleared: true,
+          runScore: score + bonusScore,
+          starsEarned: stars,
+        });
         trackLevelWin(
           levelId,
           score + bonusScore,
@@ -5446,7 +5455,7 @@ function StandardGameBoard({
     setBusy(true);
     const fxId = Date.now();
     setGravityFxId(fxId);
-    setTimeout(() => setGravityFxId((active) => (active === fxId ? null : active)), 1050);
+    setTimeout(() => setGravityFxId((active) => (active === fxId ? null : active)), 1800);
     setGravityCharges((g) => Math.max(0, g - 1));
     runPowerUpsUsedRef.current += 1;
     const atoms = balls.filter((b) => b.stoneHp == null).map((b) => ({ ...b }));
@@ -5616,7 +5625,11 @@ function StandardGameBoard({
           setEarnedStars(stars);
           if (mode === "campaign") {
             setLevelStars(levelId, stars);
-            reportQuestProgress({ levelCleared: true, starsEarned: stars });
+            reportQuestProgress({
+              levelCleared: true,
+              runScore: score + gained,
+              starsEarned: stars,
+            });
             unlockLevel(getNextLevel(levelId)?.id ?? levelId + 1);
           }
           beginStageClear(
@@ -5840,7 +5853,7 @@ function StandardGameBoard({
       setEarnedStars(stars);
       if (mode === "campaign") {
         setLevelStars(levelId, stars);
-        reportQuestProgress({ levelCleared: true, starsEarned: stars });
+        reportQuestProgress({ levelCleared: true, runScore: nextScore, starsEarned: stars });
         unlockLevel(getNextLevel(levelId)?.id ?? levelId + 1);
       }
       if (mode !== "campaign") setChallengeBestScore(mode, nextScore);

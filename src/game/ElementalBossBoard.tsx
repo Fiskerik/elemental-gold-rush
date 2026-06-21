@@ -4,7 +4,15 @@ import { ElementBall } from "./ElementBall";
 import { BOSSES } from "./bosses";
 import { getLevelById, getNextLevel } from "./levels";
 import { trackGameOver, trackGameStart, trackLevelWin, trackShot } from "./analytics";
-import { playMergeSound, playShootSound, playWinSound, primeAudio, startAmbientMusic, stopAmbientMusic, vibrate } from "./audio";
+import {
+  playMergeSound,
+  playShootSound,
+  playWinSound,
+  primeAudio,
+  startAmbientMusic,
+  stopAmbientMusic,
+  vibrate,
+} from "./audio";
 import { useProgress } from "./store";
 import { useIsTabletLayout } from "./responsive";
 import type { GameModeId } from "./challenges";
@@ -40,10 +48,7 @@ interface ProjectileAnim {
   atom: number;
   shimmer: boolean;
   blank: boolean;
-  outcome:
-    | { type: "miss" }
-    | { type: "center" }
-    | { type: "outer"; eyeId: OuterEyeId };
+  outcome: { type: "miss" } | { type: "center" } | { type: "outer"; eyeId: OuterEyeId };
 }
 
 interface VictorySummary {
@@ -134,17 +139,26 @@ function rayCircleHit(
 function makeEyeAssignments(): Record<OuterEyeId, number> {
   const ids = BOSSES["elemental-boss"].outerEyes.map((eye) => eye.id as OuterEyeId);
   const atoms = pickDistinctAtoms(BOSSES["elemental-boss"].maxEyeElement, ids.length);
-  return ids.reduce<Record<OuterEyeId, number>>((acc, id, index) => {
-    acc[id] = atoms[index] ?? 1;
-    return acc;
-  }, {} as Record<OuterEyeId, number>);
+  return ids.reduce<Record<OuterEyeId, number>>(
+    (acc, id, index) => {
+      acc[id] = atoms[index] ?? 1;
+      return acc;
+    },
+    {} as Record<OuterEyeId, number>,
+  );
 }
 
-function makeInitialQueue(eyeAtoms: Record<OuterEyeId, number>): { queue: number[]; shimmer: boolean[] } {
+function makeInitialQueue(eyeAtoms: Record<OuterEyeId, number>): {
+  queue: number[];
+  shimmer: boolean[];
+} {
   const atomValues = Object.values(eyeAtoms);
   return {
     queue: Array.from({ length: QUEUE_SIZE }, () => generateBossAtom(atomValues)),
-    shimmer: Array.from({ length: QUEUE_SIZE }, (_, index) => index > 0 && Math.random() < SHIMMER_CHANCE),
+    shimmer: Array.from(
+      { length: QUEUE_SIZE },
+      (_, index) => index > 0 && Math.random() < SHIMMER_CHANCE,
+    ),
   };
 }
 
@@ -177,7 +191,13 @@ function computeBossBattleScore({
   };
 }
 
-export function ElementalBossBoard({ levelId, onExit, onWin, onMap = onExit, mode = "elemental-boss" }: Props) {
+export function ElementalBossBoard({
+  levelId,
+  onExit,
+  onWin,
+  onMap = onExit,
+  mode = "elemental-boss",
+}: Props) {
   const config = BOSSES["elemental-boss"];
   const level = getLevelById(levelId) ?? getLevelById(config.levelId);
   const nextLevel = getNextLevel(levelId);
@@ -201,7 +221,10 @@ export function ElementalBossBoard({ levelId, onExit, onWin, onMap = onExit, mod
   const runStartRef = useRef(Date.now());
   const runRecordedRef = useRef(false);
   const [clock, setClock] = useState(() => Date.now());
-  const [arenaSize, setArenaSize] = useState({ width: isTabletLayout ? 860 : 380, height: isTabletLayout ? 710 : 600 });
+  const [arenaSize, setArenaSize] = useState({
+    width: isTabletLayout ? 860 : 380,
+    height: isTabletLayout ? 710 : 600,
+  });
   const [aimPoint, setAimPoint] = useState({ x: arenaSize.width / 2, y: 120 });
   const [eyeAtoms] = useState<Record<OuterEyeId, number>>(() => makeEyeAssignments());
   const [queueState, setQueueState] = useState(() => makeInitialQueue(eyeAtoms));
@@ -220,7 +243,9 @@ export function ElementalBossBoard({ levelId, onExit, onWin, onMap = onExit, mod
     challengeBestScores,
     hasProPack,
     incrementLevelAttempt,
+    musicEnabled,
     recordLevelRun,
+    reportQuestProgress,
     setChallengeBestScore,
     setLevelStars,
     unlockLevel,
@@ -234,8 +259,8 @@ export function ElementalBossBoard({ levelId, onExit, onWin, onMap = onExit, mod
     [arenaSize.height, arenaSize.width, isTabletLayout],
   );
 
-  const currentShot = blankCharges > 0 ? 0 : queueState.queue[0] ?? 1;
-  const currentShimmer = blankCharges > 0 ? false : queueState.shimmer[0] ?? false;
+  const currentShot = blankCharges > 0 ? 0 : (queueState.queue[0] ?? 1);
+  const currentShimmer = blankCharges > 0 ? false : (queueState.shimmer[0] ?? false);
   const shotsLeft = Math.max(0, config.maxShots - shotsUsed);
   const healthPct = clamp(bossHealth / config.maxHealth, 0, 1);
   const chargePct = clamp(centerCharge / config.centerChargeGoal, 0, 1);
@@ -299,17 +324,28 @@ export function ElementalBossBoard({ levelId, onExit, onWin, onMap = onExit, mod
         powerUpsUsed: 0,
         won: didWin,
       });
+      reportQuestProgress({ runScore: finalScore });
       if (didWin) {
         addScore(finalScore);
         setLevelStars(levelId, stars);
         unlockLevel(getNextLevel(levelId)?.id ?? levelId + 1);
+        reportQuestProgress({ levelCleared: true, runScore: finalScore, starsEarned: stars });
         setChallengeBestScore(mode, finalScore);
         trackLevelWin(levelId, finalScore, finalShotsUsed, Math.min(10, successfulHits), mode);
       } else {
         trackGameOver(levelId, finalScore, finalShotsUsed, Math.min(10, successfulHits), mode);
       }
     },
-    [addScore, levelId, mode, recordLevelRun, setChallengeBestScore, setLevelStars, unlockLevel],
+    [
+      addScore,
+      levelId,
+      mode,
+      recordLevelRun,
+      reportQuestProgress,
+      setChallengeBestScore,
+      setLevelStars,
+      unlockLevel,
+    ],
   );
 
   const triggerFlash = useCallback((kind: "hit" | "charge") => {
@@ -459,7 +495,14 @@ export function ElementalBossBoard({ levelId, onExit, onWin, onMap = onExit, mod
     (targetX: number, targetY: number) => {
       if (projectileRef.current || result) return;
       const dir = normalize(targetX - launcher.x, targetY - launcher.y);
-      const exit = rayExitPoint(launcher.x, launcher.y, dir.x, dir.y, arenaSize.width, arenaSize.height);
+      const exit = rayExitPoint(
+        launcher.x,
+        launcher.y,
+        dir.x,
+        dir.y,
+        arenaSize.width,
+        arenaSize.height,
+      );
 
       const hitCandidates: Array<{
         t: number;
@@ -482,7 +525,15 @@ export function ElementalBossBoard({ levelId, onExit, onWin, onMap = onExit, mod
       }
 
       if (centerEye.open) {
-        const t = rayCircleHit(launcher.x, launcher.y, dir.x, dir.y, centerEye.x, centerEye.y, centerEye.radius);
+        const t = rayCircleHit(
+          launcher.x,
+          launcher.y,
+          dir.x,
+          dir.y,
+          centerEye.x,
+          centerEye.y,
+          centerEye.radius,
+        );
         if (t != null && t <= exit.t) {
           hitCandidates.push({
             t,
@@ -499,7 +550,12 @@ export function ElementalBossBoard({ levelId, onExit, onWin, onMap = onExit, mod
       const travel = Math.max(120, distance(launcher.x, launcher.y, endX, endY));
       const atom = currentShot === 0 ? eyeAtoms[outerEyes[0]?.id ?? "north-west"] : currentShot;
 
-      trackShot(levelId, currentShot === 0 ? -1 : atom, Math.atan2(targetY - launcher.y, targetX - launcher.x) * (180 / Math.PI), mode);
+      trackShot(
+        levelId,
+        currentShot === 0 ? -1 : atom,
+        Math.atan2(targetY - launcher.y, targetX - launcher.x) * (180 / Math.PI),
+        mode,
+      );
       playShootSound();
 
       animateProjectile({
@@ -603,12 +659,14 @@ export function ElementalBossBoard({ levelId, onExit, onWin, onMap = onExit, mod
 
   useEffect(() => {
     primeAudio();
-    startAmbientMusic("boss");
+    if (musicEnabled) startAmbientMusic("boss");
+    else stopAmbientMusic();
+    return () => stopAmbientMusic();
+  }, [musicEnabled]);
+
+  useEffect(() => {
     incrementLevelAttempt(levelId);
     trackGameStart(levelId, mode);
-    return () => {
-      stopAmbientMusic();
-    };
   }, [incrementLevelAttempt, levelId, mode]);
 
   return (
@@ -659,7 +717,9 @@ export function ElementalBossBoard({ levelId, onExit, onWin, onMap = onExit, mod
             >
               Special Encounter
             </div>
-            <div style={{ fontSize: isTabletLayout ? 22 : 18, fontWeight: 900 }}>{level?.name ?? config.name}</div>
+            <div style={{ fontSize: isTabletLayout ? 22 : 18, fontWeight: 900 }}>
+              {level?.name ?? config.name}
+            </div>
           </div>
           <div
             style={{
@@ -754,7 +814,11 @@ export function ElementalBossBoard({ levelId, onExit, onWin, onMap = onExit, mod
                       ? "linear-gradient(90deg, #ff7d7d, #ff3b3b)"
                       : "linear-gradient(90deg, var(--accent), #ff7f50)"
                   }
-                  shadow={bossFlash === "hit" ? "0 0 18px rgba(255,70,70,0.6)" : "0 0 16px var(--accent-glow)"}
+                  shadow={
+                    bossFlash === "hit"
+                      ? "0 0 18px rgba(255,70,70,0.6)"
+                      : "0 0 16px var(--accent-glow)"
+                  }
                 />
                 <CompactBar
                   label="Blank"
@@ -787,7 +851,14 @@ export function ElementalBossBoard({ levelId, onExit, onWin, onMap = onExit, mod
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <div style={{ fontSize: 10, letterSpacing: 1.8, color: "var(--muted-foreground)", fontWeight: 800 }}>
+                  <div
+                    style={{
+                      fontSize: 10,
+                      letterSpacing: 1.8,
+                      color: "var(--muted-foreground)",
+                      fontWeight: 800,
+                    }}
+                  >
                     CURRENT SHOT
                   </div>
                   <span style={{ fontSize: 10, color: "var(--muted-foreground)", fontWeight: 800 }}>
@@ -803,7 +874,8 @@ export function ElementalBossBoard({ levelId, onExit, onWin, onMap = onExit, mod
                         borderRadius: "50%",
                         display: "grid",
                         placeItems: "center",
-                        background: "radial-gradient(circle at 35% 35%, rgba(255,255,255,0.98), rgba(210,226,255,0.88) 55%, rgba(120,136,200,0.82))",
+                        background:
+                          "radial-gradient(circle at 35% 35%, rgba(255,255,255,0.98), rgba(210,226,255,0.88) 55%, rgba(120,136,200,0.82))",
                         color: "#11162d",
                         fontWeight: 900,
                         boxShadow: "0 0 18px rgba(187,226,255,0.48)",
@@ -892,7 +964,8 @@ export function ElementalBossBoard({ levelId, onExit, onWin, onMap = onExit, mod
                 height: isTabletLayout ? 40 : 28,
                 transform: "translateX(-50%)",
                 borderRadius: "0 0 999px 999px",
-                background: "linear-gradient(180deg, rgba(11, 7, 20, 0.98), rgba(44, 14, 22, 0.92))",
+                background:
+                  "linear-gradient(180deg, rgba(11, 7, 20, 0.98), rgba(44, 14, 22, 0.92))",
                 border: "1px solid rgba(255,255,255,0.08)",
                 overflow: "hidden",
               }}
@@ -925,7 +998,9 @@ export function ElementalBossBoard({ levelId, onExit, onWin, onMap = onExit, mod
                   background: eye.open
                     ? "radial-gradient(circle at 50% 45%, rgba(255,255,255,0.92), rgba(180,185,220,0.5) 62%, rgba(25,28,50,0.9) 100%)"
                     : "linear-gradient(180deg, rgba(34,38,70,0.95), rgba(10,12,26,0.95))",
-                  border: eye.open ? "2px solid rgba(255,255,255,0.25)" : "2px solid rgba(110,120,170,0.22)",
+                  border: eye.open
+                    ? "2px solid rgba(255,255,255,0.25)"
+                    : "2px solid rgba(110,120,170,0.22)",
                   boxShadow: eye.open
                     ? "0 0 22px rgba(125,147,255,0.22)"
                     : "inset 0 0 18px rgba(0,0,0,0.45)",
@@ -950,7 +1025,8 @@ export function ElementalBossBoard({ levelId, onExit, onWin, onMap = onExit, mod
                         width: eye.radius * 1.25,
                         height: Math.max(8, eye.radius * 0.22),
                         borderRadius: 999,
-                        background: "linear-gradient(180deg, rgba(154,165,214,0.72), rgba(60,70,110,0.68))",
+                        background:
+                          "linear-gradient(180deg, rgba(154,165,214,0.72), rgba(60,70,110,0.68))",
                       }}
                     />
                   </div>
@@ -987,7 +1063,8 @@ export function ElementalBossBoard({ levelId, onExit, onWin, onMap = onExit, mod
                     borderRadius: "50%",
                     display: "grid",
                     placeItems: "center",
-                    background: "radial-gradient(circle at 45% 40%, rgba(135,209,255,0.95), rgba(35,77,140,0.95) 65%, rgba(8,16,33,0.95))",
+                    background:
+                      "radial-gradient(circle at 45% 40%, rgba(135,209,255,0.95), rgba(35,77,140,0.95) 65%, rgba(8,16,33,0.95))",
                     color: "white",
                     fontSize: isTabletLayout ? 30 : 24,
                     fontWeight: 900,
@@ -1002,7 +1079,8 @@ export function ElementalBossBoard({ levelId, onExit, onWin, onMap = onExit, mod
                       width: centerEye.radius * 1.2,
                       height: Math.max(10, centerEye.radius * 0.22),
                       borderRadius: 999,
-                      background: "linear-gradient(180deg, rgba(188,193,220,0.7), rgba(62,68,98,0.68))",
+                      background:
+                        "linear-gradient(180deg, rgba(188,193,220,0.7), rgba(62,68,98,0.68))",
                     }}
                   />
                 </div>
@@ -1066,7 +1144,8 @@ export function ElementalBossBoard({ levelId, onExit, onWin, onMap = onExit, mod
                       borderRadius: "50%",
                       display: "grid",
                       placeItems: "center",
-                      background: "radial-gradient(circle at 35% 35%, rgba(255,255,255,0.98), rgba(200,216,255,0.9) 55%, rgba(120,136,200,0.85))",
+                      background:
+                        "radial-gradient(circle at 35% 35%, rgba(255,255,255,0.98), rgba(200,216,255,0.9) 55%, rgba(120,136,200,0.85))",
                       color: "#10162a",
                       fontWeight: 900,
                     }}
@@ -1089,7 +1168,8 @@ export function ElementalBossBoard({ levelId, onExit, onWin, onMap = onExit, mod
                 borderRadius: "50%",
                 display: "grid",
                 placeItems: "center",
-                background: "radial-gradient(circle at 50% 45%, rgba(18,28,64,0.98), rgba(6,10,26,0.98))",
+                background:
+                  "radial-gradient(circle at 50% 45%, rgba(18,28,64,0.98), rgba(6,10,26,0.98))",
                 border: "1px solid rgba(255,255,255,0.12)",
                 boxShadow: "0 0 24px rgba(0,0,0,0.5)",
               }}
@@ -1102,18 +1182,19 @@ export function ElementalBossBoard({ levelId, onExit, onWin, onMap = onExit, mod
                     borderRadius: "50%",
                     display: "grid",
                     placeItems: "center",
-                    background: "radial-gradient(circle at 35% 35%, rgba(255,255,255,0.98), rgba(210,226,255,0.88) 55%, rgba(120,136,200,0.82))",
+                    background:
+                      "radial-gradient(circle at 35% 35%, rgba(255,255,255,0.98), rgba(210,226,255,0.88) 55%, rgba(120,136,200,0.82))",
                     color: "#11162d",
                     fontWeight: 900,
                     boxShadow: "0 0 18px rgba(187,226,255,0.48)",
                   }}
-                  >
-                    ?
-                  </div>
-                ) : (
-                  <ElementBall atomicNumber={currentShot} size={48} glow={currentShimmer} />
-                )}
-              </div>
+                >
+                  ?
+                </div>
+              ) : (
+                <ElementBall atomicNumber={currentShot} size={48} glow={currentShimmer} />
+              )}
+            </div>
 
             {result && (
               <div
@@ -1154,27 +1235,51 @@ export function ElementalBossBoard({ levelId, onExit, onWin, onMap = onExit, mod
                     <div style={{ fontSize: 28, fontWeight: 900, marginTop: 4 }}>
                       {result === "win" ? "The core is shattered." : "Out of atoms."}
                     </div>
-                    <div style={{ color: "var(--muted-foreground)", marginTop: 6, lineHeight: 1.5 }}>
+                    <div
+                      style={{ color: "var(--muted-foreground)", marginTop: 6, lineHeight: 1.5 }}
+                    >
                       {result === "win"
                         ? `You earned ${CLEAR_SCORE} points for clearing the fight.`
                         : "You can jump back in immediately and learn the eye pattern."}
                     </div>
                   </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10 }}>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+                      gap: 10,
+                    }}
+                  >
                     <MetricCard label="Shots used" value={`${shotsUsed}`} />
-                    <MetricCard label="Kill time" value={victorySummary ? formatDurationShort(victorySummary.clearTimeMs) : "--"} />
+                    <MetricCard
+                      label="Kill time"
+                      value={
+                        victorySummary ? formatDurationShort(victorySummary.clearTimeMs) : "--"
+                      }
+                    />
                     <MetricCard label="Score" value={`${score}`} />
                   </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10 }}>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+                      gap: 10,
+                    }}
+                  >
                     <MetricCard label="Boss hits" value={`${damageHits}`} />
-                    <MetricCard label="Shot bonus" value={victorySummary ? `${victorySummary.shotBonus}` : "--"} />
+                    <MetricCard
+                      label="Shot bonus"
+                      value={victorySummary ? `${victorySummary.shotBonus}` : "--"}
+                    />
                     <MetricCard
                       label={victorySummary?.newBest ? "New best" : "Best score"}
                       value={`${Math.max(victorySummary?.finalScore ?? 0, challengeBestScores[mode] ?? 0)}`}
                     />
                   </div>
                   {victorySummary && (
-                    <div style={{ color: "var(--muted-foreground)", fontSize: 13, fontWeight: 700 }}>
+                    <div
+                      style={{ color: "var(--muted-foreground)", fontSize: 13, fontWeight: 700 }}
+                    >
                       Speed bonus: {victorySummary.speedBonus}
                     </div>
                   )}
@@ -1203,7 +1308,8 @@ export function ElementalBossBoard({ levelId, onExit, onWin, onMap = onExit, mod
                           flex: 1.2,
                           borderRadius: 12,
                           border: "none",
-                          background: "linear-gradient(135deg, var(--primary), oklch(0.58 0.17 230))",
+                          background:
+                            "linear-gradient(135deg, var(--primary), oklch(0.58 0.17 230))",
                           color: "var(--primary-foreground)",
                           padding: "12px 14px",
                           fontWeight: 900,
@@ -1256,7 +1362,14 @@ function MetricCard({ label, value }: { label: string; value: string }) {
         justifyContent: "space-between",
       }}
     >
-      <div style={{ fontSize: 11, letterSpacing: 1.6, color: "var(--muted-foreground)", fontWeight: 800 }}>
+      <div
+        style={{
+          fontSize: 11,
+          letterSpacing: 1.6,
+          color: "var(--muted-foreground)",
+          fontWeight: 800,
+        }}
+      >
         {label.toUpperCase()}
       </div>
       <div style={{ fontSize: 22, fontWeight: 900, marginTop: 8, lineHeight: 1.05 }}>{value}</div>

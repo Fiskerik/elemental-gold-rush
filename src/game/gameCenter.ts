@@ -71,6 +71,7 @@ interface GameCenterPlugin {
     playerScope?: "global" | "friends";
     timeScope?: "allTime" | "today" | "week";
   }): Promise<GameCenterLeaderboardResult>;
+  showLeaderboard(options?: { leaderboardId?: string }): Promise<{ shown: boolean }>;
 }
 
 const GameCenterNative = registerPlugin<GameCenterPlugin>("GameCenterPlugin");
@@ -299,4 +300,17 @@ export async function loadDailyGameCenterLeaderboard(
     });
     throw error;
   }
+}
+
+export async function showGameCenterLeaderboards(
+  kind?: GameCenterLeaderboardKind,
+  scope: GameCenterLeaderboardScope = "global",
+): Promise<boolean> {
+  if (!isGameCenterAvailable()) return false;
+  await authenticateGameCenter();
+  const leaderboardId = kind
+    ? DAILY_LEADERBOARD_IDS[kind][scope] || DAILY_LEADERBOARD_IDS[kind].global
+    : "";
+  const result = await GameCenterNative.showLeaderboard({ leaderboardId });
+  return Boolean(result.shown);
 }

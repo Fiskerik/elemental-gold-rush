@@ -4,7 +4,15 @@ import { ElementBall } from "./ElementBall";
 import { BOSSES } from "./bosses";
 import { getLevelById, getNextLevel } from "./levels";
 import { trackGameOver, trackGameStart, trackLevelWin, trackShot } from "./analytics";
-import { playMergeSound, playShootSound, playWinSound, primeAudio, startAmbientMusic, stopAmbientMusic, vibrate } from "./audio";
+import {
+  playMergeSound,
+  playShootSound,
+  playWinSound,
+  primeAudio,
+  startAmbientMusic,
+  stopAmbientMusic,
+  vibrate,
+} from "./audio";
 import { useProgress } from "./store";
 import { useIsTabletLayout } from "./responsive";
 import type { GameModeId } from "./challenges";
@@ -243,13 +251,20 @@ function simulateTrajectory({
     }
 
     for (const orbitAtom of orbitAtoms) {
-      if (distanceToSegment(orbitAtom, previous, { x, y }) <= orbitAtom.radius + PROJECTILE_RADIUS) {
+      if (
+        distanceToSegment(orbitAtom, previous, { x, y }) <=
+        orbitAtom.radius + PROJECTILE_RADIUS
+      ) {
         path.push({ x: orbitAtom.x, y: orbitAtom.y });
         return { path, hit: { type: "orbit", id: orbitAtom.id, atom: orbitAtom.atom } };
       }
     }
 
-    if (eye.exposed && eye.open && distanceToSegment(eye.center, previous, { x, y }) <= eye.radius + PROJECTILE_RADIUS) {
+    if (
+      eye.exposed &&
+      eye.open &&
+      distanceToSegment(eye.center, previous, { x, y }) <= eye.radius + PROJECTILE_RADIUS
+    ) {
       path.push({ x: eye.center.x, y: eye.center.y });
       return { path, hit: { type: "eye" } };
     }
@@ -258,7 +273,13 @@ function simulateTrajectory({
   return { path, hit: null };
 }
 
-export function NucleusCoreBoard({ levelId, onExit, onWin, onMap = onExit, mode = "nucleus-core" }: Props) {
+export function NucleusCoreBoard({
+  levelId,
+  onExit,
+  onWin,
+  onMap = onExit,
+  mode = "nucleus-core",
+}: Props) {
   const config = BOSSES["nucleus-core"];
   const level = getLevelById(levelId) ?? getLevelById(config.levelId);
   const nextLevel = getNextLevel(levelId);
@@ -270,10 +291,15 @@ export function NucleusCoreBoard({ levelId, onExit, onWin, onMap = onExit, mode 
   const eyeClosedUntilRef = useRef(0);
   const nextEyeDodgeRef = useRef(Date.now() + EYE_DODGE_INTERVAL_MIN_MS);
   const [clock, setClock] = useState(() => Date.now());
-  const [arenaSize, setArenaSize] = useState({ width: isTabletLayout ? 860 : 380, height: isTabletLayout ? 700 : 580 });
+  const [arenaSize, setArenaSize] = useState({
+    width: isTabletLayout ? 860 : 380,
+    height: isTabletLayout ? 700 : 580,
+  });
   const [aimPoint, setAimPoint] = useState({ x: arenaSize.width * 0.5, y: 150 });
   const [coreAtoms, setCoreAtoms] = useState<CoreAtom[]>(() => makeInitialCoreAtoms());
-  const [queue, setQueue] = useState<number[]>(() => makeInitialQueue(Array.from({ length: 10 }, (_, index) => index + 1)));
+  const [queue, setQueue] = useState<number[]>(() =>
+    makeInitialQueue(Array.from({ length: 10 }, (_, index) => index + 1)),
+  );
   const [shotsUsed, setShotsUsed] = useState(0);
   const [eyeHealth, setEyeHealth] = useState(EYE_HEALTH);
   const [projectile, setProjectile] = useState<ProjectileAnim | null>(null);
@@ -286,7 +312,9 @@ export function NucleusCoreBoard({ levelId, onExit, onWin, onMap = onExit, mode 
     addScore,
     challengeBestScores,
     incrementLevelAttempt,
+    musicEnabled,
     recordLevelRun,
+    reportQuestProgress,
     setChallengeBestScore,
     setLevelStars,
     shootingStyle,
@@ -310,9 +338,7 @@ export function NucleusCoreBoard({ levelId, onExit, onWin, onMap = onExit, mode 
     const exposed = coreAtoms.length === 0;
     return {
       x: arenaSize.width * 0.5 + Math.sin(clock / 2500) * arenaSize.width * 0.12,
-      y:
-        arenaSize.height * (exposed ? 0.34 : 0.32) +
-        (exposed ? Math.cos(clock / 2600) * 12 : 0),
+      y: arenaSize.height * (exposed ? 0.34 : 0.32) + (exposed ? Math.cos(clock / 2600) * 12 : 0),
     };
   }, [arenaSize.height, arenaSize.width, clock, coreAtoms.length]);
 
@@ -325,7 +351,18 @@ export function NucleusCoreBoard({ levelId, onExit, onWin, onMap = onExit, mode 
   );
 
   const orbitAtoms = useMemo<OrbitPose[]>(() => {
-    const orbitRadius = coreAtoms.length > 6 ? (isTabletLayout ? 116 : 86) : coreAtoms.length > 3 ? (isTabletLayout ? 94 : 72) : (isTabletLayout ? 74 : 58);
+    const orbitRadius =
+      coreAtoms.length > 6
+        ? isTabletLayout
+          ? 116
+          : 86
+        : coreAtoms.length > 3
+          ? isTabletLayout
+            ? 94
+            : 72
+          : isTabletLayout
+            ? 74
+            : 58;
     return coreAtoms.map((item, index) => {
       const visibleIndex = Math.max(1, coreAtoms.length);
       const angle = (Math.PI * 2 * index) / visibleIndex + clock / 1240;
@@ -359,40 +396,63 @@ export function NucleusCoreBoard({ levelId, onExit, onWin, onMap = onExit, mode 
     (won: boolean, finalScore: number, finalShotsUsed: number) => {
       if (!level) return;
       const stars = won ? (finalShotsUsed <= 18 ? 3 : finalShotsUsed <= 25 ? 2 : 1) : 0;
+      reportQuestProgress({ runScore: finalScore });
       if (won) {
         addScore(finalScore);
         setChallengeBestScore(mode, finalScore);
         setLevelStars(level.id, stars);
         if (nextLevel) unlockLevel(nextLevel.id);
-        recordLevelRun(level.id, { score: finalScore, shots: finalShotsUsed, powerUpsUsed: 0, won: true });
+        reportQuestProgress({ levelCleared: true, runScore: finalScore, starsEarned: stars });
+        recordLevelRun(level.id, {
+          score: finalScore,
+          shots: finalShotsUsed,
+          powerUpsUsed: 0,
+          won: true,
+        });
         trackLevelWin(level.id, finalScore, finalShotsUsed, level.targetElement, mode);
       } else {
         setChallengeBestScore(mode, finalScore);
-        recordLevelRun(level.id, { score: finalScore, shots: finalShotsUsed, powerUpsUsed: 0, won: false });
+        recordLevelRun(level.id, {
+          score: finalScore,
+          shots: finalShotsUsed,
+          powerUpsUsed: 0,
+          won: false,
+        });
         trackGameOver(level.id, finalScore, finalShotsUsed, level.targetElement, mode);
       }
     },
-    [addScore, level, mode, nextLevel, recordLevelRun, setChallengeBestScore, setLevelStars, unlockLevel],
+    [
+      addScore,
+      level,
+      mode,
+      nextLevel,
+      recordLevelRun,
+      reportQuestProgress,
+      setChallengeBestScore,
+      setLevelStars,
+      unlockLevel,
+    ],
   );
 
-  const consumeQueue = useCallback(
-    (pool: number[]) => {
-      setQueue((current) => {
-        const [, ...rest] = current;
-        return [...rest, drawQueueAtom(pool)];
-      });
-    },
-    [],
-  );
+  const consumeQueue = useCallback((pool: number[]) => {
+    setQueue((current) => {
+      const [, ...rest] = current;
+      return [...rest, drawQueueAtom(pool)];
+    });
+  }, []);
 
   useEffect(() => {
     primeAudio();
-    startAmbientMusic("boss");
+    if (musicEnabled) startAmbientMusic("boss");
+    else stopAmbientMusic();
+    return () => stopAmbientMusic();
+  }, [musicEnabled]);
+
+  useEffect(() => {
     if (level) {
       incrementLevelAttempt(level.id);
       trackGameStart(level.id, mode);
     }
-    return () => stopAmbientMusic();
   }, [incrementLevelAttempt, level, mode]);
 
   useEffect(() => {
@@ -541,7 +601,10 @@ export function NucleusCoreBoard({ levelId, onExit, onWin, onMap = onExit, mode 
       if (!active) return;
       const elapsed = Date.now() - active.startedAt;
       const progress = clamp(elapsed / active.durationMs, 0, 1);
-      const index = Math.min(active.path.length - 1, Math.floor(progress * (active.path.length - 1)));
+      const index = Math.min(
+        active.path.length - 1,
+        Math.floor(progress * (active.path.length - 1)),
+      );
       const next = { ...active, index };
       projectileRef.current = next;
       setProjectile(next);
@@ -571,16 +634,38 @@ export function NucleusCoreBoard({ levelId, onExit, onWin, onMap = onExit, mode 
       projectileRef.current = {
         atom: currentShot,
         path: simulation.path,
-        durationMs: Math.max(260, Math.min(1100, (simulation.path.length * 14_000) / PROJECTILE_SPEED)),
+        durationMs: Math.max(
+          260,
+          Math.min(1100, (simulation.path.length * 14_000) / PROJECTILE_SPEED),
+        ),
         startedAt: Date.now(),
         index: 0,
         hit: simulation.hit,
       };
       setProjectile(projectileRef.current);
       playShootSound();
-      trackShot(level?.id ?? config.levelId, currentShot, Math.atan2(nextPoint.y - launcher.y, nextPoint.x - launcher.x) * (180 / Math.PI), mode);
+      trackShot(
+        level?.id ?? config.levelId,
+        currentShot,
+        Math.atan2(nextPoint.y - launcher.y, nextPoint.x - launcher.x) * (180 / Math.PI),
+        mode,
+      );
     },
-    [arenaSize.height, arenaSize.width, blackHole, config.levelId, config.maxShots, currentShot, eyeState, launcher, level?.id, mode, result, shotsUsed, visibleOrbitAtoms],
+    [
+      arenaSize.height,
+      arenaSize.width,
+      blackHole,
+      config.levelId,
+      config.maxShots,
+      currentShot,
+      eyeState,
+      launcher,
+      level?.id,
+      mode,
+      result,
+      shotsUsed,
+      visibleOrbitAtoms,
+    ],
   );
 
   const handleArenaPointer = useCallback(
@@ -611,9 +696,24 @@ export function NucleusCoreBoard({ levelId, onExit, onWin, onMap = onExit, mode 
     : null;
 
   return (
-    <div className="app-shell" style={{ padding: isTabletLayout ? "32px 26px" : "22px 16px 26px", minHeight: "100dvh", touchAction: "none" }}>
+    <div
+      className="app-shell"
+      style={{
+        padding: isTabletLayout ? "32px 26px" : "22px 16px 26px",
+        minHeight: "100dvh",
+        touchAction: "none",
+      }}
+    >
       <div style={{ width: "100%", maxWidth: isTabletLayout ? 980 : 520, margin: "0 auto" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 14 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 10,
+            marginBottom: 14,
+          }}
+        >
           <button
             type="button"
             onClick={onMap}
@@ -630,11 +730,20 @@ export function NucleusCoreBoard({ levelId, onExit, onWin, onMap = onExit, mode 
             {"<- Map"}
           </button>
           <div style={{ textAlign: "center", flex: 1 }}>
-            <div style={{ fontSize: 11, letterSpacing: 3, color: "var(--accent)", fontWeight: 900 }}>BOSS EXPERIMENT</div>
-            <div className="gold-text" style={{ fontSize: isTabletLayout ? 28 : 23, fontWeight: 900, marginTop: 2 }}>
+            <div
+              style={{ fontSize: 11, letterSpacing: 3, color: "var(--accent)", fontWeight: 900 }}
+            >
+              BOSS EXPERIMENT
+            </div>
+            <div
+              className="gold-text"
+              style={{ fontSize: isTabletLayout ? 28 : 23, fontWeight: 900, marginTop: 2 }}
+            >
               {config.name}
             </div>
-            <div style={{ color: "var(--muted-foreground)", fontSize: 12, marginTop: 2 }}>{level.name}</div>
+            <div style={{ color: "var(--muted-foreground)", fontSize: 12, marginTop: 2 }}>
+              {level.name}
+            </div>
           </div>
           <div
             style={{
@@ -646,7 +755,16 @@ export function NucleusCoreBoard({ levelId, onExit, onWin, onMap = onExit, mode 
               textAlign: "center",
             }}
           >
-            <div style={{ fontSize: 10, color: "var(--muted-foreground)", letterSpacing: 1.4, fontWeight: 800 }}>SHOTS</div>
+            <div
+              style={{
+                fontSize: 10,
+                color: "var(--muted-foreground)",
+                letterSpacing: 1.4,
+                fontWeight: 800,
+              }}
+            >
+              SHOTS
+            </div>
             <div style={{ fontSize: 22, fontWeight: 900 }}>{shotsLeft}</div>
           </div>
         </div>
@@ -707,7 +825,13 @@ export function NucleusCoreBoard({ levelId, onExit, onWin, onMap = onExit, mode 
                 backdropFilter: "blur(8px)",
               }}
             >
-              <CompactBar label="Nucleus" value={`${remainingHealth}/${config.maxHealth}`} fillPercent={healthPct} fill="linear-gradient(90deg, var(--accent), #ff8b56)" shadow="0 0 16px var(--accent-glow)" />
+              <CompactBar
+                label="Nucleus"
+                value={`${remainingHealth}/${config.maxHealth}`}
+                fillPercent={healthPct}
+                fill="linear-gradient(90deg, var(--accent), #ff8b56)"
+                shadow="0 0 16px var(--accent-glow)"
+              />
             </div>
 
             <div
@@ -723,14 +847,25 @@ export function NucleusCoreBoard({ levelId, onExit, onWin, onMap = onExit, mode 
                 minWidth: isTabletLayout ? 180 : 142,
               }}
             >
-              <div style={{ fontSize: 10, letterSpacing: 1.6, color: "var(--muted-foreground)", fontWeight: 900 }}>
+              <div
+                style={{
+                  fontSize: 10,
+                  letterSpacing: 1.6,
+                  color: "var(--muted-foreground)",
+                  fontWeight: 900,
+                }}
+              >
                 CURRENT SHOT
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <ElementBall atomicNumber={currentShot} size={isTabletLayout ? 48 : 42} glow />
                 <div style={{ display: "flex", gap: 6 }}>
                   {queue.slice(1).map((atom, index) => (
-                    <ElementBall key={`${atom}-${index}`} atomicNumber={atom} size={isTabletLayout ? 26 : 24} />
+                    <ElementBall
+                      key={`${atom}-${index}`}
+                      atomicNumber={atom}
+                      size={isTabletLayout ? 26 : 24}
+                    />
                   ))}
                 </div>
               </div>
@@ -747,8 +882,10 @@ export function NucleusCoreBoard({ levelId, onExit, onWin, onMap = onExit, mode 
               width: isTabletLayout ? 104 : 86,
               height: isTabletLayout ? 104 : 86,
               borderRadius: "50%",
-              background: "radial-gradient(circle at 45% 40%, rgba(72,86,165,0.78), rgba(7,10,27,1) 52%, rgba(0,0,0,1) 76%)",
-              boxShadow: "0 0 42px rgba(113,130,255,0.38), 0 0 18px rgba(255,173,72,0.12), inset 0 0 22px rgba(255,255,255,0.16)",
+              background:
+                "radial-gradient(circle at 45% 40%, rgba(72,86,165,0.78), rgba(7,10,27,1) 52%, rgba(0,0,0,1) 76%)",
+              boxShadow:
+                "0 0 42px rgba(113,130,255,0.38), 0 0 18px rgba(255,173,72,0.12), inset 0 0 22px rgba(255,255,255,0.16)",
               zIndex: 1,
             }}
           >
@@ -807,12 +944,13 @@ export function NucleusCoreBoard({ levelId, onExit, onWin, onMap = onExit, mode 
                 borderRadius: "50%",
                 display: "grid",
                 placeItems: "center",
-                background:
-                  eyeState.open
-                    ? "radial-gradient(circle at 50% 44%, rgba(255,255,255,0.98), rgba(210,220,250,0.7) 50%, rgba(26,29,52,0.95) 100%)"
-                    : "linear-gradient(180deg, rgba(46,49,76,0.95), rgba(10,12,26,0.95))",
+                background: eyeState.open
+                  ? "radial-gradient(circle at 50% 44%, rgba(255,255,255,0.98), rgba(210,220,250,0.7) 50%, rgba(26,29,52,0.95) 100%)"
+                  : "linear-gradient(180deg, rgba(46,49,76,0.95), rgba(10,12,26,0.95))",
                 border: "2px solid rgba(255,255,255,0.24)",
-                boxShadow: eyeState.open ? "0 0 24px rgba(122,214,255,0.24)" : "inset 0 0 18px rgba(0,0,0,0.48)",
+                boxShadow: eyeState.open
+                  ? "0 0 24px rgba(122,214,255,0.24)"
+                  : "inset 0 0 18px rgba(0,0,0,0.48)",
                 zIndex: 5,
               }}
             >
@@ -824,7 +962,8 @@ export function NucleusCoreBoard({ levelId, onExit, onWin, onMap = onExit, mode 
                     borderRadius: "50%",
                     display: "grid",
                     placeItems: "center",
-                    background: "radial-gradient(circle at 45% 40%, rgba(135,209,255,0.95), rgba(35,77,140,0.95) 65%, rgba(8,16,33,0.95))",
+                    background:
+                      "radial-gradient(circle at 45% 40%, rgba(135,209,255,0.95), rgba(35,77,140,0.95) 65%, rgba(8,16,33,0.95))",
                     color: "white",
                   }}
                 >
@@ -837,7 +976,8 @@ export function NucleusCoreBoard({ levelId, onExit, onWin, onMap = onExit, mode 
                       width: eyeState.radius * 1.4,
                       height: Math.max(10, eyeState.radius * 0.26),
                       borderRadius: 999,
-                      background: "linear-gradient(180deg, rgba(188,193,220,0.7), rgba(62,68,98,0.68))",
+                      background:
+                        "linear-gradient(180deg, rgba(188,193,220,0.7), rgba(62,68,98,0.68))",
                     }}
                   />
                 </div>
@@ -850,7 +990,14 @@ export function NucleusCoreBoard({ levelId, onExit, onWin, onMap = onExit, mode 
               <svg
                 viewBox={`0 0 ${arenaSize.width} ${arenaSize.height}`}
                 preserveAspectRatio="none"
-                style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 5 }}
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  width: "100%",
+                  height: "100%",
+                  pointerEvents: "none",
+                  zIndex: 5,
+                }}
               >
                 <defs>
                   <linearGradient id="nucleusBeam" x1="50%" y1="0%" x2="50%" y2="100%">
@@ -938,7 +1085,8 @@ export function NucleusCoreBoard({ levelId, onExit, onWin, onMap = onExit, mode 
               height: isTabletLayout ? 68 : 60,
               borderRadius: "50%",
               border: "2px solid rgba(255,255,255,0.12)",
-              background: "radial-gradient(circle at 30% 30%, rgba(255,255,255,0.12), rgba(14,18,36,0.96))",
+              background:
+                "radial-gradient(circle at 30% 30%, rgba(255,255,255,0.12), rgba(14,18,36,0.96))",
               display: "grid",
               placeItems: "center",
               boxShadow: "0 0 18px rgba(0,0,0,0.35)",
@@ -995,15 +1143,36 @@ export function NucleusCoreBoard({ levelId, onExit, onWin, onMap = onExit, mode 
                       : "The black hole still owns the field. Reset, bank your angles, and cut the orbit down one atom at a time."}
                   </div>
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10 }}>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+                    gap: 10,
+                  }}
+                >
                   <MetricCard label="Shots used" value={`${shotsUsed}`} />
-                  <MetricCard label="Kill time" value={victorySummary ? formatDurationShort(victorySummary.clearTimeMs) : "--"} />
+                  <MetricCard
+                    label="Kill time"
+                    value={victorySummary ? formatDurationShort(victorySummary.clearTimeMs) : "--"}
+                  />
                   <MetricCard label="Score" value={`${score}`} />
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10 }}>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+                    gap: 10,
+                  }}
+                >
                   <MetricCard label="Core left" value={`${coreAtoms.length}`} />
-                  <MetricCard label="Shot bonus" value={victorySummary ? `${victorySummary.shotBonus}` : "--"} />
-                  <MetricCard label={victorySummary?.newBest ? "New best" : "Best score"} value={`${bestScore}`} />
+                  <MetricCard
+                    label="Shot bonus"
+                    value={victorySummary ? `${victorySummary.shotBonus}` : "--"}
+                  />
+                  <MetricCard
+                    label={victorySummary?.newBest ? "New best" : "Best score"}
+                    value={`${bestScore}`}
+                  />
                 </div>
                 {victorySummary && (
                   <div style={{ color: "var(--muted-foreground)", fontSize: 13, fontWeight: 700 }}>
@@ -1087,7 +1256,14 @@ function MetricCard({ label, value }: { label: string; value: string }) {
         justifyContent: "space-between",
       }}
     >
-      <div style={{ fontSize: 11, letterSpacing: 1.6, color: "var(--muted-foreground)", fontWeight: 800 }}>
+      <div
+        style={{
+          fontSize: 11,
+          letterSpacing: 1.6,
+          color: "var(--muted-foreground)",
+          fontWeight: 800,
+        }}
+      >
         {label.toUpperCase()}
       </div>
       <div style={{ fontSize: 22, fontWeight: 900, marginTop: 8, lineHeight: 1.05 }}>{value}</div>
