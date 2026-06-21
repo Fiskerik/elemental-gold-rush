@@ -292,6 +292,7 @@ interface ProgressState {
   appLanguage: AppLanguage;
   shootingStyle: "hold" | "press";
   hasChosenShootingStyle: boolean;
+  webBoardWide: boolean;
   dailyQuestDate: string;
   dailyQuests: DailyQuest[];
   dailyStreak: number;
@@ -379,6 +380,7 @@ interface ProgressState {
   setPlayerDisplayName: (name: string) => void;
   toggleAppTheme: () => void;
   setShootingStyle: (style: "hold" | "press") => void;
+  setWebBoardWide: (wide: boolean) => void;
   reset: () => void;
 }
 
@@ -412,6 +414,7 @@ export const useProgress = create<ProgressState>()(
       appLanguage: DEFAULT_LANGUAGE,
       shootingStyle: "hold",
       hasChosenShootingStyle: false,
+      webBoardWide: false,
       dailyQuestDate: initialQuestDate,
       dailyQuests: initialDailyQuests,
       dailyStreak: 0,
