@@ -1063,6 +1063,7 @@ export const useProgress = create<ProgressState>()(
       setPlayerDisplayName: (name) => set({ playerDisplayName: normalizePlayerDisplayName(name) }),
       toggleAppTheme: () => set((s) => ({ appTheme: s.appTheme === "dark" ? "light" : "dark" })),
       setShootingStyle: (style) => set({ shootingStyle: style, hasChosenShootingStyle: true }),
+      setWebBoardWide: (wide) => set({ webBoardWide: wide }),
       reset: () =>
         set((s) => ({
           playerDisplayName: "",
