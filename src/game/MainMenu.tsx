@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { Capacitor } from "@capacitor/core";
 import {
   Atom,
   BookOpen,
@@ -141,6 +142,7 @@ export function MainMenu({
   const dailyRewardAmount = hasProPack ? 10 : 3;
   const campaignProgress = Math.round((Math.min(unlockedLevel, MAX_LEVEL) / MAX_LEVEL) * 100);
   const weeklyBonus = getWeeklyPlayBonusView(weeklyPlayBonus);
+  const isNativeIos = Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios";
   const [dailyRewardToast, setDailyRewardToast] = useState<{ id: number; text: string } | null>(
     null,
   );
@@ -164,9 +166,10 @@ export function MainMenu({
   }, [refreshDailyFeatures, refreshDailyLab]);
 
   useEffect(() => {
+    if (!isNativeIos) return;
     if (hasProPack) return;
     void initAds(false);
-  }, [hasProPack]);
+  }, [hasProPack, isNativeIos]);
 
   useEffect(
     () => () => {
@@ -322,13 +325,15 @@ export function MainMenu({
               </div>
             </div>
             <div style={playPanelActions}>
-              <button
-                onClick={handleRateApp}
-                style={{ ...chooseLevelBtn, paddingInline: 9, color: "var(--accent)" }}
-                aria-label="Rate app"
-              >
-                <Star size={18} fill="currentColor" aria-hidden="true" />
-              </button>
+              {isNativeIos && (
+                <button
+                  onClick={handleRateApp}
+                  style={{ ...chooseLevelBtn, paddingInline: 9, color: "var(--accent)" }}
+                  aria-label="Rate app"
+                >
+                  <Star size={18} fill="currentColor" aria-hidden="true" />
+                </button>
+              )}
               <button
                 onClick={() => {
                   trackMenuAction("leaderboard");
@@ -418,27 +423,29 @@ export function MainMenu({
               <ElementBall atomicNumber={nextLevel?.targetElement ?? 1} size={54} glow />
             )}
           </button>
-          <button
-            type="button"
-            className="ad-shine-btn"
-            onClick={handleRewardedCoin}
-            disabled={rewardedAdBusy}
-            style={{
-              ...rewardedAdBtn,
-              opacity: rewardedAdBusy ? 0.58 : 1,
-              cursor: rewardedAdBusy ? "not-allowed" : "pointer",
-            }}
-          >
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-              <Clapperboard size={17} aria-hidden="true" />
-              {rewardedAdBusy ? "Loading ad..." : "Free coins"}
-            </span>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-              <GoldCoinIcon size={14} />
-              +1
-            </span>
-          </button>
-          {rewardedAdMessage && (
+          {isNativeIos && (
+            <button
+              type="button"
+              className="ad-shine-btn"
+              onClick={handleRewardedCoin}
+              disabled={rewardedAdBusy}
+              style={{
+                ...rewardedAdBtn,
+                opacity: rewardedAdBusy ? 0.58 : 1,
+                cursor: rewardedAdBusy ? "not-allowed" : "pointer",
+              }}
+            >
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                <Clapperboard size={17} aria-hidden="true" />
+                {rewardedAdBusy ? "Loading ad..." : "Free coins"}
+              </span>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                <GoldCoinIcon size={14} />
+                +1
+              </span>
+            </button>
+          )}
+          {isNativeIos && rewardedAdMessage && (
             <div style={rewardedAdMessageStyle} role="status" aria-live="polite">
               {rewardedAdMessage}
             </div>
@@ -693,7 +700,7 @@ export function MainMenu({
             ))}
           </div>
         </section>
-        {ratePromptOpen && (
+        {isNativeIos && ratePromptOpen && (
           <div style={modalBackdrop} role="presentation" onClick={() => setRatePromptOpen(false)}>
             <section
               style={rateModal}

@@ -222,43 +222,45 @@ export function Profile({ onBack }: Props) {
           <HeroMetric icon={BadgeCheck} label={tr("Badges")} value={`${earnedBadges.length}`} />
           <HeroMetric icon={Trophy} label={tr("Stars")} value={`${totalStars}`} />
         </section>
-        <section style={gameCenterCard}>
-          <div style={{ minWidth: 0 }}>
-            <div style={sectionHeading}>{tr("Game Center")}</div>
-            <div style={gameCenterCopy}>
-              {gameCenterStatus ??
-                tr("Sign in once to keep Daily Board and Daily Compound submissions connected.")}
+        {isGameCenterAvailable() && (
+          <section style={gameCenterCard}>
+            <div style={{ minWidth: 0 }}>
+              <div style={sectionHeading}>{tr("Game Center")}</div>
+              <div style={gameCenterCopy}>
+                {gameCenterStatus ??
+                  tr("Sign in once to keep Daily Board and Daily Compound submissions connected.")}
+              </div>
             </div>
-          </div>
-          <div style={gameCenterActions}>
-            <button
-              type="button"
-              onClick={handleGameCenterSignIn}
-              disabled={gameCenterBusy}
-              style={{
-                ...gameCenterButton,
-                opacity: gameCenterBusy ? 0.62 : 1,
-                cursor: gameCenterBusy ? "not-allowed" : "pointer",
-              }}
-            >
-              <Gamepad2 size={17} aria-hidden="true" />
-              {tr(gameCenterBusy ? "Signing in" : "Sign in")}
-            </button>
-            <button
-              type="button"
-              onClick={handleOpenGameCenter}
-              disabled={gameCenterBusy}
-              style={{
-                ...gameCenterButton,
-                ...gameCenterButtonSecondary,
-                opacity: gameCenterBusy ? 0.62 : 1,
-                cursor: gameCenterBusy ? "not-allowed" : "pointer",
-              }}
-            >
-              {tr("Open")}
-            </button>
-          </div>
-        </section>
+            <div style={gameCenterActions}>
+              <button
+                type="button"
+                onClick={handleGameCenterSignIn}
+                disabled={gameCenterBusy}
+                style={{
+                  ...gameCenterButton,
+                  opacity: gameCenterBusy ? 0.62 : 1,
+                  cursor: gameCenterBusy ? "not-allowed" : "pointer",
+                }}
+              >
+                <Gamepad2 size={17} aria-hidden="true" />
+                {tr(gameCenterBusy ? "Signing in" : "Sign in")}
+              </button>
+              <button
+                type="button"
+                onClick={handleOpenGameCenter}
+                disabled={gameCenterBusy}
+                style={{
+                  ...gameCenterButton,
+                  ...gameCenterButtonSecondary,
+                  opacity: gameCenterBusy ? 0.62 : 1,
+                  cursor: gameCenterBusy ? "not-allowed" : "pointer",
+                }}
+              >
+                {tr("Open")}
+              </button>
+            </div>
+          </section>
+        )}
         <section style={card} aria-label="Daily Board placement badges">
           <div style={dailyBoardBadgeHeader}>
             <div>

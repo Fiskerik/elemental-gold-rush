@@ -57,6 +57,7 @@ export function GameApp() {
   const [appReviewMilestonePromptOpen, setAppReviewMilestonePromptOpen] = useState(false);
   const [appReviewRequested, setAppReviewRequested] = useState(false);
   const pendingGameStartRef = useRef<(() => void) | null>(null);
+  const isNativeIos = Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios";
 
   useDomLocalization(appLanguage);
 
@@ -97,6 +98,7 @@ export function GameApp() {
 
   const appReviewMilestonePrompt = appReviewMilestonePromptOpen ? (
     <AppReviewMilestonePrompt
+      showRating={isNativeIos}
       reviewRequested={appReviewRequested}
       onRate={() => {
         setAppReviewRequested(true);
@@ -424,11 +426,13 @@ function ResumeRunPrompt({
 }
 
 function AppReviewMilestonePrompt({
+  showRating,
   reviewRequested,
   onRate,
   onClaim,
   onSkip,
 }: {
+  showRating: boolean;
   reviewRequested: boolean;
   onRate: () => void;
   onClaim: () => void;
@@ -469,13 +473,16 @@ function AppReviewMilestonePrompt({
           <CoinAmount amount={5} suffix="coins unlocked" />
         </h2>
         <p style={{ margin: "0 0 16px", color: "var(--muted-foreground)", fontSize: 13 }}>
-          Your milestone bonus is in your wallet. If Atomic Fusion Rush is hitting the spot, a quick
-          App Store rating helps a lot.
+          {showRating
+            ? "Your milestone bonus is in your wallet. If Atomic Fusion Rush is hitting the spot, a quick App Store rating helps a lot."
+            : "Your milestone bonus is in your wallet. Keep building cleaner chains and pushing the next element."}
         </p>
         <div style={{ display: "grid", gap: 8 }}>
-          <button type="button" onClick={onRate} style={promptSecondaryBtn}>
-            {reviewRequested ? "App Store opened" : "Rate App"}
-          </button>
+          {showRating && (
+            <button type="button" onClick={onRate} style={promptSecondaryBtn}>
+              {reviewRequested ? "App Store opened" : "Rate App"}
+            </button>
+          )}
           <button type="button" onClick={onClaim} style={promptPrimaryBtn}>
             Continue
           </button>

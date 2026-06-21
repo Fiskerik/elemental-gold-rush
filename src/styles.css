@@ -1772,7 +1772,7 @@
   animation: gravity-stream-rise 1550ms ease-out forwards;
 }
 .gravity-atom-lift {
-  animation: gravity-atom-lift 1400ms ease-out;
+  animation: gravity-atom-lift 1900ms ease-out;
 }
 
 /* === Gamma Bomb impact === */

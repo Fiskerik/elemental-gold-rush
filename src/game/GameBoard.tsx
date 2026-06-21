@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import type { MouseEvent as ReactMouseEvent, ReactNode } from "react";
+import { Capacitor } from "@capacitor/core";
 import { Coins, Settings as SettingsIcon } from "lucide-react";
 import { ELEMENTS } from "./elements";
 import {
@@ -104,6 +105,7 @@ const COMPOUND_STORAGE_KEY = "elemental-gold-rush-compound-charge";
 export const SAVED_RUN_STORAGE_KEY = "elemental-gold-rush-saved-run";
 const COMPOUND_HINT_COST = 5;
 const COMPOUND_SUPER_HINT_COST = 10;
+const MOBILE_RESULT_POWER_UP_SAVE_COST = 5;
 const SEEDED_BOARD_MIN_TARGET = 10;
 const SEEDED_BOARD_MIN_ATOMS = 3;
 const SEEDED_BOARD_MAX_ATOMS = 8;
@@ -1280,6 +1282,8 @@ function StandardGameBoard({
     markInterstitialShown,
   } = useProgress();
   const activeBoardTheme = hasProPack ? boardTheme : "reactor";
+  const isNativeIos = Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios";
+  const resultPowerUpSaveCost = isNativeIos ? MOBILE_RESULT_POWER_UP_SAVE_COST : 0;
   const progressionPowerUpLevel = Math.max(level.id, unlockedLevel);
   const shimmerEnabled = progressionPowerUpLevel >= SHIMMER_MIN_LEVEL;
   const grabEnabled = progressionPowerUpLevel >= GRAB_MIN_LEVEL;
@@ -4967,10 +4971,21 @@ function StandardGameBoard({
     if (hasClaimedUnusedInventoryRef.current) return;
     const unused = collectUnusedPowerUps();
     if ((unused[powerUp] ?? 0) <= 0) return;
+    if (
+      resultPowerUpSaveCost > 0 &&
+      !spendGoldCoins(resultPowerUpSaveCost, `Save power-up: ${powerUp}`)
+    ) {
+      spawnPopup(`Need ${resultPowerUpSaveCost} coins`);
+      return;
+    }
     addInventoryPowerUps({ [powerUp]: 1 });
     hasClaimedUnusedInventoryRef.current = true;
     setClaimedResultPowerUp(powerUp);
-    spawnPopup(`${POWER_UP_INVENTORY_META[powerUp].name} saved`);
+    spawnPopup(
+      resultPowerUpSaveCost > 0
+        ? `${POWER_UP_INVENTORY_META[powerUp].name} saved`
+        : `${POWER_UP_INVENTORY_META[powerUp].name} collected`,
+    );
   }
 
   function changeInventorySelection(powerUp: InventoryPowerUpId, delta: 1 | -1) {
@@ -6635,7 +6650,9 @@ function StandardGameBoard({
                     top: y - b.r,
                     transition: isDrag
                       ? "none"
-                      : "left 420ms cubic-bezier(0.2, 0.9, 0.2, 1), top 420ms cubic-bezier(0.2, 0.9, 0.2, 1)",
+                      : gravityFxId
+                        ? "left 1450ms cubic-bezier(0.16, 0.82, 0.24, 1), top 1450ms cubic-bezier(0.16, 0.82, 0.24, 1), width 900ms ease-out, height 900ms ease-out"
+                        : "left 420ms cubic-bezier(0.2, 0.9, 0.2, 1), top 420ms cubic-bezier(0.2, 0.9, 0.2, 1)",
                     zIndex: isDrag ? 5 : undefined,
                     opacity: isFormingCompound ? 0 : 1,
                     filter: eGunPreviewHitIds.has(b.id)
@@ -7681,6 +7698,8 @@ function StandardGameBoard({
               isPowerUpStage || hasClaimedUnusedInventoryRef.current ? {} : collectUnusedPowerUps()
             }
             claimedPowerUp={claimedResultPowerUp}
+            coins={goldCoins}
+            savePowerUpCost={resultPowerUpSaveCost}
             onClaimPowerUp={claimResultPowerUp}
             onDiscoveryClick={setDiscoveryEl}
             onMain={handleWonMain}
@@ -7695,6 +7714,7 @@ function StandardGameBoard({
             coins={goldCoins}
             busy={gameOverContinueBusy}
             message={gameOverContinueMessage}
+            showRewardedContinue={isNativeIos}
             onCoinContinue={continueGameOverWithCoins}
             onAdContinue={continueGameOverWithRewardedAd}
             onResults={showFinalGameOverResults}
@@ -7712,7 +7732,14 @@ function StandardGameBoard({
             clearTimeMs={elapsedMs}
             newDiscoveries={newlyDiscoveredThisRun}
             formedCompounds={formedCompoundsThisRun}
+            claimablePowerUps={
+              isPowerUpStage || hasClaimedUnusedInventoryRef.current ? {} : collectUnusedPowerUps()
+            }
+            claimedPowerUp={claimedResultPowerUp}
+            coins={goldCoins}
+            savePowerUpCost={resultPowerUpSaveCost}
             onDiscoveryClick={setDiscoveryEl}
+            onClaimPowerUp={claimResultPowerUp}
             onMain={handleGameOverMain}
             onNext={handleGameOverRetry}
             nextLabel="Retry"
@@ -8686,6 +8713,7 @@ function GameOverContinueModal({
   coins,
   busy,
   message,
+  showRewardedContinue,
   onCoinContinue,
   onAdContinue,
   onResults,
@@ -8695,6 +8723,7 @@ function GameOverContinueModal({
   coins: number;
   busy: boolean;
   message: string;
+  showRewardedContinue: boolean;
   onCoinContinue: () => void;
   onAdContinue: () => void;
   onResults: () => void;
@@ -8756,20 +8785,22 @@ function GameOverContinueModal({
         >
           <CoinContinueLabel />
         </button>
-        <button
-          type="button"
-          onClick={onAdContinue}
-          disabled={busy}
-          style={{
-            ...modalBtn,
-            background: "var(--surface-high)",
-            color: "var(--foreground)",
-            opacity: busy ? 0.65 : 1,
-            cursor: busy ? "wait" : "pointer",
-          }}
-        >
-          {busy ? "Loading ad..." : "Watch ad to continue"}
-        </button>
+        {showRewardedContinue && (
+          <button
+            type="button"
+            onClick={onAdContinue}
+            disabled={busy}
+            style={{
+              ...modalBtn,
+              background: "var(--surface-high)",
+              color: "var(--foreground)",
+              opacity: busy ? 0.65 : 1,
+              cursor: busy ? "wait" : "pointer",
+            }}
+          >
+            {busy ? "Loading ad..." : "Watch ad to continue"}
+          </button>
+        )}
         <button
           type="button"
           onClick={onResults}
@@ -8885,6 +8916,8 @@ function ResultModal({
   formedCompounds = [],
   claimablePowerUps = {},
   claimedPowerUp = null,
+  coins = 0,
+  savePowerUpCost = 0,
   isPowerUpPass = false,
   onClaimPowerUp,
   onDiscoveryClick,
@@ -8904,6 +8937,8 @@ function ResultModal({
   formedCompounds?: string[];
   claimablePowerUps?: Partial<Record<InventoryPowerUpId, number>>;
   claimedPowerUp?: InventoryPowerUpId | null;
+  coins?: number;
+  savePowerUpCost?: number;
   isPowerUpPass?: boolean;
   onClaimPowerUp?: (powerUp: InventoryPowerUpId) => void;
   onDiscoveryClick?: (atomicNumber: number) => void;
@@ -8938,6 +8973,7 @@ function ResultModal({
   const claimableOptions = (Object.keys(POWER_UP_INVENTORY_META) as InventoryPowerUpId[]).filter(
     (id) => (claimablePowerUps[id] ?? 0) > 0,
   );
+  const canAffordPowerUpSave = savePowerUpCost <= 0 || coins >= savePowerUpCost;
   const shotGoal = getShotStarGoal(level);
   const didComplete = title === "LEVEL COMPLETE";
   const timeMet = didComplete && clearTimeMs <= TIME_STAR_LIMIT_SEC * 1000;
@@ -9190,6 +9226,25 @@ function ResultModal({
           >
             KEEP ONE POWER-UP
           </div>
+          {!claimedPowerUp && (
+            <div
+              style={{
+                textAlign: "center",
+                color: "var(--muted-foreground)",
+                fontSize: 11,
+                fontWeight: 800,
+                marginBottom: 8,
+              }}
+            >
+              {savePowerUpCost > 0 ? (
+                <>
+                  Save one unused power-up for <CoinValue amount={savePowerUpCost} />.
+                </>
+              ) : (
+                "Collect one unused power-up for free on web."
+              )}
+            </div>
+          )}
           {claimedPowerUp ? (
             <div
               style={{
@@ -9247,18 +9302,42 @@ function ResultModal({
               </div>
               <button
                 type="button"
-                disabled={!selectedSavePowerUp}
+                disabled={!selectedSavePowerUp || !canAffordPowerUpSave}
                 onClick={() => selectedSavePowerUp && onClaimPowerUp(selectedSavePowerUp)}
                 style={{
                   ...modalBtn,
                   width: "100%",
                   marginTop: 10,
-                  opacity: selectedSavePowerUp ? 1 : 0.5,
-                  cursor: selectedSavePowerUp ? "pointer" : "not-allowed",
+                  opacity: selectedSavePowerUp && canAffordPowerUpSave ? 1 : 0.5,
+                  cursor: selectedSavePowerUp && canAffordPowerUpSave ? "pointer" : "not-allowed",
                 }}
               >
-                Save selected
+                {savePowerUpCost > 0 ? (
+                  <span style={coinContinueLabel}>
+                    <span>Save selected</span>
+                    <span style={coinContinueCost}>
+                      <Coins size={15} aria-hidden="true" />
+                      <span>{savePowerUpCost}</span>
+                    </span>
+                  </span>
+                ) : (
+                  "Collect selected"
+                )}
               </button>
+              {savePowerUpCost > 0 && !canAffordPowerUpSave && (
+                <div
+                  role="status"
+                  style={{
+                    marginTop: 8,
+                    textAlign: "center",
+                    color: "var(--destructive)",
+                    fontSize: 11,
+                    fontWeight: 900,
+                  }}
+                >
+                  Need {savePowerUpCost} gold coins.
+                </div>
+              )}
             </>
           )}
         </div>

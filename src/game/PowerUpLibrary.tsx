@@ -16,6 +16,7 @@ import { ElementBall } from "./ElementBall";
 import { MoleculeVisual } from "./MoleculeVisual";
 import { COMPOUNDS } from "./compounds";
 import { POWER_UPS } from "./powerUps";
+import { INVENTORY_POWER_UPS, useProgress, type InventoryPowerUpId } from "./store";
 
 interface Props {
   onBack: () => void;
@@ -84,6 +85,7 @@ export function PowerUpBadge({ icon, size = 42 }: { icon: string; size?: number 
 }
 
 export function PowerUpLibrary({ onBack }: Props) {
+  const powerUpInventory = useProgress((s) => s.powerUpInventory);
   return (
     <div className="app-shell" style={{ padding: 20, paddingTop: 32, minHeight: "100dvh" }}>
       <div style={{ position: "relative", zIndex: 1, maxWidth: 520, margin: "0 auto" }}>
@@ -102,35 +104,55 @@ export function PowerUpLibrary({ onBack }: Props) {
           </p>
         </header>
         <div style={{ display: "grid", gap: 12 }}>
-          {POWER_UPS.map((powerUp) => (
-            <article key={powerUp.name} style={card}>
-              <div style={iconWrap}>
-                <PowerUpBadge icon={powerUp.icon} size={46} />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
-                  <h2 style={{ margin: 0, fontSize: 16 }}>{powerUp.name}</h2>
+          {POWER_UPS.map((powerUp) => {
+            const inventoryId = inventoryPowerUpIdForIcon(powerUp.icon);
+            const ownedCount = inventoryId ? powerUpInventory[inventoryId] : null;
+            return (
+              <article key={powerUp.name} style={card}>
+                <div style={iconWrap}>
+                  <PowerUpBadge icon={powerUp.icon} size={46} />
                 </div>
-                <p
-                  style={{
-                    margin: "6px 0 0",
-                    color: "var(--muted-foreground)",
-                    fontSize: 13,
-                    lineHeight: 1.45,
-                  }}
-                >
-                  {powerUp.effect}
-                </p>
-                <div style={{ marginTop: 6, color: "var(--accent)", fontSize: 11, fontWeight: 800 }}>
-                  {`Obtained: ${powerUp.unlock}`}
+                <div style={{ flex: 1 }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "flex-start",
+                      gap: 10,
+                    }}
+                  >
+                    <h2 style={{ margin: 0, fontSize: 16 }}>{powerUp.name}</h2>
+                    {ownedCount !== null && <span style={ownedPill}>Owned x{ownedCount}</span>}
+                  </div>
+                  <p
+                    style={{
+                      margin: "6px 0 0",
+                      color: "var(--muted-foreground)",
+                      fontSize: 13,
+                      lineHeight: 1.45,
+                    }}
+                  >
+                    {powerUp.effect}
+                  </p>
+                  <div
+                    style={{ marginTop: 6, color: "var(--accent)", fontSize: 11, fontWeight: 800 }}
+                  >
+                    {`Obtained: ${powerUp.unlock}`}
+                  </div>
                 </div>
-              </div>
-            </article>
-          ))}
+              </article>
+            );
+          })}
         </div>
       </div>
     </div>
   );
+}
+
+function inventoryPowerUpIdForIcon(icon: string): InventoryPowerUpId | null {
+  return (INVENTORY_POWER_UPS as readonly string[]).includes(icon)
+    ? (icon as InventoryPowerUpId)
+    : null;
 }
 
 const backBtn: React.CSSProperties = {
@@ -164,6 +186,18 @@ const iconWrap: React.CSSProperties = {
   justifyContent: "center",
   fontSize: 26,
   fontWeight: 900,
+};
+
+const ownedPill: React.CSSProperties = {
+  flexShrink: 0,
+  borderRadius: 999,
+  border: "1px solid color-mix(in oklch, var(--accent) 55%, var(--border))",
+  background: "color-mix(in oklch, var(--accent) 14%, var(--surface))",
+  color: "var(--accent)",
+  padding: "4px 8px",
+  fontSize: 10,
+  fontWeight: 900,
+  whiteSpace: "nowrap",
 };
 
 const POWER_UP_BADGE_STYLES: Record<string, { background: string; border: string; shadow: string }> = {

@@ -120,22 +120,28 @@ export function Leaderboard({ onBack }: { onBack: () => void }) {
           </SegmentButton>
         </div>
 
-        <button
-          type="button"
-          onClick={handleOpenGameCenter}
-          disabled={gameCenterBusy}
-          style={{
-            ...gameCenterButton,
-            opacity: gameCenterBusy ? 0.62 : 1,
-            cursor: gameCenterBusy ? "not-allowed" : "pointer",
-          }}
-        >
-          {gameCenterBusy ? "Opening Game Center..." : "Open Game Center"}
-        </button>
+        {isGameCenterAvailable() && (
+          <button
+            type="button"
+            onClick={handleOpenGameCenter}
+            disabled={gameCenterBusy}
+            style={{
+              ...gameCenterButton,
+              opacity: gameCenterBusy ? 0.62 : 1,
+              cursor: gameCenterBusy ? "not-allowed" : "pointer",
+            }}
+          >
+            {gameCenterBusy ? "Opening Game Center..." : "Open Game Center"}
+          </button>
+        )}
 
         {(loading || board.status || gameCenterMessage) && (
           <div style={statusLine} role="status" aria-live="polite">
-            {loading ? "Loading Game Center..." : (gameCenterMessage ?? board.status)}
+            {loading
+              ? isGameCenterAvailable()
+                ? "Loading Game Center..."
+                : "Loading scores..."
+              : (gameCenterMessage ?? board.status)}
           </div>
         )}
 
@@ -154,7 +160,9 @@ export function Leaderboard({ onBack }: { onBack: () => void }) {
                 <LeaderboardRow key={entry.id} entry={entry} kind={kind} />
               ))
             ) : (
-              <div style={emptyRows}>No Game Center scores yet.</div>
+              <div style={emptyRows}>
+                {isGameCenterAvailable() ? "No Game Center scores yet." : "No scores yet."}
+              </div>
             )}
           </div>
         </section>

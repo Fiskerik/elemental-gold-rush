@@ -173,21 +173,24 @@ public class GameCenterPlugin: CAPPlugin, CAPBridgedPlugin, GKGameCenterControll
             return
         }
 
-        let leaderboardID = call.getString("leaderboardId") ?? call.getString("leaderboardID")
-        let controller: GKGameCenterViewController
-        if let leaderboardID = leaderboardID, !leaderboardID.isEmpty {
-            controller = GKGameCenterViewController(
-                leaderboardID: leaderboardID,
-                playerScope: .global,
-                timeScope: .today
-            )
-        } else {
-            controller = GKGameCenterViewController(state: .leaderboards)
-        }
-        controller.gameCenterDelegate = self
-
+        let requestedLeaderboardID = call.getString("leaderboardId") ?? call.getString("leaderboardID")
         DispatchQueue.main.async {
-            self.bridge?.viewController?.present(controller, animated: true) {
+            guard let presentingViewController = self.bridge?.viewController else {
+                call.reject("Game Center cannot be presented right now")
+                return
+            }
+            let controller: GKGameCenterViewController
+            if let leaderboardID = requestedLeaderboardID, !leaderboardID.isEmpty {
+                controller = GKGameCenterViewController(
+                    leaderboardID: leaderboardID,
+                    playerScope: .global,
+                    timeScope: .today
+                )
+            } else {
+                controller = GKGameCenterViewController(state: .leaderboards)
+            }
+            controller.gameCenterDelegate = self
+            presentingViewController.present(controller, animated: true) {
                 call.resolve(["shown": true])
             }
         }
