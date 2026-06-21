@@ -31,6 +31,9 @@ workflows:
       - name: Install dependencies
         script: |
           npm install
+      - name: Clean generated build artifacts
+        script: |
+          rm -rf dist .tanstack node_modules/.vite ios/App/App/public
       - name: Sync iOS App Icon from project logo
         script: |
           sips -z 1024 1024 src/logo.png --out ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png
@@ -118,6 +121,8 @@ workflows:
           APP_ID="${VITE_ADMOB_IOS_APP_ID:-ca-app-pub-8854735603167656~9228353443}"
           /usr/libexec/PlistBuddy -c "Set :GADApplicationIdentifier $APP_ID" ios/App/App/Info.plist \
             || /usr/libexec/PlistBuddy -c "Add :GADApplicationIdentifier string $APP_ID" ios/App/App/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :UIRequiresFullScreen true" ios/App/App/Info.plist \
+            || /usr/libexec/PlistBuddy -c "Add :UIRequiresFullScreen bool true" ios/App/App/Info.plist
           echo "Using GADApplicationIdentifier: $APP_ID"
       - name: Install CocoaPods
         script: |
