@@ -7,6 +7,7 @@ export interface GameCenterPlayer {
   authenticated: boolean;
   alias?: string;
   displayName?: string;
+  countryCode?: string;
   gamePlayerId?: string;
   teamPlayerId?: string;
 }
@@ -76,6 +77,7 @@ interface GameCenterPlugin {
 
 const GameCenterNative = registerPlugin<GameCenterPlugin>("GameCenterPlugin");
 const GAME_CENTER_DIAGNOSTICS_STORAGE_KEY = "elemental-gold-rush-game-center-diagnostics";
+let cachedGameCenterPlayer: GameCenterPlayer | null = null;
 
 export const DAILY_BOARD_LEADERBOARD_IDS: Record<GameCenterLeaderboardScope, string> = {
   global:
@@ -181,7 +183,19 @@ export async function authenticateGameCenter(): Promise<GameCenterPlayer> {
   if (!isGameCenterAvailable()) {
     return { authenticated: false };
   }
-  return GameCenterNative.authenticate();
+  const player = await GameCenterNative.authenticate();
+  cachedGameCenterPlayer = player;
+  return player;
+}
+
+export function getCachedGameCenterPlayerName(): string {
+  const displayName = cachedGameCenterPlayer?.displayName?.trim();
+  if (displayName) return displayName;
+  return cachedGameCenterPlayer?.alias?.trim() ?? "";
+}
+
+export function getCachedGameCenterPlayerCountryCode(): string {
+  return cachedGameCenterPlayer?.countryCode?.trim() ?? "";
 }
 
 export async function submitDailyCompoundGameCenterScore(

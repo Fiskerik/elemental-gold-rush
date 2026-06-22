@@ -43,6 +43,7 @@ import {
   type CompoundDefinition,
   compoundKey,
   findCompoundByElements,
+  getDailyCompoundClue,
   getCompoundHint,
 } from "./compounds";
 import { MoleculeVisual } from "./MoleculeVisual";
@@ -957,7 +958,7 @@ function DailyCompoundGridBoard({
         </button>
         <div style={{ minWidth: 0 }}>
           <div style={dailyCompoundKicker}>DAILY COMPOUND</div>
-          <div style={dailyCompoundTitle}>{getCompoundHint(compound)}</div>
+          <div style={dailyCompoundTitle}>{getDailyCompoundClue(compound)}</div>
           <div style={dailyCompoundMeta}>
             <span style={dailyCompoundMetaBox}>
               {selectedCells.length}/{compound.totalAtoms} marked

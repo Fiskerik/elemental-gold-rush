@@ -2,6 +2,8 @@ import { getTodayQuestDate } from "./quests";
 import { DEFAULT_PLAYER_DISPLAY_NAME, useProgress } from "./store";
 import {
   type GameCenterLeaderboardKind,
+  getCachedGameCenterPlayerCountryCode,
+  getCachedGameCenterPlayerName,
   getLatestGameCenterDiagnostic,
   hasDailyGameCenterLeaderboardId,
   isGameCenterAvailable,
@@ -87,7 +89,42 @@ function normalizeCountryCode(value: string | undefined): string {
   return /^[A-Z]{2}$/.test(upper) ? upper : "US";
 }
 
+function optionalCountryCode(value: string | undefined): string {
+  const upper = (value ?? "").trim().toUpperCase();
+  return /^[A-Z]{2}$/.test(upper) ? upper : "";
+}
+
+const TIME_ZONE_COUNTRY_CODES: Record<string, string> = {
+  "America/Los_Angeles": "US",
+  "America/Denver": "US",
+  "America/Chicago": "US",
+  "America/New_York": "US",
+  "America/Toronto": "CA",
+  "America/Vancouver": "CA",
+  "America/Sao_Paulo": "BR",
+  "Asia/Kolkata": "IN",
+  "Asia/Tokyo": "JP",
+  "Australia/Sydney": "AU",
+  "Australia/Melbourne": "AU",
+  "Europe/Amsterdam": "NL",
+  "Europe/Berlin": "DE",
+  "Europe/Copenhagen": "DK",
+  "Europe/London": "GB",
+  "Europe/Madrid": "ES",
+  "Europe/Oslo": "NO",
+  "Europe/Paris": "FR",
+  "Europe/Rome": "IT",
+  "Europe/Stockholm": "SE",
+};
+
 export function inferPlayerCountryCode(): string {
+  const gameCenterCountry = optionalCountryCode(getCachedGameCenterPlayerCountryCode());
+  if (gameCenterCountry) return gameCenterCountry;
+  if (typeof Intl !== "undefined") {
+    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const timeZoneCountry = timeZone ? optionalCountryCode(TIME_ZONE_COUNTRY_CODES[timeZone]) : "";
+    if (timeZoneCountry) return timeZoneCountry;
+  }
   if (typeof navigator === "undefined") return "US";
   const locale = navigator.languages?.[0] ?? navigator.language ?? "";
   const region = locale.split("-")[1] ?? "";
@@ -153,7 +190,11 @@ function writeRecords(records: DailyCompoundRunRecord[]): void {
 }
 
 function getPlayerDisplayName(): string {
-  return useProgress.getState().playerDisplayName || DEFAULT_PLAYER_DISPLAY_NAME;
+  return (
+    useProgress.getState().playerDisplayName ||
+    getCachedGameCenterPlayerName() ||
+    DEFAULT_PLAYER_DISPLAY_NAME
+  );
 }
 
 function clamp01(value: number): number {
@@ -346,12 +387,16 @@ function mapGameCenterEntry(
   const localId = localEntry ? entryId(localEntry) : "";
   const id = entryId(entry);
   const isPlayer = Boolean(localId && id === localId);
+  const name =
+    entry.playerName?.trim() ||
+    entry.alias?.trim() ||
+    (isPlayer ? getCachedGameCenterPlayerName() || getPlayerDisplayName() : "Player");
   return {
     id: `${scope}-${id}-${entry.rank}`,
     rank: entry.rank,
     countryCode,
-    flag: scope === "local" ? countryFlag(countryCode) : "🌐",
-    name: isPlayer ? getPlayerDisplayName() : entry.playerName || entry.alias || "Player",
+    name,
+    flag: isPlayer || scope === "local" ? countryFlag(countryCode) : "🌐",
     score: Math.max(0, Math.floor(entry.score ?? 0)),
     shots: Math.max(0, Math.floor(entry.context ?? 0)),
     isPlayer,
@@ -403,11 +448,12 @@ export async function loadDailyLeaderboard(
       });
     }
     const result = await loadDailyGameCenterLeaderboard(kind, scope);
+    const resolvedCountryCode = inferPlayerCountryCode();
     const entries = result.entries.map((entry) =>
-      mapGameCenterEntry(entry, scope, countryCode, result.localPlayer),
+      mapGameCenterEntry(entry, scope, resolvedCountryCode, result.localPlayer),
     );
     const localPlayer = result.localPlayer
-      ? mapGameCenterEntry(result.localPlayer, scope, countryCode, result.localPlayer)
+      ? mapGameCenterEntry(result.localPlayer, scope, resolvedCountryCode, result.localPlayer)
       : undefined;
     const visibleEntries =
       localPlayer && !entries.some((entry) => entry.isPlayer)
@@ -431,7 +477,7 @@ export async function loadDailyLeaderboard(
           ...playerEntry(kind),
           rank: 0,
         },
-      countryCode,
+      countryCode: resolvedCountryCode,
       totalPlayerCount: Math.max(result.totalPlayerCount, entries.length),
       source: "game-center",
     };

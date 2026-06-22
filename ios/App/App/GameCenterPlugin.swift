@@ -284,6 +284,7 @@ public class GameCenterPlugin: CAPPlugin, CAPBridgedPlugin, GKGameCenterControll
             "authenticated": player.isAuthenticated,
             "alias": player.alias,
             "displayName": player.displayName,
+            "countryCode": currentCountryCode(),
             "gamePlayerId": player.gamePlayerID,
             "teamPlayerId": player.teamPlayerID
         ]
@@ -301,6 +302,13 @@ public class GameCenterPlugin: CAPPlugin, CAPBridgedPlugin, GKGameCenterControll
             "gamePlayerId": entry.player.gamePlayerID,
             "teamPlayerId": entry.player.teamPlayerID
         ]
+    }
+
+    private func currentCountryCode() -> String {
+        if #available(iOS 16.0, *) {
+            return Locale.current.region?.identifier ?? Locale.current.regionCode ?? ""
+        }
+        return Locale.current.regionCode ?? ""
     }
 
     private func timeScope(from value: String?) -> GKLeaderboard.TimeScope {
