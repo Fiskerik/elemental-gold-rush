@@ -52,7 +52,7 @@ import { POWER_UP_UNLOCK_LEVELS } from "./powerUps";
 import { DAILY_FEATURE_REWARD_COINS, hashDailySeed } from "./dailyFeatures";
 import { getTodayQuestDate } from "./quests";
 import { showInterstitialIfReady, showRewardedForCoin } from "./ads";
-import { useIsTabletLayout } from "./responsive";
+import { useIsTabletLayout, useWideBoardLayout } from "./responsive";
 import { ElementalBossBoard } from "./ElementalBossBoard";
 import { PeriodicGuardianBoard } from "./PeriodicGuardianBoard";
 import { NucleusCoreBoard } from "./NucleusCoreBoard";
@@ -1235,6 +1235,7 @@ function StandardGameBoard({
   secretCompoundId,
 }: Props) {
   const isTabletLayout = useIsTabletLayout();
+  const wideBoard = useWideBoardLayout();
   const level = getLevelById(levelId) ?? LEVELS[0];
   const gameMode = getGameMode(mode);
   const powerUpStage = mode === "campaign" && !secretCompoundId ? level.powerUpStage : undefined;
@@ -6086,7 +6087,7 @@ function StandardGameBoard({
         display: "flex",
         flexDirection: "column",
         minHeight: "100dvh",
-        padding: isTabletLayout ? 20 : 12,
+        padding: wideBoard ? 20 : 12,
         paddingTop: "calc(env(safe-area-inset-top, 0px) + 12px)",
         paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 12px)",
       }}
@@ -6098,7 +6099,7 @@ function StandardGameBoard({
           display: "flex",
           flexDirection: "column",
           flex: 1,
-          maxWidth: isTabletLayout ? 820 : 480,
+          maxWidth: wideBoard ? 820 : 480,
           margin: "0 auto",
           width: "100%",
         }}

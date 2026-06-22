@@ -1,6 +1,6 @@
 import { BOARD_THEMES, type BoardTheme, useProgress } from "./store";
 import { setMusicVolume, setSfxVolume, startAmbientMusic, stopAmbientMusic } from "./audio";
-import { useIsTabletLayout } from "./responsive";
+import { isNativePlatform, useIsTabletLayout } from "./responsive";
 
 export function Settings({ onBack }: { onBack: () => void }) {
   const isTabletLayout = useIsTabletLayout();
@@ -14,6 +14,7 @@ export function Settings({ onBack }: { onBack: () => void }) {
     boardTheme,
     hasProPack,
     shootingStyle,
+    webBoardWide,
     toggleSound,
     toggleMusic,
     toggleHaptics,
@@ -22,8 +23,10 @@ export function Settings({ onBack }: { onBack: () => void }) {
     toggleAppTheme,
     setBoardTheme,
     setShootingStyle,
+    setWebBoardWide,
     reset,
   } = useProgress();
+  const isWeb = !isNativePlatform();
   const handleMusicToggle = () => {
     if (!musicEnabled) startAmbientMusic();
     else stopAmbientMusic();
@@ -97,6 +100,13 @@ export function Settings({ onBack }: { onBack: () => void }) {
             value={shootingStyle === "press"}
             onToggle={() => setShootingStyle(shootingStyle === "hold" ? "press" : "hold")}
           />
+          {isWeb && (
+            <Row
+              label={`Board view: ${webBoardWide ? "Broad" : "Mobile"}`}
+              value={webBoardWide}
+              onToggle={() => setWebBoardWide(!webBoardWide)}
+            />
+          )}
           <button
             onClick={() => {
               if (!confirm("Reset all progress? This cannot be undone.")) return;
