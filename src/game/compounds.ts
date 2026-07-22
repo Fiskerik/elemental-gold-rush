@@ -723,25 +723,7 @@ export function getCompoundHint(compound: CompoundDefinition): string {
 }
 
 export function getDailyCompoundClue(compound: CompoundDefinition): string {
-  const commonAtom = getCommonCompoundAtom(compound);
-  if (!commonAtom) return "A hidden compound with a familiar atom.";
-  return `Common atom: ${commonAtom.name}. Trivia: ${firstTriviaSentence(commonAtom.fact)}`;
-}
-
-function getCommonCompoundAtom(compound: CompoundDefinition) {
-  const [symbol] =
-    Object.entries(compound.elements).sort(
-      ([symbolA, countA], [symbolB, countB]) =>
-        countB - countA ||
-        (SYMBOL_TO_ATOMIC.get(symbolA) ?? 999) - (SYMBOL_TO_ATOMIC.get(symbolB) ?? 999),
-    )[0] ?? [];
-  return ELEMENTS.find((element) => element.symbol === symbol) ?? null;
-}
-
-function firstTriviaSentence(fact: string): string {
-  const [sentence] = fact.split(/(?<=[.!?])\s+/);
-  const trimmed = (sentence || fact).trim();
-  return trimmed.length > 130 ? `${trimmed.slice(0, 127).trimEnd()}...` : trimmed;
+  return getCompoundHint(compound);
 }
 
 export function getCompoundStructure(compound: CompoundDefinition): CompoundStructure {
