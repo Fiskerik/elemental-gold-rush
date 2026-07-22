@@ -1,4 +1,4 @@
-# App Store Submission Pack (iOS 1.0.4)
+# App Store Submission Pack (iOS 1.0.5)
 
 ## Metadata limits to follow
 
@@ -52,7 +52,7 @@ Privacy policy: https://atomic-fusion.lovable.app/privacy
 
 ## Left-sidebar checklist before submit
 
-- iOS App Version 1.0.4
+- iOS App Version 1.0.5
   - Attach build
   - Upload required screenshot sets
   - Fill promo text, description, keywords, support URL, copyright
