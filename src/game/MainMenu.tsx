@@ -125,6 +125,7 @@ export function MainMenu({
     appLanguage,
     bestCombo,
     hasProPack,
+    clearedStageCount,
     refreshDailyLab,
     refreshDailyFeatures,
     claimDailyReward,
@@ -141,6 +142,7 @@ export function MainMenu({
   const dailyComplete = dailyQuests.length > 0 && completedDailyQuests >= 4;
   const dailyRewardAmount = hasProPack ? 10 : 3;
   const campaignProgress = Math.round((Math.min(unlockedLevel, MAX_LEVEL) / MAX_LEVEL) * 100);
+  const campaignPlayLabel = clearedStageCount > 0 ? "Continue" : "Start discovering";
   const weeklyBonus = getWeeklyPlayBonusView(weeklyPlayBonus);
   const isNativeIos = Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios";
   const [dailyRewardToast, setDailyRewardToast] = useState<{ id: number; text: string } | null>(
@@ -415,7 +417,7 @@ export function MainMenu({
           >
             <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
               <Play size={20} fill="currentColor" aria-hidden="true" />
-              Continue
+              {campaignPlayLabel}
             </span>
             {nextRunGoal.kind === "compound" ? (
               <MoleculeVisual compound={nextRunGoal.compound} size={54} />

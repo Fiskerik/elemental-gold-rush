@@ -1281,10 +1281,25 @@ function StandardGameBoard({
     hasProPack,
     boardTheme,
     clearedStagesSinceAd,
+    clearedStageCount,
     markInterstitialShown,
   } = useProgress();
   const activeBoardTheme = hasProPack ? boardTheme : "reactor";
   const isNativeIos = Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios";
+  const isFirstCampaignRun =
+    mode === "campaign" &&
+    levelId === 1 &&
+    clearedStageCount === 0 &&
+    !secretCompoundId &&
+    !isMoleculeChallenge &&
+    !isPowerUpStage;
+  const isEarlyCampaignRun =
+    mode === "campaign" &&
+    levelId <= 3 &&
+    clearedStageCount < 3 &&
+    !secretCompoundId &&
+    !isMoleculeChallenge &&
+    !isPowerUpStage;
   const resultPowerUpSaveCost = isNativeIos ? MOBILE_RESULT_POWER_UP_SAVE_COST : 0;
   const progressionPowerUpLevel = Math.max(level.id, unlockedLevel);
   const shimmerEnabled = progressionPowerUpLevel >= SHIMMER_MIN_LEVEL;
@@ -1904,6 +1919,16 @@ function StandardGameBoard({
     if (!seenTips.includes(id)) markTipSeen(id);
     setActiveTip({ id, title, body, tone });
   }
+
+  useEffect(() => {
+    if (!isFirstCampaignRun || playStylePromptOpen || shots > 0 || won || gameOver) return;
+    showTip(
+      "first-run-opening-discovery",
+      "First discovery",
+      "Create Helium by merging two Hydrogen atoms. The first clear starts your periodic table.",
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFirstCampaignRun, playStylePromptOpen, shots, won, gameOver]);
 
   function getCollectibleDiscoveries(atoms: number[]) {
     const uniqueAtoms = atoms.filter((atom, index) => atom > 1 && atoms.indexOf(atom) === index);
@@ -3256,6 +3281,7 @@ function StandardGameBoard({
   }, [dangerFeedbackState, gameOver, won, hapticsEnabled, soundEnabled]);
 
   function createSeededBoard(): Board {
+    if (isFirstCampaignRun) return createPlannedAtomBoard([1]);
     if (target < SEEDED_BOARD_MIN_TARGET) return createEmptyBoard();
     const maxSeedAtom = Math.max(1, target - SEEDED_BOARD_TARGET_OFFSET);
     const availableAtoms = discoveredSeedAtoms(maxSeedAtom);
@@ -4815,6 +4841,25 @@ function StandardGameBoard({
           }
         }, mergeComboCueDelay(i));
       });
+      if (isEarlyCampaignRun && result.merges.length >= 2) {
+        showTip(
+          "early-chain-reaction",
+          "Chain reaction",
+          "Several fusions resolved from one shot. Bigger chains build score faster and unlock deeper elements.",
+        );
+      } else if (isEarlyCampaignRun && firstDiscovery > 1) {
+        showTip(
+          "early-element-discovery",
+          "Element added",
+          `${ELEMENTS[firstDiscovery - 1]?.name ?? "A new element"} is now part of your discovery run. Clear the stage to keep it in the table.`,
+        );
+      } else if (isEarlyCampaignRun && !result.levelComplete) {
+        showTip(
+          "early-match-next-pair",
+          "Build the next pair",
+          "Each matched pair becomes the next element. Leave matching atoms close together to set up a cascade.",
+        );
+      }
     }
     if (shimmerHit) spawnPopup(`✦ SHIMMER ×${activeShimmerScoreMultiplier} ✦`);
     if (grabAdd > 0) {
@@ -6047,6 +6092,12 @@ function StandardGameBoard({
         bestCombo: runBestCombo,
       }
     : winChoice;
+  const firstRunGuideText =
+    shots === 0
+      ? "Opening discovery: combine Hydrogen with Hydrogen to create Helium."
+      : highest < target
+        ? "Keep matching equal atoms. A chain reaction can jump several discoveries at once."
+        : "Target formed. Claim the clear and start filling the periodic table.";
 
   async function runAttemptAdIfDue() {
     if (clearedStagesSinceAd < 3 || hasProPack) return;
@@ -6324,6 +6375,10 @@ function StandardGameBoard({
               <ElementBall atomicNumber={target} size={36} glow />
             </button>
           </div>
+        )}
+
+        {isFirstCampaignRun && !won && !gameOver && (
+          <FirstRunGuidePanel targetSymbol={targetEl?.symbol ?? "He"} text={firstRunGuideText} />
         )}
 
         {isMoleculeChallenge && moleculeObjective && (
@@ -7814,6 +7869,55 @@ const iconBtn: React.CSSProperties = {
   boxShadow: "var(--game-panel-shadow, none)",
 };
 
+const firstRunGuidePanel: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "auto minmax(0, 1fr)",
+  alignItems: "center",
+  gap: 10,
+  padding: "9px 10px",
+  marginBottom: 10,
+  borderRadius: 12,
+  border: "1px solid var(--game-panel-accent-border, color-mix(in oklch, var(--accent) 45%, var(--border)))",
+  background:
+    "linear-gradient(135deg, color-mix(in oklch, var(--accent) 13%, var(--game-panel-bg, var(--surface))), var(--game-panel-bg, var(--surface)))",
+  boxShadow: "var(--game-panel-shadow, 0 10px 24px rgba(0,0,0,0.28))",
+};
+
+const firstRunGuideVisual: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 4,
+  minWidth: 112,
+};
+
+const firstRunGuidePlus: React.CSSProperties = {
+  color: "var(--muted-foreground)",
+  fontSize: 13,
+  fontWeight: 950,
+};
+
+const firstRunGuideArrow: React.CSSProperties = {
+  color: "var(--accent)",
+  fontSize: 14,
+  fontWeight: 950,
+};
+
+const firstRunGuideLabel: React.CSSProperties = {
+  fontSize: 10,
+  letterSpacing: 1.7,
+  color: "var(--accent)",
+  fontWeight: 950,
+};
+
+const firstRunGuideCopy: React.CSSProperties = {
+  marginTop: 2,
+  color: "var(--foreground)",
+  fontSize: 12,
+  lineHeight: 1.35,
+  fontWeight: 750,
+};
+
 function formatTime(ms: number): string {
   const total = Math.floor(ms / 1000);
   const m = Math.floor(total / 60);
@@ -7892,6 +7996,24 @@ function FeatureTip({
         >
           Got it
         </button>
+      </div>
+    </div>
+  );
+}
+
+function FirstRunGuidePanel({ targetSymbol, text }: { targetSymbol: string; text: string }) {
+  return (
+    <div style={firstRunGuidePanel}>
+      <div style={firstRunGuideVisual} aria-hidden="true">
+        <ElementBall atomicNumber={1} size={26} glow />
+        <span style={firstRunGuidePlus}>+</span>
+        <ElementBall atomicNumber={1} size={26} glow />
+        <span style={firstRunGuideArrow}>→</span>
+        <ElementBall atomicNumber={2} size={30} glow />
+      </div>
+      <div style={{ minWidth: 0 }}>
+        <div style={firstRunGuideLabel}>{`TARGET ${targetSymbol}`}</div>
+        <div style={firstRunGuideCopy}>{text}</div>
       </div>
     </div>
   );
@@ -8978,6 +9100,7 @@ function ResultModal({
   const canAffordPowerUpSave = savePowerUpCost <= 0 || coins >= savePowerUpCost;
   const shotGoal = getShotStarGoal(level);
   const didComplete = title === "LEVEL COMPLETE";
+  const isFirstLevelComplete = didComplete && level.id === 1;
   const timeMet = didComplete && clearTimeMs <= TIME_STAR_LIMIT_SEC * 1000;
   const shotsMet = didComplete && shots <= shotGoal;
   const isCompoundPass = isCompoundFormationLevel(level);
@@ -9044,6 +9167,19 @@ function ResultModal({
           }}
         >
           {powerUpUnlockMessage}
+        </p>
+      )}
+      {isFirstLevelComplete && (
+        <p
+          style={{
+            fontSize: 13,
+            color: "var(--success, var(--accent))",
+            lineHeight: 1.5,
+            margin: "0 0 14px",
+            fontWeight: 850,
+          }}
+        >
+          Helium is secured in your table. Next up: keep merging to discover Lithium.
         </p>
       )}
       {stars > 0 && !isPowerUpPass && (

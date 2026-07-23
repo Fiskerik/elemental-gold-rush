@@ -309,6 +309,7 @@ interface ProgressState {
   clearedStageCount: number;
   completedGameCount: number;
   clearedStagesSinceAd: number;
+  onboardingSeen: boolean;
   appReviewMilestonePromptSeen: boolean;
   appReviewMilestoneRewardClaimed: boolean;
   powerUpInventory: PowerUpInventory;
@@ -343,6 +344,7 @@ interface ProgressState {
   skipLevelForCoins: (levelId: number, coinCost: number) => boolean;
   buyGoldCoins: (coins: number, pointCost: number) => boolean;
   grantGoldCoins: (coins: number, reason?: string) => void;
+  markOnboardingSeen: () => void;
   markAppReviewMilestonePromptSeen: () => void;
   claimAppReviewMilestoneReward: () => boolean;
   setHighestElement: (n: number) => void;
@@ -431,6 +433,7 @@ export const useProgress = create<ProgressState>()(
       clearedStageCount: 0,
       completedGameCount: 0,
       clearedStagesSinceAd: 0,
+      onboardingSeen: false,
       appReviewMilestonePromptSeen: false,
       appReviewMilestoneRewardClaimed: false,
       powerUpInventory: emptyPowerUpInventory(),
@@ -782,6 +785,8 @@ export const useProgress = create<ProgressState>()(
             ),
           };
         }),
+      markOnboardingSeen: () =>
+        set((s) => (s.onboardingSeen ? s : { onboardingSeen: true })),
       markAppReviewMilestonePromptSeen: () =>
         set((s) => (s.appReviewMilestonePromptSeen ? s : { appReviewMilestonePromptSeen: true })),
       claimAppReviewMilestoneReward: () => {
@@ -1103,6 +1108,7 @@ export const useProgress = create<ProgressState>()(
           clearedStageCount: 0,
           completedGameCount: s.completedGameCount,
           clearedStagesSinceAd: 0,
+          onboardingSeen: s.onboardingSeen,
           appReviewMilestonePromptSeen: s.appReviewMilestonePromptSeen,
           appReviewMilestoneRewardClaimed: s.appReviewMilestoneRewardClaimed,
           powerUpInventory: emptyPowerUpInventory(),
@@ -1132,6 +1138,17 @@ export const useProgress = create<ProgressState>()(
         const unlockedLevel = inferUnlockedLevelFromStats(
           persistedState?.unlockedLevel ?? current.unlockedLevel,
           levelStats,
+        );
+        const hasExistingProgress = Boolean(
+          persistedState &&
+            ((persistedState.clearedStageCount ?? 0) > 0 ||
+              (persistedState.completedGameCount ?? 0) > 0 ||
+              (persistedState.unlockedLevel ?? 1) > 1 ||
+              (persistedState.highestElement ?? 1) > 1 ||
+              (persistedState.totalScore ?? 0) > 0 ||
+              (persistedState.discoveredElements?.length ?? 0) > 1 ||
+              (persistedState.discoveredCompounds?.length ?? 0) > 0 ||
+              Object.keys(levelStats).length > 0),
         );
         return {
           ...current,
@@ -1181,6 +1198,7 @@ export const useProgress = create<ProgressState>()(
           ),
           clearedStagesSinceAd:
             persistedState?.clearedStagesSinceAd ?? current.clearedStagesSinceAd,
+          onboardingSeen: persistedState?.onboardingSeen ?? hasExistingProgress,
           appReviewMilestonePromptSeen:
             persistedState?.appReviewMilestonePromptSeen ?? current.appReviewMilestonePromptSeen,
           appReviewMilestoneRewardClaimed:
