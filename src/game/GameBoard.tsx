@@ -9424,8 +9424,15 @@ function ResultStat({ label, value, color }: { label: string; value: ReactNode; 
         textAlign: "center",
       }}
     >
-      <div style={{ fontSize: 9, letterSpacing: 1.5, color: "var(--muted-foreground)" }}>
-        {label.toUpperCase()}
+      <div
+        style={{
+          fontSize: 9,
+          letterSpacing: 1.5,
+          color: "var(--muted-foreground)",
+          textTransform: "uppercase",
+        }}
+      >
+        {label}
       </div>
       <div style={{ fontSize: 18, fontWeight: 800, color }}>{value}</div>
     </div>

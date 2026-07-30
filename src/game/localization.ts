@@ -389,7 +389,14 @@ function translateTrimmed(text: string, language: AppLanguage): string | undefin
 
   const formedBang = /^(.+) formed!$/.exec(source);
   if (formedBang) {
-    return `${formedBang[1]} ${dictionary["formed!"] ?? "formed!"}`;
+    const subject = translateTrimmed(formedBang[1], language) ?? formedBang[1];
+    return `${subject} ${dictionary["formed!"] ?? "formed!"}`;
+  }
+
+  const discoveredBang = /^(.+) discovered!$/.exec(source);
+  if (discoveredBang) {
+    const subject = translateTrimmed(discoveredBang[1], language) ?? discoveredBang[1];
+    return `${subject} ${dictionary["discovered!"] ?? "discovered!"}`;
   }
 
   const alreadyDiscoveredCount = /^Already discovered - found (\d+) times?$/.exec(source);
