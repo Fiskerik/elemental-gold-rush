@@ -37,7 +37,16 @@ import {
 import { playShootSound, primeAudio, startAmbientMusic, stopAmbientMusic, vibrate } from "./audio";
 import { playFeedback, type FeedbackEvent } from "./feedback";
 import { GameModeId, getGameMode, getModeLevelLabel } from "./challenges";
-import { trackGameOver, trackGameStart, trackLevelWin, trackMerge, trackShot } from "./analytics";
+import {
+  trackFirstMerge,
+  trackGameOver,
+  trackGameStart,
+  trackLevelWin,
+  trackMerge,
+  trackResultAction,
+  trackRunEnd,
+  trackShot,
+} from "./analytics";
 import {
   COMPOUNDS,
   type CompoundDefinition,
@@ -114,7 +123,7 @@ const SEEDED_BOARD_TARGET_OFFSET = 3;
 const TRANSMUTE_SHOT_INTERVAL = 30;
 const CATALYST_AURA_SHOTS = 5;
 const CATALYST_ADJ_FACTOR = 2.3;
-const SHOT_MERGE_RADIUS_BONUS_FACTOR = 0.25;
+const SHOT_MERGE_RADIUS_BONUS_FACTOR = 0.33;
 const DISCOVERY_DECAY_STEP = 5;
 const DISCOVERY_DECAY_BOOST = 0.04;
 const STAGE_CLEAR_ANIMATION_MS = 6200;
@@ -131,7 +140,9 @@ const CHALLENGE_CLEAR_SCORE = 5000;
 const POWER_UP_CLEAR_DELAY_MS = 2000;
 const DAILY_COMPOUND_GRID_COLS = 10;
 const DAILY_COMPOUND_GRID_ROWS = 15;
-const TIME_STAR_LIMIT_SEC = 5 * 60;
+const REACTION_STREAK_MAX = 5;
+const FUSION_RUSH_DURATION_MS = 8_000;
+const INTERSTITIAL_COOLDOWN_MS = 10 * 60 * 1000;
 const TARGET_BAND_QUEUE_CHANCE = 0.1;
 const TARGET_BAND_OFFSET_MIN = 2;
 const TARGET_BAND_OFFSET_MAX = 12;
@@ -139,6 +150,13 @@ const TARGET_BAND_PRESPAWN_COUNT = 2;
 
 function mergeComboCueDelay(index: number): number {
   return index * MERGE_COMBO_SOUND_STEP_MS;
+}
+
+function reactionMultiplierFor(streak: number, fusionRushActive: boolean): number {
+  if (fusionRushActive || streak >= REACTION_STREAK_MAX) return 2;
+  if (streak >= 3) return 1.5;
+  if (streak >= 2) return 1.25;
+  return 1;
 }
 
 const INVENTORY_PICK_LIMIT = 3;
@@ -158,6 +176,9 @@ interface SavedRunSnapshot {
   highest: number;
   shots: number;
   runBestCombo: number;
+  reactionStreak?: number;
+  reactionMisses?: number;
+  fusionRushRemainingMs?: number;
   runMergeCount?: number;
   runComboScore?: number;
   earnedStars: number;
@@ -704,7 +725,7 @@ function calculateStars(
   let stars = 1;
   const efficiencyTarget = getShotStarGoal(level);
   if (shots <= efficiencyTarget) stars += 1;
-  if (timeSec <= TIME_STAR_LIMIT_SEC) stars += 1;
+  if (timeSec <= (level.parTimeSec ?? 8 * 60)) stars += 1;
   return Math.min(3, stars);
 }
 
@@ -863,7 +884,12 @@ function DailyCompoundGridBoard({
 
   async function exitAfterResult() {
     const progress = useProgress.getState();
-    if (!progress.hasProPack && progress.clearedStagesSinceAd >= 3) {
+    if (
+      !progress.hasProPack &&
+      progress.completedGameCount >= 4 &&
+      progress.clearedStagesSinceAd >= 3 &&
+      Date.now() - progress.lastInterstitialAt >= INTERSTITIAL_COOLDOWN_MS
+    ) {
       const shown = await showInterstitialIfReady(progress.hasProPack);
       if (shown) progress.markInterstitialShown();
     }
@@ -1282,6 +1308,8 @@ function StandardGameBoard({
     boardTheme,
     clearedStagesSinceAd,
     clearedStageCount,
+    completedGameCount,
+    lastInterstitialAt,
     markInterstitialShown,
   } = useProgress();
   const activeBoardTheme = hasProPack ? boardTheme : "reactor";
@@ -1434,8 +1462,14 @@ function StandardGameBoard({
   const [highest, setHighest] = useState(1);
   const [shots, setShots] = useState(0);
   const [runBestCombo, setRunBestCombo] = useState(0);
+  const [reactionStreak, setReactionStreak] = useState(0);
+  const [reactionMisses, setReactionMisses] = useState(0);
+  const [fusionRushUntil, setFusionRushUntil] = useState(0);
+  const [reactionBurstDepth, setReactionBurstDepth] = useState(0);
   const runMergeCountRef = useRef(0);
   const runComboScoreRef = useRef(0);
+  const firstMergeTrackedRef = useRef(false);
+  const runEndTrackedRef = useRef(false);
   const [earnedStars, setEarnedStars] = useState(0);
   const [aimDeg, setAimDeg] = useState(0); // 0 = straight up, negative = left
   const [playStylePromptOpen, setPlayStylePromptOpen] = useState(!hasChosenShootingStyle);
@@ -2011,6 +2045,9 @@ function StandardGameBoard({
       highest,
       shots,
       runBestCombo,
+      reactionStreak,
+      reactionMisses,
+      fusionRushRemainingMs: Math.max(0, fusionRushUntil - Date.now()),
       runMergeCount: runMergeCountRef.current,
       runComboScore: runComboScoreRef.current,
       earnedStars,
@@ -2121,8 +2158,14 @@ function StandardGameBoard({
         setHighest(saved.highest);
         setShots(saved.shots);
         setRunBestCombo(saved.runBestCombo);
+        setReactionStreak(saved.reactionStreak ?? 0);
+        setReactionMisses(saved.reactionMisses ?? 0);
+        setFusionRushUntil(Date.now() + Math.max(0, saved.fusionRushRemainingMs ?? 0));
+        setReactionBurstDepth(0);
         runMergeCountRef.current = saved.runMergeCount ?? 0;
         runComboScoreRef.current = saved.runComboScore ?? 0;
+        firstMergeTrackedRef.current = saved.shots > 0;
+        runEndTrackedRef.current = false;
         setEarnedStars(saved.earnedStars);
         setGameOver(false);
         setGameOverContinueOpen(false);
@@ -2302,8 +2345,14 @@ function StandardGameBoard({
     setHighest(initialHighest);
     setShots(0);
     setRunBestCombo(0);
+    setReactionStreak(0);
+    setReactionMisses(0);
+    setFusionRushUntil(0);
+    setReactionBurstDepth(0);
     runMergeCountRef.current = 0;
     runComboScoreRef.current = 0;
+    firstMergeTrackedRef.current = false;
+    runEndTrackedRef.current = false;
     setEarnedStars(0);
     setGameOver(false);
     setGameOverContinueOpen(false);
@@ -2903,6 +2952,8 @@ function StandardGameBoard({
           shots: finalStats.shots,
           powerUpsUsed: runPowerUpsUsedRef.current,
           won: true,
+          durationMs: Date.now() - startTimeRef.current,
+          bestChain: finalStats.bestCombo,
         });
       }
     }
@@ -3082,6 +3133,22 @@ function StandardGameBoard({
         shots,
         powerUpsUsed: runPowerUpsUsedRef.current,
         won,
+        durationMs: Date.now() - startTimeRef.current,
+        bestChain: runBestCombo,
+      });
+    }
+    if ((won || gameOver) && !runEndTrackedRef.current) {
+      runEndTrackedRef.current = true;
+      trackRunEnd({
+        levelId,
+        mode,
+        outcome: won ? "win" : "game_over",
+        durationSec: (Date.now() - startTimeRef.current) / 1000,
+        shots,
+        score,
+        highestElement: highest,
+        bestChain: runBestCombo,
+        boardOccupancy: balls.length,
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -4815,7 +4882,34 @@ function StandardGameBoard({
     setHighlightId(result.finalBallId);
     const shimmerHit = currentIsShimmer && result.merges.length > 0;
     const grabAdd = result.merges.length * (shimmerHit ? activeShimmerGrabSteps : 1);
+    let scoringReactionStreak = reactionStreak;
+    let fusionRushTriggered = false;
     if (result.merges.length > 0) {
+      if (!firstMergeTrackedRef.current) {
+        firstMergeTrackedRef.current = true;
+        trackFirstMerge(levelId, (Date.now() - startTimeRef.current) / 1000, mode);
+      }
+      scoringReactionStreak = Math.min(REACTION_STREAK_MAX, reactionStreak + 1);
+      setReactionStreak(scoringReactionStreak);
+      setReactionMisses(0);
+      if (scoringReactionStreak === REACTION_STREAK_MAX && reactionStreak < REACTION_STREAK_MAX) {
+        fusionRushTriggered = true;
+        setFusionRushUntil(Date.now() + FUSION_RUSH_DURATION_MS);
+        setShimmerQueue((currentQueue) =>
+          currentQueue.map((isShimmer, index) => (index === 0 ? true : isShimmer)),
+        );
+        spawnPopup("FUSION RUSH x2");
+      } else if (scoringReactionStreak > reactionStreak && scoringReactionStreak >= 2) {
+        spawnPopup(
+          `REACTION x${reactionMultiplierFor(scoringReactionStreak, false).toFixed(
+            scoringReactionStreak === 2 ? 2 : 1,
+          )}`,
+        );
+      }
+      if (result.merges.length >= 4) {
+        setReactionBurstDepth(result.merges.length);
+        window.setTimeout(() => setReactionBurstDepth(0), 420);
+      }
       recordRunMergeStats(result.merges);
       const comboLabel = getComboLabel(result.merges.length);
       if (comboLabel) spawnPopup(comboLabel);
@@ -4860,6 +4954,14 @@ function StandardGameBoard({
           "Each matched pair becomes the next element. Leave matching atoms close together to set up a cascade.",
         );
       }
+    } else {
+      const nextMisses = reactionMisses + 1;
+      if (nextMisses >= 2) {
+        setReactionStreak((currentStreak) => Math.max(0, currentStreak - 1));
+        setReactionMisses(0);
+      } else {
+        setReactionMisses(nextMisses);
+      }
     }
     if (shimmerHit) spawnPopup(`✦ SHIMMER ×${activeShimmerScoreMultiplier} ✦`);
     if (grabAdd > 0) {
@@ -4894,7 +4996,9 @@ function StandardGameBoard({
     const nextHighest = Math.max(highest, result.highestElement);
     setHighest(nextHighest);
     setHighestElement(nextHighest);
-    const gained = Math.floor(result.scoreGained * level.scoreMultiplier);
+    const fusionRushActive = fusionRushTriggered || Date.now() < fusionRushUntil;
+    const reactionMultiplier = reactionMultiplierFor(scoringReactionStreak, fusionRushActive);
+    const gained = Math.floor(result.scoreGained * level.scoreMultiplier * reactionMultiplier);
     const nextScore = isPowerUpStage ? score : score + gained + mergeStoneBonus + impactStoneBonus;
     const nextBestCombo = Math.max(runBestCombo, result.merges.length);
     const shotPowerUps = [
@@ -4916,7 +5020,10 @@ function StandardGameBoard({
           ? `Merged ${result.merges.length} chain${result.merges.length === 1 ? "" : "s"}`
           : "Placed without a merge",
       points: gained + mergeStoneBonus + impactStoneBonus,
-      powerUp: shotPowerUps.join(", ") || undefined,
+      powerUp:
+        [...shotPowerUps, reactionMultiplier > 1 ? `Reaction x${reactionMultiplier}` : null]
+          .filter((label): label is string => Boolean(label))
+          .join(", ") || undefined,
       merges: result.merges,
     });
     if (gained + mergeStoneBonus + impactStoneBonus > 0) {
@@ -6084,6 +6191,8 @@ function StandardGameBoard({
   }, [balls, currentIsEGun, pendingStone, previewPath]);
 
   const progressPct = Math.min(100, (highest / target) * 100);
+  const fusionRushActive = fusionRushUntil > Date.now();
+  const reactionMultiplier = reactionMultiplierFor(reactionStreak, fusionRushActive);
   const continueChoiceStats = continueClaimPromptOpen
     ? {
         stars: earnedStars || 1,
@@ -6098,29 +6207,45 @@ function StandardGameBoard({
       : highest < target
         ? "Keep matching equal atoms. A chain reaction can jump several discoveries at once."
         : "Target formed. Claim the clear and start filling the periodic table.";
+  const nextCampaignLevel = mode === "campaign" ? getNextLevel(levelId) : undefined;
 
   async function runAttemptAdIfDue() {
-    if (clearedStagesSinceAd < 3 || hasProPack) return;
+    if (
+      hasProPack ||
+      completedGameCount < 4 ||
+      clearedStagesSinceAd < 3 ||
+      Date.now() - lastInterstitialAt < INTERSTITIAL_COOLDOWN_MS
+    ) {
+      return;
+    }
     const shown = await showInterstitialIfReady(hasProPack);
     if (shown) markInterstitialShown();
   }
 
   async function handleWonMain() {
+    trackResultAction("main_menu", levelId, "win");
     await runAttemptAdIfDue();
     onExit();
   }
 
-  async function handleWonMap() {
+  async function handleWonNext() {
+    trackResultAction(nextCampaignLevel ? "next_stage" : "map", levelId, "win");
     await runAttemptAdIfDue();
+    if (nextCampaignLevel) {
+      onWin(nextCampaignLevel.id);
+      return;
+    }
     onMap();
   }
 
   async function handleGameOverMain() {
+    trackResultAction("main_menu", levelId, "game_over");
     await runAttemptAdIfDue();
     onExit();
   }
 
   async function handleGameOverRetry() {
+    trackResultAction("retry", levelId, "game_over");
     await runAttemptAdIfDue();
     onWin(levelId);
   }
@@ -6350,6 +6475,13 @@ function StandardGameBoard({
                     );
                   })}
               </div>
+              <div style={evolutionRail} aria-label="Element evolution path">
+                <ElementBall atomicNumber={Math.max(1, highest)} size={20} />
+                <span aria-hidden="true">→</span>
+                <ElementBall atomicNumber={Math.min(target, Math.max(1, highest + 1))} size={20} />
+                <span aria-hidden="true">→</span>
+                <ElementBall atomicNumber={target} size={20} glow />
+              </div>
             </div>
             <button
               type="button"
@@ -6379,6 +6511,35 @@ function StandardGameBoard({
 
         {isFirstCampaignRun && !won && !gameOver && (
           <FirstRunGuidePanel targetSymbol={targetEl?.symbol ?? "He"} text={firstRunGuideText} />
+        )}
+
+        {!isMoleculeChallenge && !isPowerUpStage && (
+          <div
+            className={fusionRushActive ? "reaction-meter fusion-rush-active" : "reaction-meter"}
+            style={reactionMeter}
+          >
+            <div style={reactionMeterHeader}>
+              <span>{fusionRushActive ? "Fusion Rush" : "Reaction streak"}</span>
+              <strong>{`x${reactionMultiplier}`}</strong>
+            </div>
+            <div style={reactionMeterTrack}>
+              <span
+                style={{
+                  ...reactionMeterFill,
+                  width: `${(reactionStreak / REACTION_STREAK_MAX) * 100}%`,
+                }}
+              />
+            </div>
+            <span style={reactionMeterHint}>
+              {reactionStreak === 0
+                ? "Merge on consecutive shots to raise the score multiplier."
+                : reactionMisses === 1
+                  ? "One more miss drops a tier."
+                  : `${REACTION_STREAK_MAX - reactionStreak} merge${
+                      REACTION_STREAK_MAX - reactionStreak === 1 ? "" : "s"
+                    } to Fusion Rush.`}
+            </span>
+          </div>
         )}
 
         {isMoleculeChallenge && moleculeObjective && (
@@ -6551,13 +6712,17 @@ function StandardGameBoard({
             updateAimFromPointer(e.clientX, e.clientY);
             if (shootingStyle === "hold") shoot();
           }}
-          className={
+          className={[
+            "game-board-surface",
             dangerFeedbackState === "high"
-              ? "game-board-surface danger-high"
+              ? "danger-high"
               : dangerFeedbackState === "low"
-                ? "game-board-surface danger-low"
-                : "game-board-surface"
-          }
+                ? "danger-low"
+                : "",
+            reactionBurstDepth >= 4 ? "reaction-burst" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
           style={{
             position: "relative",
             background:
@@ -7760,8 +7925,8 @@ function StandardGameBoard({
             onClaimPowerUp={claimResultPowerUp}
             onDiscoveryClick={setDiscoveryEl}
             onMain={handleWonMain}
-            onNext={handleWonMap}
-            nextLabel="Map"
+            onNext={handleWonNext}
+            nextLabel={nextCampaignLevel ? "Next stage" : "Map"}
           />
         )}
         {gameOverContinueOpen && !won && !gameOver && (
@@ -7915,6 +8080,63 @@ const firstRunGuideCopy: React.CSSProperties = {
   color: "var(--foreground)",
   fontSize: 12,
   lineHeight: 1.35,
+  fontWeight: 750,
+};
+
+const evolutionRail: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 6,
+  minWidth: 0,
+  marginTop: 8,
+  color: "var(--muted-foreground)",
+  fontSize: 11,
+  fontWeight: 850,
+};
+
+const reactionMeter: React.CSSProperties = {
+  display: "grid",
+  gap: 6,
+  padding: "8px 10px",
+  marginBottom: 10,
+  borderRadius: 10,
+  border: "1px solid var(--game-panel-border, var(--border))",
+  background: "var(--game-panel-bg, var(--surface))",
+  boxShadow: "var(--game-panel-shadow, none)",
+};
+
+const reactionMeterHeader: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 10,
+  color: "var(--foreground)",
+  fontSize: 11,
+  fontWeight: 900,
+};
+
+const reactionMeterTrack: React.CSSProperties = {
+  height: 7,
+  overflow: "hidden",
+  borderRadius: 999,
+  border: "1px solid var(--border)",
+  background: "var(--surface-high)",
+};
+
+const reactionMeterFill: React.CSSProperties = {
+  display: "block",
+  height: "100%",
+  borderRadius: 999,
+  background: "linear-gradient(90deg, var(--primary), var(--accent))",
+  boxShadow: "0 0 10px var(--accent-glow)",
+  transition: "width 180ms ease",
+};
+
+const reactionMeterHint: React.CSSProperties = {
+  color: "var(--muted-foreground)",
+  fontSize: 10,
+  lineHeight: 1.25,
   fontWeight: 750,
 };
 
@@ -9099,9 +9321,10 @@ function ResultModal({
   );
   const canAffordPowerUpSave = savePowerUpCost <= 0 || coins >= savePowerUpCost;
   const shotGoal = getShotStarGoal(level);
+  const timeGoalSec = level.parTimeSec ?? 8 * 60;
   const didComplete = title === "LEVEL COMPLETE";
   const isFirstLevelComplete = didComplete && level.id === 1;
-  const timeMet = didComplete && clearTimeMs <= TIME_STAR_LIMIT_SEC * 1000;
+  const timeMet = didComplete && clearTimeMs <= timeGoalSec * 1000;
   const shotsMet = didComplete && shots <= shotGoal;
   const isCompoundPass = isCompoundFormationLevel(level);
   return (
@@ -9215,7 +9438,7 @@ function ResultModal({
           />
           <StarRequirementRow
             met={timeMet}
-            label="Clear under 5 minutes"
+            label={`Clear under ${formatTime(timeGoalSec * 1000)}`}
             detail={`Your time was ${formatTime(clearTimeMs)}`}
           />
           <StarRequirementRow

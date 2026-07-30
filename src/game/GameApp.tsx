@@ -22,6 +22,7 @@ import { MOLECULE_CHALLENGE_BY_LEVEL, getCompoundChallengeKind, getLevelById } f
 import { MoleculeVisual } from "@/game/MoleculeVisual";
 import { useProgress } from "@/game/store";
 import { useDomLocalization } from "@/game/useDomLocalization";
+import { trackOnboardingComplete, trackOnboardingStep } from "@/game/analytics";
 
 type Screen =
   | { name: "menu" }
@@ -48,6 +49,7 @@ export function GameApp() {
   const soundVolume = useProgress((s) => s.soundVolume);
   const musicVolume = useProgress((s) => s.musicVolume);
   const completedGameCount = useProgress((s) => s.completedGameCount);
+  const levelStars = useProgress((s) => s.levelStars);
   const onboardingSeen = useProgress((s) => s.onboardingSeen);
   const appReviewMilestonePromptSeen = useProgress((s) => s.appReviewMilestonePromptSeen);
   const appReviewMilestoneRewardClaimed = useProgress((s) => s.appReviewMilestoneRewardClaimed);
@@ -76,6 +78,10 @@ export function GameApp() {
   }, [musicVolume]);
 
   useEffect(() => {
+    if (!onboardingSeen) trackOnboardingStep(onboardingStep + 1);
+  }, [onboardingSeen, onboardingStep]);
+
+  useEffect(() => {
     const root = document.documentElement;
     root.classList.toggle("theme-light", appTheme === "light");
     root.classList.toggle("theme-dark", appTheme === "dark");
@@ -100,7 +106,10 @@ export function GameApp() {
   if (showLaunchScreen) return <LaunchScreen />;
 
   const shouldShowAppReviewMilestone =
-    completedGameCount >= 4 && !appReviewMilestonePromptSeen && !appReviewMilestoneRewardClaimed;
+    completedGameCount >= 5 &&
+    Object.values(levelStars).some((stars) => stars >= 3) &&
+    !appReviewMilestonePromptSeen &&
+    !appReviewMilestoneRewardClaimed;
 
   const onboardingPrompt = !onboardingSeen ? (
     <FirstInstallOnboarding
@@ -111,6 +120,7 @@ export function GameApp() {
           setOnboardingStep((step) => Math.min(ONBOARDING_STEPS.length - 1, step + 1));
           return;
         }
+        trackOnboardingComplete();
         markOnboardingSeen();
       }}
     />

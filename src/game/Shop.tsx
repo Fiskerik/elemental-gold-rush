@@ -6,11 +6,14 @@ import { POWER_UP_UNLOCK_LEVELS } from "./powerUps";
 import { PowerUpBadge } from "./PowerUpLibrary";
 import { PRODUCT_IDS, getProductById, type ProductId } from "./products";
 import {
+  clearCustomerInfoListener,
   debugNativePurchases,
   isPurchaseDebugUiEnabled,
   purchaseGoldCoinPack,
   purchaseProductWithResult,
+  redeemOfferCode,
   restorePurchases,
+  setCustomerInfoListener,
 } from "./purchases";
 import { initAds, showRewardedForCoin } from "./ads";
 import { useIsTabletLayout } from "./responsive";
@@ -127,7 +130,7 @@ export function Shop({ onBack }: { onBack: () => void }) {
   const [message, setMessage] = useState("");
   const [pendingProductId, setPendingProductId] = useState<ProductId | "rewarded" | null>(null);
   const [proPackMessage, setProPackMessage] = useState("");
-  const [proPackBusy, setProPackBusy] = useState<"purchase" | "restore" | "">("");
+  const [proPackBusy, setProPackBusy] = useState<"purchase" | "restore" | "redeem" | "">("");
   const [purchaseDebugBusy, setPurchaseDebugBusy] = useState(false);
   const [purchaseDebugOpen, setPurchaseDebugOpen] = useState(false);
   const [purchaseDebugLogs, setPurchaseDebugLogs] = useState<string[]>([]);
@@ -151,6 +154,20 @@ export function Shop({ onBack }: { onBack: () => void }) {
     if (hasProPack) return;
     void initAds(false);
   }, [hasProPack, isNativeIos]);
+
+  useEffect(() => {
+    if (!isNativeIos || hasProPack) return;
+    let active = true;
+    void setCustomerInfoListener((hasEntitlement) => {
+      if (!active || !hasEntitlement) return;
+      grantProPack();
+      setProPackMessage("Pro Lab Pack unlocked.");
+    });
+    return () => {
+      active = false;
+      void clearCustomerInfoListener();
+    };
+  }, [grantProPack, hasProPack, isNativeIos]);
 
   useEffect(
     () => () => {
@@ -244,6 +261,39 @@ export function Shop({ onBack }: { onBack: () => void }) {
         error instanceof Error ? error.message : "Purchases could not be restored.",
       );
     } finally {
+      setProPackBusy("");
+      if (purchaseDebugEnabled) refreshPurchaseDebugLogs();
+    }
+  }
+
+  async function handleOfferCodeRedeem() {
+    if (appStorePurchaseBusy) return;
+    logDebug("Redeem code button tapped.", { productId: PRODUCT_IDS.proLabPack });
+    setProPackBusy("redeem");
+    setProPackMessage("Opening App Store code redemption...");
+    try {
+      const result = await withTimeout(
+        () => redeemOfferCode((statusMessage) => setProPackMessage(statusMessage)),
+        SHOP_PURCHASE_GUARD_TIMEOUT_MS,
+        "App Store code redemption did not respond in time. Try again.",
+      );
+      if (result.purchased) {
+        grantProPack();
+        setProPackMessage("Pro Lab Pack unlocked from offer code.");
+        return;
+      }
+      setProPackMessage(
+        result.reason ??
+          "No Pro Lab Pack redemption was found. If you redeemed a code, tap Restore after a moment.",
+      );
+    } catch (error) {
+      setProPackMessage(
+        error instanceof Error
+          ? error.message
+          : "App Store code redemption could not be started.",
+      );
+    } finally {
+      logDebug("Offer code redemption UI flow ended.", { productId: PRODUCT_IDS.proLabPack });
       setProPackBusy("");
       if (purchaseDebugEnabled) refreshPurchaseDebugLogs();
     }
@@ -561,35 +611,51 @@ export function Shop({ onBack }: { onBack: () => void }) {
             {hasProPack ? (
               <div style={proPackActive}>Pro Lab Pack Active</div>
             ) : (
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <div style={{ display: "grid", gap: 10 }}>
                 <button
                   type="button"
-                  onClick={handleProPackRestore}
+                  onClick={handleOfferCodeRedeem}
                   disabled={appStorePurchaseBusy || purchaseDebugLocked}
                   style={{
                     ...secondaryShopButton,
                     opacity:
-                      purchaseDebugLocked || (appStorePurchaseBusy && proPackBusy !== "restore")
+                      purchaseDebugLocked || (appStorePurchaseBusy && proPackBusy !== "redeem")
                         ? 0.55
                         : 1,
                   }}
                 >
-                  {proPackBusy === "restore" ? "Checking..." : "Restore"}
+                  {proPackBusy === "redeem" ? "Opening..." : "Redeem Code"}
                 </button>
-                <button
-                  type="button"
-                  onClick={handleProPackPurchase}
-                  disabled={appStorePurchaseBusy || purchaseDebugLocked}
-                  style={{
-                    ...shopButton,
-                    opacity:
-                      purchaseDebugLocked || (appStorePurchaseBusy && proPackBusy !== "purchase")
-                        ? 0.55
-                        : 1,
-                  }}
-                >
-                  {proPackBusy === "purchase" ? "Opening..." : "Unlock Pack"}
-                </button>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  <button
+                    type="button"
+                    onClick={handleProPackRestore}
+                    disabled={appStorePurchaseBusy || purchaseDebugLocked}
+                    style={{
+                      ...secondaryShopButton,
+                      opacity:
+                        purchaseDebugLocked || (appStorePurchaseBusy && proPackBusy !== "restore")
+                          ? 0.55
+                          : 1,
+                    }}
+                  >
+                    {proPackBusy === "restore" ? "Checking..." : "Restore"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleProPackPurchase}
+                    disabled={appStorePurchaseBusy || purchaseDebugLocked}
+                    style={{
+                      ...shopButton,
+                      opacity:
+                        purchaseDebugLocked || (appStorePurchaseBusy && proPackBusy !== "purchase")
+                          ? 0.55
+                          : 1,
+                    }}
+                  >
+                    {proPackBusy === "purchase" ? "Opening..." : "Unlock Pack"}
+                  </button>
+                </div>
               </div>
             )}
             {proPackMessage && (

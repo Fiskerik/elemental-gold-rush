@@ -4,6 +4,7 @@ import {
   Atom,
   BookOpen,
   CheckCircle2,
+  ChevronDown,
   Clapperboard,
   FlaskConical,
   Layers,
@@ -154,6 +155,7 @@ export function MainMenu({
   const [rewardedAdMessage, setRewardedAdMessage] = useState<string | null>(null);
   const rewardedAdMessageTimeoutRef = useRef<number | null>(null);
   const [ratePromptOpen, setRatePromptOpen] = useState(false);
+  const [questsExpanded, setQuestsExpanded] = useState(false);
 
   useEffect(() => {
     const id = window.setInterval(() => {
@@ -472,6 +474,15 @@ export function MainMenu({
           aria-label="Main game sections"
         >
           <NavPill
+            icon={Layers}
+            label="Map"
+            tone="map"
+            onClick={() => {
+              trackMenuAction("levels");
+              onLevels();
+            }}
+          />
+          <NavPill
             icon={Atom}
             label="Collection"
             tone="collection"
@@ -650,8 +661,25 @@ export function MainMenu({
               </div>
             </div>
           </div>
+          <button
+            type="button"
+            onClick={() => setQuestsExpanded((current) => !current)}
+            aria-expanded={questsExpanded}
+            style={questToggleBtn}
+          >
+            <span>{questsExpanded ? "Hide quests" : "View quests"}</span>
+            <ChevronDown
+              size={16}
+              aria-hidden="true"
+              style={{
+                transform: questsExpanded ? "rotate(180deg)" : undefined,
+                transition: "transform 180ms ease",
+              }}
+            />
+          </button>
         </section>
 
+        {questsExpanded && (
         <section style={{ ...dailyPanel, padding: isTabletLayout ? 18 : dailyPanel.padding }}>
           <div
             style={dailyQuestClaimTrack}
@@ -704,6 +732,7 @@ export function MainMenu({
             ))}
           </div>
         </section>
+        )}
         {isNativeIos && ratePromptOpen && (
           <div style={modalBackdrop} role="presentation" onClick={() => setRatePromptOpen(false)}>
             <section
@@ -1018,8 +1047,35 @@ const compactStatRow: CSSProperties = {
 
 const subpageRow: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+  gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
   gap: 10,
+  position: "sticky",
+  bottom: 8,
+  zIndex: 20,
+  padding: 8,
+  marginInline: -8,
+  border: "1px solid color-mix(in oklch, var(--border) 72%, transparent)",
+  borderRadius: 14,
+  background: "color-mix(in oklch, var(--background) 86%, transparent)",
+  backdropFilter: "blur(14px)",
+};
+
+const questToggleBtn: CSSProperties = {
+  width: "100%",
+  minHeight: 38,
+  marginTop: 12,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 6,
+  border: "1px solid var(--border)",
+  borderRadius: 10,
+  background: "var(--surface-high)",
+  color: "var(--foreground)",
+  fontFamily: "inherit",
+  fontSize: 12,
+  fontWeight: 850,
+  cursor: "pointer",
 };
 
 const dailyPanel: CSSProperties = {
@@ -1301,10 +1357,11 @@ function NavPill({
 }: {
   icon: LucideIcon;
   label: string;
-  tone: "collection" | "lab" | "library" | "shop";
+  tone: "map" | "collection" | "lab" | "library" | "shop";
   onClick: () => void;
 }) {
-  const tones: Record<"collection" | "lab" | "library" | "shop", string> = {
+  const tones: Record<"map" | "collection" | "lab" | "library" | "shop", string> = {
+    map: "linear-gradient(135deg, color-mix(in oklch, var(--secondary) 25%, var(--surface)), color-mix(in oklch, var(--accent) 16%, var(--surface)))",
     collection:
       "linear-gradient(135deg, color-mix(in oklch, var(--primary) 32%, var(--surface)), color-mix(in oklch, var(--accent) 18%, var(--surface)))",
     lab: "linear-gradient(135deg, color-mix(in oklch, var(--success) 30%, var(--surface)), color-mix(in oklch, var(--primary) 18%, var(--surface)))",
@@ -1312,8 +1369,9 @@ function NavPill({
       "linear-gradient(135deg, color-mix(in oklch, var(--secondary) 30%, var(--surface)), color-mix(in oklch, var(--primary) 15%, var(--surface)))",
     shop: "linear-gradient(135deg, color-mix(in oklch, var(--accent) 32%, var(--surface)), color-mix(in oklch, var(--primary) 22%, var(--surface)))",
   };
-  const shimmerDelay: Record<"collection" | "lab" | "library" | "shop", string> = {
-    collection: "0s",
+  const shimmerDelay: Record<"map" | "collection" | "lab" | "library" | "shop", string> = {
+    map: "0s",
+    collection: "0.25s",
     lab: "0.35s",
     library: "0.7s",
     shop: "1.05s",

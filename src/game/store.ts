@@ -172,6 +172,8 @@ export interface LevelStats {
   fails: number;
   maxScore: number;
   bestShots: number | null;
+  bestTimeMs: number | null;
+  bestChain: number;
   powerUpsUsed: number;
   totalScore: number;
   stars: number;
@@ -190,6 +192,8 @@ export const emptyLevelStats = (): LevelStats => ({
   fails: 0,
   maxScore: 0,
   bestShots: null,
+  bestTimeMs: null,
+  bestChain: 0,
   powerUpsUsed: 0,
   totalScore: 0,
   stars: 0,
@@ -248,6 +252,9 @@ function normalizeLevelStatsRecord(
       fails: Math.max(0, Math.floor(value?.fails ?? base.fails)),
       maxScore: Math.max(0, Math.floor(value?.maxScore ?? base.maxScore)),
       bestShots: value?.bestShots == null ? null : Math.max(0, Math.floor(value.bestShots)),
+      bestTimeMs:
+        value?.bestTimeMs == null ? null : Math.max(0, Math.floor(value.bestTimeMs)),
+      bestChain: Math.max(0, Math.floor(value?.bestChain ?? base.bestChain)),
       powerUpsUsed: Math.max(0, Math.floor(value?.powerUpsUsed ?? base.powerUpsUsed)),
       totalScore: Math.max(0, Math.floor(value?.totalScore ?? base.totalScore)),
       stars: Math.max(0, Math.min(3, Math.floor(value?.stars ?? base.stars))),
@@ -309,6 +316,7 @@ interface ProgressState {
   clearedStageCount: number;
   completedGameCount: number;
   clearedStagesSinceAd: number;
+  lastInterstitialAt: number;
   onboardingSeen: boolean;
   appReviewMilestonePromptSeen: boolean;
   appReviewMilestoneRewardClaimed: boolean;
@@ -357,7 +365,14 @@ interface ProgressState {
   incrementLevelAttempt: (levelId: number) => void;
   recordLevelRun: (
     levelId: number,
-    run: { score: number; shots: number; powerUpsUsed: number; won: boolean },
+    run: {
+      score: number;
+      shots: number;
+      powerUpsUsed: number;
+      won: boolean;
+      durationMs?: number;
+      bestChain?: number;
+    },
   ) => void;
   setChallengeBestScore: (mode: GameModeId, score: number) => void;
   recordDailyBoardLeaderboardPlacement: (
@@ -433,6 +448,7 @@ export const useProgress = create<ProgressState>()(
       clearedStageCount: 0,
       completedGameCount: 0,
       clearedStagesSinceAd: 0,
+      lastInterstitialAt: 0,
       onboardingSeen: false,
       appReviewMilestonePromptSeen: false,
       appReviewMilestoneRewardClaimed: false,
@@ -918,7 +934,7 @@ export const useProgress = create<ProgressState>()(
           const attemptIncrement = 1;
           return {
             clearedStageCount: s.clearedStageCount + (run.won ? 1 : 0),
-            completedGameCount: s.completedGameCount + (run.won ? 1 : 0),
+            completedGameCount: s.completedGameCount + 1,
             clearedStagesSinceAd: s.clearedStagesSinceAd + attemptIncrement,
             levelStats: {
               ...s.levelStats,
@@ -933,6 +949,13 @@ export const useProgress = create<ProgressState>()(
                     ? run.shots
                     : Math.min(current.bestShots, run.shots)
                   : current.bestShots,
+                bestTimeMs:
+                  run.won && run.durationMs != null
+                    ? current.bestTimeMs == null
+                      ? Math.max(0, Math.floor(run.durationMs))
+                      : Math.min(current.bestTimeMs, Math.max(0, Math.floor(run.durationMs)))
+                    : current.bestTimeMs,
+                bestChain: Math.max(current.bestChain, Math.max(0, run.bestChain ?? 0)),
               },
             },
           };
@@ -1000,8 +1023,12 @@ export const useProgress = create<ProgressState>()(
           };
         }),
       recordGameAttemptForAd: () =>
-        set((s) => ({ clearedStagesSinceAd: s.clearedStagesSinceAd + 1 })),
-      markInterstitialShown: () => set({ clearedStagesSinceAd: 0 }),
+        set((s) => ({
+          completedGameCount: s.completedGameCount + 1,
+          clearedStagesSinceAd: s.clearedStagesSinceAd + 1,
+        })),
+      markInterstitialShown: () =>
+        set({ clearedStagesSinceAd: 0, lastInterstitialAt: Date.now() }),
       addInventoryPowerUps: (powerUps) =>
         set((s) => ({
           powerUpInventory: mergePowerUpInventory(s.powerUpInventory, powerUps),
@@ -1108,6 +1135,7 @@ export const useProgress = create<ProgressState>()(
           clearedStageCount: 0,
           completedGameCount: s.completedGameCount,
           clearedStagesSinceAd: 0,
+          lastInterstitialAt: s.lastInterstitialAt,
           onboardingSeen: s.onboardingSeen,
           appReviewMilestonePromptSeen: s.appReviewMilestonePromptSeen,
           appReviewMilestoneRewardClaimed: s.appReviewMilestoneRewardClaimed,
@@ -1198,6 +1226,8 @@ export const useProgress = create<ProgressState>()(
           ),
           clearedStagesSinceAd:
             persistedState?.clearedStagesSinceAd ?? current.clearedStagesSinceAd,
+          lastInterstitialAt:
+            persistedState?.lastInterstitialAt ?? current.lastInterstitialAt,
           onboardingSeen: persistedState?.onboardingSeen ?? hasExistingProgress,
           appReviewMilestonePromptSeen:
             persistedState?.appReviewMilestonePromptSeen ?? current.appReviewMilestonePromptSeen,

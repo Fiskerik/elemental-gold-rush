@@ -38,6 +38,44 @@ export function trackGameStart(levelId: number, mode = "campaign"): void {
   track("game_start", { levelId, mode });
 }
 
+export function trackOnboardingStep(step: number): void {
+  track("onboarding_step_view", { step });
+}
+
+export function trackOnboardingComplete(): void {
+  track("onboarding_complete");
+}
+
+export function trackFirstMerge(levelId: number, seconds: number, mode = "campaign"): void {
+  track("first_merge", { levelId, seconds: Math.max(0, Math.round(seconds)), mode });
+}
+
+export function trackRunEnd(payload: {
+  levelId: number;
+  mode: string;
+  outcome: "win" | "game_over";
+  durationSec: number;
+  shots: number;
+  score: number;
+  highestElement: number;
+  bestChain: number;
+  boardOccupancy: number;
+}): void {
+  track("run_end", {
+    ...payload,
+    durationSec: Math.max(0, Math.round(payload.durationSec)),
+    boardOccupancy: Math.max(0, Math.round(payload.boardOccupancy)),
+  });
+}
+
+export function trackResultAction(
+  action: "next_stage" | "map" | "main_menu" | "retry",
+  levelId: number,
+  outcome: "win" | "game_over",
+): void {
+  track("result_action", { action, levelId, outcome });
+}
+
 export function trackShot(levelId: number, atom: number, aimDeg: number, mode = "campaign"): void {
   track("shot", { levelId, atom, aimDeg: Math.round(aimDeg), mode });
 }
