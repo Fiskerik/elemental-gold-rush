@@ -779,6 +779,7 @@ function DailyCompoundGridBoard({
   );
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [revealedIds, setRevealedIds] = useState<Set<number>>(new Set());
+  const [moleculeHintUsed, setMoleculeHintUsed] = useState(false);
   const [wrongGuesses, setWrongGuesses] = useState(0);
   const [message, setMessage] = useState("Find the hidden compound atoms.");
   const [checkFx, setCheckFx] = useState<null | {
@@ -832,10 +833,9 @@ function DailyCompoundGridBoard({
       }, {}),
     [selectedCells],
   );
-  const hintsAvailable = Math.floor(wrongGuesses / 3);
-  const hintsUsed = revealedIds.size;
-  const canRevealHint =
-    !result && hintsAvailable > hintsUsed && revealedIds.size < secretAtoms.length;
+  const hintsAvailable = wrongGuesses >= 3 ? 1 : 0;
+  const hintsUsed = moleculeHintUsed ? 1 : 0;
+  const canRevealHint = !result && hintsAvailable > hintsUsed;
   const elapsedSec = Math.floor(elapsedMs / 1000);
 
   function toggleCell(cell: DailyCompoundCell) {
@@ -850,14 +850,9 @@ function DailyCompoundGridBoard({
   }
 
   function revealHint() {
-    if (!canRevealHint) return;
-    const cell = cells
-      .filter((item) => item.secret && !revealedIds.has(item.id))
-      .sort((a, b) => b.atom - a.atom || a.id - b.id)[0];
-    if (!cell) return;
-    setRevealedIds((current) => new Set([...current, cell.id]));
-    setSelectedIds((current) => new Set([...current, cell.id]));
-    setMessage(`Hint marked ${ELEMENTS[cell.atom - 1]?.symbol ?? "an atom"}.`);
+    if (!canRevealHint || !compound) return;
+    setMoleculeHintUsed(true);
+    setMessage(`Molecule hint: look for ${compound.formula} as one connected group.`);
     if (hapticsEnabled) vibrate([15, 25, 15]);
   }
 
@@ -883,9 +878,9 @@ function DailyCompoundGridBoard({
     if (compoundKey(selectedCounts) !== compoundKey(compound.elements)) {
       const nextWrong = wrongGuesses + 1;
       setWrongGuesses(nextWrong);
-      setSelectedIds(new Set(revealedIds));
+      setSelectedIds(new Set());
       setMessage(
-        nextWrong % 3 === 0
+        nextWrong === 3
           ? "Not the compound. An optional hint is now available."
           : "Not the compound. Adjust your marked atoms.",
       );
@@ -896,9 +891,9 @@ function DailyCompoundGridBoard({
     if (!isLinkedCompoundSelection(selectedCells, secretAtoms, DAILY_COMPOUND_GRID_COLS)) {
       const nextWrong = wrongGuesses + 1;
       setWrongGuesses(nextWrong);
-      setSelectedIds(new Set(revealedIds));
+      setSelectedIds(new Set());
       setMessage(
-        nextWrong % 3 === 0
+        nextWrong === 3
           ? "Those atoms match the formula, but not the hidden compound. An optional hint is available."
           : "Those atoms match the formula, but they are not linked in the compound pattern.",
       );
@@ -1045,7 +1040,7 @@ function DailyCompoundGridBoard({
               cursor: canRevealHint ? "pointer" : "not-allowed",
             }}
           >
-            Optional Hint
+            Molecule Hint
           </button>
           <button
             type="button"
