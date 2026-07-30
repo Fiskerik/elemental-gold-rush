@@ -15,7 +15,8 @@ workflows:
         BUNDLE_ID: "com.eaconsulting.atomicfusion"
         XCODE_WORKSPACE: "ios/App/App.xcworkspace"
         XCODE_SCHEME: "App"
-        APP_MARKETING_VERSION: "1.0.4"
+        APP_MARKETING_VERSION: "1.1.0"
+        APP_BUILD_NUMBER: "131"
         VITE_REVENUECAT_IOS_API_KEY: "appl_wleIrbzZnDKaUaQgnbmYbTYVxfX"
         VITE_REVENUECAT_DEBUG_LOGS: "false"
         VITE_PURCHASE_DEBUG_UI: "false"
@@ -139,7 +140,7 @@ workflows:
           if [ -n "$APP_MARKETING_VERSION" ]; then
             xcrun agvtool new-marketing-version "$APP_MARKETING_VERSION"
           fi
-          BUILD_NO="${PROJECT_BUILD_NUMBER:-$BUILD_NUMBER}"
+          BUILD_NO="${APP_BUILD_NUMBER:-${PROJECT_BUILD_NUMBER:-$BUILD_NUMBER}}"
           if [ -z "$BUILD_NO" ]; then
             BUILD_NO="$(date +%s)"
           fi

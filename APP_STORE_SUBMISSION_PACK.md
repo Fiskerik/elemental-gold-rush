@@ -1,4 +1,4 @@
-# App Store Submission Pack (iOS 1.0.4)
+# App Store Submission Pack (iOS 1.1.0, build 131)
 
 ## Metadata limits to follow
 
@@ -35,7 +35,7 @@ merge,puzzle,chemistry,elements,periodic table,science,strategy,casual,logic,bra
 No login required.
 
 Test path for rewarded ad: Shop -> Watch rewarded ad for +1 coin.
-Test path for IAP: Main Menu -> Shop -> Unlock Pack. Restore path: Main Menu -> Shop -> Restore. Coin packs are also shown on Main Menu -> Shop.
+Test path for IAP: Main Menu -> Shop -> Unlock Pack. Offer-code path: Main Menu -> Shop -> Redeem Code. Restore path: Main Menu -> Shop -> Restore. Coin packs are also shown on Main Menu -> Shop.
 
 Support: eaconsulting.supp@gmail.com
 Privacy policy: https://atomic-fusion.lovable.app/privacy
@@ -52,7 +52,7 @@ Privacy policy: https://atomic-fusion.lovable.app/privacy
 
 ## Left-sidebar checklist before submit
 
-- iOS App Version 1.0.4
+- iOS App Version 1.1.0 (build 131)
   - Attach build
   - Upload required screenshot sets
   - Fill promo text, description, keywords, support URL, copyright

@@ -39,6 +39,7 @@ type PurchasesPlugin = {
   purchasePackage: (options: {
     aPackage: PurchasesPackage;
   }) => Promise<{ customerInfo: CustomerInfo }>;
+  presentCodeRedemptionSheet?: () => Promise<void>;
   restorePurchases: () => Promise<{ customerInfo: CustomerInfo }>;
 };
 
@@ -1087,6 +1088,73 @@ export async function purchaseProductWithResult(
 export async function purchaseProduct(productId: ProductId): Promise<boolean> {
   const result = await purchaseProductWithResult(productId);
   return result.purchased;
+}
+
+export async function redeemOfferCode(
+  reportStep?: PurchaseStepReporter,
+): Promise<PurchaseProductResult> {
+  purchaseDebugLog("Starting App Store offer code redemption.");
+  if (!isNativePlatform()) {
+    return {
+      purchased: false,
+      reason: "Offer code redemption is only available in the iPhone app.",
+    };
+  }
+
+  const configuredForPurchases = await ensureConfigured(reportStep);
+  const purchases = getConfiguredPurchases();
+  if (!configuredForPurchases || !purchases) {
+    return {
+      purchased: false,
+      reason:
+        lastConfigurationReason ||
+        "RevenueCat is not configured in this build. Add VITE_REVENUECAT_IOS_API_KEY in Codemagic.",
+    };
+  }
+
+  if (!purchases.presentCodeRedemptionSheet) {
+    return {
+      purchased: false,
+      reason:
+        "This build does not support App Store code redemption. Update @revenuecat/purchases-capacitor and rebuild the iOS app.",
+    };
+  }
+
+  try {
+    reportStep?.("Opening App Store code redemption...");
+    await withNativeTimeout(
+      () => purchases.presentCodeRedemptionSheet!(),
+      NATIVE_PURCHASE_TIMEOUT_MS,
+      "App Store offer code redemption",
+    );
+
+    const { customerInfo } = await withNativeTimeout(
+      () => purchases.getCustomerInfo(),
+      NATIVE_SETUP_TIMEOUT_MS,
+      "RevenueCat customer info after code redemption",
+    );
+    if (hasProEntitlement(customerInfo)) {
+      return productPurchaseResultFromCustomerInfo(
+        PRODUCT_IDS.proLabPack,
+        customerInfo,
+        "Offer code redemption",
+      );
+    }
+
+    return {
+      purchased: false,
+      reason:
+        "Code sheet opened. Complete redemption, then tap Restore if the pack does not unlock automatically.",
+    };
+  } catch (error) {
+    const reason =
+      describePurchaseError(error) ||
+      "Offer code redemption could not be completed right now.";
+    if (isPurchaseCancellation(error, reason)) {
+      return { purchased: false, reason: "Offer code redemption was cancelled." };
+    }
+    return { purchased: false, reason };
+  }
 }
 
 export async function purchaseGoldCoinPack(

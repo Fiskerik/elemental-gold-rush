@@ -81,6 +81,13 @@ function translateTrimmed(text: string, language: AppLanguage): string | undefin
     return source === source.toUpperCase() ? dictionary[lowerSource].toUpperCase() : dictionary[lowerSource];
   }
 
+  const moleculeHint = /^Molecule hint: look for (.+) as one connected group\.$/.exec(source);
+  if (moleculeHint) {
+    const template =
+      dictionary["Molecule hint: look for {formula} as one connected group."];
+    return template?.replace("{formula}", moleculeHint[1]);
+  }
+
   const arrowPrefix = /^([←→]) (.+)$/.exec(source);
   if (arrowPrefix) {
     const label = translateTrimmed(arrowPrefix[2], language) ?? arrowPrefix[2];
