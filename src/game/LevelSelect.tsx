@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Eye, Orbit, Search, Sparkles } from "lucide-react";
 import { LEVELS, MOLECULE_CHALLENGE_BY_LEVEL, getCompoundChallengeKind } from "./levels";
 import { ELEMENTS } from "./elements";
@@ -11,6 +11,7 @@ import { PowerUpBadge } from "./PowerUpLibrary";
 import { useIsTabletLayout } from "./responsive";
 
 const SKIP_LEVEL_COIN_COST = 10;
+const CAMPAIGN_CHAPTER_SIZE = 20;
 
 function getMoleculeChallenge(levelId: number): CompoundDefinition | null {
   const id = MOLECULE_CHALLENGE_BY_LEVEL[levelId];
@@ -29,13 +30,29 @@ export function LevelSelect({
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [statsOpen, setStatsOpen] = useState(false);
   const [modalMessage, setModalMessage] = useState("");
+  const [activeChapter, setActiveChapter] = useState(() =>
+    Math.floor((Math.max(1, unlockedLevel) - 1) / CAMPAIGN_CHAPTER_SIZE),
+  );
+  const chapterCount = Math.ceil(LEVELS.length / CAMPAIGN_CHAPTER_SIZE);
+  const visibleLevels = useMemo(
+    () =>
+      LEVELS.slice(
+        activeChapter * CAMPAIGN_CHAPTER_SIZE,
+        (activeChapter + 1) * CAMPAIGN_CHAPTER_SIZE,
+      ),
+    [activeChapter],
+  );
+
+  useEffect(() => {
+    setActiveChapter(Math.floor((Math.max(1, unlockedLevel) - 1) / CAMPAIGN_CHAPTER_SIZE));
+  }, [unlockedLevel]);
 
   const MAP_W = isTabletLayout ? 700 : 360;
   const ROW_H = isTabletLayout ? 110 : 86;
   const COLS = [0.16, 0.39, 0.61, 0.84];
   const nodes = useMemo(
     () =>
-      LEVELS.map((lvl, i) => {
+      visibleLevels.map((lvl, i) => {
         const row = Math.floor(i / COLS.length);
         const colInRow = i % COLS.length;
         const colIdx = row % 2 === 0 ? colInRow : COLS.length - 1 - colInRow;
@@ -45,9 +62,9 @@ export function LevelSelect({
           y: 58 + row * ROW_H,
         };
       }),
-    [MAP_W, ROW_H],
+    [MAP_W, ROW_H, visibleLevels],
   );
-  const mapRows = Math.ceil(LEVELS.length / COLS.length);
+  const mapRows = Math.ceil(visibleLevels.length / COLS.length);
   const mapH = 112 + (mapRows - 1) * ROW_H;
 
   const pathD = useMemo(() => {
@@ -97,6 +114,62 @@ export function LevelSelect({
     <div className="app-shell" style={{ padding: isTabletLayout ? 24 : 16 }}>
       <div style={{ position: "relative", zIndex: 1, maxWidth: isTabletLayout ? 920 : 480, margin: "0 auto" }}>
         <Header title="Campaign Map" onBack={onBack} />
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: `repeat(${chapterCount}, minmax(0, 1fr))`,
+            gap: 6,
+            marginBottom: 12,
+          }}
+          aria-label="Campaign chapters"
+        >
+          {Array.from({ length: chapterCount }, (_, index) => {
+            const start = index * CAMPAIGN_CHAPTER_SIZE + 1;
+            const end = Math.min(LEVELS.length, start + CAMPAIGN_CHAPTER_SIZE - 1);
+            const chapterUnlocked = start <= unlockedLevel;
+            return (
+              <button
+                key={start}
+                type="button"
+                onClick={() => setActiveChapter(index)}
+                style={{
+                  minWidth: 0,
+                  padding: "8px 3px",
+                  borderRadius: 9,
+                  border: `1px solid ${activeChapter === index ? "var(--accent)" : "var(--border)"}`,
+                  background:
+                    activeChapter === index
+                      ? "color-mix(in oklch, var(--accent) 20%, var(--surface))"
+                      : "var(--surface)",
+                  color: chapterUnlocked ? "var(--foreground)" : "var(--muted-foreground)",
+                  fontFamily: "inherit",
+                  fontSize: 10,
+                  fontWeight: 900,
+                  cursor: "pointer",
+                  opacity: chapterUnlocked ? 1 : 0.65,
+                }}
+                aria-current={activeChapter === index ? "page" : undefined}
+                aria-label={`Chapter ${index + 1}, levels ${start} to ${end}`}
+              >
+                {start}-{end}
+              </button>
+            );
+          })}
+        </div>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 10,
+            marginBottom: 8,
+            color: "var(--muted-foreground)",
+            fontSize: 11,
+            fontWeight: 800,
+          }}
+        >
+          <span>{`Chapter ${activeChapter + 1}`}</span>
+          <span>{`${visibleLevels[0]?.id ?? 1}-${visibleLevels[visibleLevels.length - 1]?.id ?? LEVELS.length}`}</span>
+        </div>
         <div
           style={{
             position: "relative",

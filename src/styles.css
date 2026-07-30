@@ -448,6 +448,45 @@
     inset 0 -1px 0 oklch(0 0 0 / 0.36);
 }
 
+@keyframes reaction-board-impact {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.008);
+    box-shadow: 0 0 28px color-mix(in oklch, var(--accent) 45%, transparent);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes fusion-rush-pulse {
+  0%,
+  100% {
+    border-color: var(--game-panel-border, var(--border));
+  }
+  50% {
+    border-color: var(--accent);
+    box-shadow: 0 0 18px var(--accent-glow);
+  }
+}
+
+.game-board-surface.reaction-burst {
+  animation: reaction-board-impact 420ms ease-out;
+}
+
+.reaction-meter.fusion-rush-active {
+  animation: fusion-rush-pulse 900ms ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .game-board-surface.reaction-burst,
+  .reaction-meter.fusion-rush-active {
+    animation: none;
+  }
+}
+
 @media (min-width: 768px) {
   .app-shell {
     padding-left: max(24px, calc(env(safe-area-inset-left, 0px) + 24px));

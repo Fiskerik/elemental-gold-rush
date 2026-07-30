@@ -16,9 +16,13 @@ import { GameLibrary } from "@/game/GameLibrary";
 import { Profile } from "@/game/Profile";
 import { Leaderboard } from "@/game/DailyCompoundLeaderboard";
 import { GameModeId } from "@/game/challenges";
+import { COMPOUNDS } from "@/game/compounds";
+import { ElementBall } from "@/game/ElementBall";
 import { MOLECULE_CHALLENGE_BY_LEVEL, getCompoundChallengeKind, getLevelById } from "@/game/levels";
+import { MoleculeVisual } from "@/game/MoleculeVisual";
 import { useProgress } from "@/game/store";
 import { useDomLocalization } from "@/game/useDomLocalization";
+import { trackOnboardingComplete, trackOnboardingStep } from "@/game/analytics";
 
 type Screen =
   | { name: "menu" }
@@ -45,14 +49,18 @@ export function GameApp() {
   const soundVolume = useProgress((s) => s.soundVolume);
   const musicVolume = useProgress((s) => s.musicVolume);
   const completedGameCount = useProgress((s) => s.completedGameCount);
+  const levelStars = useProgress((s) => s.levelStars);
+  const onboardingSeen = useProgress((s) => s.onboardingSeen);
   const appReviewMilestonePromptSeen = useProgress((s) => s.appReviewMilestonePromptSeen);
   const appReviewMilestoneRewardClaimed = useProgress((s) => s.appReviewMilestoneRewardClaimed);
   const refreshDailyFeatures = useProgress((s) => s.refreshDailyFeatures);
+  const markOnboardingSeen = useProgress((s) => s.markOnboardingSeen);
   const markAppReviewMilestonePromptSeen = useProgress((s) => s.markAppReviewMilestonePromptSeen);
   const claimAppReviewMilestoneReward = useProgress((s) => s.claimAppReviewMilestoneReward);
   const [screen, setScreen] = useState<Screen>({ name: "menu" });
   const [gameRunNonce, setGameRunNonce] = useState(0);
   const [showLaunchScreen, setShowLaunchScreen] = useState(true);
+  const [onboardingStep, setOnboardingStep] = useState(0);
   const [resumePrompt, setResumePrompt] = useState<ReturnType<typeof getSavedRunSummary>>(null);
   const [appReviewMilestonePromptOpen, setAppReviewMilestonePromptOpen] = useState(false);
   const [appReviewRequested, setAppReviewRequested] = useState(false);
@@ -68,6 +76,10 @@ export function GameApp() {
   useEffect(() => {
     setMusicVolume(musicVolume / 100);
   }, [musicVolume]);
+
+  useEffect(() => {
+    if (!onboardingSeen) trackOnboardingStep(onboardingStep + 1);
+  }, [onboardingSeen, onboardingStep]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -94,7 +106,25 @@ export function GameApp() {
   if (showLaunchScreen) return <LaunchScreen />;
 
   const shouldShowAppReviewMilestone =
-    completedGameCount >= 4 && !appReviewMilestonePromptSeen && !appReviewMilestoneRewardClaimed;
+    completedGameCount >= 5 &&
+    Object.values(levelStars).some((stars) => stars >= 3) &&
+    !appReviewMilestonePromptSeen &&
+    !appReviewMilestoneRewardClaimed;
+
+  const onboardingPrompt = !onboardingSeen ? (
+    <FirstInstallOnboarding
+      stepIndex={onboardingStep}
+      onBack={() => setOnboardingStep((step) => Math.max(0, step - 1))}
+      onNext={() => {
+        if (onboardingStep < ONBOARDING_STEPS.length - 1) {
+          setOnboardingStep((step) => Math.min(ONBOARDING_STEPS.length - 1, step + 1));
+          return;
+        }
+        trackOnboardingComplete();
+        markOnboardingSeen();
+      }}
+    />
+  ) : null;
 
   const appReviewMilestonePrompt = appReviewMilestonePromptOpen ? (
     <AppReviewMilestonePrompt
@@ -118,6 +148,7 @@ export function GameApp() {
     return (
       <>
         {content}
+        {onboardingPrompt}
         {appReviewMilestonePrompt}
       </>
     );
@@ -300,6 +331,167 @@ export function GameApp() {
     case "settings":
       return withGlobalModals(<Settings onBack={() => setScreen({ name: "menu" })} />);
   }
+}
+
+const ONBOARDING_STEPS = [
+  {
+    title: "Reach the target atom",
+    copy: "Merge atoms upward until the board creates the target element for the stage.",
+    visual: "target",
+  },
+  {
+    title: "Build chain reactions",
+    copy: "Drop matching atoms together. Every merge can trigger the next one in line.",
+    visual: "chain",
+  },
+  {
+    title: "Complete the table",
+    copy: "Discover every atom, synthesize common molecules, and push your best score higher.",
+    visual: "collection",
+  },
+] as const;
+
+function FirstInstallOnboarding({
+  stepIndex,
+  onBack,
+  onNext,
+}: {
+  stepIndex: number;
+  onBack: () => void;
+  onNext: () => void;
+}) {
+  const step = ONBOARDING_STEPS[stepIndex];
+  const isLast = stepIndex === ONBOARDING_STEPS.length - 1;
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="first-install-onboarding-title"
+      style={onboardingBackdrop}
+    >
+      <section style={onboardingModal}>
+        <div style={onboardingEyebrow}>{`STEP ${stepIndex + 1} OF ${ONBOARDING_STEPS.length}`}</div>
+        <OnboardingVisual kind={step.visual} />
+        <h2 id="first-install-onboarding-title" style={onboardingTitle}>
+          {step.title}
+        </h2>
+        <p style={onboardingCopy}>{step.copy}</p>
+        <div style={onboardingDots} aria-label={`Onboarding step ${stepIndex + 1}`}>
+          {ONBOARDING_STEPS.map((item, index) => (
+            <span
+              key={item.title}
+              style={{
+                ...onboardingDot,
+                width: index === stepIndex ? 24 : 8,
+                background:
+                  index === stepIndex
+                    ? "linear-gradient(90deg, var(--accent), var(--primary))"
+                    : "var(--surface-high)",
+              }}
+            />
+          ))}
+        </div>
+        <div style={onboardingActions}>
+          <button
+            type="button"
+            onClick={onBack}
+            disabled={stepIndex === 0}
+            style={{
+              ...promptSecondaryBtn,
+              opacity: stepIndex === 0 ? 0.42 : 1,
+              cursor: stepIndex === 0 ? "default" : "pointer",
+            }}
+          >
+            Back
+          </button>
+          <button type="button" onClick={onNext} style={promptPrimaryBtn}>
+            {isLast ? "Start discovering" : "Next"}
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function OnboardingVisual({ kind }: { kind: (typeof ONBOARDING_STEPS)[number]["visual"] }) {
+  if (kind === "target") return <TargetOnboardingVisual />;
+  if (kind === "chain") return <ChainOnboardingVisual />;
+  return <CollectionOnboardingVisual />;
+}
+
+function TargetOnboardingVisual() {
+  return (
+    <div style={onboardingVisualFrame} aria-hidden="true">
+      <div style={onboardingMiniBoard}>
+        <span style={{ ...onboardingGridCell, gridColumn: "2", gridRow: "2" }}>
+          <ElementBall atomicNumber={1} size={34} glow />
+        </span>
+        <span style={{ ...onboardingGridCell, gridColumn: "3", gridRow: "2" }}>
+          <ElementBall atomicNumber={1} size={34} glow />
+        </span>
+        <span style={{ ...onboardingGridCell, gridColumn: "3", gridRow: "1" }}>
+          <ElementBall atomicNumber={2} size={34} glow />
+        </span>
+        <span style={onboardingTargetBadge}>TARGET</span>
+        <span style={{ position: "absolute", right: 18, top: 34 }}>
+          <ElementBall atomicNumber={3} size={50} glow />
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function ChainOnboardingVisual() {
+  return (
+    <div style={onboardingVisualFrame} aria-hidden="true">
+      <div style={chainLane}>
+        <span style={{ ...chainAtomSlot, left: "9%", top: "48%" }}>
+          <ElementBall atomicNumber={1} size={30} glow />
+        </span>
+        <span style={{ ...chainAtomSlot, left: "24%", top: "48%" }}>
+          <ElementBall atomicNumber={1} size={30} glow />
+        </span>
+        <span style={{ ...chainAtomSlot, left: "40%", top: "32%" }}>
+          <ElementBall atomicNumber={2} size={34} glow />
+        </span>
+        <span style={{ ...chainAtomSlot, left: "56%", top: "32%" }}>
+          <ElementBall atomicNumber={2} size={34} glow />
+        </span>
+        <span style={{ ...chainAtomSlot, left: "73%", top: "18%" }}>
+          <ElementBall atomicNumber={3} size={42} glow />
+        </span>
+        <span style={{ ...chainSpark, left: "31%", top: "55%" }} />
+        <span style={{ ...chainSpark, left: "63%", top: "39%" }} />
+      </div>
+    </div>
+  );
+}
+
+function CollectionOnboardingVisual() {
+  const water = COMPOUNDS.find((compound) => compound.id === "water") ?? COMPOUNDS[0];
+  return (
+    <div style={onboardingVisualFrame} aria-hidden="true">
+      <div style={tableVisualGrid}>
+        {Array.from({ length: 28 }, (_, index) => (
+          <span
+            key={index}
+            style={{
+              ...tableVisualCell,
+              background:
+                index < 14
+                  ? "linear-gradient(135deg, color-mix(in oklch, var(--primary) 42%, var(--surface-high)), var(--surface-high))"
+                  : "var(--surface)",
+              borderColor: index < 14 ? "var(--primary)" : "var(--border)",
+            }}
+          />
+        ))}
+      </div>
+      <span style={moleculeBadge}>
+        <MoleculeVisual compound={water} size={70} />
+      </span>
+      <span style={scoreBadge}>HIGH SCORE</span>
+    </div>
+  );
 }
 
 function LaunchScreen() {
@@ -539,4 +731,173 @@ const coinAmount: CSSProperties = {
   alignItems: "center",
   justifyContent: "center",
   gap: 7,
+};
+
+const onboardingBackdrop: CSSProperties = {
+  position: "fixed",
+  inset: 0,
+  zIndex: 2300,
+  display: "grid",
+  placeItems: "center",
+  padding: 20,
+  background: "rgba(0,0,0,0.74)",
+  backdropFilter: "blur(7px)",
+};
+
+const onboardingModal: CSSProperties = {
+  width: "100%",
+  maxWidth: 370,
+  display: "grid",
+  justifyItems: "center",
+  gap: 12,
+  padding: 20,
+  borderRadius: 18,
+  border: "1px solid color-mix(in oklch, var(--accent) 48%, var(--border))",
+  background:
+    "linear-gradient(150deg, color-mix(in oklch, var(--primary) 10%, var(--surface-elevated)), var(--surface))",
+  boxShadow: "0 24px 70px rgba(0,0,0,0.58), 0 0 36px var(--primary-glow)",
+  textAlign: "center",
+};
+
+const onboardingEyebrow: CSSProperties = {
+  fontSize: 10,
+  letterSpacing: 2.4,
+  color: "var(--accent)",
+  fontWeight: 900,
+};
+
+const onboardingTitle: CSSProperties = {
+  margin: "2px 0 0",
+  fontSize: 24,
+  lineHeight: 1.1,
+  fontWeight: 950,
+};
+
+const onboardingCopy: CSSProperties = {
+  margin: 0,
+  color: "var(--muted-foreground)",
+  fontSize: 14,
+  lineHeight: 1.45,
+};
+
+const onboardingVisualFrame: CSSProperties = {
+  position: "relative",
+  width: "min(100%, 270px)",
+  aspectRatio: "1.55",
+  overflow: "hidden",
+  borderRadius: 16,
+  border: "1px solid var(--border)",
+  background:
+    "radial-gradient(circle at 50% 52%, color-mix(in oklch, var(--primary) 24%, transparent), transparent 58%), linear-gradient(180deg, var(--surface-high), var(--surface))",
+  boxShadow: "inset 0 0 24px color-mix(in oklch, var(--primary) 18%, transparent)",
+};
+
+const onboardingMiniBoard: CSSProperties = {
+  position: "absolute",
+  inset: 12,
+  display: "grid",
+  gridTemplateColumns: "repeat(4, 1fr)",
+  gridTemplateRows: "repeat(3, 1fr)",
+  gap: 6,
+  borderRadius: 12,
+  backgroundImage:
+    "linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px)",
+  backgroundSize: "32px 32px",
+};
+
+const onboardingGridCell: CSSProperties = {
+  display: "grid",
+  placeItems: "center",
+};
+
+const onboardingTargetBadge: CSSProperties = {
+  position: "absolute",
+  right: 14,
+  top: 12,
+  padding: "5px 8px",
+  borderRadius: 999,
+  background: "linear-gradient(135deg, var(--accent), var(--primary))",
+  color: "var(--primary-foreground)",
+  fontSize: 9,
+  fontWeight: 950,
+};
+
+const chainLane: CSSProperties = {
+  position: "absolute",
+  inset: 0,
+  background:
+    "linear-gradient(110deg, transparent 0 17%, color-mix(in oklch, var(--accent) 44%, transparent) 18% 21%, transparent 22% 49%, color-mix(in oklch, var(--primary) 48%, transparent) 50% 53%, transparent 54%)",
+};
+
+const chainAtomSlot: CSSProperties = {
+  position: "absolute",
+  display: "grid",
+  placeItems: "center",
+};
+
+const chainSpark: CSSProperties = {
+  position: "absolute",
+  width: 24,
+  height: 24,
+  borderRadius: 999,
+  background: "radial-gradient(circle, var(--accent), transparent 65%)",
+  boxShadow: "0 0 20px var(--accent-glow)",
+};
+
+const tableVisualGrid: CSSProperties = {
+  position: "absolute",
+  left: 14,
+  top: 14,
+  width: 150,
+  display: "grid",
+  gridTemplateColumns: "repeat(7, 1fr)",
+  gap: 4,
+};
+
+const tableVisualCell: CSSProperties = {
+  aspectRatio: "1",
+  borderRadius: 4,
+  border: "1px solid var(--border)",
+  boxShadow: "0 0 8px color-mix(in oklch, var(--primary) 20%, transparent)",
+};
+
+const moleculeBadge: CSSProperties = {
+  position: "absolute",
+  right: 18,
+  top: 28,
+};
+
+const scoreBadge: CSSProperties = {
+  position: "absolute",
+  right: 18,
+  bottom: 18,
+  padding: "7px 10px",
+  borderRadius: 10,
+  background: "var(--surface-elevated)",
+  border: "1px solid color-mix(in oklch, var(--accent) 60%, var(--border))",
+  color: "var(--accent)",
+  fontSize: 10,
+  fontWeight: 950,
+  boxShadow: "0 0 16px var(--accent-glow)",
+};
+
+const onboardingDots: CSSProperties = {
+  display: "flex",
+  justifyContent: "center",
+  gap: 6,
+  marginTop: 2,
+};
+
+const onboardingDot: CSSProperties = {
+  height: 8,
+  borderRadius: 999,
+  transition: "width 180ms ease, background 180ms ease",
+};
+
+const onboardingActions: CSSProperties = {
+  width: "100%",
+  display: "grid",
+  gridTemplateColumns: "0.8fr 1.2fr",
+  gap: 10,
+  marginTop: 2,
 };

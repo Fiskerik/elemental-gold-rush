@@ -381,7 +381,12 @@ function makeAtomLevel(seed: LevelSeed, id: number, atomStage: number): Level {
     parShots,
     starShotsThree,
     starShotsTwo,
-    parTimeSec: parShots * 5,
+    parTimeSec:
+      id === 1
+        ? 90
+        : id <= 5
+          ? 180 + (id - 2) * 40
+          : Math.min(8 * 60, 6 * 60 + Math.floor(difficulty / 10) * 20),
     scoreGoal: Math.round((520 + target * 290 + difficulty * 420) * scoreMultiplier),
     comboGoal: Math.min(6, 2 + Math.floor(atomStage / 10)),
   };

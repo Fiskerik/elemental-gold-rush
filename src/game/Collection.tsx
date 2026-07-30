@@ -10,6 +10,8 @@ import { useIsTabletLayout } from "./responsive";
 import { getElementCollectionDetails } from "./elementDetails";
 import { t } from "./localization";
 
+type CollectionView = "elements" | "compounds" | "badges";
+
 export function Collection({ onBack }: { onBack: () => void }) {
   const isTabletLayout = useIsTabletLayout();
   const {
@@ -26,6 +28,8 @@ export function Collection({ onBack }: { onBack: () => void }) {
   const [selected, setSelected] = useState<number | null>(null);
   const [selectedCompound, setSelectedCompound] = useState<CompoundDefinition | null>(null);
   const [purchaseMessage, setPurchaseMessage] = useState("");
+  const [collectionView, setCollectionView] = useState<CollectionView>("elements");
+  const [periodFilter, setPeriodFilter] = useState<number | "all">("all");
   const found = new Set(discoveredElements);
   const foundCompounds = new Set(discoveredCompounds);
   const earned = new Set(earnedBadges);
@@ -39,6 +43,10 @@ export function Collection({ onBack }: { onBack: () => void }) {
     : null;
   const lockedElementCount = ELEMENTS.length - discoveredElements.length;
   const lockedCompoundCount = COMPOUNDS.length - discoveredCompounds.length;
+  const visibleElements =
+    isTabletLayout || periodFilter === "all"
+      ? ELEMENTS
+      : ELEMENTS.filter((element) => element.period === periodFilter);
 
   function handleUnlockElements() {
     const unlocked = unlockLockedElementsForCoins(50);
@@ -130,17 +138,71 @@ export function Collection({ onBack }: { onBack: () => void }) {
         </section>
 
         {/* Real periodic-table layout: 18 columns × 7 periods + lanthanide/actinide rows */}
+        <nav style={collectionTabs} aria-label="Collection sections">
+          {(
+            [
+              ["elements", `Elements ${discoveredElements.length}/118`],
+              ["compounds", `Molecules ${discoveredCompounds.length}/${COMPOUNDS.length}`],
+              ["badges", `Badges ${earnedBadges.length}/${BADGES.length}`],
+            ] as const
+          ).map(([view, label]) => (
+            <button
+              key={view}
+              type="button"
+              onClick={() => setCollectionView(view)}
+              aria-current={collectionView === view ? "page" : undefined}
+              style={{
+                ...collectionTabBtn,
+                borderColor: collectionView === view ? "var(--accent)" : "var(--border)",
+                background:
+                  collectionView === view
+                    ? "color-mix(in oklch, var(--accent) 18%, var(--surface))"
+                    : "var(--surface)",
+                color:
+                  collectionView === view ? "var(--foreground)" : "var(--muted-foreground)",
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </nav>
+
+        {collectionView === "elements" && (
+          <>
+            {!isTabletLayout && (
+              <div style={periodFilterRow} aria-label="Filter elements by period">
+                {(["all", 1, 2, 3, 4, 5, 6, 7] as const).map((period) => (
+                  <button
+                    key={period}
+                    type="button"
+                    onClick={() => setPeriodFilter(period)}
+                    style={{
+                      ...periodFilterBtn,
+                      borderColor: periodFilter === period ? "var(--accent)" : "var(--border)",
+                      color:
+                        periodFilter === period
+                          ? "var(--foreground)"
+                          : "var(--muted-foreground)",
+                    }}
+                  >
+                    {period === "all" ? "All" : `P${period}`}
+                  </button>
+                ))}
+              </div>
+            )}
         <div style={{ paddingBottom: 8 }}>
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(18, minmax(0, 1fr))",
+              gridTemplateColumns: isTabletLayout
+                ? "repeat(18, minmax(0, 1fr))"
+                : "repeat(4, minmax(0, 1fr))",
               gridAutoRows: "1fr",
-              gap: 2,
+              gap: isTabletLayout ? 2 : 8,
               width: "100%",
             }}
           >
-            {ELEMENTS.map((e) => {
+            {visibleElements.map((e) => {
               const isFound = found.has(e.atomicNumber);
               // Place lanthanides (57–71) and actinides (89–103) in their own rows below.
               let row: number;
@@ -160,11 +222,11 @@ export function Collection({ onBack }: { onBack: () => void }) {
                   key={e.atomicNumber}
                   onClick={() => setSelected(e.atomicNumber)}
                   style={{
-                    gridColumn: col,
-                    gridRow: row,
+                    gridColumn: isTabletLayout ? col : undefined,
+                    gridRow: isTabletLayout ? row : undefined,
                     aspectRatio: "1 / 1",
                     border: `1px solid ${isFound ? e.color : "var(--border)"}`,
-                    borderRadius: 4,
+                    borderRadius: isTabletLayout ? 4 : 8,
                     background: isFound ? `${e.color}33` : "var(--surface)",
                     color: isFound ? "var(--foreground)" : "var(--muted-foreground)",
                     display: "flex",
@@ -176,15 +238,21 @@ export function Collection({ onBack }: { onBack: () => void }) {
                     minWidth: 0,
                   }}
                 >
-                  <div style={{ fontSize: 7, opacity: 0.7, lineHeight: 1 }}>{e.atomicNumber}</div>
-                  <div style={{ fontSize: 10, fontWeight: 800, lineHeight: 1.1 }}>
+                  <div
+                    style={{ fontSize: isTabletLayout ? 7 : 10, opacity: 0.7, lineHeight: 1 }}
+                  >
+                    {e.atomicNumber}
+                  </div>
+                  <div
+                    style={{ fontSize: isTabletLayout ? 10 : 18, fontWeight: 800, lineHeight: 1.1 }}
+                  >
                     {isFound ? e.symbol : "?"}
                   </div>
                 </button>
               );
             })}
             {/* Placeholder markers in main table for lanthanide/actinide series */}
-            <div
+            {isTabletLayout && <div
               style={{
                 gridColumn: 3,
                 gridRow: 6,
@@ -199,8 +267,8 @@ export function Collection({ onBack }: { onBack: () => void }) {
               }}
             >
               57–71
-            </div>
-            <div
+            </div>}
+            {isTabletLayout && <div
               style={{
                 gridColumn: 3,
                 gridRow: 7,
@@ -215,11 +283,13 @@ export function Collection({ onBack }: { onBack: () => void }) {
               }}
             >
               89–103
-            </div>
+            </div>}
           </div>
         </div>
+          </>
+        )}
 
-        <section style={{ marginTop: 18 }}>
+        {collectionView === "compounds" && <section style={{ marginTop: 18 }}>
           <div
             style={{
               fontSize: 11,
@@ -288,10 +358,10 @@ export function Collection({ onBack }: { onBack: () => void }) {
               );
             })}
           </div>
-        </section>
+        </section>}
 
         {/* Badges */}
-        <div style={{ marginTop: 20 }}>
+        {collectionView === "badges" && <div style={{ marginTop: 20 }}>
           <div
             style={{
               fontSize: 11,
@@ -407,7 +477,7 @@ export function Collection({ onBack }: { onBack: () => void }) {
               );
             })}
           </div>
-        </div>
+        </div>}
       </div>
 
       {el && (
@@ -692,6 +762,46 @@ const collectionWalletPill: CSSProperties = {
   color: "var(--accent)",
   fontSize: 12,
   fontWeight: 900,
+};
+
+const collectionTabs: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+  gap: 7,
+  marginBottom: 12,
+};
+
+const collectionTabBtn: CSSProperties = {
+  minWidth: 0,
+  minHeight: 42,
+  padding: "7px 4px",
+  border: "1px solid var(--border)",
+  borderRadius: 9,
+  fontFamily: "inherit",
+  fontSize: 10,
+  lineHeight: 1.2,
+  fontWeight: 900,
+  cursor: "pointer",
+};
+
+const periodFilterRow: CSSProperties = {
+  display: "flex",
+  gap: 6,
+  overflowX: "auto",
+  paddingBottom: 10,
+};
+
+const periodFilterBtn: CSSProperties = {
+  flex: "0 0 auto",
+  minWidth: 42,
+  minHeight: 34,
+  border: "1px solid var(--border)",
+  borderRadius: 9,
+  background: "var(--surface)",
+  fontFamily: "inherit",
+  fontSize: 11,
+  fontWeight: 850,
+  cursor: "pointer",
 };
 
 const collectionUnlockPanel: CSSProperties = {
