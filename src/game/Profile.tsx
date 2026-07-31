@@ -80,6 +80,7 @@ export function Profile({ onBack, onOpenShop }: Props) {
     setBoardTheme,
     setAtomSkin,
     setAppLanguage,
+    toggleProPack,
   } = useProgress();
   const tr = (text: string) => t(text, appLanguage);
   const intlLocale = toIntlLocale(appLanguage);
@@ -539,6 +540,29 @@ export function Profile({ onBack, onOpenShop }: Props) {
               ))}
             </select>
           </label>
+        </section>
+
+        <section
+          style={{
+            ...card,
+            borderColor: "color-mix(in oklch, var(--warning) 52%, var(--border))",
+          }}
+        >
+          <div style={sectionHeading}>DEBUG</div>
+          <div style={{ color: "var(--muted-foreground)", fontSize: 12, lineHeight: 1.4 }}>
+            Temporarily toggle the local Pro Lab Pack entitlement while comparing game performance.
+          </div>
+          <button
+            type="button"
+            onClick={toggleProPack}
+            style={{
+              ...debugToggleButton,
+              color: hasProPack ? "var(--destructive)" : "var(--success)",
+              borderColor: hasProPack ? "var(--destructive)" : "var(--success)",
+            }}
+          >
+            {hasProPack ? "Remove Lab Pro pack" : "Restore Lab Pro pack"}
+          </button>
         </section>
 
         {transactionsOpen && (
@@ -1088,6 +1112,18 @@ const sectionHeading: React.CSSProperties = {
   color: "var(--accent)",
   fontWeight: 900,
   marginBottom: 8,
+};
+
+const debugToggleButton: React.CSSProperties = {
+  width: "100%",
+  marginTop: 12,
+  minHeight: 38,
+  border: "1px dashed var(--border)",
+  borderRadius: 10,
+  background: "transparent",
+  fontSize: 12,
+  fontWeight: 900,
+  cursor: "pointer",
 };
 
 const transactionButton: React.CSSProperties = {

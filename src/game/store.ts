@@ -432,6 +432,7 @@ interface ProgressState {
     date?: string,
   ) => void;
   grantProPack: () => void;
+  toggleProPack: () => void;
   recordGameAttemptForAd: () => void;
   markInterstitialShown: () => void;
   addInventoryPowerUps: (powerUps: Partial<Record<InventoryPowerUpId, number>>) => void;
@@ -1082,6 +1083,9 @@ export const useProgress = create<ProgressState>()(
             labUpgradeLevels,
           };
         }),
+      // Temporary local debug switch. It changes only the entitlement flag so
+      // Pro Pack performance can be compared without altering purchases.
+      toggleProPack: () => set((s) => ({ hasProPack: !s.hasProPack })),
       recordGameAttemptForAd: () =>
         set((s) => ({ clearedStagesSinceAd: s.clearedStagesSinceAd + 1 })),
       markInterstitialShown: () => set({ clearedStagesSinceAd: 0 }),
