@@ -438,6 +438,12 @@
   --game-danger-line: oklch(0.78 0.17 32 / 0.84);
 }
 
+/* Keep the original 1.1.0 presentation for the three default themes. */
+.game-board-shell:is(.board-theme-reactor, .board-theme-cryo, .board-theme-forge) {
+  --game-board-emblem: "";
+  --game-board-motif: none;
+}
+
 .game-board-shell.board-theme-goldLab {
   --game-shell-bg:
     radial-gradient(circle at 35% 12%, oklch(0.68 0.15 350 / 0.2), transparent 32%),
@@ -622,7 +628,8 @@
 }
 
 .game-projectile {
-  contain: layout paint;
+  contain: layout;
+  overflow: visible;
   transform-origin: 0 0;
 }
 

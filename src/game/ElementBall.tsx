@@ -64,6 +64,7 @@ export const ElementBall = memo(function ElementBall({
     ? Math.abs(Math.floor(patternSeed!))
     : atomicNumber;
   const patternIndex = (patternValue * 17 + atomicNumber * 31) % 4;
+  const useTextStroke = atomSkin === "chrome" || atomSkin === "mineral" || atomSkin === "toxic";
   const baseBackground = `radial-gradient(circle at 30% 28%, ${el.glowColor}, ${el.color} 65%, oklch(0 0 0 / 0.35))`;
   const skinBackground: Record<AtomSkin, string> = {
     classic: baseBackground,
@@ -175,8 +176,10 @@ export const ElementBall = memo(function ElementBall({
           fontSize: numberSize,
           lineHeight: 1,
           opacity: 0.85,
-          WebkitTextStroke: `${Math.max(0.7, size * 0.035)}px ${atomSkin === "mineral" ? "rgba(18,10,3,0.92)" : "rgba(255,255,255,0.9)"}`,
-          paintOrder: "stroke fill",
+          WebkitTextStroke: useTextStroke
+            ? `${Math.max(0.7, size * 0.035)}px ${atomSkin === "mineral" ? "rgba(18,10,3,0.92)" : "rgba(255,255,255,0.9)"}`
+            : undefined,
+          paintOrder: useTextStroke ? "stroke fill" : undefined,
         }}
       >
         {el.atomicNumber}
@@ -189,8 +192,10 @@ export const ElementBall = memo(function ElementBall({
           fontSize: symbolSize,
           lineHeight: 1,
           fontWeight: 900,
-          WebkitTextStroke: `${Math.max(0.8, size * 0.04)}px ${atomSkin === "mineral" ? "rgba(18,10,3,0.92)" : "rgba(255,255,255,0.9)"}`,
-          paintOrder: "stroke fill",
+          WebkitTextStroke: useTextStroke
+            ? `${Math.max(0.8, size * 0.04)}px ${atomSkin === "mineral" ? "rgba(18,10,3,0.92)" : "rgba(255,255,255,0.9)"}`
+            : undefined,
+          paintOrder: useTextStroke ? "stroke fill" : undefined,
         }}
       >
         {el.symbol}
@@ -204,8 +209,10 @@ export const ElementBall = memo(function ElementBall({
             fontSize: numberSize * 0.85,
             lineHeight: 1,
             opacity: 0.7,
-            WebkitTextStroke: `${Math.max(0.6, size * 0.03)}px ${atomSkin === "mineral" ? "rgba(18,10,3,0.92)" : "rgba(255,255,255,0.9)"}`,
-            paintOrder: "stroke fill",
+            WebkitTextStroke: useTextStroke
+              ? `${Math.max(0.6, size * 0.03)}px ${atomSkin === "mineral" ? "rgba(18,10,3,0.92)" : "rgba(255,255,255,0.9)"}`
+              : undefined,
+            paintOrder: useTextStroke ? "stroke fill" : undefined,
           }}
         >
           {el.atomicMass}
