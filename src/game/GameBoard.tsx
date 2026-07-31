@@ -31,11 +31,15 @@ import {
   emptyPowerUpInventory,
   isAtomSkinUnlocked,
   isBoardThemeUnlocked,
+  type AtomSkin,
+  type BoardTheme,
   type InventoryPowerUpId,
   type LabUpgradeId,
   type PowerUpInventory,
   useProgress,
 } from "./store";
+import type { ProductId } from "./products";
+import { AtomSkinPicker, BoardThemePicker } from "./Settings";
 import { playShootSound, primeAudio, startAmbientMusic, stopAmbientMusic, vibrate } from "./audio";
 import { playFeedback, type FeedbackEvent } from "./feedback";
 import { GameModeId, getGameMode, getModeLevelLabel } from "./challenges";
@@ -1281,6 +1285,8 @@ function StandardGameBoard({
     boardTheme,
     atomSkin,
     ownedThemeProducts,
+    setBoardTheme,
+    setAtomSkin,
     clearedStagesSinceAd,
     markInterstitialShown,
   } = useProgress();
@@ -6003,7 +6009,7 @@ function StandardGameBoard({
       if (dy >= -2) return; // pointer below launcher — ignore
       const angle = (Math.atan2(dx, -dy) * 180) / Math.PI;
       const clamped = Math.max(-MAX_AIM_DEG, Math.min(MAX_AIM_DEG, angle));
-      setAimDeg(clamped);
+      setAimDeg((current) => (Math.abs(current - clamped) < 0.15 ? current : clamped));
     },
     [launcherX, launcherY],
   );
@@ -6544,6 +6550,7 @@ function StandardGameBoard({
             userSelect: "none",
           }}
         >
+          <div aria-hidden="true" className="game-board-theme-emblem" />
           {/* danger zone shading near the launcher (bottom) */}
           <div
             className={
@@ -7576,11 +7583,17 @@ function StandardGameBoard({
             musicEnabled={musicEnabled}
             soundEnabled={soundEnabled}
             shootingStyle={shootingStyle}
+            boardTheme={activeBoardTheme}
+            atomSkin={activeAtomSkin}
+            hasProPack={hasProPack}
+            ownedThemeProducts={ownedThemeProducts}
             onToggleMusic={toggleInGameMusic}
             onToggleSound={toggleSound}
             onToggleShootingStyle={() =>
               setShootingStyle(shootingStyle === "hold" ? "press" : "hold")
             }
+            onBoardThemeChange={setBoardTheme}
+            onAtomSkinChange={setAtomSkin}
             onClose={() => setSettingsOpen(false)}
             onRestart={() => setConfirmAction("restart")}
             onLeave={() => setConfirmAction("leave")}
@@ -9476,9 +9489,15 @@ function InGameSettingsModal({
   musicEnabled,
   soundEnabled,
   shootingStyle,
+  boardTheme,
+  atomSkin,
+  hasProPack,
+  ownedThemeProducts,
   onToggleMusic,
   onToggleSound,
   onToggleShootingStyle,
+  onBoardThemeChange,
+  onAtomSkinChange,
   onClose,
   onRestart,
   onLeave,
@@ -9486,9 +9505,15 @@ function InGameSettingsModal({
   musicEnabled: boolean;
   soundEnabled: boolean;
   shootingStyle: "hold" | "press";
+  boardTheme: BoardTheme;
+  atomSkin: AtomSkin;
+  hasProPack: boolean;
+  ownedThemeProducts: ProductId[];
   onToggleMusic: () => void;
   onToggleSound: () => void;
   onToggleShootingStyle: () => void;
+  onBoardThemeChange: (theme: BoardTheme) => void;
+  onAtomSkinChange: (skin: AtomSkin) => void;
   onClose: () => void;
   onRestart: () => void;
   onLeave: () => void;
@@ -9529,6 +9554,20 @@ function InGameSettingsModal({
             </small>
           </span>
         </label>
+      </div>
+      <div style={{ display: "grid", gap: 10, marginTop: 14 }}>
+        <BoardThemePicker
+          value={boardTheme}
+          hasProPack={hasProPack}
+          ownedThemeProducts={ownedThemeProducts}
+          onChange={onBoardThemeChange}
+        />
+        <AtomSkinPicker
+          value={atomSkin}
+          hasProPack={hasProPack}
+          ownedThemeProducts={ownedThemeProducts}
+          onChange={onAtomSkinChange}
+        />
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10, marginTop: 16 }}>
         <button type="button" onClick={onClose} style={{ ...modalBtn, marginTop: 0 }}>

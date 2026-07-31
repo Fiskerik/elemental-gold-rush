@@ -684,7 +684,11 @@ export const useProgress = create<ProgressState>()(
         set((s) => {
           const target = ELEMENTS.find((element) => element.atomicNumber === atomicNumber);
           const normalizedCost = Math.max(0, Math.floor(coinCost));
-          if (!target || s.discoveredElements.includes(atomicNumber) || s.goldCoins < normalizedCost) {
+          if (
+            !target ||
+            s.discoveredElements.includes(atomicNumber) ||
+            s.goldCoins < normalizedCost
+          ) {
             return s;
           }
           const current = new Set(s.discoveredElements);
@@ -718,7 +722,11 @@ export const useProgress = create<ProgressState>()(
         set((s) => {
           const target = COMPOUNDS.find((compound) => compound.id === compoundId);
           const normalizedCost = Math.max(0, Math.floor(coinCost));
-          if (!target || s.discoveredCompounds.includes(compoundId) || s.goldCoins < normalizedCost) {
+          if (
+            !target ||
+            s.discoveredCompounds.includes(compoundId) ||
+            s.goldCoins < normalizedCost
+          ) {
             return s;
           }
           const current = new Set(s.discoveredCompounds);
@@ -1127,9 +1135,18 @@ export const useProgress = create<ProgressState>()(
         set(() => ({ musicVolume: Math.max(0, Math.min(100, Math.round(volume))) })),
       setAppTheme: (theme) => set({ appTheme: theme }),
       setBoardTheme: (theme) =>
-        set((s) => ({
-          boardTheme: isBoardTheme(theme) && isBoardThemeUnlocked(theme, s) ? theme : "reactor",
-        })),
+        set((s) => {
+          const boardTheme =
+            isBoardTheme(theme) && isBoardThemeUnlocked(theme, s) ? theme : "reactor";
+          const bundledAtomSkin = ATOM_SKIN_BY_BOARD_THEME[boardTheme];
+          return {
+            boardTheme,
+            atomSkin:
+              bundledAtomSkin && isAtomSkinUnlocked(bundledAtomSkin, s)
+                ? bundledAtomSkin
+                : s.atomSkin,
+          };
+        }),
       setAtomSkin: (skin) =>
         set((s) => ({
           atomSkin: isAtomSkin(skin) && isAtomSkinUnlocked(skin, s) ? skin : "classic",

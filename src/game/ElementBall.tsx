@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { ELEMENTS } from "./elements";
 import type { AtomSkin } from "./store";
 
@@ -22,7 +23,7 @@ function isotopeChargeCapacity(period: number): number {
   return 16;
 }
 
-export function ElementBall({
+export const ElementBall = memo(function ElementBall({
   atomicNumber,
   size = 44,
   glow = false,
@@ -57,10 +58,14 @@ export function ElementBall({
   const unstableDashArray = Array.from({ length: unstableMaxSegments }, (_, index) =>
     index < unstableSegments ? `${unstableDash} ${unstableGap}` : `0 ${unstableSegment}`,
   ).join(" ");
-  const skinRing =
-    atomSkin === "classic"
-      ? ""
-      : `, 0 0 0 ${Math.max(1, size * 0.025)}px oklch(1 0 0 / 0.34), inset 0 0 ${size * 0.16}px oklch(1 0 0 / 0.16)`;
+  const skinRingWidth = Math.max(1, size * 0.025);
+  const skinRing: Record<AtomSkin, string> = {
+    classic: "",
+    chrome: `, 0 0 0 ${skinRingWidth}px oklch(1 0 0 / 0.58), inset 0 0 ${size * 0.18}px oklch(1 0 0 / 0.25)`,
+    hologram: `, 0 0 0 ${skinRingWidth}px oklch(0.86 0.18 205 / 0.68), 0 0 ${size * 0.16}px oklch(0.72 0.2 315 / 0.34)`,
+    crystal: `, 0 0 0 ${skinRingWidth}px oklch(1 0 0 / 0.7), inset 0 0 ${size * 0.22}px oklch(1 0 0 / 0.3)`,
+    toxic: `, 0 0 0 ${skinRingWidth}px oklch(0.82 0.18 138 / 0.7), inset 0 0 ${size * 0.18}px oklch(0.22 0.07 135 / 0.28)`,
+  };
   return (
     <div
       onClick={onClick}
@@ -81,7 +86,7 @@ export function ElementBall({
           (glow
             ? `0 0 ${size * 0.45}px ${el.glowColor}99, inset 0 -${size * 0.12}px ${size * 0.12}px oklch(0 0 0 / 0.35)`
             : `0 ${size * 0.06}px ${size * 0.12}px oklch(0 0 0 / 0.45), inset 0 -${size * 0.1}px ${size * 0.12}px oklch(0 0 0 / 0.3), inset 0 ${size * 0.08}px ${size * 0.1}px oklch(1 0 0 / 0.18)`) +
-          skinRing,
+          skinRing[atomSkin],
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
@@ -140,12 +145,8 @@ export function ElementBall({
           />
         </svg>
       )}
-      <div style={{ fontSize: numberSize, lineHeight: 1, opacity: 0.85 }}>
-        {el.atomicNumber}
-      </div>
-      <div style={{ fontSize: symbolSize, lineHeight: 1, fontWeight: 900 }}>
-        {el.symbol}
-      </div>
+      <div style={{ fontSize: numberSize, lineHeight: 1, opacity: 0.85 }}>{el.atomicNumber}</div>
+      <div style={{ fontSize: symbolSize, lineHeight: 1, fontWeight: 900 }}>{el.symbol}</div>
       {showMass && (
         <div style={{ fontSize: numberSize * 0.85, lineHeight: 1, opacity: 0.7 }}>
           {el.atomicMass}
@@ -153,4 +154,4 @@ export function ElementBall({
       )}
     </div>
   );
-}
+});

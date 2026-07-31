@@ -96,7 +96,7 @@ export const DAILY_COMPOUND_LEADERBOARD_IDS: Record<GameCenterLeaderboardScope, 
     configuredEnvValue(
       import.meta.env.VITE_GAME_CENTER_DAILY_COMPOUND_GLOBAL_LEADERBOARD_ID,
       import.meta.env.VITE_DAILY_COMPOUND_GLOBAL_LEADERBOARD_ID,
-    ) || "daily_leaderboard_local",
+    ) || "daily_compound_fastest",
   local: configuredEnvValue(
     import.meta.env.VITE_GAME_CENTER_DAILY_COMPOUND_LOCAL_LEADERBOARD_ID,
     import.meta.env.VITE_DAILY_COMPOUND_LOCAL_LEADERBOARD_ID,
