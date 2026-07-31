@@ -28,6 +28,7 @@ export function Leaderboard({ onBack }: { onBack: () => void }) {
 
   useEffect(() => {
     let cancelled = false;
+    setBoard(getDailyLeaderboard(kind, scope));
     setLoading(true);
     void loadDailyLeaderboard(kind, scope)
       .then((nextBoard) => {

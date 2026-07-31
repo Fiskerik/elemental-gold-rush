@@ -138,7 +138,7 @@ export const COMPOUNDS: CompoundDefinition[] = [
   compound("nitric-acid", "Nitric Acid", "HNO₃", { H: 1, N: 1, O: 3 }, 3400, "rare", "Nitric acid is a strong oxidizing acid used to make fertilizers and explosives."),
   compound("sodium-carbonate", "Sodium Carbonate", "Na₂CO₃", { Na: 2, C: 1, O: 3 }, 3500, "rare", "Sodium carbonate, or soda ash, is used in glassmaking and cleaning products."),
   compound("ethanol", "Ethanol", "C₂H₆O", { C: 2, H: 6, O: 1 }, 3600, "rare", "Ethanol is the alcohol in beverages and is also used as a fuel and solvent."),
-  compound("titanium-dioxide", "Titanium Dioxide", "TiO₂", { Ti: 1, O: 2 }, 2400, "uncommon", "Titanium dioxide is the bright white pigment in paint, toothpaste, and sunscreen."),
+  compound("titanium-dioxide", "Titanium Dioxide", "TiO₂", { Ti: 1, O: 2 }, 2400, "uncommon", "Titanium dioxide is a bright white compound used to impart whiteness to food products, cosmetics, personal-care products, toothpaste, paint, and sunscreen."),
   compound("zinc-oxide", "Zinc Oxide", "ZnO", { Zn: 1, O: 1 }, 2300, "uncommon", "Zinc oxide is used in diaper rash cream, calamine lotion, and sunscreen."),
   compound("aluminum-oxide", "Aluminum Oxide", "Al₂O₃", { Al: 2, O: 3 }, 2800, "uncommon", "Aluminum oxide (alumina) is extremely hard and used in sandpaper and many gemstones like sapphire."),
   compound("ethylene", "Ethylene", "C₂H₄", { C: 2, H: 4 }, 2200, "uncommon", "Ethylene is the gas that makes fruit ripen faster (bananas in a bag trick)."),
@@ -719,11 +719,11 @@ export const COMPOUND_STRUCTURES: Record<string, CompoundStructure> = {
 };
 
 export function getCompoundHint(compound: CompoundDefinition): string {
-  return COMPOUND_HINTS[compound.id] ?? "A familiar substance waiting to be discovered.";
+  return compound.fact || COMPOUND_HINTS[compound.id] || "A familiar substance waiting to be discovered.";
 }
 
 export function getDailyCompoundClue(compound: CompoundDefinition): string {
-  return `Molecule hint: look for ${compound.formula} as one connected group.`;
+  return getCompoundHint(compound);
 }
 
 export function getCompoundStructure(compound: CompoundDefinition): CompoundStructure {

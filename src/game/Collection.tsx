@@ -26,6 +26,8 @@ export function Collection({ onBack }: { onBack: () => void }) {
   const [selected, setSelected] = useState<number | null>(null);
   const [selectedCompound, setSelectedCompound] = useState<CompoundDefinition | null>(null);
   const [purchaseMessage, setPurchaseMessage] = useState("");
+  const [showUndiscoveredCompounds, setShowUndiscoveredCompounds] = useState(false);
+  const [expandedBadgeGroups, setExpandedBadgeGroups] = useState<Record<string, boolean>>({});
   const found = new Set(discoveredElements);
   const foundCompounds = new Set(discoveredCompounds);
   const earned = new Set(earnedBadges);
@@ -39,23 +41,29 @@ export function Collection({ onBack }: { onBack: () => void }) {
     : null;
   const lockedElementCount = ELEMENTS.length - discoveredElements.length;
   const lockedCompoundCount = COMPOUNDS.length - discoveredCompounds.length;
+  const visibleCompounds = showUndiscoveredCompounds
+    ? COMPOUNDS
+    : COMPOUNDS.filter((compound) => foundCompounds.has(compound.id));
 
   function handleUnlockElements() {
-    const unlocked = unlockLockedElementsForCoins(50);
     setPurchaseMessage(
-      unlocked
-        ? tr("Locked elements unlocked.")
-        : tr("Need 50 gold coins or no locked elements remain."),
+      lockedElementCount > 0
+        ? tr("Select one locked element in the periodic table to unlock it for 50 gold coins.")
+        : tr("No locked elements remain."),
     );
   }
 
   function handleUnlockCompounds() {
-    const unlocked = unlockLockedCompoundsForCoins(100);
+    setShowUndiscoveredCompounds(true);
     setPurchaseMessage(
-      unlocked
-        ? tr("Locked compounds unlocked.")
-        : tr("Need 100 gold coins or no locked compounds remain."),
+      lockedCompoundCount > 0
+        ? tr("Select one undiscovered compound to unlock it for 100 gold coins.")
+        : tr("No locked compounds remain."),
     );
+  }
+
+  function toggleBadgeGroup(groupId: string) {
+    setExpandedBadgeGroups((current) => ({ ...current, [groupId]: !current[groupId] }));
   }
 
   return (
@@ -237,7 +245,7 @@ export function Collection({ onBack }: { onBack: () => void }) {
               gap: isTabletLayout ? 12 : 8,
             }}
           >
-            {COMPOUNDS.map((compound) => {
+            {visibleCompounds.map((compound) => {
               const unlocked = foundCompounds.has(compound.id);
               const foundCount = compoundCounts[compound.id] ?? (unlocked ? 1 : 0);
               return (
@@ -288,6 +296,17 @@ export function Collection({ onBack }: { onBack: () => void }) {
               );
             })}
           </div>
+          {lockedCompoundCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowUndiscoveredCompounds((current) => !current)}
+              style={collectionExpandBtn}
+            >
+              {showUndiscoveredCompounds
+                ? tr("Hide undiscovered")
+                : `${tr("Show undiscovered")} (${lockedCompoundCount})`}
+            </button>
+          )}
         </section>
 
         {/* Badges */}
@@ -306,6 +325,10 @@ export function Collection({ onBack }: { onBack: () => void }) {
             {BADGE_GROUPS.map((group) => {
               const groupBadges = BADGES.filter((badge) => badge.group === group.id);
               const unlockedCount = groupBadges.filter((badge) => earned.has(badge.id)).length;
+              const showUndiscovered = expandedBadgeGroups[group.id] ?? false;
+              const visibleBadges = showUndiscovered
+                ? groupBadges
+                : groupBadges.filter((badge) => earned.has(badge.id));
               return (
                 <section
                   key={group.id}
@@ -341,7 +364,7 @@ export function Collection({ onBack }: { onBack: () => void }) {
                       gap: isTabletLayout ? 12 : 8,
                     }}
                   >
-                    {groupBadges.map((badge) => {
+                    {visibleBadges.map((badge) => {
                       const unlocked = earned.has(badge.id);
                       const progress = badge.requiredAtomicNumbers.filter((atomicNumber) =>
                         found.has(atomicNumber),
@@ -403,6 +426,17 @@ export function Collection({ onBack }: { onBack: () => void }) {
                       );
                     })}
                   </div>
+                  {unlockedCount < groupBadges.length && (
+                    <button
+                      type="button"
+                      onClick={() => toggleBadgeGroup(group.id)}
+                      style={collectionExpandBtn}
+                    >
+                      {showUndiscovered
+                        ? tr("Hide undiscovered")
+                        : `${tr("Show undiscovered")} (${groupBadges.length - unlockedCount})`}
+                    </button>
+                  )}
                 </section>
               );
             })}
@@ -535,17 +569,34 @@ export function Collection({ onBack }: { onBack: () => void }) {
                 </div>
               </div>
             ) : (
-              <p
-                style={{
-                  fontSize: 13,
-                  lineHeight: 1.55,
-                  margin: 0,
-                  color: "var(--muted-foreground)",
-                  fontStyle: "italic",
-                }}
-              >
-                {tr("Locked. Discover this element through fusion to unlock its facts.")}
-              </p>
+              <div style={{ display: "grid", gap: 12 }}>
+                <p
+                  style={{
+                    fontSize: 13,
+                    lineHeight: 1.55,
+                    margin: 0,
+                    color: "var(--muted-foreground)",
+                    fontStyle: "italic",
+                  }}
+                >
+                  {tr("Locked. Discover this element through fusion to unlock its facts.")}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const unlocked = unlockLockedElementsForCoins(el.atomicNumber, 50);
+                    setPurchaseMessage(
+                      unlocked
+                        ? tr("Element unlocked.")
+                        : tr("Need 50 gold coins to unlock this element."),
+                    );
+                  }}
+                  disabled={goldCoins < 50}
+                  style={{ ...collectionUnlockBtn, opacity: goldCoins >= 50 ? 1 : 0.55 }}
+                >
+                  {tr("Unlock this element")} - 50
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -661,9 +712,26 @@ export function Collection({ onBack }: { onBack: () => void }) {
                 </div>
               </div>
             ) : (
-              <p style={{ fontSize: 13, lineHeight: 1.55, margin: 0, color: "var(--foreground)" }}>
-                {getCompoundHint(selectedCompound)}
-              </p>
+              <div style={{ display: "grid", gap: 12 }}>
+                <p style={{ fontSize: 13, lineHeight: 1.55, margin: 0, color: "var(--foreground)" }}>
+                  {getCompoundHint(selectedCompound)}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const unlocked = unlockLockedCompoundsForCoins(selectedCompound.id, 100);
+                    setPurchaseMessage(
+                      unlocked
+                        ? tr("Compound unlocked.")
+                        : tr("Need 100 gold coins to unlock this compound."),
+                    );
+                  }}
+                  disabled={goldCoins < 100}
+                  style={{ ...collectionUnlockBtn, opacity: goldCoins >= 100 ? 1 : 0.55 }}
+                >
+                  {tr("Unlock this compound")} - 100
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -725,6 +793,18 @@ const collectionPurchaseMessage: CSSProperties = {
   color: "var(--muted-foreground)",
   fontSize: 11,
   fontWeight: 800,
+};
+
+const collectionExpandBtn: CSSProperties = {
+  marginTop: 10,
+  border: "1px solid var(--border)",
+  borderRadius: 999,
+  padding: "7px 11px",
+  background: "var(--surface)",
+  color: "var(--accent)",
+  fontSize: 11,
+  fontWeight: 900,
+  cursor: "pointer",
 };
 
 const collectionModalCloseBtn: CSSProperties = {
