@@ -32,7 +32,12 @@ import {
 } from "./dailyFeatures";
 import { COMPOUNDS } from "./compounds";
 import { ELEMENTS } from "./elements";
-import { PRODUCT_IDS, THEME_BUNDLE_PRODUCT_IDS, type ProductId } from "./products";
+import {
+  COSMETIC_THEME_PURCHASES_ENABLED,
+  PRODUCT_IDS,
+  THEME_BUNDLE_PRODUCT_IDS,
+  type ProductId,
+} from "./products";
 
 export const INVENTORY_POWER_UPS = [
   "transmute",
@@ -159,6 +164,7 @@ export function isBoardThemeUnlocked(
   theme: BoardTheme,
   state: { hasProPack: boolean; ownedThemeProducts: ProductId[] },
 ): boolean {
+  if (!COSMETIC_THEME_PURCHASES_ENABLED) return true;
   if (theme === "reactor") return true;
   if (theme === "cryo" || theme === "forge") return state.hasProPack;
   const productId = THEME_PRODUCT_BY_BOARD_THEME[theme];

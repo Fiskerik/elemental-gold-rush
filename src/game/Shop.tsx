@@ -5,6 +5,7 @@ import { type InventoryPowerUpId, useProgress } from "./store";
 import { POWER_UP_UNLOCK_LEVELS } from "./powerUps";
 import { PowerUpBadge } from "./PowerUpLibrary";
 import {
+  COSMETIC_THEME_PURCHASES_ENABLED,
   PRODUCT_IDS,
   THEME_BUNDLE_PRODUCT_IDS,
   getProductById,
@@ -105,23 +106,27 @@ const THEME_BUNDLE_VISUALS: Partial<
 > = {
   [PRODUCT_IDS.themeGoldLab]: {
     board: "linear-gradient(135deg, #ffe9a8, #241505 58%, #c9902c)",
-    atom: "radial-gradient(circle at 30% 25%, #fff, #aeb7bd 54%, #42484d)",
-    skin: "Chrome atoms",
+    atom:
+      "linear-gradient(132deg, transparent 32%, rgba(255,255,255,.75) 34%, transparent 39%), radial-gradient(circle at 30% 25%, #ffe5a1, #d26c32 58%, #4d1e1e)",
+    skin: "Marble atoms",
   },
   [PRODUCT_IDS.themeNeonPeriodic]: {
     board: "linear-gradient(135deg, #7af6ff, #120a24 58%, #ea5cff)",
-    atom: "radial-gradient(circle at 30% 25%, #d6fbff, #35c7e6 54%, #0c3a47)",
-    skin: "Hologram atoms",
+    atom:
+      "linear-gradient(165deg, rgba(88,239,255,.35), transparent 42%, rgba(238,92,255,.3)), radial-gradient(circle at 30% 25%, #ffe5a1, #d26c32 58%, #4d1e1e)",
+    skin: "Prism atoms",
   },
   [PRODUCT_IDS.themeQuantumVoid]: {
     board: "linear-gradient(135deg, #b79bff, #07040f 58%, #4a2fa8)",
-    atom: "radial-gradient(circle at 30% 25%, #f1e6ff, #9a6fe0 54%, #2c1355)",
-    skin: "Crystal atoms",
+    atom:
+      "conic-gradient(from 25deg, transparent, rgba(255,255,255,.42), transparent 28% 62%, rgba(255,255,255,.28), transparent 78%), radial-gradient(circle at 30% 25%, #ffe5a1, #d26c32 58%, #4d1e1e)",
+    skin: "Glass atoms",
   },
   [PRODUCT_IDS.themeBiohazard]: {
     board: "linear-gradient(135deg, #e4ff7a, #131c06 58%, #63c92c)",
-    atom: "radial-gradient(circle at 30% 25%, #ecffb0, #7ed321 54%, #1e3b06)",
-    skin: "Toxic atoms",
+    atom:
+      "radial-gradient(circle at 68% 66%, rgba(255,255,255,.5) 0 7%, transparent 8%), radial-gradient(circle at 42% 72%, rgba(255,255,255,.35) 0 5%, transparent 6%), radial-gradient(circle at 30% 25%, #ffe5a1, #d26c32 58%, #4d1e1e)",
+    skin: "Bubble atoms",
   },
 };
 const SHOP_PURCHASE_GUARD_TIMEOUT_MS = 60_000;
@@ -358,6 +363,10 @@ export function Shop({ onBack }: { onBack: () => void }) {
   }
 
   async function handleThemePurchase(productId: ProductId) {
+    if (!COSMETIC_THEME_PURCHASES_ENABLED) {
+      setCosmeticMessage("All cosmetic themes are free during testing.");
+      return;
+    }
     if (appStorePurchaseBusy || ownedThemeProducts.includes(productId)) return;
     setPendingProductId(productId);
     setCosmeticMessage("Preparing cosmetic purchase with App Store...");
@@ -778,28 +787,31 @@ export function Shop({ onBack }: { onBack: () => void }) {
                     marginBottom: 6,
                   }}
                 >
-                  COSMETIC BUNDLES
+                  {COSMETIC_THEME_PURCHASES_ENABLED ? "COSMETIC BUNDLES" : "FREE THEME PREVIEW"}
                 </div>
                 <h2 style={{ margin: 0, fontSize: 22, fontWeight: 900 }}>
                   Boards + atom skins
                 </h2>
               </div>
-              <button
-                type="button"
-                onClick={handleThemeRestore}
-                disabled={appStorePurchaseBusy || purchaseDebugLocked}
-                style={{
-                  ...secondaryShopButton,
-                  padding: "8px 11px",
-                  opacity: appStorePurchaseBusy || purchaseDebugLocked ? 0.55 : 1,
-                }}
-              >
-                {proPackBusy === "restore" ? "Checking..." : "Restore"}
-              </button>
+              {COSMETIC_THEME_PURCHASES_ENABLED && (
+                <button
+                  type="button"
+                  onClick={handleThemeRestore}
+                  disabled={appStorePurchaseBusy || purchaseDebugLocked}
+                  style={{
+                    ...secondaryShopButton,
+                    padding: "8px 11px",
+                    opacity: appStorePurchaseBusy || purchaseDebugLocked ? 0.55 : 1,
+                  }}
+                >
+                  {proPackBusy === "restore" ? "Checking..." : "Restore"}
+                </button>
+              )}
             </div>
             <p style={{ margin: "0 0 14px", color: "var(--muted-foreground)", fontSize: 13 }}>
-              Each one-time purchase unlocks a board and its matching atom finish. Element colors
-              and gameplay remain unchanged.
+              {COSMETIC_THEME_PURCHASES_ENABLED
+                ? "Each one-time purchase unlocks a board and its matching atom finish. Element colors and gameplay remain unchanged."
+                : "All board themes and atom finishes are unlocked for testing. Element colors and gameplay remain unchanged."}
             </p>
             <div
               style={{
@@ -814,7 +826,8 @@ export function Shop({ onBack }: { onBack: () => void }) {
                 const product = getProductById(productId);
                 const visual = THEME_BUNDLE_VISUALS[productId];
                 if (!product || !visual) return null;
-                const owned = ownedThemeProducts.includes(productId);
+                const owned =
+                  !COSMETIC_THEME_PURCHASES_ENABLED || ownedThemeProducts.includes(productId);
                 const pending = pendingProductId === productId;
                 const disabled = owned || appStorePurchaseBusy || purchaseDebugLocked;
                 return (
@@ -881,7 +894,13 @@ export function Shop({ onBack }: { onBack: () => void }) {
                           cursor: disabled ? "not-allowed" : "pointer",
                         }}
                       >
-                        {owned ? "Owned" : pending ? "Opening..." : "Buy in App Store"}
+                        {owned
+                          ? COSMETIC_THEME_PURCHASES_ENABLED
+                            ? "Owned"
+                            : "Free for testing"
+                          : pending
+                            ? "Opening..."
+                            : "Buy in App Store"}
                       </button>
                     </div>
                   </article>

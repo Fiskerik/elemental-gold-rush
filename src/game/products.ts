@@ -12,23 +12,24 @@ export const PRODUCT_IDS = {
 
 export type ProductId = (typeof PRODUCT_IDS)[keyof typeof PRODUCT_IDS];
 
-export const APP_STORE_PURCHASE_PRODUCT_IDS = [
-  PRODUCT_IDS.proLabPack,
-  PRODUCT_IDS.coins5,
-  PRODUCT_IDS.coins20,
-  PRODUCT_IDS.coins50,
-  PRODUCT_IDS.coins100,
-  PRODUCT_IDS.themeGoldLab,
-  PRODUCT_IDS.themeNeonPeriodic,
-  PRODUCT_IDS.themeQuantumVoid,
-  PRODUCT_IDS.themeBiohazard,
-] as const satisfies readonly ProductId[];
+// Keep the complete IAP wiring ready, but leave cosmetic themes free during visual testing.
+// Flip this to true when the four theme products are ready in App Store Connect and RevenueCat.
+export const COSMETIC_THEME_PURCHASES_ENABLED = false;
 
 export const THEME_BUNDLE_PRODUCT_IDS = [
   PRODUCT_IDS.themeGoldLab,
   PRODUCT_IDS.themeNeonPeriodic,
   PRODUCT_IDS.themeQuantumVoid,
   PRODUCT_IDS.themeBiohazard,
+] as const satisfies readonly ProductId[];
+
+export const APP_STORE_PURCHASE_PRODUCT_IDS = [
+  PRODUCT_IDS.proLabPack,
+  PRODUCT_IDS.coins5,
+  PRODUCT_IDS.coins20,
+  PRODUCT_IDS.coins50,
+  PRODUCT_IDS.coins100,
+  ...(COSMETIC_THEME_PURCHASES_ENABLED ? THEME_BUNDLE_PRODUCT_IDS : []),
 ] as const satisfies readonly ProductId[];
 
 export interface ProductDefinition {
@@ -93,11 +94,11 @@ export const PRODUCTS: ProductDefinition[] = [
   {
     id: PRODUCT_IDS.themeGoldLab,
     name: "Gold Lab",
-    description: "A brass-and-amber laboratory board theme with a matching Chrome atom skin.",
+    description: "A brass-and-amber laboratory board theme with a matching Marble atom finish.",
     type: "non_consumable",
     benefits: [
       "Warm brass-and-amber board theme.",
-      "Bundled Chrome atom skin with a polished metallic shine.",
+      "Bundled Marble finish with translucent veins over every atom's original color.",
       "Purely cosmetic — no gameplay changes.",
     ],
   },
@@ -105,33 +106,33 @@ export const PRODUCTS: ProductDefinition[] = [
     id: PRODUCT_IDS.themeNeonPeriodic,
     name: "Neon Periodic",
     description:
-      "A glowing periodic-table blueprint board theme with a matching Hologram atom skin.",
+      "A glowing periodic-table blueprint board theme with a matching Prism atom finish.",
     type: "non_consumable",
     benefits: [
       "Neon periodic-table grid board theme.",
-      "Bundled Hologram atom skin with a scanning wireframe glow.",
+      "Bundled Prism finish with a subtle iridescent scan over every original atom color.",
       "Purely cosmetic — no gameplay changes.",
     ],
   },
   {
     id: PRODUCT_IDS.themeQuantumVoid,
     name: "Quantum Void",
-    description: "A deep-space indigo board theme with a matching Crystal atom skin.",
+    description: "A deep-space indigo board theme with a matching Glass atom finish.",
     type: "non_consumable",
     benefits: [
       "Starfield indigo board theme.",
-      "Bundled Crystal atom skin with faceted, glassy highlights.",
+      "Bundled Glass finish with color-preserving facets and highlights.",
       "Purely cosmetic — no gameplay changes.",
     ],
   },
   {
     id: PRODUCT_IDS.themeBiohazard,
     name: "Biohazard",
-    description: "An acid-green containment-lab board theme with a matching Toxic atom skin.",
+    description: "An acid-green containment-lab board theme with a matching Bubble atom finish.",
     type: "non_consumable",
     benefits: [
       "Acid-green hazard-lab board theme.",
-      "Bundled Toxic atom skin with a bubbling, pulsing glow.",
+      "Bundled Bubble finish layered over every atom's original color.",
       "Purely cosmetic — no gameplay changes.",
     ],
   },

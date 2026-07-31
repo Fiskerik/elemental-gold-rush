@@ -216,12 +216,13 @@ function recordDailyLeaderboardRun(kind: LeaderboardKind, score: number, shots: 
   const today = getTodayQuestDate();
   const now = Date.now();
   const countryCode = inferPlayerCountryCode();
-  const records = readRecords();
-  if (
-    kind === "daily-compound" &&
-    records.some((record) => record.date === today && record.kind === kind)
-  ) {
-    return false;
+  let records = readRecords();
+  if (kind === "daily-compound") {
+    const previousBest = records
+      .filter((record) => record.date === today && record.kind === kind)
+      .sort((a, b) => a.score - b.score || a.recordedAt - b.recordedAt)[0];
+    if (previousBest && normalizedScore >= previousBest.score) return false;
+    records = records.filter((record) => !(record.date === today && record.kind === kind));
   }
   records.push({
     id: `${kind}-${today}-${now}`,
@@ -270,7 +271,7 @@ function playerEntry(kind: LeaderboardKind): LeaderboardEntry {
     .filter((record) => record.date === today && record.kind === kind)
     .sort((a, b) =>
       kind === "daily-compound"
-        ? a.recordedAt - b.recordedAt
+        ? a.score - b.score || a.recordedAt - b.recordedAt
         : b.score - a.score || a.shots - b.shots,
     )[0];
   return {
@@ -383,16 +384,47 @@ export async function loadDailyLeaderboard(
     }
     const result = await loadDailyGameCenterLeaderboard(kind, scope);
     const resolvedCountryCode = inferPlayerCountryCode();
-    const entries = result.entries.map((entry) =>
+    let entries = result.entries.map((entry) =>
       mapGameCenterEntry(entry, scope, resolvedCountryCode, result.localPlayer),
     );
-    const localPlayer = result.localPlayer
+    const gameCenterLocalPlayer = result.localPlayer
       ? mapGameCenterEntry(result.localPlayer, scope, resolvedCountryCode, result.localPlayer)
       : undefined;
-    const visibleEntries =
+    const localPlayer =
+      kind === "daily-compound" &&
+      fallbackBoard.player.score > 0 &&
+      (!gameCenterLocalPlayer || fallbackBoard.player.score < gameCenterLocalPlayer.score)
+        ? {
+            ...(gameCenterLocalPlayer ?? fallbackBoard.player),
+            score: fallbackBoard.player.score,
+            isPlayer: true,
+          }
+        : gameCenterLocalPlayer;
+    if (localPlayer && entries.some((entry) => entry.isPlayer)) {
+      entries = entries.map((entry) =>
+        entry.isPlayer ? { ...entry, score: localPlayer.score } : entry,
+      );
+    }
+    const combinedEntries =
       localPlayer && !entries.some((entry) => entry.isPlayer)
         ? [localPlayer, ...entries].sort((a, b) => a.rank - b.rank)
         : entries;
+    const visibleEntries =
+      kind === "daily-compound"
+        ? [...combinedEntries]
+            .sort((a, b) => a.score - b.score || a.name.localeCompare(b.name))
+            .map((entry, index) => ({ ...entry, rank: index + 1 }))
+        : combinedEntries;
+    const rankedLocalPlayer =
+      visibleEntries.find((entry) => entry.isPlayer) ??
+      (localPlayer && kind === "daily-compound"
+        ? {
+            ...localPlayer,
+            rank:
+              visibleEntries.findIndex((entry) => entry.score >= localPlayer.score) + 1 ||
+              visibleEntries.length + 1,
+          }
+        : localPlayer);
     const hasGameCenterScores =
       visibleEntries.length > 0 || Boolean(localPlayer && localPlayer.score > 0);
     if (!hasGameCenterScores) {
@@ -406,7 +438,7 @@ export async function loadDailyLeaderboard(
     }
     return {
       entries: visibleEntries,
-      player: localPlayer ??
+      player: rankedLocalPlayer ??
         visibleEntries.find((entry) => entry.isPlayer) ?? {
           ...playerEntry(kind),
           rank: 0,

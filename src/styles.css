@@ -1587,7 +1587,7 @@
 }
 
 /* Cosmetic atom textures preserve each element's identifying base color. */
-@keyframes chrome-sweep {
+@keyframes marble-sheen {
   0% {
     transform: translateX(-120%) rotate(18deg);
   }
@@ -1597,6 +1597,9 @@
 }
 .atom-skin-overlay-chrome {
   mix-blend-mode: screen;
+  background:
+    linear-gradient(128deg, transparent 25%, oklch(1 0 0 / 0.34) 28%, transparent 32%),
+    linear-gradient(42deg, transparent 58%, oklch(1 0 0 / 0.22) 61%, transparent 65%);
 }
 .atom-skin-overlay-chrome::before {
   content: "";
@@ -1605,8 +1608,8 @@
   left: 0;
   width: 40%;
   height: 160%;
-  background: linear-gradient(90deg, transparent, oklch(1 0 0 / 0.55) 48%, transparent);
-  animation: chrome-sweep 2.6s ease-in-out infinite;
+  background: linear-gradient(90deg, transparent, oklch(1 0 0 / 0.42) 48%, transparent);
+  animation: marble-sheen 3.2s ease-in-out infinite;
 }
 
 @keyframes holo-scan {
@@ -1618,18 +1621,24 @@
   }
 }
 .atom-skin-overlay-hologram {
-  mix-blend-mode: overlay;
+  mix-blend-mode: screen;
   background-image:
     repeating-linear-gradient(0deg, oklch(1 0 0 / 0.12) 0 1px, transparent 1px 6px),
     repeating-linear-gradient(90deg, oklch(1 0 0 / 0.12) 0 1px, transparent 1px 6px);
-  opacity: 0.55;
+  opacity: 0.42;
 }
 .atom-skin-overlay-hologram::after {
   content: "";
   position: absolute;
   inset: -10% 0;
   height: 30%;
-  background: linear-gradient(180deg, transparent, oklch(0.9 0.2 195 / 0.5), transparent);
+  background: linear-gradient(
+    180deg,
+    transparent,
+    oklch(0.9 0.16 195 / 0.28),
+    oklch(0.82 0.16 325 / 0.22),
+    transparent
+  );
   animation: holo-scan 2.1s linear infinite;
 }
 
@@ -1694,7 +1703,12 @@
   width: 16%;
   height: 16%;
   border-radius: 50%;
-  background: radial-gradient(circle, oklch(0.9 0.22 145 / 0.9), transparent 70%);
+  background: radial-gradient(
+    circle at 36% 30%,
+    oklch(1 0 0 / 0.58),
+    oklch(1 0 0 / 0.16) 42%,
+    transparent 72%
+  );
   animation: toxic-bubble 1.8s ease-in infinite;
 }
 .atom-skin-overlay-toxic::before {

@@ -16,13 +16,6 @@ interface Props {
   atomSkin?: AtomSkin;
 }
 
-const SKIN_RING_COLOR: Partial<Record<AtomSkin, string>> = {
-  chrome: "oklch(0.93 0.03 92 / 0.75)",
-  hologram: "oklch(0.85 0.19 195 / 0.85)",
-  crystal: "oklch(0.82 0.14 290 / 0.8)",
-  toxic: "oklch(0.86 0.22 145 / 0.85)",
-};
-
 function isotopeChargeCapacity(period: number): number {
   if (period <= 1) return 2;
   if (period === 2) return 8;
@@ -64,8 +57,10 @@ export function ElementBall({
   const unstableDashArray = Array.from({ length: unstableMaxSegments }, (_, index) =>
     index < unstableSegments ? `${unstableDash} ${unstableGap}` : `0 ${unstableSegment}`,
   ).join(" ");
-  const skinRingColor = SKIN_RING_COLOR[atomSkin];
-  const skinRing = skinRingColor ? `, 0 0 0 ${Math.max(1.5, size * 0.035)}px ${skinRingColor}` : "";
+  const skinRing =
+    atomSkin === "classic"
+      ? ""
+      : `, 0 0 0 ${Math.max(1, size * 0.025)}px oklch(1 0 0 / 0.34), inset 0 0 ${size * 0.16}px oklch(1 0 0 / 0.16)`;
   return (
     <div
       onClick={onClick}

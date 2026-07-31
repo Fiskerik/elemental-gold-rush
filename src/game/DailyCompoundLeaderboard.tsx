@@ -94,7 +94,7 @@ export function Leaderboard({ onBack }: { onBack: () => void }) {
             <strong style={summaryValue}>{playerRank}</strong>
           </div>
           <div style={{ textAlign: "center" }}>
-            <div style={summaryLabel}>{kind === "daily-compound" ? "Seconds" : "Score"}</div>
+            <div style={summaryLabel}>{kind === "daily-compound" ? "Time" : "Score"}</div>
             <strong style={summaryValue}>
               {kind === "daily-compound"
                 ? formatSeconds(board.player.score)
@@ -151,7 +151,7 @@ export function Leaderboard({ onBack }: { onBack: () => void }) {
             <span>Rank</span>
             <span>Player</span>
             <span style={{ textAlign: "right" }}>
-              {kind === "daily-compound" ? "Seconds" : "Score"}
+              {kind === "daily-compound" ? "Time" : "Score"}
             </span>
             {kind === "daily-board" && <span style={{ textAlign: "right" }}>Shots</span>}
           </div>
@@ -209,7 +209,10 @@ function leaderboardGridColumns(kind: LeaderboardKind): string {
 }
 
 function formatSeconds(seconds: number): string {
-  return `${Math.max(0, Math.floor(seconds))}s`;
+  const totalSeconds = Math.max(0, Math.floor(seconds));
+  const minutes = Math.floor(totalSeconds / 60);
+  const remainingSeconds = totalSeconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`;
 }
 
 function SegmentButton({

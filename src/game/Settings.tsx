@@ -292,10 +292,10 @@ export function BoardThemePicker({
 
 const ATOM_SKIN_LABELS: Record<AtomSkin, string> = {
   classic: "Classic",
-  chrome: "Chrome",
-  hologram: "Hologram",
-  crystal: "Crystal",
-  toxic: "Toxic",
+  chrome: "Marble",
+  hologram: "Prism",
+  crystal: "Glass",
+  toxic: "Bubbles",
 };
 
 const BOARD_THEME_BY_ATOM_SKIN = Object.fromEntries(
@@ -419,10 +419,14 @@ export function AtomSkinPicker({
 function AtomSkinSwatch({ skin }: { skin: AtomSkin }) {
   const gradients: Record<AtomSkin, string> = {
     classic: "radial-gradient(circle at 32% 28%, #ffe9a8, #d68a2c 65%, #241505)",
-    chrome: "radial-gradient(circle at 32% 28%, #ffffff, #b9c2c9 55%, #4a5157)",
-    hologram: "radial-gradient(circle at 32% 28%, #d6fbff, #35c7e6 55%, #0c3a47)",
-    crystal: "radial-gradient(circle at 32% 28%, #f1e6ff, #9a6fe0 55%, #2c1355)",
-    toxic: "radial-gradient(circle at 32% 28%, #ecffb0, #7ed321 55%, #1e3b06)",
+    chrome:
+      "linear-gradient(132deg, transparent 30%, rgba(255,255,255,.8) 34%, transparent 40%), radial-gradient(circle at 32% 28%, #ffe9a8, #d68a2c 65%, #241505)",
+    hologram:
+      "linear-gradient(165deg, rgba(88,239,255,.38), transparent 42%, rgba(238,92,255,.32)), radial-gradient(circle at 32% 28%, #ffe9a8, #d68a2c 65%, #241505)",
+    crystal:
+      "conic-gradient(from 25deg, transparent, rgba(255,255,255,.48), transparent 28% 62%, rgba(255,255,255,.3), transparent 78%), radial-gradient(circle at 32% 28%, #ffe9a8, #d68a2c 65%, #241505)",
+    toxic:
+      "radial-gradient(circle at 68% 66%, rgba(255,255,255,.55) 0 8%, transparent 9%), radial-gradient(circle at 42% 72%, rgba(255,255,255,.38) 0 6%, transparent 7%), radial-gradient(circle at 32% 28%, #ffe9a8, #d68a2c 65%, #241505)",
   };
   return (
     <span
