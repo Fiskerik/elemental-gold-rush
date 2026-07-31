@@ -29,6 +29,8 @@ import {
 import { ElementBall } from "./ElementBall";
 import {
   emptyPowerUpInventory,
+  isAtomSkinUnlocked,
+  isBoardThemeUnlocked,
   type InventoryPowerUpId,
   type LabUpgradeId,
   type PowerUpInventory,
@@ -45,6 +47,7 @@ import {
   findCompoundByElements,
   getDailyCompoundClue,
   getCompoundHint,
+  getCompoundSecondaryHint,
 } from "./compounds";
 import { MoleculeVisual } from "./MoleculeVisual";
 import { PowerUpBadge } from "./PowerUpLibrary";
@@ -852,7 +855,7 @@ function DailyCompoundGridBoard({
   function revealHint() {
     if (!canRevealHint || !compound) return;
     setMoleculeHintUsed(true);
-    setMessage(getCompoundHint(compound));
+    setMessage(getCompoundSecondaryHint(compound));
     if (hapticsEnabled) vibrate([15, 25, 15]);
   }
 
@@ -953,11 +956,12 @@ function DailyCompoundGridBoard({
         </button>
         <div style={{ minWidth: 0 }}>
           <div style={dailyCompoundKicker}>DAILY COMPOUND</div>
-          <div style={dailyCompoundTitle}>{getDailyCompoundClue(compound)}</div>
+          <div style={dailyCompoundTitle}>
+            <span style={{ color: "var(--accent)", fontWeight: 900 }}>Hint: </span>
+            {getDailyCompoundClue(compound)}
+          </div>
           <div style={dailyCompoundMeta}>
-            <span style={dailyCompoundMetaBox}>
-              {selectedCells.length}/{compound.totalAtoms} marked
-            </span>
+            <span style={dailyCompoundMetaBox}>{selectedCells.length} marked</span>
             <span style={dailyCompoundMetaBox}>{wrongGuesses} wrong</span>
             <span style={dailyCompoundMetaBox}>{hintsUsed} hints</span>
             <span style={dailyCompoundMetaBox}>{elapsedSec}s</span>
@@ -1275,10 +1279,17 @@ function StandardGameBoard({
     setShootingStyle,
     hasProPack,
     boardTheme,
+    atomSkin,
+    ownedThemeProducts,
     clearedStagesSinceAd,
     markInterstitialShown,
   } = useProgress();
-  const activeBoardTheme = hasProPack ? boardTheme : "reactor";
+  const activeBoardTheme = isBoardThemeUnlocked(boardTheme, { hasProPack, ownedThemeProducts })
+    ? boardTheme
+    : "reactor";
+  const activeAtomSkin = isAtomSkinUnlocked(atomSkin, { hasProPack, ownedThemeProducts })
+    ? atomSkin
+    : "classic";
   const isNativeIos = Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios";
   const resultPowerUpSaveCost = isNativeIos ? MOBILE_RESULT_POWER_UP_SAVE_COST : 0;
   const progressionPowerUpLevel = Math.max(level.id, unlockedLevel);
@@ -6687,6 +6698,7 @@ function StandardGameBoard({
                     glow={isDrag || isCompoundSelected}
                     shimmer={b.shimmer}
                     unstableShots={b.unstableShots}
+                    atomSkin={activeAtomSkin}
                   />
                 </div>
               );
@@ -7061,6 +7073,7 @@ function StandardGameBoard({
                   glow
                   shimmer={currentIsShimmer}
                   unstableShots={currentIsUnstable ? unstableChargeCapacity(current) : undefined}
+                  atomSkin={activeAtomSkin}
                 />
               )}
             </div>
@@ -7116,6 +7129,7 @@ function StandardGameBoard({
                   glow
                   shimmer={currentIsShimmer}
                   unstableShots={currentIsUnstable ? unstableChargeCapacity(current) : undefined}
+                  atomSkin={activeAtomSkin}
                 />
               ))}
           </div>
@@ -7179,6 +7193,7 @@ function StandardGameBoard({
                         ? unstableChargeCapacity(atom)
                         : undefined
                     }
+                    atomSkin={activeAtomSkin}
                   />
                 ),
               )}

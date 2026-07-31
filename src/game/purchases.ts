@@ -1,11 +1,19 @@
 import { Capacitor } from "@capacitor/core";
 import { logDebug } from "../lib/debugLogger";
-import { APP_STORE_PURCHASE_PRODUCT_IDS, PRODUCT_IDS, ProductId, getProductById } from "./products";
+import {
+  APP_STORE_PURCHASE_PRODUCT_IDS,
+  PRODUCT_IDS,
+  THEME_BUNDLE_PRODUCT_IDS,
+  ProductId,
+  getProductById,
+} from "./products";
 
 type CustomerInfo = {
   entitlements?: { active?: Record<string, unknown> };
   managementURL?: string | null;
   managementUrl?: string | null;
+  allPurchasedProductIdentifiers?: string[];
+  nonSubscriptionTransactions?: Array<{ productIdentifier?: string }>;
 };
 
 type PurchasesStoreProduct = { identifier: string };
@@ -1349,5 +1357,16 @@ export async function restorePurchases(): Promise<ProductId[]> {
     NATIVE_SETUP_TIMEOUT_MS,
     "RevenueCat restore purchases",
   );
-  return hasProEntitlement(customerInfo) ? [PRODUCT_IDS.proLabPack] : [];
+  const restored = new Set<ProductId>();
+  if (hasProEntitlement(customerInfo)) restored.add(PRODUCT_IDS.proLabPack);
+  const purchasedProductIds = new Set([
+    ...(customerInfo.allPurchasedProductIdentifiers ?? []),
+    ...(customerInfo.nonSubscriptionTransactions ?? [])
+      .map((transaction) => transaction.productIdentifier)
+      .filter((id): id is string => Boolean(id)),
+  ]);
+  for (const productId of THEME_BUNDLE_PRODUCT_IDS) {
+    if (purchasedProductIds.has(productId)) restored.add(productId);
+  }
+  return Array.from(restored);
 }

@@ -32,6 +32,7 @@ import {
 } from "./dailyFeatures";
 import { COMPOUNDS } from "./compounds";
 import { ELEMENTS } from "./elements";
+import { PRODUCT_IDS, THEME_BUNDLE_PRODUCT_IDS, type ProductId } from "./products";
 
 export const INVENTORY_POWER_UPS = [
   "transmute",
@@ -118,11 +119,61 @@ function normalizeLabUpgradeEnabled(
 }
 
 export type AppTheme = "dark" | "light";
-export const BOARD_THEMES = ["reactor", "cryo", "forge"] as const;
+export const BOARD_THEMES = [
+  "reactor",
+  "cryo",
+  "forge",
+  "goldLab",
+  "neonPeriodic",
+  "quantumVoid",
+  "biohazard",
+] as const;
 export type BoardTheme = (typeof BOARD_THEMES)[number];
 
 export function isBoardTheme(value: unknown): value is BoardTheme {
   return typeof value === "string" && (BOARD_THEMES as readonly string[]).includes(value);
+}
+
+export const ATOM_SKINS = ["classic", "chrome", "hologram", "crystal", "toxic"] as const;
+export type AtomSkin = (typeof ATOM_SKINS)[number];
+
+export function isAtomSkin(value: unknown): value is AtomSkin {
+  return typeof value === "string" && (ATOM_SKINS as readonly string[]).includes(value);
+}
+
+export const THEME_PRODUCT_BY_BOARD_THEME: Partial<Record<BoardTheme, ProductId>> = {
+  goldLab: PRODUCT_IDS.themeGoldLab,
+  neonPeriodic: PRODUCT_IDS.themeNeonPeriodic,
+  quantumVoid: PRODUCT_IDS.themeQuantumVoid,
+  biohazard: PRODUCT_IDS.themeBiohazard,
+};
+
+export const ATOM_SKIN_BY_BOARD_THEME: Partial<Record<BoardTheme, AtomSkin>> = {
+  goldLab: "chrome",
+  neonPeriodic: "hologram",
+  quantumVoid: "crystal",
+  biohazard: "toxic",
+};
+
+export function isBoardThemeUnlocked(
+  theme: BoardTheme,
+  state: { hasProPack: boolean; ownedThemeProducts: ProductId[] },
+): boolean {
+  if (theme === "reactor") return true;
+  if (theme === "cryo" || theme === "forge") return state.hasProPack;
+  const productId = THEME_PRODUCT_BY_BOARD_THEME[theme];
+  return productId ? state.ownedThemeProducts.includes(productId) : false;
+}
+
+export function isAtomSkinUnlocked(
+  skin: AtomSkin,
+  state: { hasProPack: boolean; ownedThemeProducts: ProductId[] },
+): boolean {
+  if (skin === "classic") return true;
+  const theme = (Object.entries(ATOM_SKIN_BY_BOARD_THEME) as [BoardTheme, AtomSkin][]).find(
+    ([, candidate]) => candidate === skin,
+  )?.[0];
+  return theme ? isBoardThemeUnlocked(theme, state) : false;
 }
 
 export const DEFAULT_PLAYER_DISPLAY_NAME = "You";
@@ -289,6 +340,8 @@ interface ProgressState {
   musicVolume: number; // 0-100
   appTheme: AppTheme;
   boardTheme: BoardTheme;
+  atomSkin: AtomSkin;
+  ownedThemeProducts: ProductId[];
   appLanguage: AppLanguage;
   shootingStyle: "hold" | "press";
   hasChosenShootingStyle: boolean;
@@ -377,6 +430,8 @@ interface ProgressState {
   setMusicVolume: (volume: number) => void;
   setAppTheme: (theme: AppTheme) => void;
   setBoardTheme: (theme: BoardTheme) => void;
+  setAtomSkin: (skin: AtomSkin) => void;
+  grantThemeProduct: (productId: ProductId) => void;
   setAppLanguage: (language: AppLanguage) => void;
   setPlayerDisplayName: (name: string) => void;
   toggleAppTheme: () => void;
@@ -412,6 +467,8 @@ export const useProgress = create<ProgressState>()(
       musicVolume: 100,
       appTheme: "dark",
       boardTheme: "reactor",
+      atomSkin: "classic",
+      ownedThemeProducts: [],
       appLanguage: DEFAULT_LANGUAGE,
       shootingStyle: "hold",
       hasChosenShootingStyle: false,
@@ -1065,9 +1122,19 @@ export const useProgress = create<ProgressState>()(
       setAppTheme: (theme) => set({ appTheme: theme }),
       setBoardTheme: (theme) =>
         set((s) => ({
-          boardTheme:
-            isBoardTheme(theme) && (theme === "reactor" || s.hasProPack) ? theme : "reactor",
+          boardTheme: isBoardTheme(theme) && isBoardThemeUnlocked(theme, s) ? theme : "reactor",
         })),
+      setAtomSkin: (skin) =>
+        set((s) => ({
+          atomSkin: isAtomSkin(skin) && isAtomSkinUnlocked(skin, s) ? skin : "classic",
+        })),
+      grantThemeProduct: (productId) =>
+        set((s) =>
+          !(THEME_BUNDLE_PRODUCT_IDS as readonly ProductId[]).includes(productId) ||
+          s.ownedThemeProducts.includes(productId)
+            ? s
+            : { ownedThemeProducts: [...s.ownedThemeProducts, productId] },
+        ),
       setAppLanguage: (language) => set({ appLanguage: normalizeLanguage(language) }),
       setPlayerDisplayName: (name) => set({ playerDisplayName: normalizePlayerDisplayName(name) }),
       toggleAppTheme: () => set((s) => ({ appTheme: s.appTheme === "dark" ? "light" : "dark" })),
@@ -1093,6 +1160,8 @@ export const useProgress = create<ProgressState>()(
           musicVolume: 100,
           appTheme: "dark",
           boardTheme: "reactor",
+          atomSkin: "classic",
+          ownedThemeProducts: [],
           appLanguage: DEFAULT_LANGUAGE,
           shootingStyle: "hold",
           hasChosenShootingStyle: false,
@@ -1168,6 +1237,16 @@ export const useProgress = create<ProgressState>()(
           boardTheme: isBoardTheme(persistedState?.boardTheme)
             ? persistedState.boardTheme
             : current.boardTheme,
+          ownedThemeProducts: Array.isArray(persistedState?.ownedThemeProducts)
+            ? persistedState.ownedThemeProducts.filter(
+                (id): id is ProductId =>
+                  typeof id === "string" &&
+                  (THEME_BUNDLE_PRODUCT_IDS as readonly string[]).includes(id),
+              )
+            : current.ownedThemeProducts,
+          atomSkin: isAtomSkin(persistedState?.atomSkin)
+            ? persistedState.atomSkin
+            : current.atomSkin,
           appLanguage: normalizeLanguage(persistedState?.appLanguage),
           shootingStyle: persistedState?.shootingStyle ?? current.shootingStyle,
           hasChosenShootingStyle:

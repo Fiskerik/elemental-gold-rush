@@ -1,8 +1,18 @@
-import { BOARD_THEMES, type BoardTheme, useProgress } from "./store";
+import {
+  ATOM_SKINS,
+  ATOM_SKIN_BY_BOARD_THEME,
+  BOARD_THEMES,
+  isAtomSkinUnlocked,
+  isBoardThemeUnlocked,
+  type AtomSkin,
+  type BoardTheme,
+  useProgress,
+} from "./store";
+import type { ProductId } from "./products";
 import { setMusicVolume, setSfxVolume, startAmbientMusic, stopAmbientMusic } from "./audio";
 import { isNativePlatform, useIsTabletLayout } from "./responsive";
 
-export function Settings({ onBack }: { onBack: () => void }) {
+export function Settings({ onBack, onOpenShop }: { onBack: () => void; onOpenShop?: () => void }) {
   const isTabletLayout = useIsTabletLayout();
   const {
     soundEnabled,
@@ -12,6 +22,8 @@ export function Settings({ onBack }: { onBack: () => void }) {
     musicVolume,
     appTheme,
     boardTheme,
+    atomSkin,
+    ownedThemeProducts,
     hasProPack,
     shootingStyle,
     webBoardWide,
@@ -22,6 +34,7 @@ export function Settings({ onBack }: { onBack: () => void }) {
     setMusicVolume: setMusicVolumeStore,
     toggleAppTheme,
     setBoardTheme,
+    setAtomSkin,
     setShootingStyle,
     setWebBoardWide,
     reset,
@@ -91,9 +104,18 @@ export function Settings({ onBack }: { onBack: () => void }) {
             onToggle={toggleAppTheme}
           />
           <BoardThemePicker
-            value={hasProPack ? boardTheme : "reactor"}
+            value={boardTheme}
             hasProPack={hasProPack}
+            ownedThemeProducts={ownedThemeProducts}
             onChange={setBoardTheme}
+            onOpenShop={onOpenShop}
+          />
+          <AtomSkinPicker
+            value={atomSkin}
+            hasProPack={hasProPack}
+            ownedThemeProducts={ownedThemeProducts}
+            onChange={setAtomSkin}
+            onOpenShop={onOpenShop}
           />
           <Row
             label={`Play style: ${shootingStyle === "hold" ? "Hold" : "Press"}`}
@@ -141,17 +163,38 @@ const BOARD_THEME_LABELS: Record<BoardTheme, string> = {
   reactor: "Reactor",
   cryo: "Cryo Core",
   forge: "Solar Forge",
+  goldLab: "Gold Lab",
+  neonPeriodic: "Neon Periodic",
+  quantumVoid: "Quantum Void",
+  biohazard: "Biohazard",
 };
 
-function BoardThemePicker({
+const BOARD_THEME_UNLOCK_KIND: Record<BoardTheme, "free" | "pro" | "buy"> = {
+  reactor: "free",
+  cryo: "pro",
+  forge: "pro",
+  goldLab: "buy",
+  neonPeriodic: "buy",
+  quantumVoid: "buy",
+  biohazard: "buy",
+};
+
+export function BoardThemePicker({
   value,
   hasProPack,
+  ownedThemeProducts,
   onChange,
+  onOpenShop,
 }: {
   value: BoardTheme;
   hasProPack: boolean;
+  ownedThemeProducts: ProductId[];
   onChange: (theme: BoardTheme) => void;
+  onOpenShop?: () => void;
 }) {
+  const anyLocked = BOARD_THEMES.some(
+    (theme) => !isBoardThemeUnlocked(theme, { hasProPack, ownedThemeProducts }),
+  );
   return (
     <section
       style={{
@@ -166,21 +209,37 @@ function BoardThemePicker({
     >
       <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
         <strong>Board theme</strong>
-        {!hasProPack && (
-          <span style={{ color: "var(--accent)", fontSize: 12, fontWeight: 900 }}>Pro skins</span>
+        {anyLocked && onOpenShop && (
+          <button
+            type="button"
+            onClick={onOpenShop}
+            style={{
+              background: "none",
+              border: "none",
+              padding: 0,
+              color: "var(--accent)",
+              fontSize: 12,
+              fontWeight: 900,
+              cursor: "pointer",
+            }}
+          >
+            Buy in Shop →
+          </button>
         )}
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8 }}>
         {BOARD_THEMES.map((theme) => {
-          const locked = theme !== "reactor" && !hasProPack;
+          const locked = !isBoardThemeUnlocked(theme, { hasProPack, ownedThemeProducts });
           const active = value === theme;
           const label = BOARD_THEME_LABELS[theme];
+          const unlockKind = BOARD_THEME_UNLOCK_KIND[theme];
+          const badge = unlockKind === "pro" ? "Pro" : unlockKind === "buy" ? "Buy" : null;
           return (
             <button
               key={theme}
               type="button"
-              disabled={locked}
-              onClick={() => onChange(theme)}
+              aria-disabled={locked}
+              onClick={() => (locked ? onOpenShop?.() : onChange(theme))}
               style={{
                 minHeight: 72,
                 display: "grid",
@@ -194,7 +253,7 @@ function BoardThemePicker({
                   : "var(--surface-high)",
                 color: locked ? "var(--muted-foreground)" : "var(--foreground)",
                 opacity: locked ? 0.56 : 1,
-                cursor: locked ? "not-allowed" : "pointer",
+                cursor: locked ? (onOpenShop ? "pointer" : "not-allowed") : "pointer",
                 textAlign: "left",
               }}
             >
@@ -209,7 +268,7 @@ function BoardThemePicker({
                 }}
               >
                 {label}
-                {locked && (
+                {locked && badge && (
                   <span
                     style={{
                       fontSize: 8,
@@ -218,7 +277,7 @@ function BoardThemePicker({
                       textTransform: "uppercase",
                     }}
                   >
-                    Pro
+                    {badge}
                   </span>
                 )}
               </span>
@@ -231,11 +290,163 @@ function BoardThemePicker({
   );
 }
 
+const ATOM_SKIN_LABELS: Record<AtomSkin, string> = {
+  classic: "Classic",
+  chrome: "Chrome",
+  hologram: "Hologram",
+  crystal: "Crystal",
+  toxic: "Toxic",
+};
+
+const BOARD_THEME_BY_ATOM_SKIN = Object.fromEntries(
+  Object.entries(ATOM_SKIN_BY_BOARD_THEME).map(([theme, skin]) => [skin, theme as BoardTheme]),
+) as Partial<Record<AtomSkin, BoardTheme>>;
+
+export function AtomSkinPicker({
+  value,
+  hasProPack,
+  ownedThemeProducts,
+  onChange,
+  onOpenShop,
+}: {
+  value: AtomSkin;
+  hasProPack: boolean;
+  ownedThemeProducts: ProductId[];
+  onChange: (skin: AtomSkin) => void;
+  onOpenShop?: () => void;
+}) {
+  return (
+    <section
+      style={{
+        display: "grid",
+        gap: 8,
+        padding: "14px 16px",
+        background: "var(--surface)",
+        border: "1px solid var(--border)",
+        borderRadius: 12,
+      }}
+      aria-label="Atom skin"
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
+        <strong>Atom skin</strong>
+        {onOpenShop &&
+          ATOM_SKINS.some(
+            (skin) => !isAtomSkinUnlocked(skin, { hasProPack, ownedThemeProducts }),
+          ) && (
+            <button
+              type="button"
+              onClick={onOpenShop}
+              style={{
+                background: "none",
+                border: "none",
+                padding: 0,
+                color: "var(--accent)",
+                fontSize: 12,
+                fontWeight: 900,
+                cursor: "pointer",
+              }}
+            >
+              Buy in Shop →
+            </button>
+          )}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8 }}>
+        {ATOM_SKINS.map((skin) => {
+          const locked = !isAtomSkinUnlocked(skin, { hasProPack, ownedThemeProducts });
+          const active = value === skin;
+          const bundleTheme = BOARD_THEME_BY_ATOM_SKIN[skin];
+          return (
+            <button
+              key={skin}
+              type="button"
+              aria-disabled={locked}
+              onClick={() => (locked ? onOpenShop?.() : onChange(skin))}
+              title={
+                locked && bundleTheme
+                  ? `Included with the ${BOARD_THEME_LABELS[bundleTheme]} theme`
+                  : undefined
+              }
+              style={{
+                minHeight: 60,
+                display: "grid",
+                alignContent: "space-between",
+                gap: 6,
+                padding: 10,
+                borderRadius: 10,
+                border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`,
+                background: active
+                  ? "color-mix(in oklch, var(--accent) 16%, var(--surface-high))"
+                  : "var(--surface-high)",
+                color: locked ? "var(--muted-foreground)" : "var(--foreground)",
+                opacity: locked ? 0.56 : 1,
+                cursor: locked ? (onOpenShop ? "pointer" : "not-allowed") : "pointer",
+                textAlign: "left",
+              }}
+            >
+              <span
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 6,
+                  fontSize: 12,
+                  fontWeight: 900,
+                }}
+              >
+                {ATOM_SKIN_LABELS[skin]}
+                {locked && (
+                  <span
+                    style={{
+                      fontSize: 8,
+                      letterSpacing: 0.6,
+                      color: "var(--accent)",
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    Buy
+                  </span>
+                )}
+              </span>
+              <AtomSkinSwatch skin={skin} />
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function AtomSkinSwatch({ skin }: { skin: AtomSkin }) {
+  const gradients: Record<AtomSkin, string> = {
+    classic: "radial-gradient(circle at 32% 28%, #ffe9a8, #d68a2c 65%, #241505)",
+    chrome: "radial-gradient(circle at 32% 28%, #ffffff, #b9c2c9 55%, #4a5157)",
+    hologram: "radial-gradient(circle at 32% 28%, #d6fbff, #35c7e6 55%, #0c3a47)",
+    crystal: "radial-gradient(circle at 32% 28%, #f1e6ff, #9a6fe0 55%, #2c1355)",
+    toxic: "radial-gradient(circle at 32% 28%, #ecffb0, #7ed321 55%, #1e3b06)",
+  };
+  return (
+    <span
+      aria-hidden="true"
+      style={{
+        width: 20,
+        height: 20,
+        borderRadius: "50%",
+        background: gradients[skin],
+        boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.22)",
+      }}
+    />
+  );
+}
+
 function ThemeSwatch({ theme }: { theme: BoardTheme }) {
   const gradients: Record<BoardTheme, string> = {
     reactor: "linear-gradient(135deg, #10252a, #0c1116 52%, #c27638)",
     cryo: "linear-gradient(135deg, #d7f5ff, #183040 52%, #4ca7d8)",
     forge: "linear-gradient(135deg, #ffce72, #2a1511 52%, #db5c32)",
+    goldLab: "linear-gradient(135deg, #ffe9a8, #241505 52%, #c9902c)",
+    neonPeriodic: "linear-gradient(135deg, #7af6ff, #120a24 52%, #ea5cff)",
+    quantumVoid: "linear-gradient(135deg, #b79bff, #07040f 52%, #4a2fa8)",
+    biohazard: "linear-gradient(135deg, #e4ff7a, #131c06 52%, #63c92c)",
   };
   return (
     <span

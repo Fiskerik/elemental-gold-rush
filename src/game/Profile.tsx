@@ -6,6 +6,7 @@ import { useIsTabletLayout } from "./responsive";
 import { SUPPORTED_LANGUAGES, t, toIntlLocale, type AppLanguage } from "./localization";
 import { COMPOUNDS } from "./compounds";
 import { BOSSES, type BossId } from "./bosses";
+import { BoardThemePicker } from "./Settings";
 import {
   authenticateGameCenter,
   getCachedGameCenterPlayerName,
@@ -36,9 +37,10 @@ import {
 
 interface Props {
   onBack: () => void;
+  onOpenShop?: () => void;
 }
 
-export function Profile({ onBack }: Props) {
+export function Profile({ onBack, onOpenShop }: Props) {
   const isTabletLayout = useIsTabletLayout();
   const [transactionsOpen, setTransactionsOpen] = useState(false);
   const [gameCenterBusy, setGameCenterBusy] = useState(false);
@@ -70,8 +72,11 @@ export function Profile({ onBack }: Props) {
     dailyCompoundBestScore,
     dailyBoardLeaderboardAchievementCounts,
     appTheme,
+    boardTheme,
+    ownedThemeProducts,
     appLanguage,
     setAppTheme,
+    setBoardTheme,
     setAppLanguage,
   } = useProgress();
   const tr = (text: string) => t(text, appLanguage);
@@ -480,6 +485,15 @@ export function Profile({ onBack }: Props) {
 
         <section style={card}>
           <div style={sectionHeading}>{tr("Display")}</div>
+          <div style={{ marginBottom: 14 }}>
+            <BoardThemePicker
+              value={boardTheme}
+              hasProPack={hasProPack}
+              ownedThemeProducts={ownedThemeProducts}
+              onChange={setBoardTheme}
+              onOpenShop={onOpenShop}
+            />
+          </div>
           <div style={preferenceRow}>
             <span style={preferenceLabel}>{tr("Theme")}</span>
             <div style={{ display: "inline-grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>

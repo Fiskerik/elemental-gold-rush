@@ -294,11 +294,21 @@ export function GameApp() {
     case "library":
       return withGlobalModals(<GameLibrary onBack={() => setScreen({ name: "menu" })} />);
     case "profile":
-      return withGlobalModals(<Profile onBack={() => setScreen({ name: "menu" })} />);
+      return withGlobalModals(
+        <Profile
+          onBack={() => setScreen({ name: "menu" })}
+          onOpenShop={() => setScreen({ name: "shop" })}
+        />,
+      );
     case "leaderboard":
       return withGlobalModals(<Leaderboard onBack={() => setScreen({ name: "menu" })} />);
     case "settings":
-      return withGlobalModals(<Settings onBack={() => setScreen({ name: "menu" })} />);
+      return withGlobalModals(
+        <Settings
+          onBack={() => setScreen({ name: "menu" })}
+          onOpenShop={() => setScreen({ name: "shop" })}
+        />,
+      );
   }
 }
 

@@ -6,6 +6,8 @@ export const PRODUCT_IDS = {
   coins100: "coins_100",
   themeGoldLab: "theme_gold_lab",
   themeNeonPeriodic: "theme_neon_periodic",
+  themeQuantumVoid: "theme_quantum_void",
+  themeBiohazard: "theme_biohazard",
 } as const;
 
 export type ProductId = (typeof PRODUCT_IDS)[keyof typeof PRODUCT_IDS];
@@ -16,6 +18,17 @@ export const APP_STORE_PURCHASE_PRODUCT_IDS = [
   PRODUCT_IDS.coins20,
   PRODUCT_IDS.coins50,
   PRODUCT_IDS.coins100,
+  PRODUCT_IDS.themeGoldLab,
+  PRODUCT_IDS.themeNeonPeriodic,
+  PRODUCT_IDS.themeQuantumVoid,
+  PRODUCT_IDS.themeBiohazard,
+] as const satisfies readonly ProductId[];
+
+export const THEME_BUNDLE_PRODUCT_IDS = [
+  PRODUCT_IDS.themeGoldLab,
+  PRODUCT_IDS.themeNeonPeriodic,
+  PRODUCT_IDS.themeQuantumVoid,
+  PRODUCT_IDS.themeBiohazard,
 ] as const satisfies readonly ProductId[];
 
 export interface ProductDefinition {
@@ -79,17 +92,48 @@ export const PRODUCTS: ProductDefinition[] = [
   },
   {
     id: PRODUCT_IDS.themeGoldLab,
-    name: "Gold Lab Theme",
-    description: "A premium cosmetic board theme for the Pro Lab Pack.",
+    name: "Gold Lab",
+    description: "A brass-and-amber laboratory board theme with a matching Chrome atom skin.",
     type: "non_consumable",
-    benefits: ["Adds a gold-tinted laboratory board style."],
+    benefits: [
+      "Warm brass-and-amber board theme.",
+      "Bundled Chrome atom skin with a polished metallic shine.",
+      "Purely cosmetic — no gameplay changes.",
+    ],
   },
   {
     id: PRODUCT_IDS.themeNeonPeriodic,
-    name: "Neon Periodic Theme",
-    description: "A premium cosmetic periodic-table theme for the Pro Lab Pack.",
+    name: "Neon Periodic",
+    description:
+      "A glowing periodic-table blueprint board theme with a matching Hologram atom skin.",
     type: "non_consumable",
-    benefits: ["Adds a neon periodic-table inspired board style."],
+    benefits: [
+      "Neon periodic-table grid board theme.",
+      "Bundled Hologram atom skin with a scanning wireframe glow.",
+      "Purely cosmetic — no gameplay changes.",
+    ],
+  },
+  {
+    id: PRODUCT_IDS.themeQuantumVoid,
+    name: "Quantum Void",
+    description: "A deep-space indigo board theme with a matching Crystal atom skin.",
+    type: "non_consumable",
+    benefits: [
+      "Starfield indigo board theme.",
+      "Bundled Crystal atom skin with faceted, glassy highlights.",
+      "Purely cosmetic — no gameplay changes.",
+    ],
+  },
+  {
+    id: PRODUCT_IDS.themeBiohazard,
+    name: "Biohazard",
+    description: "An acid-green containment-lab board theme with a matching Toxic atom skin.",
+    type: "non_consumable",
+    benefits: [
+      "Acid-green hazard-lab board theme.",
+      "Bundled Toxic atom skin with a bubbling, pulsing glow.",
+      "Purely cosmetic — no gameplay changes.",
+    ],
   },
 ];
 

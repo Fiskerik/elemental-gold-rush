@@ -4,7 +4,12 @@ import { Clapperboard } from "lucide-react";
 import { type InventoryPowerUpId, useProgress } from "./store";
 import { POWER_UP_UNLOCK_LEVELS } from "./powerUps";
 import { PowerUpBadge } from "./PowerUpLibrary";
-import { PRODUCT_IDS, getProductById, type ProductId } from "./products";
+import {
+  PRODUCT_IDS,
+  THEME_BUNDLE_PRODUCT_IDS,
+  getProductById,
+  type ProductId,
+} from "./products";
 import {
   clearCustomerInfoListener,
   debugNativePurchases,
@@ -95,6 +100,30 @@ const APP_STORE_COIN_PACKS = [
   PRODUCT_IDS.coins50,
   PRODUCT_IDS.coins100,
 ] as const;
+const THEME_BUNDLE_VISUALS: Partial<
+  Record<ProductId, { board: string; atom: string; skin: string }>
+> = {
+  [PRODUCT_IDS.themeGoldLab]: {
+    board: "linear-gradient(135deg, #ffe9a8, #241505 58%, #c9902c)",
+    atom: "radial-gradient(circle at 30% 25%, #fff, #aeb7bd 54%, #42484d)",
+    skin: "Chrome atoms",
+  },
+  [PRODUCT_IDS.themeNeonPeriodic]: {
+    board: "linear-gradient(135deg, #7af6ff, #120a24 58%, #ea5cff)",
+    atom: "radial-gradient(circle at 30% 25%, #d6fbff, #35c7e6 54%, #0c3a47)",
+    skin: "Hologram atoms",
+  },
+  [PRODUCT_IDS.themeQuantumVoid]: {
+    board: "linear-gradient(135deg, #b79bff, #07040f 58%, #4a2fa8)",
+    atom: "radial-gradient(circle at 30% 25%, #f1e6ff, #9a6fe0 54%, #2c1355)",
+    skin: "Crystal atoms",
+  },
+  [PRODUCT_IDS.themeBiohazard]: {
+    board: "linear-gradient(135deg, #e4ff7a, #131c06 58%, #63c92c)",
+    atom: "radial-gradient(circle at 30% 25%, #ecffb0, #7ed321 54%, #1e3b06)",
+    skin: "Toxic atoms",
+  },
+};
 const SHOP_PURCHASE_GUARD_TIMEOUT_MS = 60_000;
 
 function withTimeout<T>(
@@ -126,10 +155,13 @@ export function Shop({ onBack }: { onBack: () => void }) {
     reportQuestProgress,
     purchaseInventoryPowerUp,
     hasProPack,
+    ownedThemeProducts,
+    grantThemeProduct,
   } = useProgress();
   const [message, setMessage] = useState("");
   const [pendingProductId, setPendingProductId] = useState<ProductId | "rewarded" | null>(null);
   const [proPackMessage, setProPackMessage] = useState("");
+  const [cosmeticMessage, setCosmeticMessage] = useState("");
   const [proPackBusy, setProPackBusy] = useState<"purchase" | "restore" | "redeem" | "">("");
   const [purchaseDebugBusy, setPurchaseDebugBusy] = useState(false);
   const [purchaseDebugOpen, setPurchaseDebugOpen] = useState(false);
@@ -321,6 +353,61 @@ export function Shop({ onBack }: { onBack: () => void }) {
     } finally {
       logDebug("Coin purchase UI flow ended.", { productId });
       setPendingProductId(null);
+      if (purchaseDebugEnabled) refreshPurchaseDebugLogs();
+    }
+  }
+
+  async function handleThemePurchase(productId: ProductId) {
+    if (appStorePurchaseBusy || ownedThemeProducts.includes(productId)) return;
+    setPendingProductId(productId);
+    setCosmeticMessage("Preparing cosmetic purchase with App Store...");
+    try {
+      const result = await withTimeout(
+        () =>
+          purchaseProductWithResult(productId, (statusMessage) =>
+            setCosmeticMessage(statusMessage),
+          ),
+        SHOP_PURCHASE_GUARD_TIMEOUT_MS,
+        "App Store did not respond in time. Try again.",
+      );
+      if (result.purchased) {
+        grantThemeProduct(productId);
+        setCosmeticMessage(`${getProductById(productId)?.name ?? "Cosmetic bundle"} unlocked.`);
+        return;
+      }
+      setCosmeticMessage(result.reason ?? "This cosmetic bundle is not available right now.");
+    } catch (error) {
+      setCosmeticMessage(
+        error instanceof Error ? error.message : "App Store purchase could not be started.",
+      );
+    } finally {
+      setPendingProductId(null);
+      if (purchaseDebugEnabled) refreshPurchaseDebugLogs();
+    }
+  }
+
+  async function handleThemeRestore() {
+    if (appStorePurchaseBusy) return;
+    setProPackBusy("restore");
+    setCosmeticMessage("Checking App Store purchases...");
+    try {
+      const restored = await restorePurchases();
+      if (restored.includes(PRODUCT_IDS.proLabPack)) grantProPack();
+      const restoredThemes = restored.filter((productId) =>
+        (THEME_BUNDLE_PRODUCT_IDS as readonly ProductId[]).includes(productId),
+      );
+      restoredThemes.forEach(grantThemeProduct);
+      setCosmeticMessage(
+        restoredThemes.length
+          ? `${restoredThemes.length} cosmetic bundle${restoredThemes.length === 1 ? "" : "s"} restored.`
+          : "No cosmetic bundle purchases were found.",
+      );
+    } catch (error) {
+      setCosmeticMessage(
+        error instanceof Error ? error.message : "Purchases could not be restored.",
+      );
+    } finally {
+      setProPackBusy("");
       if (purchaseDebugEnabled) refreshPurchaseDebugLogs();
     }
   }
@@ -657,6 +744,153 @@ export function Shop({ onBack }: { onBack: () => void }) {
             {proPackMessage && (
               <p style={{ margin: "12px 0 0", color: "var(--muted-foreground)", fontSize: 12 }}>
                 {proPackMessage}
+              </p>
+            )}
+          </section>
+        )}
+
+        {isNativeIos && (
+          <section
+            style={{
+              background: "var(--surface-elevated)",
+              border: "1px solid var(--border)",
+              borderRadius: 18,
+              padding: 18,
+              boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 12,
+                marginBottom: 8,
+              }}
+            >
+              <div>
+                <div
+                  style={{
+                    fontSize: 11,
+                    letterSpacing: 2,
+                    color: "var(--accent)",
+                    fontWeight: 800,
+                    marginBottom: 6,
+                  }}
+                >
+                  COSMETIC BUNDLES
+                </div>
+                <h2 style={{ margin: 0, fontSize: 22, fontWeight: 900 }}>
+                  Boards + atom skins
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={handleThemeRestore}
+                disabled={appStorePurchaseBusy || purchaseDebugLocked}
+                style={{
+                  ...secondaryShopButton,
+                  padding: "8px 11px",
+                  opacity: appStorePurchaseBusy || purchaseDebugLocked ? 0.55 : 1,
+                }}
+              >
+                {proPackBusy === "restore" ? "Checking..." : "Restore"}
+              </button>
+            </div>
+            <p style={{ margin: "0 0 14px", color: "var(--muted-foreground)", fontSize: 13 }}>
+              Each one-time purchase unlocks a board and its matching atom finish. Element colors
+              and gameplay remain unchanged.
+            </p>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: isTabletLayout
+                  ? "repeat(2, minmax(0, 1fr))"
+                  : "1fr",
+                gap: 10,
+              }}
+            >
+              {THEME_BUNDLE_PRODUCT_IDS.map((productId) => {
+                const product = getProductById(productId);
+                const visual = THEME_BUNDLE_VISUALS[productId];
+                if (!product || !visual) return null;
+                const owned = ownedThemeProducts.includes(productId);
+                const pending = pendingProductId === productId;
+                const disabled = owned || appStorePurchaseBusy || purchaseDebugLocked;
+                return (
+                  <article
+                    key={productId}
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "72px minmax(0, 1fr)",
+                      gap: 12,
+                      padding: 12,
+                      borderRadius: 14,
+                      border: `1px solid ${owned ? "var(--accent)" : "var(--border)"}`,
+                      background: "var(--surface)",
+                    }}
+                  >
+                    <div
+                      aria-hidden="true"
+                      style={{
+                        position: "relative",
+                        minHeight: 82,
+                        borderRadius: 12,
+                        background: visual.board,
+                        boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.14)",
+                      }}
+                    >
+                      <span
+                        style={{
+                          position: "absolute",
+                          width: 34,
+                          height: 34,
+                          left: 19,
+                          top: 24,
+                          borderRadius: "50%",
+                          background: visual.atom,
+                          boxShadow: "0 0 14px rgba(255,255,255,0.28)",
+                        }}
+                      />
+                    </div>
+                    <div style={{ minWidth: 0, display: "grid", gap: 7 }}>
+                      <div>
+                        <strong style={{ display: "block", fontSize: 15 }}>{product.name}</strong>
+                        <span style={{ color: "var(--accent)", fontSize: 11, fontWeight: 800 }}>
+                          {visual.skin}
+                        </span>
+                      </div>
+                      <p
+                        style={{
+                          margin: 0,
+                          color: "var(--muted-foreground)",
+                          fontSize: 11,
+                          lineHeight: 1.35,
+                        }}
+                      >
+                        {product.description}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => handleThemePurchase(productId)}
+                        disabled={disabled}
+                        style={{
+                          ...(owned ? secondaryShopButton : shopButton),
+                          padding: "8px 10px",
+                          opacity: disabled && !owned ? 0.55 : 1,
+                          cursor: disabled ? "not-allowed" : "pointer",
+                        }}
+                      >
+                        {owned ? "Owned" : pending ? "Opening..." : "Buy in App Store"}
+                      </button>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+            {cosmeticMessage && (
+              <p style={{ margin: "12px 0 0", color: "var(--muted-foreground)", fontSize: 12 }}>
+                {cosmeticMessage}
               </p>
             )}
           </section>
