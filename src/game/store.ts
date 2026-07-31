@@ -1070,18 +1070,24 @@ export const useProgress = create<ProgressState>()(
           const { levels: labUpgradeLevels, changed: grantedUpgrade } =
             grantUnlockedProStarterUpgrades(normalizedLevels, s.unlockedLevel);
           if (s.hasProPack && s.proStarterCoinsGranted && !grantedUpgrade) return s;
-          const coinDelta = shouldGrantStarter ? 100 + refundCoins : 0;
+          // Do not grant a large starter balance: it can be spent immediately
+          // on collection unlocks and bypasses the intended progression.
+          const coinDelta = shouldGrantStarter ? refundCoins : 0;
           const balanceAfter = s.goldCoins + coinDelta;
           return {
             hasProPack: true,
             proStarterCoinsGranted: true,
-            goldCoins: balanceAfter,
-            coinTransactions: appendCoinTransaction(
-              s.coinTransactions,
-              coinDelta,
-              balanceAfter,
-              "Pro Lab Pack coins",
-            ),
+            ...(coinDelta > 0
+              ? {
+                  goldCoins: balanceAfter,
+                  coinTransactions: appendCoinTransaction(
+                    s.coinTransactions,
+                    coinDelta,
+                    balanceAfter,
+                    "Pro Lab Pack coins",
+                  ),
+                }
+              : {}),
             labUpgradeLevels,
           };
         }),

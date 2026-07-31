@@ -695,7 +695,6 @@ export function Shop({ onBack }: { onBack: () => void }) {
             <div style={{ display: "grid", gap: 7, marginBottom: 14 }}>
               <Benefit text="Remove forced interstitial ads." />
               <Benefit text="Unlock the Pro Lab profile badge." />
-              <Benefit text="Get 100 starting gold coins." />
               <Benefit text="Daily quest claims pay 10 gold coins instead of 3." />
               <Benefit text="Daily challenges award 5 gold coins each instead of 3." />
               <Benefit text="Level 1 upgrade to all power-ups (10 coin refund each for already upgraded)." />
