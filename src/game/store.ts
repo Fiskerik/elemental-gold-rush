@@ -139,7 +139,7 @@ export function isBoardTheme(value: unknown): value is BoardTheme {
   return typeof value === "string" && (BOARD_THEMES as readonly string[]).includes(value);
 }
 
-export const ATOM_SKINS = ["classic", "chrome", "hologram", "crystal", "toxic"] as const;
+export const ATOM_SKINS = ["classic", "chrome", "hologram", "crystal", "mineral", "toxic"] as const;
 export type AtomSkin = (typeof ATOM_SKINS)[number];
 
 export function isAtomSkin(value: unknown): value is AtomSkin {
@@ -160,6 +160,16 @@ export const ATOM_SKIN_BY_BOARD_THEME: Partial<Record<BoardTheme, AtomSkin>> = {
   biohazard: "toxic",
 };
 
+// A theme may unlock more than its automatically selected skin. Crystal Cove
+// includes both the glassy Crystal Core and the faceted Mineral construction.
+export const BOARD_THEME_BY_ATOM_SKIN: Partial<Record<AtomSkin, BoardTheme>> = {
+  chrome: "goldLab",
+  hologram: "neonPeriodic",
+  crystal: "quantumVoid",
+  mineral: "quantumVoid",
+  toxic: "biohazard",
+};
+
 export function isBoardThemeUnlocked(
   theme: BoardTheme,
   state: { hasProPack: boolean; ownedThemeProducts: ProductId[] },
@@ -176,9 +186,7 @@ export function isAtomSkinUnlocked(
   state: { hasProPack: boolean; ownedThemeProducts: ProductId[] },
 ): boolean {
   if (skin === "classic") return true;
-  const theme = (Object.entries(ATOM_SKIN_BY_BOARD_THEME) as [BoardTheme, AtomSkin][]).find(
-    ([, candidate]) => candidate === skin,
-  )?.[0];
+  const theme = BOARD_THEME_BY_ATOM_SKIN[skin];
   return theme ? isBoardThemeUnlocked(theme, state) : false;
 }
 

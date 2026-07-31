@@ -58,14 +58,20 @@ export const ElementBall = memo(function ElementBall({
   const unstableDashArray = Array.from({ length: unstableMaxSegments }, (_, index) =>
     index < unstableSegments ? `${unstableDash} ${unstableGap}` : `0 ${unstableSegment}`,
   ).join(" ");
-  const skinRingWidth = Math.max(1, size * 0.025);
-  const skinRing: Record<AtomSkin, string> = {
-    classic: "",
-    chrome: `, 0 0 0 ${skinRingWidth}px oklch(1 0 0 / 0.58), inset 0 0 ${size * 0.18}px oklch(1 0 0 / 0.25)`,
-    hologram: `, 0 0 0 ${skinRingWidth}px oklch(0.86 0.18 205 / 0.68), 0 0 ${size * 0.16}px oklch(0.72 0.2 315 / 0.34)`,
-    crystal: `, 0 0 0 ${skinRingWidth}px oklch(1 0 0 / 0.7), inset 0 0 ${size * 0.22}px oklch(1 0 0 / 0.3)`,
-    toxic: `, 0 0 0 ${skinRingWidth}px oklch(0.82 0.18 138 / 0.7), inset 0 0 ${size * 0.18}px oklch(0.22 0.07 135 / 0.28)`,
+  const baseBackground = `radial-gradient(circle at 30% 28%, ${el.glowColor}, ${el.color} 65%, oklch(0 0 0 / 0.35))`;
+  const skinBackground: Record<AtomSkin, string> = {
+    classic: baseBackground,
+    chrome: `radial-gradient(circle at 27% 22%, color-mix(in oklch, ${el.glowColor} 78%, white) 0 7%, transparent 24%), radial-gradient(circle at 35% 30%, ${el.glowColor}, ${el.color} 68%, color-mix(in oklch, ${el.color} 62%, black))`,
+    hologram: `radial-gradient(circle at 31% 24%, color-mix(in oklch, ${el.glowColor} 70%, white), transparent 32%), radial-gradient(circle at 56% 59%, color-mix(in oklch, ${el.color} 78%, white), ${el.color} 64%, color-mix(in oklch, ${el.color} 64%, #5c6295))`,
+    crystal: `radial-gradient(circle at 31% 24%, color-mix(in oklch, ${el.glowColor} 74%, white), transparent 30%), radial-gradient(circle at 50% 52%, color-mix(in oklch, ${el.color} 70%, white), ${el.color} 62%, color-mix(in oklch, ${el.color} 56%, #10152f))`,
+    mineral: "transparent",
+    toxic: `radial-gradient(circle at 30% 24%, ${el.glowColor}, ${el.color} 58%, color-mix(in oklch, ${el.color} 55%, #12220c))`,
   };
+  const materialVariables = {
+    "--atom-color": el.color,
+    "--atom-glow-color": el.glowColor,
+    "--atom-dark-color": `color-mix(in oklch, ${el.color} 58%, black)`,
+  } as React.CSSProperties;
   return (
     <div
       onClick={onClick}
@@ -81,12 +87,12 @@ export const ElementBall = memo(function ElementBall({
         height: size,
         borderRadius: "50%",
         position: "relative",
-        background: `radial-gradient(circle at 30% 28%, ${el.glowColor}, ${el.color} 65%, oklch(0 0 0 / 0.35))`,
-        boxShadow:
-          (glow
-            ? `0 0 ${size * 0.45}px ${el.glowColor}99, inset 0 -${size * 0.12}px ${size * 0.12}px oklch(0 0 0 / 0.35)`
-            : `0 ${size * 0.06}px ${size * 0.12}px oklch(0 0 0 / 0.45), inset 0 -${size * 0.1}px ${size * 0.12}px oklch(0 0 0 / 0.3), inset 0 ${size * 0.08}px ${size * 0.1}px oklch(1 0 0 / 0.18)`) +
-          skinRing[atomSkin],
+        background: skinBackground[atomSkin],
+        boxShadow: glow
+          ? `0 0 ${size * 0.45}px ${el.glowColor}99, inset 0 -${size * 0.12}px ${size * 0.12}px oklch(0 0 0 / 0.35)`
+          : atomSkin === "mineral"
+            ? "none"
+            : `0 ${size * 0.06}px ${size * 0.12}px oklch(0 0 0 / 0.45), inset 0 -${size * 0.1}px ${size * 0.12}px oklch(0 0 0 / 0.3), inset 0 ${size * 0.08}px ${size * 0.1}px oklch(1 0 0 / 0.18)`,
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
@@ -101,9 +107,17 @@ export const ElementBall = memo(function ElementBall({
           : highlight
             ? "pop-in 320ms ease-out, pulse-glow 1.6s ease-in-out infinite 320ms"
             : undefined,
+        ...materialVariables,
         ...style,
       }}
     >
+      {atomSkin === "mineral" && (
+        <>
+          <div aria-hidden="true" className="atom-mineral-shadow" />
+          <div aria-hidden="true" className="atom-mineral-surface" />
+        </>
+      )}
+      {atomSkin === "crystal" && <div aria-hidden="true" className="atom-crystal-core" />}
       {atomSkin !== "classic" && (
         <div
           aria-hidden="true"
@@ -145,10 +159,38 @@ export const ElementBall = memo(function ElementBall({
           />
         </svg>
       )}
-      <div style={{ fontSize: numberSize, lineHeight: 1, opacity: 0.85 }}>{el.atomicNumber}</div>
-      <div style={{ fontSize: symbolSize, lineHeight: 1, fontWeight: 900 }}>{el.symbol}</div>
+      <div
+        style={{
+          position: "relative",
+          zIndex: 2,
+          fontSize: numberSize,
+          lineHeight: 1,
+          opacity: 0.85,
+        }}
+      >
+        {el.atomicNumber}
+      </div>
+      <div
+        style={{
+          position: "relative",
+          zIndex: 2,
+          fontSize: symbolSize,
+          lineHeight: 1,
+          fontWeight: 900,
+        }}
+      >
+        {el.symbol}
+      </div>
       {showMass && (
-        <div style={{ fontSize: numberSize * 0.85, lineHeight: 1, opacity: 0.7 }}>
+        <div
+          style={{
+            position: "relative",
+            zIndex: 2,
+            fontSize: numberSize * 0.85,
+            lineHeight: 1,
+            opacity: 0.7,
+          }}
+        >
           {el.atomicMass}
         </div>
       )}

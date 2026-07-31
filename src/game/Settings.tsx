@@ -1,6 +1,6 @@
 import {
   ATOM_SKINS,
-  ATOM_SKIN_BY_BOARD_THEME,
+  BOARD_THEME_BY_ATOM_SKIN,
   BOARD_THEMES,
   isAtomSkinUnlocked,
   isBoardThemeUnlocked,
@@ -163,10 +163,10 @@ const BOARD_THEME_LABELS: Record<BoardTheme, string> = {
   reactor: "Reactor",
   cryo: "Cryo Core",
   forge: "Solar Forge",
-  goldLab: "Gold Lab",
-  neonPeriodic: "Neon Periodic",
-  quantumVoid: "Quantum Void",
-  biohazard: "Biohazard",
+  goldLab: "Gummy Lab",
+  neonPeriodic: "Cloud Nine",
+  quantumVoid: "Crystal Cove",
+  biohazard: "Radioactive",
 };
 
 const BOARD_THEME_UNLOCK_KIND: Record<BoardTheme, "free" | "pro" | "buy"> = {
@@ -292,15 +292,12 @@ export function BoardThemePicker({
 
 const ATOM_SKIN_LABELS: Record<AtomSkin, string> = {
   classic: "Classic",
-  chrome: "Marble",
-  hologram: "Prism",
-  crystal: "Glass",
-  toxic: "Bubbles",
+  chrome: "Gummy",
+  hologram: "Cloud Glass",
+  crystal: "Crystal Core",
+  mineral: "Mineral",
+  toxic: "Irradiated",
 };
-
-const BOARD_THEME_BY_ATOM_SKIN = Object.fromEntries(
-  Object.entries(ATOM_SKIN_BY_BOARD_THEME).map(([theme, skin]) => [skin, theme as BoardTheme]),
-) as Partial<Record<AtomSkin, BoardTheme>>;
 
 export function AtomSkinPicker({
   value,
@@ -420,13 +417,15 @@ function AtomSkinSwatch({ skin }: { skin: AtomSkin }) {
   const gradients: Record<AtomSkin, string> = {
     classic: "radial-gradient(circle at 32% 28%, #ffe9a8, #d68a2c 65%, #241505)",
     chrome:
-      "linear-gradient(132deg, transparent 30%, rgba(255,255,255,.8) 34%, transparent 40%), radial-gradient(circle at 32% 28%, #ffe9a8, #d68a2c 65%, #241505)",
+      "radial-gradient(circle at 68% 68%, rgba(255,255,255,.36) 0 9%, transparent 10%), linear-gradient(145deg, rgba(255,255,255,.58), transparent 30%), radial-gradient(circle at 32% 28%, #ffe9a8, #d68a2c 65%, #241505)",
     hologram:
-      "linear-gradient(165deg, rgba(88,239,255,.38), transparent 42%, rgba(238,92,255,.32)), radial-gradient(circle at 32% 28%, #ffe9a8, #d68a2c 65%, #241505)",
+      "radial-gradient(ellipse at 32% 30%, rgba(255,255,255,.62), transparent 30%), linear-gradient(165deg, rgba(117,220,255,.3), transparent 42%, rgba(255,148,222,.28)), radial-gradient(circle at 32% 28%, #ffe9a8, #d68a2c 65%, #241505)",
     crystal:
-      "conic-gradient(from 25deg, transparent, rgba(255,255,255,.48), transparent 28% 62%, rgba(255,255,255,.3), transparent 78%), radial-gradient(circle at 32% 28%, #ffe9a8, #d68a2c 65%, #241505)",
+      "linear-gradient(55deg, transparent 46%, rgba(255,255,255,.5) 48% 50%, transparent 52%), conic-gradient(from 25deg, transparent, rgba(255,255,255,.38), transparent 28% 62%, rgba(120,225,255,.22), transparent 78%), radial-gradient(circle at 32% 28%, #ffe9a8, #d68a2c 65%, #241505)",
+    mineral:
+      "linear-gradient(125deg, rgba(255,255,255,.45) 0 17%, transparent 18% 54%, rgba(75,34,8,.28) 55%), conic-gradient(from 12deg, #ffd775, #b86b24, #ffe6a5, #8f4c17, #ffd775)",
     toxic:
-      "radial-gradient(circle at 68% 66%, rgba(255,255,255,.55) 0 8%, transparent 9%), radial-gradient(circle at 42% 72%, rgba(255,255,255,.38) 0 6%, transparent 7%), radial-gradient(circle at 32% 28%, #ffe9a8, #d68a2c 65%, #241505)",
+      "radial-gradient(circle at 67% 68%, rgba(14,30,10,.55) 0 7%, transparent 9%), radial-gradient(circle at 42% 72%, rgba(205,255,105,.42) 0 6%, transparent 8%), linear-gradient(145deg, rgba(184,255,76,.3), transparent 42%), radial-gradient(circle at 32% 28%, #ffe9a8, #d68a2c 65%, #241505)",
   };
   return (
     <span
@@ -434,9 +433,13 @@ function AtomSkinSwatch({ skin }: { skin: AtomSkin }) {
       style={{
         width: 20,
         height: 20,
-        borderRadius: "50%",
+        borderRadius: skin === "mineral" ? 3 : "50%",
+        clipPath:
+          skin === "mineral"
+            ? "polygon(50% 0%, 82% 12%, 100% 42%, 88% 78%, 58% 100%, 22% 91%, 0% 58%, 12% 23%)"
+            : undefined,
         background: gradients[skin],
-        boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.22)",
+        boxShadow: "inset 2px 2px 4px rgba(255,255,255,0.2), inset -2px -2px 4px rgba(0,0,0,0.18)",
       }}
     />
   );
@@ -447,10 +450,10 @@ function ThemeSwatch({ theme }: { theme: BoardTheme }) {
     reactor: "linear-gradient(135deg, #10252a, #0c1116 52%, #c27638)",
     cryo: "linear-gradient(135deg, #d7f5ff, #183040 52%, #4ca7d8)",
     forge: "linear-gradient(135deg, #ffce72, #2a1511 52%, #db5c32)",
-    goldLab: "linear-gradient(135deg, #ffe9a8, #241505 52%, #c9902c)",
-    neonPeriodic: "linear-gradient(135deg, #7af6ff, #120a24 52%, #ea5cff)",
-    quantumVoid: "linear-gradient(135deg, #b79bff, #07040f 52%, #4a2fa8)",
-    biohazard: "linear-gradient(135deg, #e4ff7a, #131c06 52%, #63c92c)",
+    goldLab: "url('/themes/gummy-lab.webp') center 58% / cover no-repeat",
+    neonPeriodic: "url('/themes/cloud-nine.webp') center 46% / cover no-repeat",
+    quantumVoid: "url('/themes/crystal-cove.webp') center 58% / cover no-repeat",
+    biohazard: "url('/themes/radioactive-reactor.webp') center 58% / cover no-repeat",
   };
   return (
     <span
