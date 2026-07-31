@@ -615,7 +615,9 @@ export const useProgress = create<ProgressState>()(
           if (s.unlockedLevel < POWER_UP_UNLOCK_LEVELS[id]) return s;
           const levels = normalizeLabUpgradeLevels(s.labUpgradeLevels);
           const current = levels[id] ?? 0;
-          const cap = getLabUpgradeLevelCap(s.unlockedLevel);
+          const cap = s.hasProPack
+            ? LAB_UPGRADE_COSTS.length
+            : getLabUpgradeLevelCap(s.unlockedLevel);
           if (current >= cap || current >= LAB_UPGRADE_COSTS.length) return s;
           const cost = LAB_UPGRADE_COSTS[current];
           if (s.goldCoins < cost) return s;

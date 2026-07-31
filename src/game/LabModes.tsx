@@ -23,6 +23,7 @@ interface Props {
 export function LabModes({ onBack, onStart }: Props) {
   const isTabletLayout = useIsTabletLayout();
   const unlockedLevel = useProgress((s) => s.unlockedLevel);
+  const hasProPack = useProgress((s) => s.hasProPack);
   const levelStats = useProgress((s) => s.levelStats);
   const goldCoins = useProgress((s) => s.goldCoins);
   const labUpgradeLevels = useProgress((s) => s.labUpgradeLevels);
@@ -32,7 +33,7 @@ export function LabModes({ onBack, onStart }: Props) {
   const revealSecretCompound = useProgress((s) => s.revealSecretCompound);
   const upgradeLabPowerUp = useProgress((s) => s.upgradeLabPowerUp);
   const toggleLabUpgrade = useProgress((s) => s.toggleLabUpgrade);
-  const labLevelCap = getLabUpgradeLevelCap(unlockedLevel);
+  const labLevelCap = hasProPack ? 5 : getLabUpgradeLevelCap(unlockedLevel);
   const unlockedModes = new Set(getUnlockedGameModes(unlockedLevel).map((mode) => mode.id));
   const levelId = Math.min(unlockedLevel, MAX_LEVEL);
   const latestStandardLevel =
@@ -47,6 +48,7 @@ export function LabModes({ onBack, onStart }: Props) {
     ),
   );
   const [selectedUpgradeId, setSelectedUpgradeId] = useState<LabUpgradeId | null>(null);
+  const [upgradeMessage, setUpgradeMessage] = useState<string | null>(null);
   const [infoPowerUpId, setInfoPowerUpId] = useState<LabUpgradeId | null>(null);
   const infoPressTimerRef = useRef<number | null>(null);
   const activeUpgradeId = selectedUpgradeId && discoveredUpgradeIds.includes(selectedUpgradeId) ? selectedUpgradeId : discoveredUpgradeIds[0] ?? null;
@@ -54,6 +56,28 @@ export function LabModes({ onBack, onStart }: Props) {
     ? POWER_UPS.find((powerUp) => powerUp.icon === infoPowerUpId)
     : null;
   const tr = (text: string) => t(text, appLanguage);
+
+  function attemptUpgrade(id: LabUpgradeId) {
+    const level = labUpgradeLevels[id] ?? 0;
+    const nextCost = LAB_UPGRADE_COSTS[level];
+    if (level >= LAB_UPGRADE_COSTS.length || nextCost == null) return;
+    if (!hasProPack && labLevelCap <= level) {
+      const requiredLevel = [5, 10, 20, 35, 50][level] ?? 50;
+      setUpgradeMessage(
+        `Reach campaign level ${requiredLevel} to unlock the next tier, or activate Lab Pro Pack.`,
+      );
+      return;
+    }
+    if (goldCoins < nextCost) {
+      setUpgradeMessage(`You need ${nextCost - goldCoins} more coins to upgrade this power-up.`);
+      return;
+    }
+    if (upgradeLabPowerUp(id)) {
+      setUpgradeMessage(null);
+    } else {
+      setUpgradeMessage("This power-up cannot be upgraded yet.");
+    }
+  }
 
   function clearInfoPressTimer() {
     if (infoPressTimerRef.current != null) window.clearTimeout(infoPressTimerRef.current);
@@ -115,7 +139,11 @@ export function LabModes({ onBack, onStart }: Props) {
             <div style={coinBalanceChip}>{`${goldCoins} ${tr("coins")}`}</div>
           </div>
           <p style={{ margin: "0 0 12px", color: "var(--muted-foreground)", fontSize: 12, lineHeight: 1.45 }}>
-            {tr("Upgrade levels unlock at campaign levels 5, 10, 20, 35, and 50. Toggle a researched power-up off to disable its bonus effects.")}
+            {tr(
+              hasProPack
+                ? "Lab Pro Pack removes campaign milestone restrictions. Toggle a researched power-up off to disable its bonus effects."
+                : "Upgrade levels unlock at campaign levels 5, 10, 20, 35, and 50. Toggle a researched power-up off to disable its bonus effects.",
+            )}
           </p>
           {activeUpgradeId && (() => {
             const id = activeUpgradeId;
@@ -124,6 +152,7 @@ export function LabModes({ onBack, onStart }: Props) {
             const active = labUpgradeEnabled[id] ?? true;
             const nextCost = LAB_UPGRADE_COSTS[level];
             const canUpgrade = labLevelCap > level && nextCost != null && goldCoins >= nextCost;
+            const upgradeButtonDisabled = level >= LAB_UPGRADE_COSTS.length || nextCost == null;
             const activeBonuses = meta.bonuses.slice(0, Math.max(1, level));
             const futureBonuses = meta.bonuses.slice(Math.max(1, level));
             return (
@@ -167,9 +196,27 @@ export function LabModes({ onBack, onStart }: Props) {
                     </details>
                   )}
                 </div>
-                <button type="button" disabled={!canUpgrade} onClick={() => upgradeLabPowerUp(id)} style={{ ...startBtn, marginTop: 10, opacity: canUpgrade ? 1 : 0.55 }}>
+                <button
+                  type="button"
+                  disabled={upgradeButtonDisabled}
+                  onClick={() => attemptUpgrade(id)}
+                  style={{ ...startBtn, marginTop: 10, opacity: canUpgrade ? 1 : 0.55 }}
+                >
                   {level >= 5 ? tr("Maxed") : nextCost == null ? tr("Locked") : `${tr("Upgrade")} - ${nextCost} ${tr("coins")}`}
                 </button>
+                {upgradeMessage && (
+                  <div
+                    role="status"
+                    style={{
+                      marginTop: 7,
+                      color: "var(--warning)",
+                      fontSize: 11,
+                      lineHeight: 1.35,
+                    }}
+                  >
+                    {tr(upgradeMessage)}
+                  </div>
+                )}
               </article>
             );
           })()}
@@ -183,7 +230,10 @@ export function LabModes({ onBack, onStart }: Props) {
                 <button
                   key={id}
                   type="button"
-                  onClick={() => setSelectedUpgradeId(id)}
+                  onClick={() => {
+                    setSelectedUpgradeId(id);
+                    setUpgradeMessage(null);
+                  }}
                   {...powerUpInfoHandlers(id)}
                   style={{ ...upgradePickerTile, ...(active ? upgradePickerTileActive : null) }}
                 >

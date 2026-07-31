@@ -767,12 +767,12 @@ const topBar: CSSProperties = {
 };
 
 const brandTitle: CSSProperties = {
-  fontSize: 22,
+  fontSize: "clamp(13px, 4.2vw, 22px)",
   fontWeight: 1000,
   lineHeight: 1,
   overflow: "hidden",
-  textOverflow: "ellipsis",
   whiteSpace: "nowrap",
+  letterSpacing: "-0.25px",
 };
 
 const brandSubline: CSSProperties = {

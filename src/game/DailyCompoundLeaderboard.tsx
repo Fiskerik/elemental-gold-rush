@@ -190,7 +190,14 @@ function LeaderboardRow({ entry, kind }: { entry: LeaderboardEntry; kind: Leader
       <span style={playerCell}>
         <span aria-hidden="true">{entry.flag}</span>
         <span
-          style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+          style={{
+            minWidth: 0,
+            flex: 1,
+            overflow: "hidden",
+            whiteSpace: "nowrap",
+            fontSize: leaderboardNameFontSize(entry.name),
+            letterSpacing: entry.name.length > 12 ? "-0.2px" : undefined,
+          }}
           data-no-localize="true"
         >
           {entry.name}
@@ -202,6 +209,14 @@ function LeaderboardRow({ entry, kind }: { entry: LeaderboardEntry; kind: Leader
       {kind === "daily-board" && <span style={shotsCell}>{entry.shots}</span>}
     </div>
   );
+}
+
+function leaderboardNameFontSize(name: string): number {
+  const length = Array.from(name).length;
+  if (length <= 8) return 15;
+  if (length <= 12) return 13;
+  if (length <= 16) return 11;
+  return 9.5;
 }
 
 function leaderboardGridColumns(kind: LeaderboardKind): string {
