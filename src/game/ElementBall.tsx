@@ -15,6 +15,7 @@ interface Props {
   shimmer?: boolean;
   unstableShots?: number;
   atomSkin?: AtomSkin;
+  patternSeed?: number;
 }
 
 function isotopeChargeCapacity(period: number): number {
@@ -36,6 +37,7 @@ export const ElementBall = memo(function ElementBall({
   shimmer,
   unstableShots,
   atomSkin = "classic",
+  patternSeed,
 }: Props) {
   const el = ELEMENTS[atomicNumber - 1];
   if (!el) return null;
@@ -58,6 +60,10 @@ export const ElementBall = memo(function ElementBall({
   const unstableDashArray = Array.from({ length: unstableMaxSegments }, (_, index) =>
     index < unstableSegments ? `${unstableDash} ${unstableGap}` : `0 ${unstableSegment}`,
   ).join(" ");
+  const patternValue = Number.isFinite(patternSeed)
+    ? Math.abs(Math.floor(patternSeed!))
+    : atomicNumber;
+  const patternIndex = (patternValue * 17 + atomicNumber * 31) % 4;
   const baseBackground = `radial-gradient(circle at 30% 28%, ${el.glowColor}, ${el.color} 65%, oklch(0 0 0 / 0.35))`;
   const skinBackground: Record<AtomSkin, string> = {
     classic: baseBackground,
@@ -79,6 +85,7 @@ export const ElementBall = memo(function ElementBall({
         className,
         shimmer ? "shimmer-atom" : "",
         atomSkin !== "classic" ? `atom-skin-${atomSkin}` : "",
+        `atom-pattern-${patternIndex}`,
       ]
         .filter(Boolean)
         .join(" ")}
@@ -97,11 +104,12 @@ export const ElementBall = memo(function ElementBall({
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        color: "#0A0A1A",
+        color: atomSkin === "mineral" ? "#fff8e8" : "#0A0A1A",
         fontWeight: 800,
         cursor: onClick ? "pointer" : "default",
         userSelect: "none",
-        textShadow: "0 1px 0 rgba(255,255,255,0.4)",
+        textShadow:
+          atomSkin === "mineral" ? "0 1px 2px rgba(0,0,0,0.9)" : "0 1px 0 rgba(255,255,255,0.4)",
         animation: wiggle
           ? "wiggle 360ms ease-in-out"
           : highlight
@@ -160,35 +168,44 @@ export const ElementBall = memo(function ElementBall({
         </svg>
       )}
       <div
+        className="atom-ball-label"
         style={{
           position: "relative",
           zIndex: 2,
           fontSize: numberSize,
           lineHeight: 1,
           opacity: 0.85,
+          WebkitTextStroke: `${Math.max(0.7, size * 0.035)}px ${atomSkin === "mineral" ? "rgba(18,10,3,0.92)" : "rgba(255,255,255,0.9)"}`,
+          paintOrder: "stroke fill",
         }}
       >
         {el.atomicNumber}
       </div>
       <div
+        className="atom-ball-label"
         style={{
           position: "relative",
           zIndex: 2,
           fontSize: symbolSize,
           lineHeight: 1,
           fontWeight: 900,
+          WebkitTextStroke: `${Math.max(0.8, size * 0.04)}px ${atomSkin === "mineral" ? "rgba(18,10,3,0.92)" : "rgba(255,255,255,0.9)"}`,
+          paintOrder: "stroke fill",
         }}
       >
         {el.symbol}
       </div>
       {showMass && (
         <div
+          className="atom-ball-label"
           style={{
             position: "relative",
             zIndex: 2,
             fontSize: numberSize * 0.85,
             lineHeight: 1,
             opacity: 0.7,
+            WebkitTextStroke: `${Math.max(0.6, size * 0.03)}px ${atomSkin === "mineral" ? "rgba(18,10,3,0.92)" : "rgba(255,255,255,0.9)"}`,
+            paintOrder: "stroke fill",
           }}
         >
           {el.atomicMass}

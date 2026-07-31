@@ -6,7 +6,7 @@ import { useIsTabletLayout } from "./responsive";
 import { SUPPORTED_LANGUAGES, t, toIntlLocale, type AppLanguage } from "./localization";
 import { COMPOUNDS } from "./compounds";
 import { BOSSES, type BossId } from "./bosses";
-import { BoardThemePicker } from "./Settings";
+import { AtomSkinPicker, BoardThemePicker } from "./Settings";
 import {
   authenticateGameCenter,
   getCachedGameCenterPlayerName,
@@ -73,10 +73,12 @@ export function Profile({ onBack, onOpenShop }: Props) {
     dailyBoardLeaderboardAchievementCounts,
     appTheme,
     boardTheme,
+    atomSkin,
     ownedThemeProducts,
     appLanguage,
     setAppTheme,
     setBoardTheme,
+    setAtomSkin,
     setAppLanguage,
   } = useProgress();
   const tr = (text: string) => t(text, appLanguage);
@@ -494,6 +496,13 @@ export function Profile({ onBack, onOpenShop }: Props) {
               onOpenShop={onOpenShop}
             />
           </div>
+          <AtomSkinPicker
+            value={atomSkin}
+            hasProPack={hasProPack}
+            ownedThemeProducts={ownedThemeProducts}
+            onChange={setAtomSkin}
+            onOpenShop={onOpenShop}
+          />
           <div style={preferenceRow}>
             <span style={preferenceLabel}>{tr("Theme")}</span>
             <div style={{ display: "inline-grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>

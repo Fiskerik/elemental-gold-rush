@@ -12,7 +12,7 @@ import type { ProductId } from "./products";
 import { setMusicVolume, setSfxVolume, startAmbientMusic, stopAmbientMusic } from "./audio";
 import { isNativePlatform, useIsTabletLayout } from "./responsive";
 
-export function Settings({ onBack, onOpenShop }: { onBack: () => void; onOpenShop?: () => void }) {
+export function Settings({ onBack }: { onBack: () => void; onOpenShop?: () => void }) {
   const isTabletLayout = useIsTabletLayout();
   const {
     soundEnabled,
@@ -21,10 +21,6 @@ export function Settings({ onBack, onOpenShop }: { onBack: () => void; onOpenSho
     soundVolume,
     musicVolume,
     appTheme,
-    boardTheme,
-    atomSkin,
-    ownedThemeProducts,
-    hasProPack,
     shootingStyle,
     webBoardWide,
     toggleSound,
@@ -33,8 +29,6 @@ export function Settings({ onBack, onOpenShop }: { onBack: () => void; onOpenSho
     setSoundVolume,
     setMusicVolume: setMusicVolumeStore,
     toggleAppTheme,
-    setBoardTheme,
-    setAtomSkin,
     setShootingStyle,
     setWebBoardWide,
     reset,
@@ -102,20 +96,6 @@ export function Settings({ onBack, onOpenShop }: { onBack: () => void; onOpenSho
             label={`Theme: ${appTheme === "dark" ? "Dark" : "Light"}`}
             value={appTheme === "light"}
             onToggle={toggleAppTheme}
-          />
-          <BoardThemePicker
-            value={boardTheme}
-            hasProPack={hasProPack}
-            ownedThemeProducts={ownedThemeProducts}
-            onChange={setBoardTheme}
-            onOpenShop={onOpenShop}
-          />
-          <AtomSkinPicker
-            value={atomSkin}
-            hasProPack={hasProPack}
-            ownedThemeProducts={ownedThemeProducts}
-            onChange={setAtomSkin}
-            onOpenShop={onOpenShop}
           />
           <Row
             label={`Play style: ${shootingStyle === "hold" ? "Hold" : "Press"}`}
