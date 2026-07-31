@@ -1567,6 +1567,7 @@ function StandardGameBoard({
   } | null>(null);
   const stageClearTimeoutRef = useRef<number | null>(null);
   const projectileFrameRef = useRef<number | null>(null);
+  const projectileVisualRef = useRef<HTMLDivElement | null>(null);
   const hasClaimedUnusedInventoryRef = useRef(false);
   const [claimedResultPowerUp, setClaimedResultPowerUp] = useState<InventoryPowerUpId | null>(null);
   const runPowerUpsUsedRef = useRef(0);
@@ -3856,10 +3857,16 @@ function StandardGameBoard({
       const local = exact - index;
       const from = path[index];
       const to = path[nextIndex];
-      setProjectile({
+      const nextPosition = {
         x: from.x + (to.x - from.x) * local,
         y: from.y + (to.y - from.y) * local,
-      });
+      };
+      // Keep the flying atom on its own compositor layer. Updating React state
+      // here used to rerender the entire board every animation frame, which is
+      // especially costly with illustrated themes and textured atom skins.
+      if (projectileVisualRef.current) {
+        projectileVisualRef.current.style.transform = `translate3d(${nextPosition.x - projShotSize / 2}px, ${nextPosition.y - projShotSize / 2}px, 0)`;
+      }
       if (progress >= 1) {
         projectileFrameRef.current = null;
         onComplete();
@@ -6550,6 +6557,7 @@ function StandardGameBoard({
             userSelect: "none",
           }}
         >
+          <div aria-hidden="true" className="game-board-background-art" />
           <div aria-hidden="true" className="game-board-theme-emblem" />
           {/* danger zone shading near the launcher (bottom) */}
           <div
@@ -7054,12 +7062,17 @@ function StandardGameBoard({
           {/* PROJECTILE */}
           {projectile && (
             <div
+              ref={projectileVisualRef}
+              className="game-projectile"
               style={{
                 position: "absolute",
-                left: projectile.x - projShotSize / 2,
-                top: projectile.y - projShotSize / 2,
+                left: 0,
+                top: 0,
                 pointerEvents: "none",
                 zIndex: 12,
+                transform: `translate3d(${projectile.x - projShotSize / 2}px, ${projectile.y - projShotSize / 2}px, 0)`,
+                willChange: "transform",
+                backfaceVisibility: "hidden",
               }}
             >
               {showCatalystShotRadius && (
@@ -7177,6 +7190,9 @@ function StandardGameBoard({
             alignItems: "center",
             justifyContent: "space-between",
             gap: 10,
+            position: "relative",
+            zIndex: 20,
+            overflow: "visible",
           }}
         >
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-start", flex: "0 0 auto" }}>
@@ -7216,7 +7232,7 @@ function StandardGameBoard({
               overflowX: "auto",
               flexWrap: "nowrap",
               flexDirection: "row",
-              padding: "2px 2px 4px",
+              padding: "6px 12px 8px 4px",
             }}
           >
             {(transmuteCharges > 0 || pendingReversiblePowerUp === "transmute") && (
@@ -7463,6 +7479,7 @@ function StandardGameBoard({
                   }
                   style={{
                     ...powerUpIconBtn,
+                    zIndex: 30,
                     border: `1px solid ${compoundMode ? "var(--accent)" : "oklch(0.75 0.16 145)"}`,
                     background: compoundMode
                       ? "linear-gradient(135deg, var(--accent), oklch(0.55 0.16 145))"
@@ -7797,6 +7814,8 @@ const powerUpIconBtn: React.CSSProperties = {
   position: "relative",
   width: 40,
   height: 40,
+  flex: "0 0 40px",
+  overflow: "visible",
   borderRadius: 12,
   display: "flex",
   alignItems: "center",
