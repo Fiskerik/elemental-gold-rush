@@ -66,24 +66,6 @@ const DAILY_BOARD_SLOW_CLEAR_MS = 8 * 60_000;
 const DAILY_BOARD_IDEAL_SHOTS = 10;
 const DAILY_BOARD_SOFT_SHOT_LIMIT = 38;
 
-const SEEDED_NAMES = [
-  ["SE", "Astrid"],
-  ["US", "Nova"],
-  ["DE", "Klara"],
-  ["GB", "Morgan"],
-  ["JP", "Hana"],
-  ["FR", "Luc"],
-  ["BR", "Lia"],
-  ["CA", "Rowan"],
-  ["AU", "Mika"],
-  ["IN", "Asha"],
-  ["NO", "Sven"],
-  ["ES", "Iris"],
-  ["IT", "Enzo"],
-  ["NL", "Mila"],
-  ["DK", "Freja"],
-] as const;
-
 function normalizeCountryCode(value: string | undefined): string {
   const upper = (value ?? "").trim().toUpperCase();
   return /^[A-Z]{2}$/.test(upper) ? upper : "US";
@@ -228,17 +210,6 @@ export function calculateDailyBoardLeaderboardScore(input: DailyBoardScoreInput)
   return Math.max(1, baseScore + timeBonus + shotBonus + comboBonus - powerUpPenalty);
 }
 
-function isBetterLeaderboardEntry(
-  kind: LeaderboardKind,
-  a: LeaderboardEntry,
-  b: LeaderboardEntry,
-): number {
-  if (kind === "daily-compound") {
-    return a.score - b.score || a.name.localeCompare(b.name);
-  }
-  return b.score - a.score || a.shots - b.shots || a.name.localeCompare(b.name);
-}
-
 function recordDailyLeaderboardRun(kind: LeaderboardKind, score: number, shots: number): boolean {
   const normalizedScore = Math.max(0, Math.floor(score));
   if (normalizedScore <= 0) return false;
@@ -291,43 +262,6 @@ export function submitDailyCompoundLeaderboardScore(score: number, shots: number
   });
 }
 
-function seededNumber(seed: string): number {
-  let hash = 2166136261;
-  for (let index = 0; index < seed.length; index += 1) {
-    hash ^= seed.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-  return Math.abs(hash >>> 0);
-}
-
-function seededEntries(
-  kind: LeaderboardKind,
-  scope: LeaderboardScope,
-  countryCode: string,
-): LeaderboardEntry[] {
-  const today = getTodayQuestDate();
-  const rows = Array.from({ length: scope === "local" ? 10 : 18 }, (_, index) => {
-    const [seedCountry, name] = SEEDED_NAMES[index % SEEDED_NAMES.length];
-    const rowCountry = scope === "local" ? countryCode : seedCountry;
-    const variance = seededNumber(`daily-${kind}-${scope}-${today}-${index}-${rowCountry}`);
-    const score =
-      kind === "daily-board"
-        ? Math.max(1200, 62000 - index * 2450 + (variance % 1800))
-        : Math.max(12, 28 + index * 7 + (variance % 9));
-    const shots = kind === "daily-board" ? 12 + ((variance + index) % 17) : 0;
-    return {
-      id: `seed-daily-${kind}-${scope}-${index}`,
-      rank: 0,
-      countryCode: rowCountry,
-      flag: countryFlag(rowCountry),
-      name,
-      score,
-      shots,
-    };
-  });
-  return rows;
-}
-
 function playerEntry(kind: LeaderboardKind): LeaderboardEntry {
   const today = getTodayQuestDate();
   const records = readRecords();
@@ -361,12 +295,12 @@ export function getDailyLeaderboard(
 ): LeaderboardBoard {
   const countryCode = inferPlayerCountryCode();
   const player = playerEntry(kind);
-  const entries = [...seededEntries(kind, scope, countryCode), player]
-    .filter((entry) => scope === "global" || entry.countryCode === countryCode)
-    .sort((a, b) => isBetterLeaderboardEntry(kind, a, b))
-    .map((entry, index) => ({ ...entry, rank: index + 1 }));
+  const entries =
+    player.score > 0 && (scope === "global" || player.countryCode === countryCode)
+      ? [{ ...player, rank: 1 }]
+      : [];
   return {
-    entries: entries.slice(0, 20),
+    entries,
     player: entries.find((entry) => entry.isPlayer) ?? { ...player, rank: 0 },
     countryCode,
     totalPlayerCount: entries.length,

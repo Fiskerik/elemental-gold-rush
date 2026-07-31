@@ -41,6 +41,7 @@ import { t } from "./localization";
 import { PodiumMark } from "./DailyCompoundLeaderboard";
 import { openAppStoreReview } from "./appReview";
 import { toast } from "sonner";
+import { getTimeUntilDailyResetMs } from "./quests";
 
 const POWER_UP_STAGE_LABELS: Record<PowerUpStageId, string> = {
   shimmer: "Merge the shimmering queued atom",
@@ -619,7 +620,7 @@ export function MainMenu({
                   letterSpacing: 0.6,
                 }}
               >
-                {`Resets in ${resetCountdown}`}
+                {`Time until reset: ${resetCountdown}`}
               </div>
             </div>
             <div style={{ display: "grid", justifyItems: "end", gap: 8 }}>
@@ -1124,9 +1125,7 @@ const weeklyReward: CSSProperties = {
 };
 
 function formatResetCountdown(now: Date = new Date()): string {
-  const next = new Date(now);
-  next.setHours(24, 0, 0, 0);
-  const diff = Math.max(0, next.getTime() - now.getTime());
+  const diff = getTimeUntilDailyResetMs(now);
   const totalSec = Math.floor(diff / 1000);
   const h = Math.floor(totalSec / 3600);
   const m = Math.floor((totalSec % 3600) / 60);

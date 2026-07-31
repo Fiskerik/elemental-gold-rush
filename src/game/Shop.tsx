@@ -842,8 +842,13 @@ export function Shop({ onBack }: { onBack: () => void }) {
                     background: "var(--surface)",
                   }}
                 >
-                  <span style={{ display: "grid", placeItems: "center" }} aria-hidden="true">
+                  <span style={shopPowerUpIconWrap} aria-label={isUnlocked ? `Owned ${powerUpInventory[powerUp.id]}` : undefined}>
                     <PowerUpBadge icon={powerUp.id} size={34} />
+                    {isUnlocked && (
+                      <span style={shopPowerUpCountPill} aria-hidden="true">
+                        ×{powerUpInventory[powerUp.id]}
+                      </span>
+                    )}
                   </span>
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 900 }}>
@@ -856,11 +861,11 @@ export function Shop({ onBack }: { onBack: () => void }) {
                         ? powerUp.description
                         : `Unlocked at level ${powerUp.unlockLevel}.`}
                     </div>
-                    <div style={{ fontSize: 11, color: "var(--accent)", marginTop: 3 }}>
-                      {isUnlocked
-                        ? `Owned: ${powerUpInventory[powerUp.id]}`
-                        : `Secret unlock at level ${powerUp.unlockLevel}`}
-                    </div>
+                    {!isUnlocked && (
+                      <div style={{ fontSize: 11, color: "var(--accent)", marginTop: 3 }}>
+                        Secret unlock at level {powerUp.unlockLevel}
+                      </div>
+                    )}
                   </div>
                   <button
                     type="button"
@@ -1116,6 +1121,30 @@ const smallButton: React.CSSProperties = {
   padding: "6px 12px",
   fontSize: 13,
   cursor: "pointer",
+};
+
+const shopPowerUpIconWrap: React.CSSProperties = {
+  position: "relative",
+  display: "grid",
+  placeItems: "center",
+  width: 36,
+  height: 36,
+};
+
+const shopPowerUpCountPill: React.CSSProperties = {
+  position: "absolute",
+  right: -6,
+  bottom: -4,
+  minWidth: 20,
+  padding: "2px 5px",
+  borderRadius: 999,
+  background: "var(--accent)",
+  color: "var(--primary-foreground)",
+  fontSize: 10,
+  lineHeight: 1,
+  fontWeight: 950,
+  textAlign: "center",
+  boxShadow: "0 2px 6px rgba(0,0,0,0.28)",
 };
 
 const shopButton: React.CSSProperties = {

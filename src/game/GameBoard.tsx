@@ -852,7 +852,7 @@ function DailyCompoundGridBoard({
   function revealHint() {
     if (!canRevealHint || !compound) return;
     setMoleculeHintUsed(true);
-    setMessage(`Molecule hint: look for ${compound.formula} as one connected group.`);
+    setMessage(getCompoundHint(compound));
     if (hapticsEnabled) vibrate([15, 25, 15]);
   }
 
@@ -1040,7 +1040,7 @@ function DailyCompoundGridBoard({
               cursor: canRevealHint ? "pointer" : "not-allowed",
             }}
           >
-            Molecule Hint
+            Compound Hint
           </button>
           <button
             type="button"
@@ -1694,6 +1694,7 @@ function StandardGameBoard({
   const isDailyAtomChallenge = mode === "daily-challenge";
   const isMoleculeChallenge =
     moleculeObjective != null && (mode === "campaign" || isSecretCompoundChallenge);
+  const isAmmoniumChallenge = isMoleculeChallenge && moleculeObjective?.id === "ammonium";
   const canIntroducePowerUps = mode === "campaign" && !isMoleculeChallenge && !isPowerUpStage;
   const unstableEnabled = progressionPowerUpLevel >= UNSTABLE_UNLOCK_LEVEL;
   const current = queue[0];
@@ -2205,9 +2206,11 @@ function StandardGameBoard({
     if (initialDiscoveries.length > 0) registerDiscoveries(initialDiscoveries);
     const powerUpQueuePrefix = isPowerUpStage ? powerUpStageQueuePrefix(powerUpStage) : [];
     const challengeQueuePrefix = isMoleculeChallenge
-      ? moleculeChallengeQueuePrefix(moleculeObjective, {
-          useHelpfulAtomPlan: isSecretCompoundChallenge || isDailyMoleculeChallenge,
-        })
+      ? isAmmoniumChallenge
+        ? Array.from({ length: QUEUE_SIZE }, () => 1)
+        : moleculeChallengeQueuePrefix(moleculeObjective, {
+            useHelpfulAtomPlan: isSecretCompoundChallenge || isDailyMoleculeChallenge,
+          })
       : isDailyAtomChallenge
         ? dailyTargetAtomPlan().queueAtoms
         : [];
@@ -2617,6 +2620,9 @@ function StandardGameBoard({
 
   function generateQueueAtom(maxElement: number, board: Board, forceUniform = false): number {
     const minElement = queueFloorFromBoard(board);
+    if (isAmmoniumChallenge) {
+      return Math.random() < 0.5 ? 7 : 1;
+    }
     if (isMoleculeChallenge && moleculeObjective) {
       const highestRecipeAtom = Math.max(...atomsForCompound(moleculeObjective), 1);
       return randomAvailableElement(highestRecipeAtom, 1);
@@ -6358,6 +6364,18 @@ function StandardGameBoard({
                     : getCompoundHint(moleculeObjective)
                   : `Form ${moleculeObjective.name} (${moleculeObjective.formula}) to clear`}
               </div>
+              {isAmmoniumChallenge && (
+                <div
+                  style={{
+                    marginTop: 4,
+                    color: "var(--muted-foreground)",
+                    fontSize: 11,
+                    lineHeight: 1.35,
+                  }}
+                >
+                  Place 1x N and 4x H on the board and form ammonium.
+                </div>
+              )}
               {isSecretCompoundChallenge && secretCompoundConcealed && (
                 <div style={{ marginTop: 3, color: "var(--muted-foreground)", fontSize: 11 }}>
                   Compound reveals after 50 shots
@@ -8290,7 +8308,7 @@ function CompoundSelectionPanel({
         left: 10,
         right: 10,
         bottom: 10,
-        zIndex: 8,
+        zIndex: 30,
         padding: 10,
         borderRadius: 12,
         border: "1px solid var(--border)",

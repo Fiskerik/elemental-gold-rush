@@ -47,8 +47,73 @@ export interface QuestProgressEvent {
   secretCompoundCleared?: boolean;
 }
 
-export function getTodayQuestDate(date = new Date()): string {
+export const DAILY_RESET_TIME_ZONE = "Europe/Stockholm";
+
+const dailyResetDateFormatter = new Intl.DateTimeFormat("en-US", {
+  timeZone: DAILY_RESET_TIME_ZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hourCycle: "h23",
+});
+
+function getStockholmDateParts(date: Date): Record<string, number> {
+  return dailyResetDateFormatter.formatToParts(date).reduce<Record<string, number>>(
+    (parts, part) => {
+      if (part.type !== "literal") parts[part.type] = Number(part.value);
+      return parts;
+    },
+    {},
+  );
+}
+
+function addCalendarDay(dateKey: string): string {
+  const date = new Date(`${dateKey}T12:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + 1);
   return date.toISOString().slice(0, 10);
+}
+
+function stockholmOffsetMs(date: Date): number {
+  const parts = getStockholmDateParts(date);
+  const displayedAsUtc = Date.UTC(
+    parts.year,
+    parts.month - 1,
+    parts.day,
+    parts.hour,
+    parts.minute,
+    parts.second,
+  );
+  return displayedAsUtc - date.getTime();
+}
+
+function stockholmMidnight(dateKey: string): Date {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  const naiveUtcMs = Date.UTC(year, month - 1, day);
+  let timestamp = naiveUtcMs;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    timestamp = naiveUtcMs - stockholmOffsetMs(new Date(timestamp));
+  }
+  return new Date(timestamp);
+}
+
+export function getTodayQuestDate(date = new Date()): string {
+  const parts = getStockholmDateParts(date);
+  return `${parts.year}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}`;
+}
+
+export function getNextDailyReset(date = new Date()): Date {
+  let reset = stockholmMidnight(addCalendarDay(getTodayQuestDate(date)));
+  if (reset.getTime() <= date.getTime()) {
+    reset = stockholmMidnight(addCalendarDay(addCalendarDay(getTodayQuestDate(date))));
+  }
+  return reset;
+}
+
+export function getTimeUntilDailyResetMs(date = new Date()): number {
+  return Math.max(0, getNextDailyReset(date).getTime() - date.getTime());
 }
 
 function hashString(value: string): number {

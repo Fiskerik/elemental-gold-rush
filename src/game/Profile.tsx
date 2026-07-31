@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { ELEMENTS } from "./elements";
 import { getLevelById, MAX_LEVEL } from "./levels";
-import { DEFAULT_PLAYER_DISPLAY_NAME, useProgress, type CoinTransaction } from "./store";
+import { useProgress, type CoinTransaction } from "./store";
 import { useIsTabletLayout } from "./responsive";
 import { SUPPORTED_LANGUAGES, t, toIntlLocale, type AppLanguage } from "./localization";
 import { COMPOUNDS } from "./compounds";
 import { BOSSES, type BossId } from "./bosses";
 import {
   authenticateGameCenter,
+  getCachedGameCenterPlayerName,
   isGameCenterAvailable,
   showGameCenterLeaderboards,
 } from "./gameCenter";
@@ -42,6 +43,7 @@ export function Profile({ onBack }: Props) {
   const [transactionsOpen, setTransactionsOpen] = useState(false);
   const [gameCenterBusy, setGameCenterBusy] = useState(false);
   const [gameCenterStatus, setGameCenterStatus] = useState<string | null>(null);
+  const [gameCenterName, setGameCenterName] = useState(() => getCachedGameCenterPlayerName());
   const {
     unlockedLevel,
     highestElement,
@@ -60,6 +62,7 @@ export function Profile({ onBack }: Props) {
     levelStars,
     levelStats,
     challengeBestScores,
+    challengeBestScoreDates,
     hasProPack,
     dailyBoardRuns,
     dailyBoardBestScore,
@@ -71,7 +74,6 @@ export function Profile({ onBack }: Props) {
     setAppTheme,
     setAppLanguage,
   } = useProgress();
-  const displayName = DEFAULT_PLAYER_DISPLAY_NAME;
   const tr = (text: string) => t(text, appLanguage);
   const intlLocale = toIntlLocale(appLanguage);
   const numberFormatter = new Intl.NumberFormat(intlLocale);
@@ -81,9 +83,16 @@ export function Profile({ onBack }: Props) {
   const bestChallengeEntry = Object.entries(challengeBestScores).reduce<{
     mode: string;
     score: number;
+    date: string | null;
   } | null>((best, [mode, score]) => {
     const safeScore = score ?? 0;
-    if (!best || safeScore > best.score) return { mode, score: safeScore };
+    if (!best || safeScore > best.score) {
+      return {
+        mode,
+        score: safeScore,
+        date: challengeBestScoreDates[mode as keyof typeof challengeBestScoreDates] ?? null,
+      };
+    }
     return best;
   }, null);
   const bestLevelScoreEntry = Object.entries(levelStats).reduce<{
@@ -133,6 +142,8 @@ export function Profile({ onBack }: Props) {
     setGameCenterStatus(tr("Opening Game Center..."));
     try {
       const player = await authenticateGameCenter();
+      const authenticatedName = player.displayName?.trim() || player.alias?.trim() || "";
+      setGameCenterName(authenticatedName || getCachedGameCenterPlayerName());
       setGameCenterStatus(
         player.authenticated
           ? `${tr("Signed in as")} ${player.displayName || player.alias || tr("Player")}`
@@ -196,13 +207,15 @@ export function Profile({ onBack }: Props) {
             >
               PLAYER PROFILE
             </div>
-            <h1
-              className="gold-text"
-              style={{ margin: "4px 0", fontSize: 34 }}
-              data-no-localize="true"
-            >
-              {displayName}
-            </h1>
+            {gameCenterName && (
+              <h1
+                className="gold-text"
+                style={{ margin: "4px 0", fontSize: 34 }}
+                data-no-localize="true"
+              >
+                {gameCenterName}
+              </h1>
+            )}
             <p style={{ margin: 0, color: "var(--muted-foreground)", fontSize: 13 }}>
               {`${tr(hasProPack ? "Pro Lab active" : "Free Lab")} • ${tr("Level")} ${unlockedLevel} / ${MAX_LEVEL}`}
             </p>
@@ -269,20 +282,37 @@ export function Profile({ onBack }: Props) {
             </div>
             <span style={dailyBoardBadgeScope}>{tr("Global")}</span>
           </div>
-          <div style={dailyBoardBadgeGrid}>
-            {DAILY_BOARD_LEADERBOARD_ACHIEVEMENTS.map((achievement) => (
-              <div key={achievement.id} style={dailyBoardBadgeCard} title={achievement.description}>
-                <span style={dailyBoardBadgeIcon}>
-                  <DailyBoardBadgeIcon id={achievement.id} />
-                </span>
-                <span style={{ minWidth: 0 }}>
-                  <strong style={dailyBoardBadgeName}>{tr(achievement.name)}</strong>
-                  <small style={dailyBoardBadgeCount}>
-                    {`${dailyBoardLeaderboardAchievementCounts[achievement.id] ?? 0}x ${tr("earned")}`}
-                  </small>
-                </span>
-              </div>
-            ))}
+          <div style={dailyBoardBadgeColumns}>
+            {[DAILY_BOARD_LEADERBOARD_ACHIEVEMENTS.slice(0, 3), DAILY_BOARD_LEADERBOARD_ACHIEVEMENTS.slice(3)].map(
+              (column, columnIndex) => (
+                <div key={columnIndex} style={dailyBoardBadgeColumn}>
+                  {column.map((achievement, achievementIndex) => {
+                    const iconColor = placementIconColors[achievementIndex];
+                    return (
+                      <div key={achievement.id} style={dailyBoardBadgeCard} title={achievement.description}>
+                        <span
+                          style={{
+                            ...dailyBoardBadgeIcon,
+                            color: iconColor,
+                            background: `${iconColor}22`,
+                            border: `1px solid ${iconColor}88`,
+                            boxShadow: `0 0 14px ${iconColor}55`,
+                          }}
+                        >
+                          <DailyBoardBadgeIcon id={achievement.id} />
+                        </span>
+                        <span style={{ minWidth: 0 }}>
+                          <strong style={dailyBoardBadgeName}>{tr(achievement.name)}</strong>
+                          <small style={dailyBoardBadgeCount}>
+                            {`${dailyBoardLeaderboardAchievementCounts[achievement.id] ?? 0}x ${tr("earned")}`}
+                          </small>
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ),
+            )}
           </div>
         </section>
         <section style={card}>
@@ -304,7 +334,7 @@ export function Profile({ onBack }: Props) {
               value={bestChallengeEntry ? exactScore(bestChallengeEntry.score) : "0"}
               sub={
                 bestChallengeEntry
-                  ? bestChallengeEntry.mode.replaceAll("-", " ")
+                  ? formatDate(bestChallengeEntry.date)
                   : tr("no record yet")
               }
             />
@@ -450,12 +480,6 @@ export function Profile({ onBack }: Props) {
 
         <section style={card}>
           <div style={sectionHeading}>{tr("Display")}</div>
-          <div style={{ ...preferenceRow, marginBottom: 18 }}>
-            <span style={preferenceLabel}>{tr("Profile name")}</span>
-            <strong data-no-localize="true" style={profileNameValue}>
-              {DEFAULT_PLAYER_DISPLAY_NAME}
-            </strong>
-          </div>
           <div style={preferenceRow}>
             <span style={preferenceLabel}>{tr("Theme")}</span>
             <div style={{ display: "inline-grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
@@ -945,11 +969,18 @@ const dailyBoardBadgeScope: React.CSSProperties = {
   textTransform: "uppercase",
 };
 
-const dailyBoardBadgeGrid: React.CSSProperties = {
+const dailyBoardBadgeColumns: React.CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
   gap: 8,
 };
+
+const dailyBoardBadgeColumn: React.CSSProperties = {
+  display: "grid",
+  gap: 8,
+};
+
+const placementIconColors = ["#f4c95d", "#cfd5df", "#cd7f32"];
 
 const dailyBoardBadgeCard: React.CSSProperties = {
   display: "flex",
@@ -1003,12 +1034,6 @@ const preferenceLabel: React.CSSProperties = {
   fontSize: 13,
   fontWeight: 850,
   lineHeight: 1.15,
-};
-
-const profileNameValue: React.CSSProperties = {
-  color: "var(--foreground)",
-  fontSize: 16,
-  fontWeight: 950,
 };
 
 const themeChoiceButton: React.CSSProperties = {

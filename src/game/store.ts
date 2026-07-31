@@ -304,6 +304,7 @@ interface ProgressState {
   levelStars: Record<number, number>;
   levelStats: Record<number, LevelStats>;
   challengeBestScores: Partial<Record<GameModeId, number>>;
+  challengeBestScoreDates: Partial<Record<GameModeId, string>>;
   hasProPack: boolean;
   proStarterCoinsGranted: boolean;
   clearedStageCount: number;
@@ -334,8 +335,8 @@ interface ProgressState {
   setUnlockedLevel: (id: number) => void;
   recordDiscovery: (atomicNumbers: number[]) => void;
   recordCompoundDiscovery: (compoundId: string) => void;
-  unlockLockedElementsForCoins: (coinCost: number) => boolean;
-  unlockLockedCompoundsForCoins: (coinCost: number) => boolean;
+  unlockLockedElementsForCoins: (atomicNumber: number, coinCost: number) => boolean;
+  unlockLockedCompoundsForCoins: (compoundId: string, coinCost: number) => boolean;
   addScore: (n: number) => void;
   recordSingleShotScore: (score: number) => void;
   spendScore: (cost: number) => boolean;
@@ -426,6 +427,7 @@ export const useProgress = create<ProgressState>()(
       levelStars: {},
       levelStats: {},
       challengeBestScores: {},
+      challengeBestScoreDates: {},
       hasProPack: false,
       proStarterCoinsGranted: false,
       clearedStageCount: 0,
@@ -614,16 +616,16 @@ export const useProgress = create<ProgressState>()(
             [compoundId]: (s.compoundCounts[compoundId] ?? 0) + 1,
           },
         })),
-      unlockLockedElementsForCoins: (coinCost) => {
+      unlockLockedElementsForCoins: (atomicNumber, coinCost) => {
         let unlocked = false;
         set((s) => {
+          const target = ELEMENTS.find((element) => element.atomicNumber === atomicNumber);
           const normalizedCost = Math.max(0, Math.floor(coinCost));
+          if (!target || s.discoveredElements.includes(atomicNumber) || s.goldCoins < normalizedCost) {
+            return s;
+          }
           const current = new Set(s.discoveredElements);
-          const locked = ELEMENTS.map((element) => element.atomicNumber).filter(
-            (atomicNumber) => !current.has(atomicNumber),
-          );
-          if (locked.length === 0 || s.goldCoins < normalizedCost) return s;
-          locked.forEach((atomicNumber) => current.add(atomicNumber));
+          current.add(atomicNumber);
           const discoveredElements = Array.from(current).sort((a, b) => a - b);
           unlocked = true;
           const refreshed = refreshDailyQuests(
@@ -639,7 +641,7 @@ export const useProgress = create<ProgressState>()(
               s.coinTransactions,
               -normalizedCost,
               balanceAfter,
-              "Collection elements unlock",
+              `Collection element unlock: ${target.symbol}`,
             ),
             discoveredElements,
             earnedBadges: getEarnedBadgeIds(discoveredElements),
@@ -648,20 +650,18 @@ export const useProgress = create<ProgressState>()(
         });
         return unlocked;
       },
-      unlockLockedCompoundsForCoins: (coinCost) => {
+      unlockLockedCompoundsForCoins: (compoundId, coinCost) => {
         let unlocked = false;
         set((s) => {
+          const target = COMPOUNDS.find((compound) => compound.id === compoundId);
           const normalizedCost = Math.max(0, Math.floor(coinCost));
+          if (!target || s.discoveredCompounds.includes(compoundId) || s.goldCoins < normalizedCost) {
+            return s;
+          }
           const current = new Set(s.discoveredCompounds);
-          const locked = COMPOUNDS.map((compound) => compound.id).filter(
-            (compoundId) => !current.has(compoundId),
-          );
-          if (locked.length === 0 || s.goldCoins < normalizedCost) return s;
-          locked.forEach((compoundId) => current.add(compoundId));
+          current.add(compoundId);
           const compoundCounts = { ...s.compoundCounts };
-          locked.forEach((compoundId) => {
-            compoundCounts[compoundId] = Math.max(1, compoundCounts[compoundId] ?? 0);
-          });
+          compoundCounts[compoundId] = Math.max(1, compoundCounts[compoundId] ?? 0);
           unlocked = true;
           const refreshed = refreshDailyQuests(
             s.dailyQuestDate,
@@ -676,7 +676,7 @@ export const useProgress = create<ProgressState>()(
               s.coinTransactions,
               -normalizedCost,
               balanceAfter,
-              "Collection compounds unlock",
+              `Collection compound unlock: ${target.name}`,
             ),
             discoveredCompounds: Array.from(current),
             compoundCounts,
@@ -933,12 +933,21 @@ export const useProgress = create<ProgressState>()(
           };
         }),
       setChallengeBestScore: (mode, score) =>
-        set((s) => ({
-          challengeBestScores: {
-            ...s.challengeBestScores,
-            [mode]: Math.max(s.challengeBestScores[mode] ?? 0, score),
-          },
-        })),
+        set((s) => {
+          const normalizedScore = Math.max(0, Math.floor(score));
+          const previousBest = s.challengeBestScores[mode] ?? 0;
+          if (normalizedScore <= previousBest) return s;
+          return {
+            challengeBestScores: {
+              ...s.challengeBestScores,
+              [mode]: normalizedScore,
+            },
+            challengeBestScoreDates: {
+              ...s.challengeBestScoreDates,
+              [mode]: new Date().toISOString(),
+            },
+          };
+        }),
       recordDailyBoardLeaderboardPlacement: (rank, totalPlayerCount, date = getTodayQuestDate()) =>
         set((s) => {
           const achievementIds = getDailyBoardLeaderboardAchievementIds(rank, totalPlayerCount);
@@ -1098,6 +1107,7 @@ export const useProgress = create<ProgressState>()(
           levelStars: {},
           levelStats: {},
           challengeBestScores: {},
+          challengeBestScoreDates: {},
           hasProPack: false,
           proStarterCoinsGranted: false,
           clearedStageCount: 0,
@@ -1169,6 +1179,8 @@ export const useProgress = create<ProgressState>()(
           compoundCounts,
           levelStars: persistedState?.levelStars ?? current.levelStars,
           challengeBestScores: persistedState?.challengeBestScores ?? current.challengeBestScores,
+          challengeBestScoreDates:
+            persistedState?.challengeBestScoreDates ?? current.challengeBestScoreDates,
           hasProPack: persistedState?.hasProPack ?? current.hasProPack,
           proStarterCoinsGranted:
             persistedState?.proStarterCoinsGranted ?? current.proStarterCoinsGranted,
