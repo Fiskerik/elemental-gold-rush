@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { Clapperboard } from "lucide-react";
 import { ElementBall } from "./ElementBall";
+import { nextBallId, placeAndMerge, type Ball, type Board, type Geo } from "./logic";
 import { type AtomSkin, type BoardTheme, type InventoryPowerUpId, useProgress } from "./store";
 import { POWER_UP_UNLOCK_LEVELS } from "./powerUps";
 import { PowerUpBadge } from "./PowerUpLibrary";
@@ -241,22 +242,77 @@ function BundlePreview({
   );
 }
 
+const PREVIEW_BOARD_GEO: Geo = {
+  width: 100,
+  height: 100,
+  radius: 5.5,
+  leftPad: 5,
+  rightPad: 5,
+  topPad: 5,
+  dangerY: 94,
+};
+const PREVIEW_ATOM_RADIUS = 5.5;
+const PREVIEW_LAUNCHER = { x: 50, y: 87 };
+const PREVIEW_SHOT_ATOMS = [1, 6, 8, 10, 14, 17, 26, 79, 1, 6];
+
 type PreviewBoardAtom = {
   id: string;
+  physicsId: number;
   atomicNumber: number;
   x: number;
   y: number;
   atomSkin: AtomSkin;
+  isShot?: boolean;
+};
+
+type PreviewPath = {
+  path: Array<{ x: number; y: number }>;
+  impact: { x: number; y: number };
 };
 
 function makePreviewAtoms(visual: ThemeBundleVisual): PreviewBoardAtom[] {
-  return THEME_PREVIEW_POSITIONS.map(([x, y], index) => ({
-    id: `initial-${index}`,
-    atomicNumber: THEME_PREVIEW_ATOMS[index % THEME_PREVIEW_ATOMS.length],
-    x,
-    y,
-    atomSkin: visual.atomSkins[index % visual.atomSkins.length] ?? "classic",
-  }));
+  return THEME_PREVIEW_POSITIONS.map(([x, y], index) => {
+    const physicsId = nextBallId();
+    return {
+      id: `initial-${index}-${physicsId}`,
+      physicsId,
+      atomicNumber: THEME_PREVIEW_ATOMS[index % THEME_PREVIEW_ATOMS.length],
+      x,
+      y,
+      atomSkin: visual.atomSkins[index % visual.atomSkins.length] ?? "classic",
+    };
+  });
+}
+
+function raycastPreview(atoms: PreviewBoardAtom[], target: { x: number; y: number }): PreviewPath {
+  const projectileRadius = PREVIEW_ATOM_RADIUS;
+  const dxTarget = target.x - PREVIEW_LAUNCHER.x;
+  const dyTarget = Math.min(target.y, PREVIEW_LAUNCHER.y - 6) - PREVIEW_LAUNCHER.y;
+  const magnitude = Math.hypot(dxTarget, dyTarget) || 1;
+  let dx = dxTarget / magnitude;
+  let dy = dyTarget / magnitude;
+  let x = PREVIEW_LAUNCHER.x;
+  let y = PREVIEW_LAUNCHER.y;
+  const path = [{ x, y }];
+
+  for (let step = 0; step < 180; step += 1) {
+    x += dx * 1.25;
+    y += dy * 1.25;
+    if (x <= 5 || x >= 95) {
+      x = Math.max(5, Math.min(95, x));
+      dx *= -1;
+    }
+    if (y <= 5) {
+      path.push({ x, y: 5 });
+      return { path, impact: { x, y: 5 } };
+    }
+    const hit = atoms.find(
+      (atom) => Math.hypot(atom.x - x, atom.y - y) <= projectileRadius + PREVIEW_ATOM_RADIUS,
+    );
+    path.push({ x, y });
+    if (hit) return { path, impact: { x, y } };
+  }
+  return { path, impact: { x, y } };
 }
 
 function ThemePreviewModal({
@@ -270,33 +326,113 @@ function ThemePreviewModal({
 }) {
   const [atoms, setAtoms] = useState(() => makePreviewAtoms(visual));
   const [shotsUsed, setShotsUsed] = useState(0);
+  const [aimTarget, setAimTarget] = useState({ x: 50, y: 24 });
+  const [projectile, setProjectile] = useState<{
+    atomicNumber: number;
+    atomSkin: AtomSkin;
+    x: number;
+    y: number;
+    impactX: number;
+    impactY: number;
+  } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [score, setScore] = useState(0);
+  const [combo, setCombo] = useState(0);
+  const [bestCombo, setBestCombo] = useState(0);
+  const [lastResult, setLastResult] = useState("Aim at the board, then press SHOOT");
+  const launchTimerRef = useRef<number | null>(null);
+  const previewPath = useMemo(() => raycastPreview(atoms, aimTarget), [atoms, aimTarget]);
+
+  useEffect(
+    () => () => {
+      if (launchTimerRef.current !== null) window.clearTimeout(launchTimerRef.current);
+    },
+    [],
+  );
 
   function resetPreview() {
+    if (launchTimerRef.current !== null) window.clearTimeout(launchTimerRef.current);
     setAtoms(makePreviewAtoms(visual));
     setShotsUsed(0);
+    setAimTarget({ x: 50, y: 24 });
+    setProjectile(null);
+    setBusy(false);
+    setScore(0);
+    setCombo(0);
+    setBestCombo(0);
+    setLastResult("Aim at the board, then press SHOOT");
   }
 
-  function shootAt(x: number, y: number) {
-    if (shotsUsed >= 10) return;
-    const shotIndex = shotsUsed;
-    setAtoms((current) => [
-      ...current,
-      {
-        id: `shot-${shotIndex}`,
-        atomicNumber: THEME_PREVIEW_ATOMS[(shotIndex + 3) % THEME_PREVIEW_ATOMS.length],
-        x,
-        y,
-        atomSkin: visual.atomSkins[(shotIndex + current.length) % visual.atomSkins.length] ?? "classic",
-      },
-    ]);
-    setShotsUsed((current) => current + 1);
-  }
-
-  function handleBoardClick(event: React.MouseEvent<HTMLDivElement>) {
+  function handleBoardAim(event: React.MouseEvent<HTMLDivElement>) {
+    if (busy || shotsUsed >= 10) return;
     const bounds = event.currentTarget.getBoundingClientRect();
-    const x = Math.max(8, Math.min(92, ((event.clientX - bounds.left) / bounds.width) * 100));
-    const y = Math.max(10, Math.min(82, ((event.clientY - bounds.top) / bounds.height) * 100));
-    shootAt(x, y);
+    setAimTarget({
+      x: Math.max(8, Math.min(92, ((event.clientX - bounds.left) / bounds.width) * 100)),
+      y: Math.max(8, Math.min(82, ((event.clientY - bounds.top) / bounds.height) * 100)),
+    });
+  }
+
+  function launchPreviewShot() {
+    if (busy || shotsUsed >= 10) return;
+    const shotIndex = shotsUsed;
+    const atomicNumber = PREVIEW_SHOT_ATOMS[shotIndex] ?? 1;
+    const atomSkin = visual.atomSkins[shotIndex % visual.atomSkins.length] ?? "classic";
+    const impact = previewPath.impact;
+    setBusy(true);
+    setShotsUsed((current) => current + 1);
+    setProjectile({
+      atomicNumber,
+      atomSkin,
+      x: PREVIEW_LAUNCHER.x,
+      y: PREVIEW_LAUNCHER.y,
+      impactX: impact.x,
+      impactY: impact.y,
+    });
+    window.requestAnimationFrame(() => {
+      setProjectile((current) =>
+        current ? { ...current, x: current.impactX, y: current.impactY } : current,
+      );
+    });
+    launchTimerRef.current = window.setTimeout(() => {
+      const incoming: Ball = {
+        id: nextBallId(),
+        x: impact.x,
+        y: impact.y,
+        atom: atomicNumber,
+        r: PREVIEW_ATOM_RADIUS,
+      };
+      const board: Board = atoms.map((atom) => ({
+        id: atom.physicsId,
+        x: atom.x,
+        y: atom.y,
+        atom: atom.atomicNumber,
+        r: PREVIEW_ATOM_RADIUS,
+      }));
+      const result = placeAndMerge(board, incoming, PREVIEW_BOARD_GEO, 118, 118, 1.15, false, 0);
+      const skins = new Map(atoms.map((atom) => [atom.physicsId, atom.atomSkin]));
+      skins.set(incoming.id, atomSkin);
+      const nextAtoms = result.balls.map((ball) => ({
+        id: `board-${ball.id}`,
+        physicsId: ball.id,
+        atomicNumber: ball.atom,
+        x: Math.max(7, Math.min(93, ball.x)),
+        y: Math.max(7, Math.min(90, ball.y)),
+        atomSkin: skins.get(ball.id) ?? visual.atomSkins[ball.id % visual.atomSkins.length] ?? "classic",
+        isShot: ball.id === incoming.id,
+      }));
+      setAtoms(nextAtoms);
+      setProjectile(null);
+      setBusy(false);
+      setScore((current) => current + result.scoreGained);
+      setCombo(result.merges.length);
+      setBestCombo((current) => Math.max(current, result.merges.length));
+      setLastResult(
+        result.merges.length > 0
+          ? `${result.merges.length > 1 ? "Chain merge" : "Merge"} · +${result.scoreGained.toLocaleString()} points`
+          : "Shot placed · no merge",
+      );
+      launchTimerRef.current = null;
+    }, 360);
   }
 
   return (
@@ -339,7 +475,7 @@ function ThemePreviewModal({
               {product.name}
             </h2>
             <p style={{ margin: 0, color: "var(--muted-foreground)", fontSize: 12 }}>
-              {visual.skin} · Tap the board to shoot
+              {visual.skin} · Aim, then press SHOOT · No power-ups
             </p>
           </div>
           <button type="button" onClick={onClose} style={smallButton}>
@@ -349,8 +485,8 @@ function ThemePreviewModal({
 
         <div
           style={{
-            display: "flex",
-            justifyContent: "space-between",
+            display: "grid",
+            gridTemplateColumns: "1fr auto auto",
             alignItems: "center",
             gap: 10,
             margin: "14px 0 10px",
@@ -363,20 +499,24 @@ function ThemePreviewModal({
           }}
         >
           <span>{shotsUsed >= 10 ? "Preview complete" : "10-shot test board"}</span>
-          <span style={{ color: shotsUsed >= 10 ? "var(--success)" : "var(--accent)" }}>
-            {10 - shotsUsed} shots left
+          <span style={{ color: "var(--accent)" }}>Score {score.toLocaleString()}</span>
+          <span style={{ color: combo > 1 ? "var(--success)" : "var(--accent)" }}>
+            {10 - shotsUsed} shots · Combo {combo} · Best {bestCombo}
           </span>
+        </div>
+        <div style={{ margin: "0 0 10px", color: "var(--muted-foreground)", fontSize: 11 }}>
+          {lastResult}
         </div>
 
         <div
           role="button"
           tabIndex={0}
-          aria-label={shotsUsed >= 10 ? "Theme preview complete" : "Shoot a test atom"}
-          onClick={handleBoardClick}
+          aria-label="Aim the preview board"
+          onClick={handleBoardAim}
           onKeyDown={(event) => {
-            if ((event.key === "Enter" || event.key === " ") && shotsUsed < 10) {
+            if ((event.key === "Enter" || event.key === " ") && !busy) {
               event.preventDefault();
-              shootAt(50, 78);
+              launchPreviewShot();
             }
           }}
           style={{
@@ -384,13 +524,18 @@ function ThemePreviewModal({
             minHeight: "min(62vh, 520px)",
             borderRadius: 18,
             overflow: "hidden",
-            cursor: shotsUsed >= 10 ? "default" : "crosshair",
+            cursor: busy || shotsUsed >= 10 ? "default" : "crosshair",
             background: `${visual.board}, linear-gradient(180deg, rgba(255,255,255,.08), rgba(0,0,0,.2))`,
             border: "1px solid rgba(255,255,255,.3)",
             boxShadow: "inset 0 0 0 1px rgba(0,0,0,.22), inset 0 -80px 120px rgba(0,0,0,.18)",
           }}
         >
           <div aria-hidden="true" style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(255,255,255,.12), transparent 28%, rgba(0,0,0,.12))", pointerEvents: "none" }} />
+          {!busy && shotsUsed < 10 && (
+            <svg aria-hidden="true" viewBox="0 0 100 100" preserveAspectRatio="none" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }}>
+              <polyline points={previewPath.path.map((point) => `${point.x},${point.y}`).join(" ")} fill="none" stroke="rgba(255,255,255,.72)" strokeWidth="0.45" strokeDasharray="1.4 1.7" />
+            </svg>
+          )}
           {atoms.map((atom) => (
             <div
               key={atom.id}
@@ -401,27 +546,48 @@ function ThemePreviewModal({
                 transform: "translate(-50%, -50%)",
                 pointerEvents: "none",
                 filter: "drop-shadow(0 4px 5px rgba(0,0,0,.4))",
-                animation: atom.id.startsWith("shot-") ? "pop-in 260ms ease-out" : undefined,
+                animation: atom.isShot ? "pop-in 260ms ease-out" : undefined,
               }}
             >
               <ElementBall
                 atomicNumber={atom.atomicNumber}
                 size={46}
-                glow={atom.id.endsWith("0") || atom.id.endsWith("3")}
+                glow={atom.physicsId % 4 === 0}
                 atomSkin={atom.atomSkin}
-                patternSeed={atom.id.length + atom.atomicNumber}
+                patternSeed={atom.physicsId + atom.atomicNumber}
               />
             </div>
           ))}
-          <div
-            aria-hidden="true"
+          {projectile && (
+            <div
+              style={{
+                position: "absolute",
+                left: `${projectile.x}%`,
+                top: `${projectile.y}%`,
+                transform: "translate(-50%, -50%)",
+                pointerEvents: "none",
+                zIndex: 4,
+                transition: "left 360ms linear, top 360ms linear",
+                filter: "drop-shadow(0 4px 5px rgba(0,0,0,.5))",
+              }}
+            >
+              <ElementBall atomicNumber={projectile.atomicNumber} size={46} glow atomSkin={projectile.atomSkin} />
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              launchPreviewShot();
+            }}
+            disabled={busy || shotsUsed >= 10}
             style={{
               position: "absolute",
               left: "50%",
               bottom: 14,
               transform: "translateX(-50%)",
-              width: 56,
-              height: 56,
+              width: 68,
+              height: 68,
               borderRadius: "50%",
               display: "grid",
               placeItems: "center",
@@ -431,11 +597,13 @@ function ThemePreviewModal({
               boxShadow: "0 0 18px rgba(100,190,255,.55)",
               fontSize: 10,
               fontWeight: 900,
+              cursor: busy || shotsUsed >= 10 ? "not-allowed" : "pointer",
+              opacity: busy || shotsUsed >= 10 ? 0.55 : 1,
             }}
           >
-            SHOOT
-          </div>
-          {shotsUsed >= 10 && (
+            {busy ? "..." : "SHOOT"}
+          </button>
+          {shotsUsed >= 10 && !busy && (
             <div
               style={{
                 position: "absolute",
