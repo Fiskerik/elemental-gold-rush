@@ -64,7 +64,18 @@ export const ElementBall = memo(function ElementBall({
     ? Math.abs(Math.floor(patternSeed!))
     : atomicNumber;
   const patternIndex = (patternValue * 17 + atomicNumber * 31) % 4;
-  const useTextStroke = atomSkin === "chrome" || atomSkin === "mineral" || atomSkin === "toxic";
+  const useTextStroke =
+    atomSkin === "chrome" ||
+    atomSkin === "crystal" ||
+    atomSkin === "mineral" ||
+    atomSkin === "toxic";
+  const textColor = atomSkin === "crystal" || atomSkin === "mineral" ? "#fff8e8" : "#0A0A1A";
+  const textStrokeColor =
+    atomSkin === "crystal"
+      ? "rgba(0,0,0,0.96)"
+      : atomSkin === "mineral"
+        ? "rgba(18,10,3,0.92)"
+        : "rgba(255,255,255,0.9)";
   const baseBackground = `radial-gradient(circle at 30% 28%, ${el.glowColor}, ${el.color} 65%, oklch(0 0 0 / 0.35))`;
   const skinBackground: Record<AtomSkin, string> = {
     classic: baseBackground,
@@ -105,7 +116,7 @@ export const ElementBall = memo(function ElementBall({
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        color: atomSkin === "mineral" ? "#fff8e8" : "#0A0A1A",
+        color: textColor,
         fontWeight: 800,
         cursor: onClick ? "pointer" : "default",
         userSelect: "none",
@@ -177,7 +188,7 @@ export const ElementBall = memo(function ElementBall({
           lineHeight: 1,
           opacity: 0.85,
           WebkitTextStroke: useTextStroke
-            ? `${Math.max(0.7, size * 0.035)}px ${atomSkin === "mineral" ? "rgba(18,10,3,0.92)" : "rgba(255,255,255,0.9)"}`
+            ? `${Math.max(0.7, size * 0.035)}px ${textStrokeColor}`
             : undefined,
           paintOrder: useTextStroke ? "stroke fill" : undefined,
         }}
@@ -193,7 +204,7 @@ export const ElementBall = memo(function ElementBall({
           lineHeight: 1,
           fontWeight: 900,
           WebkitTextStroke: useTextStroke
-            ? `${Math.max(0.8, size * 0.04)}px ${atomSkin === "mineral" ? "rgba(18,10,3,0.92)" : "rgba(255,255,255,0.9)"}`
+            ? `${Math.max(0.8, size * 0.04)}px ${textStrokeColor}`
             : undefined,
           paintOrder: useTextStroke ? "stroke fill" : undefined,
         }}
@@ -210,7 +221,7 @@ export const ElementBall = memo(function ElementBall({
             lineHeight: 1,
             opacity: 0.7,
             WebkitTextStroke: useTextStroke
-              ? `${Math.max(0.6, size * 0.03)}px ${atomSkin === "mineral" ? "rgba(18,10,3,0.92)" : "rgba(255,255,255,0.9)"}`
+              ? `${Math.max(0.6, size * 0.03)}px ${textStrokeColor}`
               : undefined,
             paintOrder: useTextStroke ? "stroke fill" : undefined,
           }}

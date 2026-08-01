@@ -434,12 +434,14 @@ export function Profile({ onBack, onOpenShop }: Props) {
             label={tr("Total Score")}
             value={exactScore(totalScore)}
             sub={tr("career")}
+            tone="oklch(0.86 0.18 88)"
           />
           <ProfileStat
             icon={Zap}
             label={tr("Best Shot")}
             value={exactScore(highestSingleShotScore)}
             sub={formatDate(highestSingleShotScoreDate)}
+            tone="oklch(0.78 0.18 205)"
           />
           <CoinProfileStat
             value={`${goldCoins}`}
@@ -451,6 +453,7 @@ export function Profile({ onBack, onOpenShop }: Props) {
             label={tr("Daily Streak")}
             value={`${dailyStreak}`}
             sub={tr(claimedDailyReward ? "claimed" : "active")}
+            tone="oklch(0.78 0.18 150)"
           />
           <ProfileStat
             icon={Zap}
@@ -465,24 +468,28 @@ export function Profile({ onBack, onOpenShop }: Props) {
                   })
                 : tr("no record yet")
             }
+            tone="oklch(0.86 0.18 48)"
           />
           <ProfileStat
             icon={Atom}
             label={tr("Highest Atom")}
             value={tr(highestEl?.name ?? "Hydrogen")}
             sub={`${highestEl?.symbol ?? "H"} • #${highestElement}`}
+            tone="oklch(0.78 0.16 250)"
           />
           <ProfileStat
             icon={FlaskConical}
             label={tr("Elements")}
             value={`${discoveredElements.length}`}
             sub={tr(`${completionPercent}% found`)}
+            tone="oklch(0.78 0.18 320)"
           />
           <ProfileStat
             icon={Star}
             label={tr("Stars")}
             value={`${totalStars}`}
             sub={tr(`${perfectLevels} perfect`)}
+            tone="oklch(0.9 0.18 82)"
           />
         </section>
 
@@ -627,16 +634,26 @@ function ProfileStat({
   label,
   value,
   sub,
+  tone = "var(--primary)",
 }: {
   icon?: LucideIcon;
   label: string;
   value: string;
   sub: string;
+  tone?: string;
 }) {
   return (
     <div style={statCard}>
       {Icon && (
-        <div style={statIcon}>
+        <div
+          style={{
+            ...statIcon,
+            background: `color-mix(in oklch, ${tone} 18%, var(--surface-high))`,
+            color: tone,
+            borderColor: `color-mix(in oklch, ${tone} 42%, var(--border))`,
+            boxShadow: `0 0 14px color-mix(in oklch, ${tone} 22%, transparent)`,
+          }}
+        >
           <Icon size={18} aria-hidden="true" />
         </div>
       )}
@@ -653,7 +670,7 @@ function ProfileStat({
       <div
         style={{
           fontSize: value.length > 9 ? 16 : value.length > 6 ? 20 : 24,
-          color: "var(--primary)",
+          color: tone,
           fontWeight: 900,
           marginTop: 3,
           lineHeight: 1.1,
@@ -676,9 +693,18 @@ function CoinProfileStat({
   sub: string;
   onTransactions: () => void;
 }) {
+  const tone = "oklch(0.86 0.18 88)";
   return (
     <div style={statCard}>
-      <div style={statIcon}>
+      <div
+        style={{
+          ...statIcon,
+          background: `color-mix(in oklch, ${tone} 18%, var(--surface-high))`,
+          color: tone,
+          borderColor: `color-mix(in oklch, ${tone} 42%, var(--border))`,
+          boxShadow: `0 0 14px color-mix(in oklch, ${tone} 22%, transparent)`,
+        }}
+      >
         <Coins size={18} aria-hidden="true" />
       </div>
       <div
@@ -694,7 +720,7 @@ function CoinProfileStat({
       <div
         style={{
           fontSize: value.length > 9 ? 16 : value.length > 6 ? 20 : 24,
-          color: "var(--primary)",
+          color: tone,
           fontWeight: 900,
           marginTop: 3,
           lineHeight: 1.1,

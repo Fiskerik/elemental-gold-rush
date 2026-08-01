@@ -23,6 +23,21 @@ export const THEME_BUNDLE_PRODUCT_IDS = [
   PRODUCT_IDS.themeBiohazard,
 ] as const satisfies readonly ProductId[];
 
+// Base US App Store tiers used for the lifetime Researcher / Developer badge.
+// The badge is a thank-you tier, not a receipt or currency balance; update
+// these values alongside the App Store pricing tiers if those tiers change.
+export const SHOP_SPEND_CENTS: Record<ProductId, number> = {
+  [PRODUCT_IDS.proLabPack]: 999,
+  [PRODUCT_IDS.coins5]: 99,
+  [PRODUCT_IDS.coins20]: 399,
+  [PRODUCT_IDS.coins50]: 799,
+  [PRODUCT_IDS.coins100]: 1499,
+  [PRODUCT_IDS.themeGoldLab]: 199,
+  [PRODUCT_IDS.themeNeonPeriodic]: 199,
+  [PRODUCT_IDS.themeQuantumVoid]: 199,
+  [PRODUCT_IDS.themeBiohazard]: 199,
+};
+
 export const APP_STORE_PURCHASE_PRODUCT_IDS = [
   PRODUCT_IDS.proLabPack,
   PRODUCT_IDS.coins5,
@@ -94,11 +109,11 @@ export const PRODUCTS: ProductDefinition[] = [
   {
     id: PRODUCT_IDS.themeGoldLab,
     name: "Gummy Lab",
-    description: "A playful candy chemistry laboratory with a matching glossy Gummy atom finish.",
+    description: "A playful candy chemistry laboratory with a matching candy-textured Gummy atom finish.",
     type: "non_consumable",
     benefits: [
       "Illustrated pastel candy-lab board theme.",
-      "Bundled Gummy finish with glossy highlights over every atom's original color.",
+      "Bundled Gummy finish with soft candy bubbles, gel highlights, and every atom's original color.",
       "Purely cosmetic — no gameplay changes.",
     ],
   },
@@ -116,11 +131,11 @@ export const PRODUCTS: ProductDefinition[] = [
   {
     id: PRODUCT_IDS.themeQuantumVoid,
     name: "Crystal Cove",
-    description: "A luminous fantasy cavern with two matching crystalline atom finishes.",
+    description: "A luminous crystal cavern plus a sunny beach-cove variant for two matching mineral finishes.",
     type: "non_consumable",
     benefits: [
-      "Illustrated crystal-cavern board theme.",
-      "Includes glassy Crystal Core and faceted Mineral finishes.",
+      "Illustrated Crystal Cove board with a Mineral Cove beach-cove style.",
+      "Includes glassy Crystal Core and faceted Mineral finishes, each with varied patterns.",
       "Purely cosmetic — no gameplay changes.",
     ],
   },

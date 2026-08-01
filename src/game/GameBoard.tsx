@@ -961,7 +961,9 @@ function DailyCompoundGridBoard({
             {getDailyCompoundClue(compound)}
           </div>
           <div style={dailyCompoundMeta}>
-            <span style={dailyCompoundMetaBox}>{selectedCells.length} marked</span>
+            <span style={dailyCompoundMetaBox}>
+              {selectedCells.length}/{secretAtoms.length} atoms
+            </span>
             <span style={dailyCompoundMetaBox}>{wrongGuesses} wrong</span>
             <span style={dailyCompoundMetaBox}>{hintsUsed} hints</span>
             <span style={dailyCompoundMetaBox}>{elapsedSec}s</span>
@@ -6101,7 +6103,7 @@ function StandardGameBoard({
 
   return (
     <div
-      className={`app-shell game-board-shell board-theme-${activeBoardTheme}`}
+      className={`app-shell game-board-shell board-theme-${activeBoardTheme} atom-skin-${activeAtomSkin}-active`}
       style={{
         display: "flex",
         flexDirection: "column",

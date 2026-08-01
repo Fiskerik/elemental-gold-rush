@@ -8,6 +8,8 @@ let musicTimer: number | null = null;
 let musicMaster: GainNode | null = null;
 let musicStep = 0;
 let musicNextTime = 0;
+let musicStartRequest = 0;
+let pendingMusicStart: { request: number; context: AudioContext; theme: MusicTheme } | null = null;
 export type MusicTheme = "default" | "boss" | "powerup" | "compound";
 let currentMusicTheme: MusicTheme = "default";
 const MIN_EXP_VALUE = 0.0001;
@@ -780,12 +782,27 @@ export function startAmbientMusic(theme: MusicTheme = "default") {
   const c = getCtx();
   if (!c) return;
   if (c.state === "suspended") {
+    if (pendingMusicStart?.context === c && pendingMusicStart.theme === theme) return;
+    const request = ++musicStartRequest;
+    pendingMusicStart = { request, context: c, theme };
     void c
       .resume()
-      .then(() => startAmbientMusic(theme))
-      .catch(() => {});
+      .then(() => {
+        if (
+          pendingMusicStart?.request !== request ||
+          pendingMusicStart.context !== c ||
+          pendingMusicStart.theme !== theme
+        )
+          return;
+        pendingMusicStart = null;
+        startAmbientMusic(theme);
+      })
+      .catch(() => {
+        if (pendingMusicStart?.request === request) pendingMusicStart = null;
+      });
     return;
   }
+  pendingMusicStart = null;
   if (musicTimer != null && musicMaster && currentMusicTheme === theme) return;
   if (musicTimer != null) stopAmbientMusic();
 
@@ -811,6 +828,8 @@ export function startAmbientMusic(theme: MusicTheme = "default") {
 }
 
 export function stopAmbientMusic() {
+  musicStartRequest += 1;
+  pendingMusicStart = null;
   if (musicTimer != null) {
     window.clearInterval(musicTimer);
     musicTimer = null;

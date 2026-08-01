@@ -4,6 +4,7 @@ import {
   Award,
   Beaker,
   Crown,
+  Code2,
   FlaskConical,
   Hexagon,
   Layers,
@@ -14,7 +15,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-export type BadgeGroup = "milestones" | "families" | "periods" | "mastery";
+export type BadgeGroup = "milestones" | "families" | "periods" | "mastery" | "supporters";
 
 export interface BadgeDefinition {
   id: string;
@@ -24,6 +25,7 @@ export interface BadgeDefinition {
   iconLucide?: LucideIcon;
   group: BadgeGroup;
   requiredAtomicNumbers: number[];
+  requiredShopSpendCents?: number;
 }
 
 export const BADGE_GROUPS: { id: BadgeGroup; title: string; description: string }[] = [
@@ -31,6 +33,7 @@ export const BADGE_GROUPS: { id: BadgeGroup; title: string; description: string 
   { id: "families", title: "Chemical Families", description: "Complete periodic-table families." },
   { id: "periods", title: "Full Periods", description: "Discover every element in a row." },
   { id: "mastery", title: "Collection Mastery", description: "Long-term collection goals." },
+  { id: "supporters", title: "Researcher / Developer", description: "Support the lab in the shop." },
 ];
 
 function byCategory(category: string): number[] {
@@ -370,11 +373,32 @@ export const BADGES: BadgeDefinition[] = [
     iconLucide: Award,
     requiredAtomicNumbers: allElements(),
   },
+  {
+    id: "researcher",
+    group: "supporters",
+    name: "Researcher",
+    description: "Spend at least $5 in the shop to fund new experiments.",
+    icon: "R",
+    iconLucide: FlaskConical,
+    requiredAtomicNumbers: [],
+    requiredShopSpendCents: 500,
+  },
+  {
+    id: "developer",
+    group: "supporters",
+    name: "Developer",
+    description: "Spend at least $20 in the shop to help build the lab.",
+    icon: "D",
+    iconLucide: Code2,
+    requiredAtomicNumbers: [],
+    requiredShopSpendCents: 2000,
+  },
 ];
 
-export function getEarnedBadgeIds(discoveredElements: number[]): string[] {
+export function getEarnedBadgeIds(discoveredElements: number[], shopSpendCents = 0): string[] {
   const found = new Set(discoveredElements);
   return BADGES.filter((badge) =>
-    badge.requiredAtomicNumbers.every((atomicNumber) => found.has(atomicNumber)),
+    badge.requiredAtomicNumbers.every((atomicNumber) => found.has(atomicNumber)) &&
+    (badge.requiredShopSpendCents == null || shopSpendCents >= badge.requiredShopSpendCents),
   ).map((badge) => badge.id);
 }

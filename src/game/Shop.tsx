@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { Clapperboard } from "lucide-react";
-import { type InventoryPowerUpId, useProgress } from "./store";
+import { ElementBall } from "./ElementBall";
+import { type AtomSkin, type BoardTheme, type InventoryPowerUpId, useProgress } from "./store";
 import { POWER_UP_UNLOCK_LEVELS } from "./powerUps";
 import { PowerUpBadge } from "./PowerUpLibrary";
 import {
@@ -102,33 +103,43 @@ const APP_STORE_COIN_PACKS = [
   PRODUCT_IDS.coins100,
 ] as const;
 const THEME_BUNDLE_VISUALS: Partial<
-  Record<ProductId, { board: string; atom: string; skin: string }>
+  Record<ProductId, { board: string; atom: string; skin: string; theme: BoardTheme; atomSkins: AtomSkin[] }>
 > = {
   [PRODUCT_IDS.themeGoldLab]: {
-    board: "linear-gradient(135deg, #ffe9a8, #241505 58%, #c9902c)",
+    board: "url('/themes/gummy-lab.webp') center / cover no-repeat",
     atom:
       "linear-gradient(132deg, transparent 32%, rgba(255,255,255,.75) 34%, transparent 39%), radial-gradient(circle at 30% 25%, #ffe5a1, #d26c32 58%, #4d1e1e)",
-    skin: "Marble atoms",
+    skin: "Gummy atoms",
+    theme: "goldLab",
+    atomSkins: ["chrome"],
   },
   [PRODUCT_IDS.themeNeonPeriodic]: {
-    board: "linear-gradient(135deg, #7af6ff, #120a24 58%, #ea5cff)",
+    board: "url('/themes/cloud-nine.webp') center / cover no-repeat",
     atom:
       "linear-gradient(165deg, rgba(88,239,255,.35), transparent 42%, rgba(238,92,255,.3)), radial-gradient(circle at 30% 25%, #ffe5a1, #d26c32 58%, #4d1e1e)",
-    skin: "Prism atoms",
+    skin: "Cloud Glass atoms",
+    theme: "neonPeriodic",
+    atomSkins: ["hologram"],
   },
   [PRODUCT_IDS.themeQuantumVoid]: {
-    board: "linear-gradient(135deg, #b79bff, #07040f 58%, #4a2fa8)",
+    board: "url('/themes/crystal-cove.webp') center / cover no-repeat",
     atom:
       "conic-gradient(from 25deg, transparent, rgba(255,255,255,.42), transparent 28% 62%, rgba(255,255,255,.28), transparent 78%), radial-gradient(circle at 30% 25%, #ffe5a1, #d26c32 58%, #4d1e1e)",
-    skin: "Glass atoms",
+    skin: "Crystal Core + Mineral atoms",
+    theme: "quantumVoid",
+    atomSkins: ["crystal", "mineral"],
   },
   [PRODUCT_IDS.themeBiohazard]: {
-    board: "linear-gradient(135deg, #e4ff7a, #131c06 58%, #63c92c)",
+    board: "url('/themes/radioactive-reactor.webp') center / cover no-repeat",
     atom:
       "radial-gradient(circle at 68% 66%, rgba(255,255,255,.5) 0 7%, transparent 8%), radial-gradient(circle at 42% 72%, rgba(255,255,255,.35) 0 5%, transparent 6%), radial-gradient(circle at 30% 25%, #ffe5a1, #d26c32 58%, #4d1e1e)",
-    skin: "Bubble atoms",
+    skin: "Irradiated atoms",
+    theme: "biohazard",
+    atomSkins: ["toxic"],
   },
 };
+
+const THEME_PREVIEW_ATOMS = [1, 6, 8, 10, 14, 17, 26, 79];
 const SHOP_PURCHASE_GUARD_TIMEOUT_MS = 60_000;
 
 function withTimeout<T>(
@@ -149,6 +160,60 @@ function withTimeout<T>(
   ]);
 }
 
+function BundlePreview({
+  visual,
+}: {
+  visual: { board: string; atom: string; skin: string; theme: BoardTheme; atomSkins: AtomSkin[] };
+}) {
+  return (
+    <div
+      aria-label={`${visual.skin} preview with eight atoms`}
+      style={{
+        position: "absolute",
+        inset: 0,
+        background:
+          visual.theme === "quantumVoid"
+            ? "linear-gradient(180deg, transparent 0 58%, rgba(20,100,116,.42) 59% 100%)"
+            : "linear-gradient(180deg, transparent 0 56%, rgba(0,0,0,.22) 57% 100%)",
+      }}
+    >
+      {THEME_PREVIEW_ATOMS.map((atomicNumber, index) => {
+        const atomSkin = visual.atomSkins[index % visual.atomSkins.length] ?? "classic";
+        const positions = [
+          [9, 12],
+          [39, 7],
+          [70, 14],
+          [23, 43],
+          [54, 38],
+          [83, 46],
+          [8, 72],
+          [62, 70],
+        ][index];
+        return (
+          <div
+            key={`${atomicNumber}-${index}`}
+            style={{
+              position: "absolute",
+              left: `${positions[0]}%`,
+              top: `${positions[1]}%`,
+              transform: "translate(-50%, -50%)",
+              filter: "drop-shadow(0 3px 4px rgba(0,0,0,.38))",
+            }}
+          >
+            <ElementBall
+              atomicNumber={atomicNumber}
+              size={30}
+              glow={index % 3 === 0}
+              atomSkin={atomSkin}
+              patternSeed={index + 101}
+            />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function Shop({ onBack }: { onBack: () => void }) {
   const isTabletLayout = useIsTabletLayout();
   const {
@@ -162,6 +227,7 @@ export function Shop({ onBack }: { onBack: () => void }) {
     hasProPack,
     ownedThemeProducts,
     grantThemeProduct,
+    recordShopSpend,
   } = useProgress();
   const [message, setMessage] = useState("");
   const [pendingProductId, setPendingProductId] = useState<ProductId | "rewarded" | null>(null);
@@ -266,6 +332,7 @@ export function Shop({ onBack }: { onBack: () => void }) {
       );
       if (result.purchased) {
         grantProPack();
+        recordShopSpend(PRODUCT_IDS.proLabPack);
         setProPackMessage("Pro Lab Pack unlocked.");
         return;
       }
@@ -345,6 +412,7 @@ export function Shop({ onBack }: { onBack: () => void }) {
       );
       if (result.coins > 0) {
         grantGoldCoins(result.coins, "App Store coin pack");
+        recordShopSpend(productId);
         setMessage(
           `${result.coins} gold coin${result.coins === 1 ? "" : "s"} added from App Store purchase.`,
         );
@@ -381,6 +449,7 @@ export function Shop({ onBack }: { onBack: () => void }) {
       );
       if (result.purchased) {
         grantThemeProduct(productId);
+        recordShopSpend(productId);
         setCosmeticMessage(`${getProductById(productId)?.name ?? "Cosmetic bundle"} unlocked.`);
         return;
       }
@@ -809,7 +878,7 @@ export function Shop({ onBack }: { onBack: () => void }) {
             </div>
             <p style={{ margin: "0 0 14px", color: "var(--muted-foreground)", fontSize: 13 }}>
               {COSMETIC_THEME_PURCHASES_ENABLED
-                ? "Each one-time purchase unlocks a board and its matching atom finish. Element colors and gameplay remain unchanged."
+                ? "Each one-time purchase unlocks a board and its matching atom finish. Element colors and gameplay remain unchanged. Shop support also unlocks Researcher at $5 and Developer at $20."
                 : "All board themes and atom finishes are unlocked for testing. Element colors and gameplay remain unchanged."}
             </p>
             <div
@@ -834,7 +903,7 @@ export function Shop({ onBack }: { onBack: () => void }) {
                     key={productId}
                     style={{
                       display: "grid",
-                      gridTemplateColumns: "72px minmax(0, 1fr)",
+                      gridTemplateColumns: "132px minmax(0, 1fr)",
                       gap: 12,
                       padding: 12,
                       borderRadius: 14,
@@ -843,27 +912,16 @@ export function Shop({ onBack }: { onBack: () => void }) {
                     }}
                   >
                     <div
-                      aria-hidden="true"
                       style={{
                         position: "relative",
-                        minHeight: 82,
+                        minHeight: 108,
                         borderRadius: 12,
                         background: visual.board,
                         boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.14)",
+                        overflow: "hidden",
                       }}
                     >
-                      <span
-                        style={{
-                          position: "absolute",
-                          width: 34,
-                          height: 34,
-                          left: 19,
-                          top: 24,
-                          borderRadius: "50%",
-                          background: visual.atom,
-                          boxShadow: "0 0 14px rgba(255,255,255,0.28)",
-                        }}
-                      />
+                      <BundlePreview visual={visual} />
                     </div>
                     <div style={{ minWidth: 0, display: "grid", gap: 7 }}>
                       <div>
@@ -871,6 +929,16 @@ export function Shop({ onBack }: { onBack: () => void }) {
                         <span style={{ color: "var(--accent)", fontSize: 11, fontWeight: 800 }}>
                           {visual.skin}
                         </span>
+                        <small
+                          style={{
+                            display: "block",
+                            marginTop: 3,
+                            color: "var(--muted-foreground)",
+                            fontSize: 10,
+                          }}
+                        >
+                          8-atom bundle preview
+                        </small>
                       </div>
                       <p
                         style={{

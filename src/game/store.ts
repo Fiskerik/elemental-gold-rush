@@ -36,6 +36,7 @@ import {
   COSMETIC_THEME_PURCHASES_ENABLED,
   PRODUCT_IDS,
   THEME_BUNDLE_PRODUCT_IDS,
+  SHOP_SPEND_CENTS,
   type ProductId,
 } from "./products";
 
@@ -356,6 +357,7 @@ interface ProgressState {
   boardTheme: BoardTheme;
   atomSkin: AtomSkin;
   ownedThemeProducts: ProductId[];
+  shopSpendCents: number;
   appLanguage: AppLanguage;
   shootingStyle: "hold" | "press";
   hasChosenShootingStyle: boolean;
@@ -447,6 +449,7 @@ interface ProgressState {
   setBoardTheme: (theme: BoardTheme) => void;
   setAtomSkin: (skin: AtomSkin) => void;
   grantThemeProduct: (productId: ProductId) => void;
+  recordShopSpend: (productId: ProductId) => void;
   setAppLanguage: (language: AppLanguage) => void;
   setPlayerDisplayName: (name: string) => void;
   toggleAppTheme: () => void;
@@ -484,6 +487,7 @@ export const useProgress = create<ProgressState>()(
       boardTheme: "reactor",
       atomSkin: "classic",
       ownedThemeProducts: [],
+      shopSpendCents: 0,
       appLanguage: DEFAULT_LANGUAGE,
       shootingStyle: "hold",
       hasChosenShootingStyle: false,
@@ -677,7 +681,7 @@ export const useProgress = create<ProgressState>()(
           const discoveredElements = Array.from(next).sort((a, b) => a - b);
           return {
             discoveredElements,
-            earnedBadges: getEarnedBadgeIds(discoveredElements),
+            earnedBadges: getEarnedBadgeIds(discoveredElements, s.shopSpendCents),
           };
         }),
       recordCompoundDiscovery: (compoundId) =>
@@ -722,7 +726,7 @@ export const useProgress = create<ProgressState>()(
               `Collection element unlock: ${target.symbol}`,
             ),
             discoveredElements,
-            earnedBadges: getEarnedBadgeIds(discoveredElements),
+            earnedBadges: getEarnedBadgeIds(discoveredElements, s.shopSpendCents),
             dailyQuests: applyQuestProgress(refreshed.dailyQuests, { itemsPurchased: 1 }),
           };
         });
@@ -1178,6 +1182,16 @@ export const useProgress = create<ProgressState>()(
             ? s
             : { ownedThemeProducts: [...s.ownedThemeProducts, productId] },
         ),
+      recordShopSpend: (productId) =>
+        set((s) => {
+          const spendCents = SHOP_SPEND_CENTS[productId] ?? 0;
+          if (spendCents <= 0) return s;
+          const shopSpendCents = s.shopSpendCents + spendCents;
+          return {
+            shopSpendCents,
+            earnedBadges: getEarnedBadgeIds(s.discoveredElements, shopSpendCents),
+          };
+        }),
       setAppLanguage: (language) => set({ appLanguage: normalizeLanguage(language) }),
       setPlayerDisplayName: (name) => set({ playerDisplayName: normalizePlayerDisplayName(name) }),
       toggleAppTheme: () => set((s) => ({ appTheme: s.appTheme === "dark" ? "light" : "dark" })),
@@ -1205,6 +1219,7 @@ export const useProgress = create<ProgressState>()(
           boardTheme: "reactor",
           atomSkin: "classic",
           ownedThemeProducts: [],
+          shopSpendCents: s.shopSpendCents,
           appLanguage: DEFAULT_LANGUAGE,
           shootingStyle: "hold",
           hasChosenShootingStyle: false,
@@ -1215,7 +1230,7 @@ export const useProgress = create<ProgressState>()(
           weeklyPlayBonus: createWeeklyPlayBonus(),
           bestCombo: 0,
           bestComboDate: null,
-          earnedBadges: [],
+          earnedBadges: getEarnedBadgeIds([1], s.shopSpendCents),
           levelStars: {},
           levelStats: {},
           challengeBestScores: {},
@@ -1296,7 +1311,14 @@ export const useProgress = create<ProgressState>()(
             persistedState?.hasChosenShootingStyle ?? current.hasChosenShootingStyle,
           bestCombo: persistedState?.bestCombo ?? current.bestCombo,
           bestComboDate: persistedState?.bestComboDate ?? current.bestComboDate,
-          earnedBadges: getEarnedBadgeIds(discoveredElements),
+          shopSpendCents: Math.max(
+            0,
+            Math.floor(persistedState?.shopSpendCents ?? current.shopSpendCents),
+          ),
+          earnedBadges: getEarnedBadgeIds(
+            discoveredElements,
+            Math.max(0, Math.floor(persistedState?.shopSpendCents ?? current.shopSpendCents)),
+          ),
           discoveredCompounds: persistedState?.discoveredCompounds ?? current.discoveredCompounds,
           compoundCounts,
           levelStars: persistedState?.levelStars ?? current.levelStars,
