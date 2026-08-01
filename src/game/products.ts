@@ -134,7 +134,7 @@ export const PRODUCTS: ProductDefinition[] = [
   {
     id: PRODUCT_IDS.themeQuantumVoid,
     name: "Crystal Cove",
-    description: "A luminous crystal cavern plus a sunny beach-cove variant for two matching mineral finishes.",
+    description: "A luminous crystal cavern plus a sunny beach-cove variant with a matching faceted Mineral atom finish.",
     type: "non_consumable",
     benefits: [
       "Illustrated Crystal Cove board with a Mineral Cove beach-cove style.",

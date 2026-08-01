@@ -34,6 +34,8 @@ import {
   type InventoryPowerUpId,
   type LabUpgradeId,
   type PowerUpInventory,
+  type AtomSkin,
+  type BoardTheme,
   useProgress,
 } from "./store";
 import { playShootSound, primeAudio, startAmbientMusic, stopAmbientMusic, vibrate } from "./audio";
@@ -72,9 +74,16 @@ interface Props {
   mode?: GameModeId;
   resumeSavedRun?: boolean;
   secretCompoundId?: string;
+  preview?: boolean;
+  previewBoardTheme?: BoardTheme;
+  previewAtomSkin?: AtomSkin;
+  previewLabel?: string;
+  previewShotLimit?: number;
+  previewOnFinish?: () => void;
 }
 
 const QUEUE_SIZE = 4;
+const PREVIEW_QUEUE = [1, 6, 8, 10, 14, 17, 26, 79, 1, 6];
 const MAX_AIM_DEG = 75;
 const SHIMMER_MIN_LEVEL = POWER_UP_UNLOCK_LEVELS.shimmer;
 const UNSTABLE_UNLOCK_LEVEL = POWER_UP_UNLOCK_LEVELS.unstable;
@@ -1249,14 +1258,20 @@ function StandardGameBoard({
   mode = "campaign",
   resumeSavedRun = false,
   secretCompoundId,
+  preview = false,
+  previewBoardTheme,
+  previewAtomSkin,
+  previewLabel,
+  previewShotLimit = 10,
+  previewOnFinish,
 }: Props) {
   const isTabletLayout = useIsTabletLayout();
   const wideBoard = useWideBoardLayout();
   const level = getLevelById(levelId) ?? LEVELS[0];
   const gameMode = getGameMode(mode);
-  const powerUpStage = mode === "campaign" && !secretCompoundId ? level.powerUpStage : undefined;
+  const powerUpStage = !preview && mode === "campaign" && !secretCompoundId ? level.powerUpStage : undefined;
   const isPowerUpStage = powerUpStage != null;
-  const compoundEnabled = mode === "campaign" && !isPowerUpStage;
+  const compoundEnabled = !preview && mode === "campaign" && !isPowerUpStage;
   const {
     recordDiscovery,
     addScore,
@@ -1301,25 +1316,25 @@ function StandardGameBoard({
     clearedStagesSinceAd,
     markInterstitialShown,
   } = useProgress();
-  const activeBoardTheme = isBoardThemeUnlocked(boardTheme, { hasProPack, ownedThemeProducts })
+  const activeBoardTheme = previewBoardTheme ?? (isBoardThemeUnlocked(boardTheme, { hasProPack, ownedThemeProducts })
     ? boardTheme
-    : "reactor";
-  const activeAtomSkin = isAtomSkinUnlocked(atomSkin, { hasProPack, ownedThemeProducts })
+    : "reactor");
+  const activeAtomSkin = previewAtomSkin ?? (isAtomSkinUnlocked(atomSkin, { hasProPack, ownedThemeProducts })
     ? atomSkin
-    : "classic";
+    : "classic");
   const isNativeIos = Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios";
   const resultPowerUpSaveCost = isNativeIos ? MOBILE_RESULT_POWER_UP_SAVE_COST : 0;
   const progressionPowerUpLevel = Math.max(level.id, unlockedLevel);
-  const shimmerEnabled = progressionPowerUpLevel >= SHIMMER_MIN_LEVEL;
-  const grabEnabled = progressionPowerUpLevel >= GRAB_MIN_LEVEL;
-  const eGunEnabled = progressionPowerUpLevel >= EGUN_MIN_LEVEL;
-  const gravityEnabled = progressionPowerUpLevel >= GRAVITY_MIN_LEVEL;
-  const emissionEnabled = progressionPowerUpLevel >= EMISSION_MIN_LEVEL;
-  const transmuteEnabled = progressionPowerUpLevel >= TRANSMUTE_MIN_LEVEL;
-  const fusionJumpEnabled = progressionPowerUpLevel >= FUSION_JUMP_MIN_LEVEL;
-  const catalystEnabled = progressionPowerUpLevel >= CATALYST_MIN_LEVEL;
-  const stoneEnabled = progressionPowerUpLevel >= STONE_MIN_LEVEL;
-  const blankEnabled = progressionPowerUpLevel >= BLANK_MIN_LEVEL;
+  const shimmerEnabled = !preview && progressionPowerUpLevel >= SHIMMER_MIN_LEVEL;
+  const grabEnabled = !preview && progressionPowerUpLevel >= GRAB_MIN_LEVEL;
+  const eGunEnabled = !preview && progressionPowerUpLevel >= EGUN_MIN_LEVEL;
+  const gravityEnabled = !preview && progressionPowerUpLevel >= GRAVITY_MIN_LEVEL;
+  const emissionEnabled = !preview && progressionPowerUpLevel >= EMISSION_MIN_LEVEL;
+  const transmuteEnabled = !preview && progressionPowerUpLevel >= TRANSMUTE_MIN_LEVEL;
+  const fusionJumpEnabled = !preview && progressionPowerUpLevel >= FUSION_JUMP_MIN_LEVEL;
+  const catalystEnabled = !preview && progressionPowerUpLevel >= CATALYST_MIN_LEVEL;
+  const stoneEnabled = !preview && progressionPowerUpLevel >= STONE_MIN_LEVEL;
+  const blankEnabled = !preview && progressionPowerUpLevel >= BLANK_MIN_LEVEL;
 
   const labUpgradeLevel = useCallback(
     (id: LabUpgradeId) => (labUpgradeEnabled[id] ? (labUpgradeLevels[id] ?? 0) : 0),
@@ -1674,8 +1689,8 @@ function StandardGameBoard({
 
   // === Pre-level shuffle (lvl 10+) ===
   // Player gets 3 reshuffles of 4 starting atoms before the level begins.
-  const shuffleEnabled = progressionPowerUpLevel >= SHUFFLE_MIN_LEVEL;
-  const gammaEnabled = progressionPowerUpLevel >= GAMMA_MIN_LEVEL;
+  const shuffleEnabled = !preview && progressionPowerUpLevel >= SHUFFLE_MIN_LEVEL;
+  const gammaEnabled = !preview && progressionPowerUpLevel >= GAMMA_MIN_LEVEL;
   const [shuffleStartOpen, setShuffleStartOpen] = useState(false);
   const [shufflesLeft, setShufflesLeft] = useState(SHUFFLE_LIMIT);
   const [shuffleAtoms, setShuffleAtoms] = useState<number[]>([]);
@@ -1724,8 +1739,8 @@ function StandardGameBoard({
   const isMoleculeChallenge =
     moleculeObjective != null && (mode === "campaign" || isSecretCompoundChallenge);
   const isAmmoniumChallenge = isMoleculeChallenge && moleculeObjective?.id === "ammonium";
-  const canIntroducePowerUps = mode === "campaign" && !isMoleculeChallenge && !isPowerUpStage;
-  const unstableEnabled = progressionPowerUpLevel >= UNSTABLE_UNLOCK_LEVEL;
+  const canIntroducePowerUps = !preview && mode === "campaign" && !isMoleculeChallenge && !isPowerUpStage;
+  const unstableEnabled = !preview && progressionPowerUpLevel >= UNSTABLE_UNLOCK_LEVEL;
   const current = queue[0];
   const currentIsEGun = eGunQueue[0] ?? false;
   const currentIsBlank = blankQueue[0] ?? false;
@@ -2204,7 +2219,7 @@ function StandardGameBoard({
         startTimeRef.current = Date.now() - saved.elapsedMs;
         setElapsedMs(saved.elapsedMs);
         clearSavedRun();
-        trackGameStart(levelId, mode);
+        if (!preview) trackGameStart(levelId, mode);
         return;
       }
     }
@@ -2213,8 +2228,10 @@ function StandardGameBoard({
     pendingDiscoveryAtomsRef.current = [];
     pendingCompoundDiscoveryIdsRef.current = [];
     setSecretCompoundFormulaRevealed(false);
-    const initialBalls = isPowerUpStage
-      ? createPowerUpStageBoard(powerUpStage)
+    const initialBalls = preview
+      ? createPreviewBoard()
+      : isPowerUpStage
+        ? createPowerUpStageBoard(powerUpStage)
       : isMoleculeChallenge
         ? createMoleculeChallengeBoard(moleculeObjective, {
             useHelpfulAtomPlan: isSecretCompoundChallenge || isDailyMoleculeChallenge,
@@ -2228,11 +2245,11 @@ function StandardGameBoard({
               : createSeededBoard();
     setBalls(initialBalls);
     const initialHighest = Math.max(1, getHighestOnBoard(initialBalls));
-    if (initialHighest > 1) setHighestElement(initialHighest);
+    if (!preview && initialHighest > 1) setHighestElement(initialHighest);
     const initialDiscoveries = initialBalls
       .map((b) => b.atom)
       .filter((n, i, atoms) => n > 1 && atoms.indexOf(n) === i && !discoveredElements.includes(n));
-    if (initialDiscoveries.length > 0) registerDiscoveries(initialDiscoveries);
+    if (!preview && initialDiscoveries.length > 0) registerDiscoveries(initialDiscoveries);
     const powerUpQueuePrefix = isPowerUpStage ? powerUpStageQueuePrefix(powerUpStage) : [];
     const challengeQueuePrefix = isMoleculeChallenge
       ? isAmmoniumChallenge
@@ -2245,11 +2262,13 @@ function StandardGameBoard({
         : [];
     challengeQueuePlanRef.current = challengeQueuePrefix.slice(QUEUE_SIZE);
     challengeQueuePoolRef.current = challengeQueuePrefix;
-    const initialQueue = [
-      ...powerUpQueuePrefix,
-      ...challengeQueuePrefix,
-      ...generateInitialQueue(level.maxQueueElement, QUEUE_SIZE, currentQueueDecay(), dailyRandom),
-    ].slice(0, QUEUE_SIZE);
+    const initialQueue = preview
+      ? PREVIEW_QUEUE.slice(0, QUEUE_SIZE)
+      : [
+          ...powerUpQueuePrefix,
+          ...challengeQueuePrefix,
+          ...generateInitialQueue(level.maxQueueElement, QUEUE_SIZE, currentQueueDecay(), dailyRandom),
+        ].slice(0, QUEUE_SIZE);
     const initialPlannedCount = Math.min(QUEUE_SIZE, challengeQueuePrefix.length);
     const initialEGun = Array.from(
       { length: QUEUE_SIZE },
@@ -2267,6 +2286,7 @@ function StandardGameBoard({
           (!isEGun && !initialBlank[i] && shimmerEnabled && dailyRandom() < shimmerChance)),
     );
     const resolvedInitialQueue = initialQueue.map((atom, i) => {
+      if (preview) return atom;
       if (i < initialPlannedCount) return atom;
       if (isPowerUpStage || initialBlank[i] || initialEGun[i]) return atom;
       if (initialShimmer[i])
@@ -2384,9 +2404,9 @@ function StandardGameBoard({
     setTransmuteStagePending(false);
     setQueueShuffleStagePending(false);
     runRecordedRef.current = false;
-    incrementLevelAttempt(levelId);
+    if (!preview) incrementLevelAttempt(levelId);
     setSelectedInventoryPowerUps(emptyPowerUpInventory());
-    setInventoryPickerOpen(!isPowerUpStage && hasPowerUps(powerUpInventory));
+    setInventoryPickerOpen(!preview && !isPowerUpStage && hasPowerUps(powerUpInventory));
     setShotHistory([]);
     setHistoryOpen(false);
     setGammaCharges((powerUpStage === "gamma" ? 1 : 0) + initialLabCharge("gamma", 3));
@@ -2402,7 +2422,7 @@ function StandardGameBoard({
     eGunCooldownSlots.current = 0;
     startTimeRef.current = Date.now();
     setElapsedMs(0);
-    trackGameStart(levelId, mode);
+    if (!preview) trackGameStart(levelId, mode);
     // Per-level intro tooltips for newly unlocked features.
     if (canIntroducePowerUps && shimmerEnabled) {
       showTip(
@@ -2835,6 +2855,15 @@ function StandardGameBoard({
   }
 
   function advanceQueueAfterFiredShot(board: Board = balls) {
+    if (preview) {
+      const nextAtom = PREVIEW_QUEUE[(shots + QUEUE_SIZE) % PREVIEW_QUEUE.length] ?? 1;
+      setQueue((q) => [...q.slice(1), nextAtom]);
+      setShimmerQueue((s) => [...s.slice(1), false]);
+      setEGunQueue((e) => [...e.slice(1), false]);
+      setBlankQueue((b) => [...b.slice(1), false]);
+      setUnstableQueue((u) => [...u.slice(1), false]);
+      return;
+    }
     const nextSlot = makeNextQueueSlot(dynamicMaxQueue(board.length), board);
     setQueue((q) => [...q.slice(1), nextSlot.atom]);
     setShimmerQueue((s) => [...s.slice(1), nextSlot.shimmer]);
@@ -3284,6 +3313,32 @@ function StandardGameBoard({
       return;
     feedback({ type: "danger", severity: dangerFeedbackState });
   }, [dangerFeedbackState, gameOver, won, hapticsEnabled, soundEnabled]);
+
+  function createPreviewBoard(): Board {
+    const atoms = [1, 6, 8, 10, 14, 17, 26, 79, 1];
+    const positions = [
+      [0.14, 0.18],
+      [0.37, 0.12],
+      [0.64, 0.17],
+      [0.86, 0.29],
+      [0.24, 0.42],
+      [0.52, 0.37],
+      [0.76, 0.55],
+      [0.17, 0.72],
+      [0.48, 0.66],
+    ] as const;
+    return atoms.map((atom, index) => {
+      const r = radiusFor(atom);
+      const [xRatio, yRatio] = positions[index];
+      return {
+        id: nextBallId(),
+        x: Math.max(SIDE_PAD + r, Math.min(boardW - SIDE_PAD - r, boardW * xRatio)),
+        y: Math.max(TOP_PAD + r, Math.min(dangerY - r - 8, boardH * yRatio)),
+        atom,
+        r,
+      };
+    });
+  }
 
   function createSeededBoard(): Board {
     if (target < SEEDED_BOARD_MIN_TARGET) return createEmptyBoard();
@@ -3961,9 +4016,10 @@ function StandardGameBoard({
       confirmAction
     )
       return;
+    if (preview && shots >= previewShotLimit) return;
     primeAudio();
     if (musicEnabled) startAmbientMusic(ambientMusicTheme);
-    trackShot(levelId, pendingStone ? -1 : currentIsEGun ? 0 : current, aimDeg, mode);
+    if (!preview) trackShot(levelId, pendingStone ? -1 : currentIsEGun ? 0 : current, aimDeg, mode);
     queueUndoRef.current = null;
     setPendingReversiblePowerUp(null);
     if (pendingGamma) {
@@ -4076,8 +4132,8 @@ function StandardGameBoard({
     });
     window.setTimeout(() => setGammaImpactFx((fx) => (fx?.id === gammaFxId ? null : fx)), 820);
     setShots(nextShots);
-    applyShotMilestones(nextShots);
-    consumeEmissionBoostShot();
+    if (!preview) applyShotMilestones(nextShots);
+    if (!preview) consumeEmissionBoostShot();
     feedback({ type: "drop" });
     const updatedWithEffects = applyShotModeEffects(updated, nextShots);
     setBalls(updatedWithEffects);
@@ -4181,7 +4237,7 @@ function StandardGameBoard({
     setShots(nextShots);
     applyShotMilestones(nextShots);
     setPendingGamma(false);
-    consumeEmissionBoostShot();
+    if (!preview) consumeEmissionBoostShot();
     const updated = applyShotModeEffects(relaxBoard(remaining), nextShots);
     setBalls(updated);
     setWiggleIds(hitIds);
@@ -4752,7 +4808,7 @@ function StandardGameBoard({
         mergeScoreMultiplier: fusionJumpArmed ? fusionJumpScoreMultiplier : 1,
       },
     );
-    consumeEmissionBoostShot();
+    if (!preview) consumeEmissionBoostShot();
     if (fusionJumpArmed && result.fusionJumpConsumed) {
       setFusionJumpArmed(false);
       if (pendingReversiblePowerUp === "fusion-jump") setPendingReversiblePowerUp(null);
@@ -4764,13 +4820,13 @@ function StandardGameBoard({
     }
     const nextShots = shots + 1;
     setShots(nextShots);
-    applyShotMilestones(nextShots);
+    if (!preview) applyShotMilestones(nextShots);
 
     const newAtoms = new Set<number>([atomOverride]);
     result.merges.forEach((m) => newAtoms.add(m.resultAtomicNumber));
     const undiscovered = Array.from(newAtoms).filter((n) => !discoveredElements.includes(n));
     const firstDiscovery = undiscovered.sort((a, b) => b - a)[0];
-    if (undiscovered.length > 0) registerDiscoveries(undiscovered);
+    if (!preview && undiscovered.length > 0) registerDiscoveries(undiscovered);
 
     let mergeStoneBonus = 0;
     const mergeStoneDamage = damageStones(
@@ -4823,6 +4879,24 @@ function StandardGameBoard({
     // Refresh radii on any merged survivors (their atom changed).
     setBalls(result.balls.map((b) => (b.stoneHp != null ? b : { ...b, r: radiusFor(b.atom) })));
     setHighlightId(result.finalBallId);
+    if (preview) {
+      const previewScore = Math.floor(result.scoreGained * level.scoreMultiplier);
+      setScore((currentScore) => currentScore + previewScore);
+      setHighest((currentHighest) => Math.max(currentHighest, result.highestElement));
+      if (result.merges.length > 0) {
+        recordRunMergeStats(result.merges);
+        const comboLabel = getComboLabel(result.merges.length);
+        if (comboLabel) spawnPopup(comboLabel);
+        showMergeJuice(result.merges, result.balls, result.finalBallId, level.scoreMultiplier);
+        setRunBestCombo((best) => Math.max(best, result.merges.length));
+      }
+      window.setTimeout(() => {
+        setHighlightId(null);
+        setBusy(false);
+        if (nextShots >= previewShotLimit) previewOnFinish?.();
+      }, MERGE_COMBO_START_MS + result.merges.length * MERGE_COMBO_STEP_MS + MERGE_COMBO_END_PAD_MS);
+      return;
+    }
     const shimmerHit = currentIsShimmer && result.merges.length > 0;
     const grabAdd = result.merges.length * (shimmerHit ? activeShimmerGrabSteps : 1);
     if (result.merges.length > 0) {
@@ -6181,10 +6255,12 @@ function StandardGameBoard({
           </div>
           <div style={{ textAlign: "center" }}>
             <div style={{ fontSize: 10, letterSpacing: 2, color: "var(--muted-foreground)" }}>
-              {getModeLevelLabel(gameMode, level)}
+              {preview ? "THEME PREVIEW" : getModeLevelLabel(gameMode, level)}
             </div>
             <div style={{ fontSize: 14, fontWeight: 700 }}>
-              {gameMode.id === "campaign"
+              {preview
+                ? previewLabel ?? "Theme test board"
+                : gameMode.id === "campaign"
                 ? level.name
                 : gameMode.emoji
                   ? `${gameMode.emoji} ${gameMode.name}`
@@ -6199,7 +6275,9 @@ function StandardGameBoard({
                 fontVariantNumeric: "tabular-nums",
               }}
             >
-              {mode === "gold-rush-timer"
+              {preview
+                ? `${Math.max(0, previewShotLimit - shots)} shots left`
+                : mode === "gold-rush-timer"
                 ? `⏱ ${formatTime(Math.max(0, (gameMode.timerSec ?? 180) * 1000 - elapsedMs))}`
                 : `⏱ ${formatTime(elapsedMs)}`}
             </div>
@@ -7248,7 +7326,7 @@ function StandardGameBoard({
           </div>
           <div
             style={{
-              display: "flex",
+              display: preview ? "none" : "flex",
               alignItems: "center",
               justifyContent: "flex-end",
               gap: 6,

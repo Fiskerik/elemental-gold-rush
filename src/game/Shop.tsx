@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { Clapperboard } from "lucide-react";
 import { ElementBall } from "./ElementBall";
+import { GameBoard } from "./GameBoard";
 import { nextBallId, placeAndMerge, type Ball, type Board, type Geo } from "./logic";
 import { type AtomSkin, type BoardTheme, type InventoryPowerUpId, useProgress } from "./store";
 import { POWER_UP_UNLOCK_LEVELS } from "./powerUps";
@@ -133,9 +134,9 @@ const THEME_BUNDLE_VISUALS: Partial<Record<ProductId, ThemeBundleVisual>> = {
     board: "url('/themes/crystal-cove.webp') center / cover no-repeat",
     atom:
       "conic-gradient(from 25deg, transparent, rgba(255,255,255,.42), transparent 28% 62%, rgba(255,255,255,.28), transparent 78%), radial-gradient(circle at 30% 25%, #ffe5a1, #d26c32 58%, #4d1e1e)",
-    skin: "Crystal Core + Mineral atoms",
+    skin: "Mineral atoms",
     theme: "quantumVoid",
-    atomSkins: ["crystal", "mineral"],
+    atomSkins: ["mineral"],
   },
   [PRODUCT_IDS.themeVerdantCrystal]: {
     board:
@@ -315,7 +316,7 @@ function raycastPreview(atoms: PreviewBoardAtom[], target: { x: number; y: numbe
   return { path, impact: { x, y } };
 }
 
-function ThemePreviewModal({
+function LegacyThemePreviewModal({
   product,
   visual,
   onClose,
@@ -631,6 +632,111 @@ function ThemePreviewModal({
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function GameBoardThemePreviewModal({
+  product,
+  visual,
+  onClose,
+}: {
+  product: ProductDefinition;
+  visual: ThemeBundleVisual;
+  onClose: () => void;
+}) {
+  const [finished, setFinished] = useState(false);
+  const previewAtomSkin = visual.atomSkins[0] ?? "classic";
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={`${product.name} theme preview`}
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 100,
+        overflow: "auto",
+        background: "var(--background, #080a18)",
+      }}
+    >
+      <div
+        style={{
+          position: "fixed",
+          top: "calc(env(safe-area-inset-top, 0px) + 12px)",
+          right: 14,
+          zIndex: 1200,
+          display: "grid",
+          gap: 4,
+          justifyItems: "end",
+        }}
+      >
+        <button type="button" onClick={onClose} style={smallButton}>
+          Close preview
+        </button>
+        <span
+          style={{
+            padding: "4px 8px",
+            borderRadius: 999,
+            background: "rgba(4,8,24,.72)",
+            color: "white",
+            fontSize: 10,
+            fontWeight: 800,
+          }}
+        >
+          {product.name} · {visual.skin}
+        </span>
+      </div>
+      <GameBoard
+        levelId={1}
+        mode="campaign"
+        onExit={onClose}
+        onMap={onClose}
+        onWin={() => undefined}
+        preview
+        previewBoardTheme={visual.theme}
+        previewAtomSkin={previewAtomSkin}
+        previewLabel={product.name}
+        previewShotLimit={10}
+        previewOnFinish={() => setFinished(true)}
+      />
+      {finished && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 1100,
+            display: "grid",
+            placeItems: "center",
+            padding: 20,
+            background: "rgba(3,5,18,.68)",
+            backdropFilter: "blur(5px)",
+          }}
+        >
+          <div
+            style={{
+              width: "min(100%, 340px)",
+              padding: 22,
+              borderRadius: 18,
+              textAlign: "center",
+              background: "var(--surface-elevated)",
+              border: "1px solid var(--border)",
+              boxShadow: "0 18px 60px rgba(0,0,0,.5)",
+            }}
+          >
+            <div style={{ color: "var(--accent)", fontSize: 11, letterSpacing: 2, fontWeight: 900 }}>
+              PREVIEW COMPLETE
+            </div>
+            <h2 style={{ margin: "6px 0 8px", fontSize: 24 }}>10 shots played</h2>
+            <p style={{ margin: "0 0 16px", color: "var(--muted-foreground)", fontSize: 13 }}>
+              This preview used the regular shooting, collision, merge, and combo systems. No power-ups or progress were saved.
+            </p>
+            <button type="button" onClick={onClose} style={{ ...shopButton, width: "100%" }}>
+              Back to shop
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1655,7 +1761,7 @@ export function Shop({ onBack }: { onBack: () => void }) {
         </section>
       </div>
       {previewProduct && previewVisual && (
-        <ThemePreviewModal
+        <GameBoardThemePreviewModal
           product={previewProduct}
           visual={previewVisual}
           onClose={() => setPreviewProductId(null)}
