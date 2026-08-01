@@ -1,4 +1,5 @@
 import Capacitor
+import CloudKit
 import GameKit
 import UIKit
 
@@ -18,6 +19,9 @@ public class GameCenterPlugin: CAPPlugin, CAPBridgedPlugin, GKGameCenterControll
 
     private var pendingAuthCalls: [CAPPluginCall] = []
     private var hasInstalledAuthHandler = false
+    private let cloudContainerIdentifier = "iCloud.com.eaconsulting.atomicfusionrush"
+    private let cloudRecordType = "GameSave"
+    private let cloudRecordName = "atomic-fusion-progress"
 
     @objc func authenticate(_ call: CAPPluginCall) {
         let player = GKLocalPlayer.local
@@ -60,14 +64,82 @@ public class GameCenterPlugin: CAPPlugin, CAPBridgedPlugin, GKGameCenterControll
         call.resolve(playerPayload(GKLocalPlayer.local))
     }
 
-    // CloudKit is intentionally disabled until the iCloud container and
-    // production schema are configured in Apple Developer/CloudKit Console.
     @objc func saveCloudSave(_ call: CAPPluginCall) {
-        call.reject("Cloud save is temporarily disabled")
+        guard GKLocalPlayer.local.isAuthenticated else {
+            call.reject("Game Center player is not authenticated")
+            return
+        }
+
+        guard let payload = call.getString("payload"), !payload.isEmpty else {
+            call.reject("Missing cloud save payload")
+            return
+        }
+
+        let version = call.getInt("version", 1)
+        let database = CKContainer(identifier: cloudContainerIdentifier).privateCloudDatabase
+        let recordID = CKRecord.ID(recordName: cloudRecordName)
+
+        database.fetch(withRecordID: recordID) { [weak self] record, error in
+            guard let self = self else { return }
+
+            if let error = error as? CKError, error.code != .unknownItem {
+                call.reject("Cloud save could not be loaded before saving: \(error.localizedDescription)")
+                return
+            }
+
+            let saveRecord = record ?? CKRecord(recordType: self.cloudRecordType, recordID: recordID)
+            saveRecord["payload"] = payload as CKRecordValue
+            saveRecord["schemaVersion"] = NSNumber(value: version)
+            saveRecord["updatedAt"] = Date() as CKRecordValue
+
+            database.save(saveRecord) { savedRecord, saveError in
+                if let saveError = saveError {
+                    call.reject("Cloud save failed: \(saveError.localizedDescription)")
+                    return
+                }
+
+                call.resolve([
+                    "saved": savedRecord != nil,
+                    "version": version
+                ])
+            }
+        }
     }
 
     @objc func loadCloudSave(_ call: CAPPluginCall) {
-        call.resolve(["found": false, "disabled": true])
+        guard GKLocalPlayer.local.isAuthenticated else {
+            call.reject("Game Center player is not authenticated")
+            return
+        }
+
+        let database = CKContainer(identifier: cloudContainerIdentifier).privateCloudDatabase
+        let recordID = CKRecord.ID(recordName: cloudRecordName)
+
+        database.fetch(withRecordID: recordID) { record, error in
+            if let cloudError = error as? CKError, cloudError.code == .unknownItem {
+                call.resolve(["found": false])
+                return
+            }
+            if let error = error {
+                call.reject("Cloud save could not be loaded: \(error.localizedDescription)")
+                return
+            }
+
+            guard let record = record, let payload = record["payload"] as? String else {
+                call.resolve(["found": false])
+                return
+            }
+
+            var result: [String: Any] = [
+                "found": true,
+                "payload": payload,
+                "version": (record["schemaVersion"] as? NSNumber)?.intValue ?? 1
+            ]
+            if let updatedAt = record["updatedAt"] as? Date {
+                result["updatedAt"] = ISO8601DateFormatter().string(from: updatedAt)
+            }
+            call.resolve(result)
+        }
     }
 
     @objc func submitScore(_ call: CAPPluginCall) {

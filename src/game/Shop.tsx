@@ -666,7 +666,6 @@ function GameBoardThemePreviewModal({
           top: "calc(env(safe-area-inset-top, 0px) + 12px)",
           right: 14,
           zIndex: 1200,
-          display: "grid",
           gap: 4,
           justifyItems: "end",
           display: "none",

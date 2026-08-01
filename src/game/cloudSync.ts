@@ -1,6 +1,6 @@
 import { Capacitor } from "@capacitor/core";
 import {
-  getCurrentGameCenterPlayer,
+  authenticateGameCenter,
   loadGameCloudSave,
   saveGameCloudSave,
 } from "./gameCenter";
@@ -172,7 +172,7 @@ export async function syncCloudProgressNow(): Promise<CloudSyncResult> {
 
   syncInFlight = (async () => {
     try {
-      const player = await getCurrentGameCenterPlayer();
+      const player = await authenticateGameCenter();
       if (!player.authenticated || !player.gamePlayerId) {
         return { synced: false, restored: false, reason: "game-center-not-signed-in" };
       }

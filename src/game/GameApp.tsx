@@ -5,6 +5,7 @@ import { StatusBar, Style } from "@capacitor/status-bar";
 import { Coins } from "lucide-react";
 import { MainMenu } from "@/game/MainMenu";
 import { openAppStoreReview } from "@/game/appReview";
+import { startCloudProgressSync } from "@/game/cloudSync";
 import { clearSavedRun, GameBoard, getSavedRunSummary } from "@/game/GameBoard";
 import { setMusicVolume, setSfxVolume } from "@/game/audio";
 import { LevelSelect } from "@/game/LevelSelect";
@@ -61,7 +62,10 @@ export function GameApp() {
 
   useDomLocalization(appLanguage);
 
-  // Cloud save is intentionally disabled until the iCloud container is configured.
+  useEffect(() => {
+    if (!isNativeIos) return;
+    return startCloudProgressSync();
+  }, [isNativeIos]);
 
   useEffect(() => {
     setSfxVolume(soundVolume / 100);

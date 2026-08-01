@@ -4,6 +4,13 @@
 <dict>
 	<key>com.apple.developer.game-center</key>
 	<true/>
-	<!-- CloudKit temporarily disabled until the container is configured. -->
+	<key>com.apple.developer.icloud-container-identifiers</key>
+	<array>
+		<string>iCloud.com.eaconsulting.atomicfusionrush</string>
+	</array>
+	<key>com.apple.developer.icloud-services</key>
+	<array>
+		<string>CloudKit</string>
+	</array>
 </dict>
 </plist>
