@@ -131,23 +131,143 @@ export function PowerUpIcon({ icon, size = 42 }: { icon: string; size?: number }
   if (icon === "shimmer") return <ShimmerAtomIcon size={size} />;
   if (icon === "H") return <ElementBall atomicNumber={1} size={size} />;
   if (icon === "molecule") return <CompoundPowerUpIcon size={size} />;
-  const map: Record<string, { Icon: LucideIcon; color: string }> = {
-    grab: { Icon: Hand, color: "oklch(0.78 0.16 50)" },
-    egun: { Icon: Zap, color: "oklch(0.85 0.18 95)" },
-    gravity: { Icon: Magnet, color: "oklch(0.7 0.18 260)" },
-    emission: { Icon: Radiation, color: "oklch(0.78 0.2 55)" },
-    transmute: { Icon: Shuffle, color: "oklch(0.78 0.18 320)" },
-    "fusion-jump": { Icon: SkipForward, color: "oklch(0.8 0.18 145)" },
-    catalyst: { Icon: FlaskConical, color: "oklch(0.78 0.18 115)" },
-    stone: { Icon: Mountain, color: "oklch(0.7 0.04 60)" },
-    gamma: { Icon: Bomb, color: "oklch(0.65 0.2 145)" },
-    unstable: { Icon: Radiation, color: "oklch(0.86 0.2 58)" },
-    blank: { Icon: HelpCircle, color: "oklch(0.78 0.04 250)" },
-    "queue-shuffle": { Icon: Recycle, color: "oklch(0.78 0.16 175)" },
-  };
-  const entry = map[icon];
-  if (entry) return <entry.Icon size={Math.round(size * 0.68)} color={entry.color} strokeWidth={2.4} />;
+  const entry = POWER_UP_GLYPHS[icon];
+  if (entry) return <PowerUpIllustratedIcon {...entry} size={size} />;
   return <>{icon}</>;
+}
+
+type PowerUpMotif = "hand" | "bolt" | "orbit" | "rays" | "shuffle" | "jump" | "flask" | "facet" | "burst" | "warning" | "blank" | "recycle";
+
+const POWER_UP_GLYPHS: Record<
+  string,
+  { Icon: LucideIcon; color: string; motif: PowerUpMotif }
+> = {
+  grab: { Icon: Hand, color: "oklch(0.78 0.16 50)", motif: "hand" },
+  egun: { Icon: Zap, color: "oklch(0.85 0.18 95)", motif: "bolt" },
+  gravity: { Icon: Magnet, color: "oklch(0.7 0.18 260)", motif: "orbit" },
+  emission: { Icon: Radiation, color: "oklch(0.78 0.2 55)", motif: "rays" },
+  transmute: { Icon: Shuffle, color: "oklch(0.78 0.18 320)", motif: "shuffle" },
+  "fusion-jump": { Icon: SkipForward, color: "oklch(0.8 0.18 145)", motif: "jump" },
+  catalyst: { Icon: FlaskConical, color: "oklch(0.78 0.18 115)", motif: "flask" },
+  stone: { Icon: Mountain, color: "oklch(0.7 0.04 60)", motif: "facet" },
+  gamma: { Icon: Bomb, color: "oklch(0.65 0.2 145)", motif: "burst" },
+  unstable: { Icon: Radiation, color: "oklch(0.86 0.2 58)", motif: "warning" },
+  blank: { Icon: HelpCircle, color: "oklch(0.78 0.04 250)", motif: "blank" },
+  "queue-shuffle": { Icon: Recycle, color: "oklch(0.78 0.16 175)", motif: "recycle" },
+};
+
+function PowerUpIllustratedIcon({
+  Icon,
+  color,
+  motif,
+  size,
+}: {
+  Icon: LucideIcon;
+  color: string;
+  motif: PowerUpMotif;
+  size: number;
+}) {
+  const coreSize = Math.max(18, size * 0.56);
+  return (
+    <div
+      aria-hidden="true"
+      style={{
+        width: size + 8,
+        height: size + 8,
+        position: "relative",
+        display: "grid",
+        placeItems: "center",
+        filter: `drop-shadow(0 0 7px color-mix(in oklch, ${color} 58%, transparent))`,
+      }}
+    >
+      <svg viewBox="0 0 72 72" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
+        <circle cx="36" cy="36" r="27" fill="none" stroke={color} strokeOpacity="0.28" strokeWidth="1.4" />
+        {motif === "hand" && (
+          <>
+            <circle cx="36" cy="36" r="21" fill="none" stroke={color} strokeOpacity="0.42" strokeDasharray="2 5" />
+            <path d="M14 36h8M50 36h8M36 14v8M36 50v8" stroke={color} strokeOpacity="0.62" strokeWidth="2" strokeLinecap="round" />
+          </>
+        )}
+        {motif === "bolt" && (
+          <>
+            <path d="M12 50h14M46 22h14M20 18l-5 5M52 49l6 6" stroke={color} strokeOpacity="0.58" strokeWidth="2" strokeLinecap="round" />
+            <circle cx="36" cy="36" r="24" fill="none" stroke={color} strokeOpacity="0.38" strokeDasharray="1 6" />
+          </>
+        )}
+        {motif === "orbit" && (
+          <>
+            <ellipse cx="36" cy="36" rx="28" ry="11" fill="none" stroke={color} strokeOpacity="0.62" strokeWidth="1.8" transform="rotate(-25 36 36)" />
+            <ellipse cx="36" cy="36" rx="28" ry="11" fill="none" stroke={color} strokeOpacity="0.4" strokeWidth="1.4" transform="rotate(55 36 36)" />
+            <circle cx="14" cy="28" r="2.5" fill={color} />
+            <circle cx="57" cy="45" r="2.5" fill={color} />
+          </>
+        )}
+        {motif === "rays" && (
+          <>
+            {Array.from({ length: 8 }, (_, index) => {
+              const angle = index * 45;
+              return <path key={angle} d="M36 7v8" stroke={color} strokeOpacity="0.7" strokeWidth="2" strokeLinecap="round" transform={`rotate(${angle} 36 36)`} />;
+            })}
+            <circle cx="36" cy="36" r="22" fill="none" stroke={color} strokeOpacity="0.38" strokeDasharray="3 4" />
+          </>
+        )}
+        {motif === "shuffle" && (
+          <>
+            <path d="M15 23h8c10 0 13 26 24 26h10M15 49h8c4 0 7-5 9-10M47 23h10M51 19l6 4-6 4M51 45l6 4-6 4" fill="none" stroke={color} strokeOpacity="0.68" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+          </>
+        )}
+        {motif === "jump" && (
+          <>
+            <path d="M15 48h12V36h12V24h18" fill="none" stroke={color} strokeOpacity="0.72" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M50 18l7 6-7 6" fill="none" stroke={color} strokeOpacity="0.72" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </>
+        )}
+        {motif === "flask" && (
+          <>
+            <circle cx="19" cy="23" r="3" fill={color} fillOpacity="0.72" />
+            <circle cx="53" cy="48" r="4" fill={color} fillOpacity="0.54" />
+            <path d="M16 53h40" stroke={color} strokeOpacity="0.46" strokeWidth="2" strokeLinecap="round" />
+          </>
+        )}
+        {motif === "facet" && (
+          <polygon points="36,10 58,24 53,52 36,62 17,50 13,25" fill="none" stroke={color} strokeOpacity="0.7" strokeWidth="2" strokeLinejoin="round" />
+        )}
+        {motif === "burst" && (
+          <>
+            <circle cx="36" cy="36" r="22" fill="none" stroke={color} strokeOpacity="0.42" strokeWidth="2" strokeDasharray="1 6" />
+            <path d="M36 10v10M36 52v10M10 36h10M52 36h10" stroke={color} strokeOpacity="0.72" strokeWidth="2" strokeLinecap="round" />
+          </>
+        )}
+        {motif === "warning" && (
+          <>
+            <path d="M36 11l25 45H11z" fill="none" stroke={color} strokeOpacity="0.72" strokeWidth="2" strokeLinejoin="round" />
+            <circle cx="36" cy="48" r="2" fill={color} />
+          </>
+        )}
+        {motif === "blank" && <circle cx="36" cy="36" r="24" fill="none" stroke={color} strokeOpacity="0.6" strokeWidth="2" strokeDasharray="4 4" />}
+        {motif === "recycle" && (
+          <>
+            <path d="M36 12l7 12h-6M60 42l-14 1 5-10M21 57l7-12 6 10" fill="none" stroke={color} strokeOpacity="0.72" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+            <circle cx="36" cy="36" r="18" fill="none" stroke={color} strokeOpacity="0.32" strokeWidth="1.4" />
+          </>
+        )}
+      </svg>
+      <div
+        style={{
+          width: coreSize,
+          height: coreSize,
+          borderRadius: "50%",
+          display: "grid",
+          placeItems: "center",
+          background: `radial-gradient(circle at 28% 22%, rgba(255,255,255,.78), transparent 20%), radial-gradient(circle at 54% 60%, color-mix(in oklch, ${color} 76%, white), color-mix(in oklch, ${color} 68%, #10152b))`,
+          border: `1px solid color-mix(in oklch, ${color} 62%, white)`,
+          boxShadow: `inset 2px 2px 4px rgba(255,255,255,.32), inset -3px -4px 6px rgba(0,0,0,.28), 0 0 8px color-mix(in oklch, ${color} 62%, transparent)`,
+        }}
+      >
+        <Icon size={Math.round(coreSize * 0.52)} color={color} strokeWidth={2.25} />
+      </div>
+    </div>
+  );
 }
 
 export function PowerUpBadge({ icon, size = 42 }: { icon: string; size?: number }) {
