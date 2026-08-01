@@ -10,6 +10,7 @@ import {
   PRODUCT_IDS,
   THEME_BUNDLE_PRODUCT_IDS,
   getProductById,
+  type ProductDefinition,
   type ProductId,
 } from "./products";
 import {
@@ -102,9 +103,15 @@ const APP_STORE_COIN_PACKS = [
   PRODUCT_IDS.coins50,
   PRODUCT_IDS.coins100,
 ] as const;
-const THEME_BUNDLE_VISUALS: Partial<
-  Record<ProductId, { board: string; atom: string; skin: string; theme: BoardTheme; atomSkins: AtomSkin[] }>
-> = {
+type ThemeBundleVisual = {
+  board: string;
+  atom: string;
+  skin: string;
+  theme: BoardTheme;
+  atomSkins: AtomSkin[];
+};
+
+const THEME_BUNDLE_VISUALS: Partial<Record<ProductId, ThemeBundleVisual>> = {
   [PRODUCT_IDS.themeGoldLab]: {
     board: "url('/themes/gummy-lab.webp') center / cover no-repeat",
     atom:
@@ -149,6 +156,17 @@ const THEME_BUNDLE_VISUALS: Partial<
 };
 
 const THEME_PREVIEW_ATOMS = [1, 6, 8, 10, 14, 17, 26, 79];
+const THEME_PREVIEW_POSITIONS = [
+  [12, 14],
+  [36, 9],
+  [67, 16],
+  [86, 31],
+  [22, 42],
+  [52, 36],
+  [76, 57],
+  [16, 72],
+  [48, 68],
+] as const;
 const SHOP_PURCHASE_GUARD_TIMEOUT_MS = 60_000;
 
 function withTimeout<T>(
@@ -172,7 +190,7 @@ function withTimeout<T>(
 function BundlePreview({
   visual,
 }: {
-  visual: { board: string; atom: string; skin: string; theme: BoardTheme; atomSkins: AtomSkin[] };
+  visual: ThemeBundleVisual;
 }) {
   return (
     <div
@@ -223,6 +241,232 @@ function BundlePreview({
   );
 }
 
+type PreviewBoardAtom = {
+  id: string;
+  atomicNumber: number;
+  x: number;
+  y: number;
+  atomSkin: AtomSkin;
+};
+
+function makePreviewAtoms(visual: ThemeBundleVisual): PreviewBoardAtom[] {
+  return THEME_PREVIEW_POSITIONS.map(([x, y], index) => ({
+    id: `initial-${index}`,
+    atomicNumber: THEME_PREVIEW_ATOMS[index % THEME_PREVIEW_ATOMS.length],
+    x,
+    y,
+    atomSkin: visual.atomSkins[index % visual.atomSkins.length] ?? "classic",
+  }));
+}
+
+function ThemePreviewModal({
+  product,
+  visual,
+  onClose,
+}: {
+  product: ProductDefinition;
+  visual: ThemeBundleVisual;
+  onClose: () => void;
+}) {
+  const [atoms, setAtoms] = useState(() => makePreviewAtoms(visual));
+  const [shotsUsed, setShotsUsed] = useState(0);
+
+  function resetPreview() {
+    setAtoms(makePreviewAtoms(visual));
+    setShotsUsed(0);
+  }
+
+  function shootAt(x: number, y: number) {
+    if (shotsUsed >= 10) return;
+    const shotIndex = shotsUsed;
+    setAtoms((current) => [
+      ...current,
+      {
+        id: `shot-${shotIndex}`,
+        atomicNumber: THEME_PREVIEW_ATOMS[(shotIndex + 3) % THEME_PREVIEW_ATOMS.length],
+        x,
+        y,
+        atomSkin: visual.atomSkins[(shotIndex + current.length) % visual.atomSkins.length] ?? "classic",
+      },
+    ]);
+    setShotsUsed((current) => current + 1);
+  }
+
+  function handleBoardClick(event: React.MouseEvent<HTMLDivElement>) {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const x = Math.max(8, Math.min(92, ((event.clientX - bounds.left) / bounds.width) * 100));
+    const y = Math.max(10, Math.min(82, ((event.clientY - bounds.top) / bounds.height) * 100));
+    shootAt(x, y);
+  }
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="theme-preview-title"
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 100,
+        padding: 16,
+        display: "grid",
+        placeItems: "center",
+        overflowY: "auto",
+        background: "rgba(3, 5, 18, .78)",
+        backdropFilter: "blur(10px)",
+      }}
+    >
+      <div
+        onClick={(event) => event.stopPropagation()}
+        style={{
+          width: "min(100%, 560px)",
+          maxHeight: "calc(100vh - 32px)",
+          overflowY: "auto",
+          padding: 16,
+          borderRadius: 20,
+          background: "var(--surface-elevated)",
+          border: "1px solid var(--border)",
+          boxShadow: "0 18px 70px rgba(0,0,0,.5)",
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "start" }}>
+          <div>
+            <div style={{ color: "var(--accent)", fontSize: 11, letterSpacing: 2, fontWeight: 900 }}>
+              THEME PREVIEW
+            </div>
+            <h2 id="theme-preview-title" style={{ margin: "4px 0 2px", fontSize: 22 }}>
+              {product.name}
+            </h2>
+            <p style={{ margin: 0, color: "var(--muted-foreground)", fontSize: 12 }}>
+              {visual.skin} · Tap the board to shoot
+            </p>
+          </div>
+          <button type="button" onClick={onClose} style={smallButton}>
+            Close
+          </button>
+        </div>
+
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 10,
+            margin: "14px 0 10px",
+            padding: "9px 11px",
+            borderRadius: 11,
+            background: "var(--surface)",
+            color: "var(--foreground)",
+            fontSize: 12,
+            fontWeight: 800,
+          }}
+        >
+          <span>{shotsUsed >= 10 ? "Preview complete" : "10-shot test board"}</span>
+          <span style={{ color: shotsUsed >= 10 ? "var(--success)" : "var(--accent)" }}>
+            {10 - shotsUsed} shots left
+          </span>
+        </div>
+
+        <div
+          role="button"
+          tabIndex={0}
+          aria-label={shotsUsed >= 10 ? "Theme preview complete" : "Shoot a test atom"}
+          onClick={handleBoardClick}
+          onKeyDown={(event) => {
+            if ((event.key === "Enter" || event.key === " ") && shotsUsed < 10) {
+              event.preventDefault();
+              shootAt(50, 78);
+            }
+          }}
+          style={{
+            position: "relative",
+            minHeight: "min(62vh, 520px)",
+            borderRadius: 18,
+            overflow: "hidden",
+            cursor: shotsUsed >= 10 ? "default" : "crosshair",
+            background: `${visual.board}, linear-gradient(180deg, rgba(255,255,255,.08), rgba(0,0,0,.2))`,
+            border: "1px solid rgba(255,255,255,.3)",
+            boxShadow: "inset 0 0 0 1px rgba(0,0,0,.22), inset 0 -80px 120px rgba(0,0,0,.18)",
+          }}
+        >
+          <div aria-hidden="true" style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(255,255,255,.12), transparent 28%, rgba(0,0,0,.12))", pointerEvents: "none" }} />
+          {atoms.map((atom) => (
+            <div
+              key={atom.id}
+              style={{
+                position: "absolute",
+                left: `${atom.x}%`,
+                top: `${atom.y}%`,
+                transform: "translate(-50%, -50%)",
+                pointerEvents: "none",
+                filter: "drop-shadow(0 4px 5px rgba(0,0,0,.4))",
+                animation: atom.id.startsWith("shot-") ? "pop-in 260ms ease-out" : undefined,
+              }}
+            >
+              <ElementBall
+                atomicNumber={atom.atomicNumber}
+                size={46}
+                glow={atom.id.endsWith("0") || atom.id.endsWith("3")}
+                atomSkin={atom.atomSkin}
+                patternSeed={atom.id.length + atom.atomicNumber}
+              />
+            </div>
+          ))}
+          <div
+            aria-hidden="true"
+            style={{
+              position: "absolute",
+              left: "50%",
+              bottom: 14,
+              transform: "translateX(-50%)",
+              width: 56,
+              height: 56,
+              borderRadius: "50%",
+              display: "grid",
+              placeItems: "center",
+              color: "var(--foreground)",
+              background: "radial-gradient(circle at 30% 24%, rgba(255,255,255,.8), rgba(80,160,240,.75) 42%, rgba(20,35,85,.95))",
+              border: "2px solid rgba(255,255,255,.65)",
+              boxShadow: "0 0 18px rgba(100,190,255,.55)",
+              fontSize: 10,
+              fontWeight: 900,
+            }}
+          >
+            SHOOT
+          </div>
+          {shotsUsed >= 10 && (
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                display: "grid",
+                placeItems: "center",
+                background: "rgba(4,8,24,.52)",
+                color: "white",
+                fontSize: 18,
+                fontWeight: 900,
+                letterSpacing: 1,
+              }}
+            >
+              Preview complete
+            </div>
+          )}
+        </div>
+
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 10, marginTop: 12 }}>
+          <button type="button" onClick={resetPreview} style={{ ...secondaryShopButton, flex: 1 }}>
+            Reset preview
+          </button>
+          <button type="button" onClick={onClose} style={{ ...shopButton, flex: 1 }}>
+            Back to shop
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function Shop({ onBack }: { onBack: () => void }) {
   const isTabletLayout = useIsTabletLayout();
   const {
@@ -240,6 +484,7 @@ export function Shop({ onBack }: { onBack: () => void }) {
   } = useProgress();
   const [message, setMessage] = useState("");
   const [pendingProductId, setPendingProductId] = useState<ProductId | "rewarded" | null>(null);
+  const [previewProductId, setPreviewProductId] = useState<ProductId | null>(null);
   const [proPackMessage, setProPackMessage] = useState("");
   const [cosmeticMessage, setCosmeticMessage] = useState("");
   const [proPackBusy, setProPackBusy] = useState<"purchase" | "restore" | "redeem" | "">("");
@@ -256,6 +501,8 @@ export function Shop({ onBack }: { onBack: () => void }) {
   const purchaseDebugEnabled = isPurchaseDebugUiEnabled();
   const purchaseDebugLocked = purchaseDebugEnabled && purchaseDebugBusy;
   const appStorePurchaseBusy = Boolean(proPackBusy) || Boolean(pendingProductId);
+  const previewProduct = previewProductId ? getProductById(previewProductId) : undefined;
+  const previewVisual = previewProductId ? THEME_BUNDLE_VISUALS[previewProductId] : undefined;
   const showPurchaseSupport =
     isNativeIos &&
     purchaseDebugEnabled &&
@@ -959,25 +1206,34 @@ export function Shop({ onBack }: { onBack: () => void }) {
                       >
                         {product.description}
                       </p>
-                      <button
-                        type="button"
-                        onClick={() => handleThemePurchase(productId)}
-                        disabled={disabled}
-                        style={{
-                          ...(owned ? secondaryShopButton : shopButton),
-                          padding: "8px 10px",
-                          opacity: disabled && !owned ? 0.55 : 1,
-                          cursor: disabled ? "not-allowed" : "pointer",
-                        }}
-                      >
-                        {owned
-                          ? COSMETIC_THEME_PURCHASES_ENABLED
-                            ? "Owned"
-                            : "Free for testing"
-                          : pending
-                            ? "Opening..."
-                            : "Buy in App Store"}
-                      </button>
+                      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 0.8fr) minmax(0, 1.2fr)", gap: 8 }}>
+                        <button
+                          type="button"
+                          onClick={() => setPreviewProductId(productId)}
+                          style={{ ...secondaryShopButton, padding: "8px 10px" }}
+                        >
+                          Preview
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleThemePurchase(productId)}
+                          disabled={disabled}
+                          style={{
+                            ...(owned ? secondaryShopButton : shopButton),
+                            padding: "8px 10px",
+                            opacity: disabled && !owned ? 0.55 : 1,
+                            cursor: disabled ? "not-allowed" : "pointer",
+                          }}
+                        >
+                          {owned
+                            ? COSMETIC_THEME_PURCHASES_ENABLED
+                              ? "Owned"
+                              : "Free for testing"
+                            : pending
+                              ? "Opening..."
+                              : "Buy in App Store"}
+                        </button>
+                      </div>
                     </div>
                   </article>
                 );
@@ -1230,6 +1486,13 @@ export function Shop({ onBack }: { onBack: () => void }) {
           </div>
         </section>
       </div>
+      {previewProduct && previewVisual && (
+        <ThemePreviewModal
+          product={previewProduct}
+          visual={previewVisual}
+          onClose={() => setPreviewProductId(null)}
+        />
+      )}
     </div>
   );
 }

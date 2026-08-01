@@ -8369,6 +8369,7 @@ function CompoundSelectionPanel({
   const visibleMatchIsNew = visibleMatch ? matchIsNew : false;
   return (
     <div
+      className="compound-mode-panel"
       style={{
         position: "absolute",
         left: 10,

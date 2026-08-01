@@ -259,12 +259,17 @@ function PowerUpIllustratedIcon({
           borderRadius: "50%",
           display: "grid",
           placeItems: "center",
-          background: `radial-gradient(circle at 28% 22%, rgba(255,255,255,.78), transparent 20%), radial-gradient(circle at 54% 60%, color-mix(in oklch, ${color} 76%, white), color-mix(in oklch, ${color} 68%, #10152b))`,
-          border: `1px solid color-mix(in oklch, ${color} 62%, white)`,
+          background: `radial-gradient(circle at 28% 22%, rgba(255,255,255,.86), transparent 20%), radial-gradient(circle at 54% 60%, color-mix(in oklch, ${color} 62%, white), color-mix(in oklch, ${color} 46%, #081126))`,
+          border: `1px solid color-mix(in oklch, ${color} 52%, white)`,
           boxShadow: `inset 2px 2px 4px rgba(255,255,255,.32), inset -3px -4px 6px rgba(0,0,0,.28), 0 0 8px color-mix(in oklch, ${color} 62%, transparent)`,
         }}
       >
-        <Icon size={Math.round(coreSize * 0.52)} color={color} strokeWidth={2.25} />
+        <Icon
+          size={Math.round(coreSize * 0.52)}
+          color="white"
+          strokeWidth={2.8}
+          style={{ filter: "drop-shadow(0 1px 1px rgba(0,0,0,.96))" }}
+        />
       </div>
     </div>
   );

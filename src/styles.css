@@ -625,6 +625,17 @@
   color: var(--foreground);
 }
 
+.game-board-shell.board-theme-verdantCrystal .compound-mode-panel {
+  --foreground: oklch(0.96 0.02 155);
+  --muted-foreground: oklch(0.78 0.035 155);
+  --surface: oklch(0.11 0.035 280);
+  --surface-high: oklch(0.16 0.045 280);
+  --surface-elevated: oklch(0.13 0.04 280);
+  --border: oklch(0.4 0.12 250 / 0.62);
+  --primary-foreground: oklch(0.16 0.04 165);
+  color: var(--foreground);
+}
+
 .game-board-shell.board-theme-biohazard {
   --game-shell-bg:
     radial-gradient(circle at 50% 16%, oklch(0.62 0.2 140 / 0.18), transparent 30%),

@@ -139,6 +139,7 @@ export const ElementBall = memo(function ElementBall({
   const baseBackground = `radial-gradient(circle at 30% 28%, ${el.glowColor}, ${el.color} 65%, oklch(0 0 0 / 0.35))`;
   const isGummy = atomSkin === "chrome";
   const isCrystal = atomSkin === "crystal" || atomSkin === "verdantCrystal";
+  const isMineral = atomSkin === "mineral";
   const skinBackground: Record<AtomSkin, string> = {
     classic: baseBackground,
     chrome: `radial-gradient(circle at 27% 22%, color-mix(in oklch, ${el.glowColor} 78%, white) 0 7%, transparent 24%), radial-gradient(circle at 35% 30%, ${el.glowColor}, ${el.color} 68%, color-mix(in oklch, ${el.color} 62%, black))`,
@@ -168,7 +169,10 @@ export const ElementBall = memo(function ElementBall({
       style={{
         width: size,
         height: size,
-        borderRadius: "50%",
+        borderRadius: isMineral ? "18%" : "50%",
+        clipPath: isMineral
+          ? "polygon(50% 0%, 82% 12%, 100% 42%, 88% 78%, 58% 100%, 22% 91%, 0% 58%, 12% 23%)"
+          : undefined,
         position: "relative",
         background: skinBackground[atomSkin],
         border: isGummy
