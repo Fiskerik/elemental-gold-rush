@@ -6256,7 +6256,7 @@ function StandardGameBoard({
               marginBottom: 10,
             }}
           >
-            <ElementBall atomicNumber={highest} size={36} />
+            <ElementBall atomicNumber={highest} size={36} atomSkin={activeAtomSkin} />
             <div style={{ flex: 1 }}>
               <div
                 style={{
@@ -6330,7 +6330,12 @@ function StandardGameBoard({
                           animation: read ? undefined : "icon-shimmer 1.5s ease-in-out infinite",
                         }}
                       >
-                        <ElementBall atomicNumber={atomicNumber} size={22} glow={!read} />
+                        <ElementBall
+                          atomicNumber={atomicNumber}
+                          size={22}
+                          glow={!read}
+                          atomSkin={activeAtomSkin}
+                        />
                       </button>
                     );
                   })}
@@ -6357,7 +6362,7 @@ function StandardGameBoard({
                 cursor: continuingPastTarget ? "pointer" : "default",
               }}
             >
-              <ElementBall atomicNumber={target} size={36} glow />
+              <ElementBall atomicNumber={target} size={36} glow atomSkin={activeAtomSkin} />
             </button>
           </div>
         )}
@@ -9626,6 +9631,7 @@ function Modal({ children, zIndex = 100 }: { children: React.ReactNode; zIndex?:
       }}
     >
       <div
+        className="game-modal-surface"
         style={{
           background: "var(--surface-elevated)",
           border: "1px solid var(--border)",

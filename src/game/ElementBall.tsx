@@ -51,12 +51,28 @@ const CRYSTAL_SHARD_LAYOUTS = [
   ],
 ] as const;
 
-function CrystalShardCluster({ patternIndex }: { patternIndex: number }) {
-  const shards = CRYSTAL_SHARD_LAYOUTS[patternIndex] ?? CRYSTAL_SHARD_LAYOUTS[0];
+type CrystalShard = readonly [string, string, number];
+
+function CrystalShardCluster({
+  patternIndex,
+  verdant = false,
+}: {
+  patternIndex: number;
+  verdant?: boolean;
+}) {
+  const shards: readonly CrystalShard[] =
+    CRYSTAL_SHARD_LAYOUTS[patternIndex] ?? CRYSTAL_SHARD_LAYOUTS[0];
+  const verdantShards: readonly CrystalShard[] = verdant
+    ? [
+        ["50,7 59,43 53,73 47,46", "white", 0.78],
+        ["39,29 48,48 42,87 31,58", "var(--atom-glow-color)", 0.8],
+        ["60,34 70,59 58,91 52,70", "var(--atom-dark-color)", 0.72],
+      ]
+    : [];
   return (
     <div aria-hidden="true" className="atom-crystal-core">
       <svg className="atom-crystal-shards" viewBox="0 0 100 100" focusable="false">
-        {shards.map(([points, fill, opacity], index) => (
+        {[...shards, ...verdantShards].map(([points, fill, opacity], index) => (
           <polygon key={`${patternIndex}-${index}`} points={points} fill={fill} opacity={opacity} />
         ))}
       </svg>
@@ -194,7 +210,9 @@ export const ElementBall = memo(function ElementBall({
           <div aria-hidden="true" className="atom-mineral-surface" />
         </>
       )}
-      {atomSkin === "crystal" && <CrystalShardCluster patternIndex={patternIndex} />}
+      {isCrystal && (
+        <CrystalShardCluster patternIndex={patternIndex} verdant={atomSkin === "verdantCrystal"} />
+      )}
       {atomSkin !== "classic" && (
         <div
           aria-hidden="true"

@@ -613,6 +613,18 @@
     linear-gradient(120deg, transparent 0 43%, oklch(0.28 0.14 165 / 0.08) 44% 45%, transparent 46% 100%);
 }
 
+/* In-game dialogs remain dark glass panels on the light Verdant board, so
+   their controls keep the same high-contrast text as the other themes. */
+.game-board-shell.board-theme-verdantCrystal .game-modal-surface {
+  --foreground: oklch(0.96 0.02 155);
+  --muted-foreground: oklch(0.78 0.035 155);
+  --surface: oklch(0.11 0.035 280);
+  --surface-high: oklch(0.16 0.045 280);
+  --surface-elevated: oklch(0.13 0.04 280);
+  --border: oklch(0.4 0.12 250 / 0.62);
+  color: var(--foreground);
+}
+
 .game-board-shell.board-theme-biohazard {
   --game-shell-bg:
     radial-gradient(circle at 50% 16%, oklch(0.62 0.2 140 / 0.18), transparent 30%),
@@ -2043,6 +2055,8 @@
 }
 
 .atom-skin-verdantCrystal .atom-crystal-core {
+  inset: 12% 14% 8%;
+  clip-path: polygon(50% 0%, 72% 18%, 94% 55%, 72% 100%, 43% 87%, 16% 100%, 3% 54%, 27% 18%);
   background:
     linear-gradient(128deg, oklch(1 0 0 / 0.72) 0 18%, transparent 19% 48%, oklch(0.08 0.08 165 / 0.18) 49%),
     conic-gradient(
