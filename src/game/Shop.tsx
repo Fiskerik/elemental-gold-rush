@@ -1249,7 +1249,7 @@ export function Shop({ onBack }: { onBack: () => void }) {
               background: "var(--surface-elevated)",
               border: "1px solid var(--border)",
               borderRadius: 18,
-              padding: 18,
+              padding: hasProPack ? "10px 12px" : 18,
               boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
             }}
           >
@@ -1257,7 +1257,7 @@ export function Shop({ onBack }: { onBack: () => void }) {
               style={{
                 display: "flex",
                 justifyContent: "space-between",
-                alignItems: "start",
+                alignItems: hasProPack ? "center" : "start",
                 gap: 12,
               }}
             >
@@ -1271,9 +1271,11 @@ export function Shop({ onBack }: { onBack: () => void }) {
                     marginBottom: 6,
                   }}
                 >
-                  ONE-TIME UPGRADE
+                  {hasProPack ? "PRO LAB PACK" : "ONE-TIME UPGRADE"}
                 </div>
-                <h2 style={{ margin: 0, fontSize: 28, fontWeight: 900 }}>{proPack.name}</h2>
+                <h2 style={{ margin: 0, fontSize: hasProPack ? 16 : 28, fontWeight: 900 }}>
+                  {proPack.name}
+                </h2>
               </div>
               <WalletPill
                 label="Status"
@@ -1281,25 +1283,38 @@ export function Shop({ onBack }: { onBack: () => void }) {
                 accent={hasProPack}
               />
             </div>
-            <p
-              style={{
-                margin: "12px 0 10px",
-                color: "var(--muted-foreground)",
-                fontSize: 14,
-                lineHeight: 1.45,
-              }}
-            >
-              A one-time premium upgrade for long-term progression.
-            </p>
-            <div style={{ display: "grid", gap: 7, marginBottom: 14 }}>
-              <Benefit text="Remove forced interstitial ads." />
-              <Benefit text="Unlock the Pro Lab profile badge." />
-              <Benefit text="Daily quest claims pay 10 gold coins instead of 3." />
-              <Benefit text="Daily challenges award 5 gold coins each instead of 3." />
-              <Benefit text="Level 1 upgrade to all power-ups (10 coin refund each for already upgraded)." />
-            </div>
+            {!hasProPack && (
+              <>
+                <p
+                  style={{
+                    margin: "12px 0 10px",
+                    color: "var(--muted-foreground)",
+                    fontSize: 14,
+                    lineHeight: 1.45,
+                  }}
+                >
+                  A one-time premium upgrade for long-term progression.
+                </p>
+                <div style={{ display: "grid", gap: 7, marginBottom: 14 }}>
+                  <Benefit text="Remove forced interstitial ads." />
+                  <Benefit text="Unlock the Pro Lab profile badge." />
+                  <Benefit text="Daily quest claims pay 10 gold coins instead of 3." />
+                  <Benefit text="Daily challenges award 5 gold coins each instead of 3." />
+                  <Benefit text="Level 1 upgrade to all power-ups (10 coin refund each for already upgraded)." />
+                </div>
+              </>
+            )}
             {hasProPack ? (
-              <div style={proPackActive}>Pro Lab Pack Active</div>
+              <div
+                style={{
+                  ...proPackActive,
+                  margin: 0,
+                  padding: "8px 10px",
+                  fontSize: 12,
+                }}
+              >
+                Pro Lab Pack Active
+              </div>
             ) : (
               <div style={{ display: "grid", gap: 10 }}>
                 <button
@@ -1348,13 +1363,123 @@ export function Shop({ onBack }: { onBack: () => void }) {
                 </div>
               </div>
             )}
-            {proPackMessage && (
+            {proPackMessage && !hasProPack && (
               <p style={{ margin: "12px 0 0", color: "var(--muted-foreground)", fontSize: 12 }}>
                 {proPackMessage}
               </p>
             )}
           </section>
         )}
+
+        {isNativeIos && (
+          <section
+            style={{
+              background: "var(--surface-elevated)",
+              border: "1px solid var(--border)",
+              borderRadius: 18,
+              padding: 18,
+              boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 12,
+                marginBottom: 12,
+              }}
+            >
+              <div>
+                <div
+                  style={{
+                    fontSize: 11,
+                    letterSpacing: 2,
+                    color: "var(--accent)",
+                    fontWeight: 800,
+                    marginBottom: 6,
+                  }}
+                >
+                  APP STORE COINS
+                </div>
+                <h2 style={{ margin: 0, fontSize: 22, fontWeight: 900 }}>Buy gold coins</h2>
+              </div>
+              <WalletPill
+                label="Coins"
+                value={`${goldCoins}`}
+                icon={<GoldCoinIcon size={18} />}
+                accent
+              />
+            </div>
+            <p style={{ margin: "0 0 14px", color: "var(--muted-foreground)", fontSize: 13 }}>
+              Buy extra gold coins for power-ups and experiments. Purchases are processed securely
+              by the App Store.
+            </p>
+            <button
+              type="button"
+              className="ad-shine-btn"
+              onClick={handleRewardedCoin}
+              disabled={appStorePurchaseBusy}
+              style={{
+                ...shopButton,
+                width: "100%",
+                marginBottom: 10,
+                opacity: appStorePurchaseBusy ? 0.6 : 1,
+                cursor: appStorePurchaseBusy ? "not-allowed" : "pointer",
+              }}
+            >
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 8,
+                }}
+              >
+                <Clapperboard size={18} aria-hidden="true" />
+                {pendingProductId === "rewarded" ? "Loading ad..." : "Free coins"}
+              </span>
+            </button>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: isTabletLayout
+                  ? "repeat(4, minmax(0, 1fr))"
+                  : "repeat(2, minmax(0, 1fr))",
+                gap: isTabletLayout ? 12 : 8,
+              }}
+            >
+              {APP_STORE_COIN_PACKS.map((productId) => {
+                const product = getProductById(productId);
+                if (!product?.coins) return null;
+                return (
+                  <button
+                    key={productId}
+                    type="button"
+                    onClick={() => handleNativeCoinPurchase(productId)}
+                    disabled={appStorePurchaseBusy || purchaseDebugLocked}
+                    style={{
+                      ...coinPackButton,
+                      opacity:
+                        purchaseDebugLocked ||
+                        (appStorePurchaseBusy && pendingProductId !== productId)
+                          ? 0.55
+                          : 1,
+                      cursor:
+                        appStorePurchaseBusy || purchaseDebugLocked ? "not-allowed" : "pointer",
+                    }}
+                  >
+                    <GoldCoinIcon size={28} />
+                    <strong style={coinPackAmount}>{product.coins}x</strong>
+                    <span>{pendingProductId === productId ? "Opening..." : "App Store"}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
+        {coinToast && <div style={shopCoinToast}>{coinToast.text}</div>}
 
         {isNativeIos && (
           <section
@@ -1520,116 +1645,6 @@ export function Shop({ onBack }: { onBack: () => void }) {
             )}
           </section>
         )}
-
-        {isNativeIos && (
-          <section
-            style={{
-              background: "var(--surface-elevated)",
-              border: "1px solid var(--border)",
-              borderRadius: 18,
-              padding: 18,
-              boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                gap: 12,
-                marginBottom: 12,
-              }}
-            >
-              <div>
-                <div
-                  style={{
-                    fontSize: 11,
-                    letterSpacing: 2,
-                    color: "var(--accent)",
-                    fontWeight: 800,
-                    marginBottom: 6,
-                  }}
-                >
-                  APP STORE COINS
-                </div>
-                <h2 style={{ margin: 0, fontSize: 22, fontWeight: 900 }}>Buy gold coins</h2>
-              </div>
-              <WalletPill
-                label="Coins"
-                value={`${goldCoins}`}
-                icon={<GoldCoinIcon size={18} />}
-                accent
-              />
-            </div>
-            <p style={{ margin: "0 0 14px", color: "var(--muted-foreground)", fontSize: 13 }}>
-              Buy extra gold coins for power-ups and experiments. Purchases are processed securely
-              by the App Store.
-            </p>
-            <button
-              type="button"
-              className="ad-shine-btn"
-              onClick={handleRewardedCoin}
-              disabled={appStorePurchaseBusy}
-              style={{
-                ...shopButton,
-                width: "100%",
-                marginBottom: 10,
-                opacity: appStorePurchaseBusy ? 0.6 : 1,
-                cursor: appStorePurchaseBusy ? "not-allowed" : "pointer",
-              }}
-            >
-              <span
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 8,
-                }}
-              >
-                <Clapperboard size={18} aria-hidden="true" />
-                {pendingProductId === "rewarded" ? "Loading ad..." : "Free coins"}
-              </span>
-            </button>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: isTabletLayout
-                  ? "repeat(4, minmax(0, 1fr))"
-                  : "repeat(2, minmax(0, 1fr))",
-                gap: isTabletLayout ? 12 : 8,
-              }}
-            >
-              {APP_STORE_COIN_PACKS.map((productId) => {
-                const product = getProductById(productId);
-                if (!product?.coins) return null;
-                return (
-                  <button
-                    key={productId}
-                    type="button"
-                    onClick={() => handleNativeCoinPurchase(productId)}
-                    disabled={appStorePurchaseBusy || purchaseDebugLocked}
-                    style={{
-                      ...coinPackButton,
-                      opacity:
-                        purchaseDebugLocked ||
-                        (appStorePurchaseBusy && pendingProductId !== productId)
-                          ? 0.55
-                          : 1,
-                      cursor:
-                        appStorePurchaseBusy || purchaseDebugLocked ? "not-allowed" : "pointer",
-                    }}
-                  >
-                    <GoldCoinIcon size={28} />
-                    <strong style={coinPackAmount}>{product.coins}x</strong>
-                    <span>{pendingProductId === productId ? "Opening..." : "App Store"}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-        )}
-
-        {coinToast && <div style={shopCoinToast}>{coinToast.text}</div>}
 
         <section
           style={{

@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { Capacitor } from "@capacitor/core";
 import {
   Atom,
-  BookOpen,
   CheckCircle2,
   Clapperboard,
   FlaskConical,
@@ -498,8 +497,8 @@ export function MainMenu({
             }}
           />
           <NavPill
-            icon={hasProPack ? BookOpen : ShoppingBag}
-            label={hasProPack ? "Pro" : "Shop"}
+            icon={ShoppingBag}
+            label="Shop"
             tone="shop"
             onClick={() => {
               trackMenuAction("shop");
