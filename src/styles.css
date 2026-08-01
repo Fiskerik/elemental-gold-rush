@@ -562,12 +562,8 @@
   --game-panel-border: oklch(0.68 0.12 195 / 0.48);
   --game-panel-accent-border: oklch(0.82 0.14 78 / 0.58);
   --game-board-bg: linear-gradient(180deg, oklch(0.28 0.1 202), oklch(0.095 0.045 220));
-  --game-board-art:
-    radial-gradient(ellipse at 83% 17%, oklch(0.92 0.14 82 / 0.5), transparent 25%),
-    radial-gradient(ellipse at 20% 78%, oklch(0.83 0.12 92 / 0.25) 0 14%, transparent 15%),
-    repeating-linear-gradient(168deg, transparent 0 20px, oklch(0.78 0.12 195 / 0.08) 21px 23px, transparent 24px 42px),
-    linear-gradient(180deg, oklch(0.72 0.13 195 / 0.68), oklch(0.3 0.1 205 / 0.72) 48%, oklch(0.12 0.05 225 / 0.98));
-  --game-board-art-opacity: 0.9;
+  --game-board-art: url("/themes/crystal-cove.webp");
+  --game-board-art-opacity: 0.82;
   --game-board-border: oklch(0.76 0.13 190 / 0.52);
   --game-board-shadow:
     inset 0 0 0 1px oklch(1 0 0 / 0.08), inset 0 0 54px oklch(0.72 0.14 190 / 0.13),
@@ -1891,11 +1887,19 @@
   filter: saturate(1.24) contrast(1.04);
 }
 
+.atom-skin-gummy {
+  transform: rotate(var(--gummy-tilt, 0deg));
+}
+
+.atom-gummy-shape-1 { --gummy-tilt: -2deg; }
+.atom-gummy-shape-2 { --gummy-tilt: 1.5deg; }
+.atom-gummy-shape-3 { --gummy-tilt: -1deg; }
+
 .atom-gummy-glaze {
   position: absolute;
   inset: 7%;
   z-index: 1;
-  border-radius: 50%;
+  border-radius: var(--gummy-radius, 50%);
   pointer-events: none;
   background:
     radial-gradient(ellipse at 28% 16%, rgba(255, 255, 255, 0.72) 0 7%, transparent 18%),
@@ -1906,6 +1910,21 @@
   box-shadow:
     inset 0 2px 4px rgba(255, 255, 255, 0.42),
     inset 0 -4px 7px rgba(42, 5, 52, 0.18);
+}
+
+.atom-gummy-bubbles {
+  position: absolute;
+  inset: 12%;
+  z-index: 1;
+  pointer-events: none;
+  border-radius: var(--gummy-radius, 50%);
+  opacity: 0.72;
+  background:
+    radial-gradient(circle at 20% 66%, rgba(255, 255, 255, 0.35) 0 3%, transparent 4%),
+    radial-gradient(circle at 73% 31%, rgba(255, 255, 255, 0.3) 0 4%, transparent 5%),
+    radial-gradient(circle at 62% 76%, rgba(255, 134, 211, 0.26) 0 5%, transparent 6%),
+    radial-gradient(circle at 37% 42%, rgba(255, 255, 255, 0.18) 0 2%, transparent 3%);
+  mix-blend-mode: screen;
 }
 
 .atom-skin-overlay-chrome::after {

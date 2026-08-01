@@ -51,6 +51,13 @@ const CRYSTAL_SHARD_LAYOUTS = [
   ],
 ] as const;
 
+const GUMMY_BORDER_RADII: string[] = [
+  "43% 57% 50% 50% / 55% 45% 58% 42%",
+  "52% 48% 42% 58% / 46% 58% 42% 54%",
+  "58% 42% 55% 45% / 44% 52% 48% 56%",
+  "47% 53% 59% 41% / 50% 43% 57% 50%",
+];
+
 type CrystalShard = readonly [string, string, number];
 
 function CrystalShardCluster({
@@ -140,6 +147,7 @@ export const ElementBall = memo(function ElementBall({
   const isGummy = atomSkin === "chrome";
   const isCrystal = atomSkin === "crystal" || atomSkin === "verdantCrystal";
   const isMineral = atomSkin === "mineral";
+  const gummyRadius = GUMMY_BORDER_RADII[patternIndex] ?? GUMMY_BORDER_RADII[0];
   const skinBackground: Record<AtomSkin, string> = {
     classic: baseBackground,
     chrome: `radial-gradient(circle at 27% 22%, color-mix(in oklch, ${el.glowColor} 78%, white) 0 7%, transparent 24%), radial-gradient(circle at 35% 30%, ${el.glowColor}, ${el.color} 68%, color-mix(in oklch, ${el.color} 62%, black))`,
@@ -154,6 +162,7 @@ export const ElementBall = memo(function ElementBall({
     "--atom-glow-color": el.glowColor,
     "--atom-dark-color": `color-mix(in oklch, ${el.color} 58%, black)`,
   } as React.CSSProperties;
+  const gummyVariables = { "--gummy-radius": gummyRadius } as React.CSSProperties;
   return (
     <div
       onClick={onClick}
@@ -162,6 +171,7 @@ export const ElementBall = memo(function ElementBall({
         shimmer ? "shimmer-atom" : "",
         atomSkin !== "classic" ? `atom-skin-${atomSkin}` : "",
         isGummy ? "atom-skin-gummy" : "",
+        isGummy ? `atom-gummy-shape-${patternIndex}` : "",
         `atom-pattern-${patternIndex}`,
       ]
         .filter(Boolean)
@@ -169,7 +179,7 @@ export const ElementBall = memo(function ElementBall({
       style={{
         width: size,
         height: size,
-        borderRadius: isMineral ? "18%" : "50%",
+        borderRadius: isMineral ? "18%" : isGummy ? gummyRadius : "50%",
         clipPath: isMineral
           ? "polygon(50% 0%, 82% 12%, 100% 42%, 88% 78%, 58% 100%, 22% 91%, 0% 58%, 12% 23%)"
           : undefined,
@@ -205,6 +215,7 @@ export const ElementBall = memo(function ElementBall({
             ? "pop-in 320ms ease-out, pulse-glow 1.6s ease-in-out infinite 320ms"
             : undefined,
         ...materialVariables,
+        ...gummyVariables,
         ...style,
       }}
     >
@@ -230,13 +241,18 @@ export const ElementBall = memo(function ElementBall({
           style={{
             position: "absolute",
             inset: 0,
-            borderRadius: "50%",
+            borderRadius: isGummy ? "var(--gummy-radius)" : "50%",
             pointerEvents: "none",
             overflow: "hidden",
           }}
         />
       )}
-      {isGummy && <div aria-hidden="true" className="atom-gummy-glaze" />}
+      {isGummy && (
+        <>
+          <div aria-hidden="true" className="atom-gummy-glaze" />
+          <div aria-hidden="true" className="atom-gummy-bubbles" />
+        </>
+      )}
       {unstableSegments > 0 && (
         <svg
           aria-hidden="true"

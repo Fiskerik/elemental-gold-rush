@@ -6215,6 +6215,44 @@ function StandardGameBoard({
         }}
       >
         {/* HEADER */}
+        {preview ? (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+              marginBottom: 10,
+              padding: "8px 10px",
+              borderRadius: 12,
+              background: "var(--game-panel-bg, var(--surface))",
+              border: "1px solid var(--game-panel-border, var(--border))",
+              boxShadow: "var(--game-panel-shadow, none)",
+            }}
+          >
+            <div>
+              <div style={{ fontSize: 10, letterSpacing: 2, color: "var(--muted-foreground)" }}>
+                THEME PREVIEW
+              </div>
+              <div style={{ fontSize: 15, fontWeight: 900 }}>{previewLabel ?? "Theme test board"}</div>
+            </div>
+            <button
+              type="button"
+              onClick={onExit}
+              style={{
+                border: "1px solid var(--game-panel-accent-border, var(--border))",
+                borderRadius: 10,
+                padding: "8px 11px",
+                background: "var(--game-panel-accent-bg, var(--surface))",
+                color: "var(--foreground)",
+                fontWeight: 800,
+                cursor: "pointer",
+              }}
+            >
+              Close preview
+            </button>
+          </div>
+        ) : (
         <div
           style={{
             display: "flex",
@@ -6317,8 +6355,9 @@ function StandardGameBoard({
             </div>
           </div>
         </div>
+        )}
 
-        {!isMoleculeChallenge && (
+        {!preview && !isMoleculeChallenge && (
           <div
             style={{
               display: "flex",

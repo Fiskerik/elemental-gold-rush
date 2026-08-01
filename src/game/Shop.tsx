@@ -669,6 +669,7 @@ function GameBoardThemePreviewModal({
           display: "grid",
           gap: 4,
           justifyItems: "end",
+          display: "none",
         }}
       >
         <button type="button" onClick={onClose} style={smallButton}>
@@ -696,7 +697,7 @@ function GameBoardThemePreviewModal({
         preview
         previewBoardTheme={visual.theme}
         previewAtomSkin={previewAtomSkin}
-        previewLabel={product.name}
+        previewLabel={`${product.name} • ${visual.skin}`}
         previewShotLimit={10}
         previewOnFinish={() => setFinished(true)}
       />
