@@ -7,7 +7,6 @@ import { SUPPORTED_LANGUAGES, t, toIntlLocale, type AppLanguage } from "./locali
 import { COMPOUNDS } from "./compounds";
 import { BOSSES, type BossId } from "./bosses";
 import { ElementBall } from "./ElementBall";
-import { syncCloudProgressNow } from "./cloudSync";
 import { AtomSkinPicker, BoardThemePicker } from "./Settings";
 import {
   authenticateGameCenter,
@@ -157,12 +156,9 @@ export function Profile({ onBack, onOpenShop }: Props) {
       const player = await authenticateGameCenter();
       const authenticatedName = player.displayName?.trim() || player.alias?.trim() || "";
       setGameCenterName(authenticatedName || getCachedGameCenterPlayerName());
-      const cloudSync = player.authenticated ? await syncCloudProgressNow() : null;
       setGameCenterStatus(
         player.authenticated
-          ? `${tr("Signed in as")} ${player.displayName || player.alias || tr("Player")}${
-              cloudSync?.synced ? ` • ${tr("Cloud save synced")}` : ""
-            }`
+          ? `${tr("Signed in as")} ${player.displayName || player.alias || tr("Player")}`
           : tr("Game Center sign-in was not completed."),
       );
     } catch (error) {

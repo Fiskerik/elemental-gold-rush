@@ -57,7 +57,7 @@ export const PRIVACY = {
     {
       heading: "Storage and Retention",
       body: [
-        "Gameplay state is stored locally on your device or browser. On supported iOS builds, signing in to Game Center enables a private CloudKit backup that can restore progress after reinstalling on the same Apple account. Browser progress and unsynced offline progress may still be lost if local storage is cleared.",
+        "Gameplay state is stored locally on your device or browser. Cloud backup is not currently enabled. Browser progress may be lost if local storage is cleared.",
       ],
     },
     {

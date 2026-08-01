@@ -150,9 +150,6 @@
 							com.apple.GameCenter = {
 								enabled = 1;
 							};
-							com.apple.iCloud = {
-								enabled = 1;
-							};
 						};
 					};
 				};

@@ -1,5 +1,4 @@
 import Capacitor
-import CloudKit
 import GameKit
 import UIKit
 
@@ -19,8 +18,6 @@ public class GameCenterPlugin: CAPPlugin, CAPBridgedPlugin, GKGameCenterControll
 
     private var pendingAuthCalls: [CAPPluginCall] = []
     private var hasInstalledAuthHandler = false
-    private let cloudContainerIdentifier = "iCloud.com.eaconsulting.atomicfusion"
-    private let cloudSaveRecordType = "GameSave"
 
     @objc func authenticate(_ call: CAPPluginCall) {
         let player = GKLocalPlayer.local
@@ -63,69 +60,14 @@ public class GameCenterPlugin: CAPPlugin, CAPBridgedPlugin, GKGameCenterControll
         call.resolve(playerPayload(GKLocalPlayer.local))
     }
 
+    // CloudKit is intentionally disabled until the iCloud container and
+    // production schema are configured in Apple Developer/CloudKit Console.
     @objc func saveCloudSave(_ call: CAPPluginCall) {
-        let player = GKLocalPlayer.local
-        guard player.isAuthenticated else {
-            call.reject("Game Center player is not authenticated")
-            return
-        }
-        guard let payload = call.getString("payload"), !payload.isEmpty else {
-            call.reject("Missing cloud save payload")
-            return
-        }
-
-        let version = max(1, call.getInt("version", 1))
-        let record = CKRecord(
-            recordType: cloudSaveRecordType,
-            recordID: cloudSaveRecordID(for: player)
-        )
-        record["payload"] = payload as CKRecordValue
-        record["version"] = NSNumber(value: version)
-        record["gameCenterPlayerID"] = player.gamePlayerID as CKRecordValue
-        record["updatedAt"] = Date() as CKRecordValue
-
-        CKContainer(identifier: cloudContainerIdentifier).privateCloudDatabase.save(record) { [weak self] _, error in
-            guard let self = self else { return }
-            if let error = error {
-                NSLog("GameCenterPlugin cloud save failed: %@", error.localizedDescription)
-                call.reject(error.localizedDescription)
-                return
-            }
-            call.resolve(["saved": true, "version": version])
-        }
+        call.reject("Cloud save is temporarily disabled")
     }
 
     @objc func loadCloudSave(_ call: CAPPluginCall) {
-        let player = GKLocalPlayer.local
-        guard player.isAuthenticated else {
-            call.reject("Game Center player is not authenticated")
-            return
-        }
-
-        CKContainer(identifier: cloudContainerIdentifier).privateCloudDatabase.fetch(
-            withRecordID: cloudSaveRecordID(for: player)
-        ) { record, error in
-            if let ckError = error as? CKError, ckError.code == .unknownItem {
-                call.resolve(["found": false])
-                return
-            }
-            if let error = error {
-                call.reject(error.localizedDescription)
-                return
-            }
-            guard let record = record,
-                  let payload = record["payload"] as? String else {
-                call.resolve(["found": false])
-                return
-            }
-            call.resolve([
-                "found": true,
-                "payload": payload,
-                "version": (record["version"] as? NSNumber)?.intValue ?? 1,
-                "updatedAt": record.modificationDate?.ISO8601Format() ?? "",
-                "gameCenterPlayerID": (record["gameCenterPlayerID"] as? String) ?? ""
-            ])
-        }
+        call.resolve(["found": false, "disabled": true])
     }
 
     @objc func submitScore(_ call: CAPPluginCall) {
@@ -363,13 +305,6 @@ public class GameCenterPlugin: CAPPlugin, CAPBridgedPlugin, GKGameCenterControll
             "gamePlayerId": player.gamePlayerID,
             "teamPlayerId": player.teamPlayerID
         ]
-    }
-
-    private func cloudSaveRecordID(for player: GKLocalPlayer) -> CKRecord.ID {
-        let safePlayerID = player.gamePlayerID
-            .replacingOccurrences(of: "/", with: "-")
-            .replacingOccurrences(of: "\\", with: "-")
-        return CKRecord.ID(recordName: "game-center-save-\(safePlayerID)")
     }
 
     private func entryPayload(_ entry: GKLeaderboard.Entry?) -> [String: Any]? {

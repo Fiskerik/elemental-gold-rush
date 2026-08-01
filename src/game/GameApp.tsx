@@ -18,7 +18,6 @@ import { Leaderboard } from "@/game/DailyCompoundLeaderboard";
 import { GameModeId } from "@/game/challenges";
 import { MOLECULE_CHALLENGE_BY_LEVEL, getCompoundChallengeKind, getLevelById } from "@/game/levels";
 import { useProgress } from "@/game/store";
-import { startCloudProgressSync } from "@/game/cloudSync";
 import { useDomLocalization } from "@/game/useDomLocalization";
 
 type Screen =
@@ -62,7 +61,7 @@ export function GameApp() {
 
   useDomLocalization(appLanguage);
 
-  useEffect(() => startCloudProgressSync(), []);
+  // Cloud save is intentionally disabled until the iCloud container is configured.
 
   useEffect(() => {
     setSfxVolume(soundVolume / 100);
