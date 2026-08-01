@@ -13,8 +13,6 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { ElementBall } from "./ElementBall";
-import { MoleculeVisual } from "./MoleculeVisual";
-import { COMPOUNDS } from "./compounds";
 import { POWER_UPS } from "./powerUps";
 import { INVENTORY_POWER_UPS, useProgress, type InventoryPowerUpId } from "./store";
 
@@ -23,27 +21,116 @@ interface Props {
 }
 
 export function ShimmerAtomIcon({ size = 42 }: { size?: number }) {
+  const orbitSize = size + 18;
   return (
     <div
       style={{
-        width: size + 8,
-        height: size + 8,
+        width: orbitSize,
+        height: orbitSize,
+        position: "relative",
         borderRadius: "50%",
-        padding: 4,
-        background:
-          "conic-gradient(from 20deg, #ff4d6d, #ffd166, #06d6a0, #4cc9f0, #9b5de5, #ff4d6d)",
-        boxShadow: "0 0 18px rgba(155, 93, 229, 0.55)",
+        display: "grid",
+        placeItems: "center",
+        filter: "drop-shadow(0 0 10px rgba(86, 210, 255, 0.62))",
       }}
     >
-      <ElementBall atomicNumber={1} size={size} />
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 72 72"
+        style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
+      >
+        <ellipse
+          cx="36"
+          cy="36"
+          rx="30"
+          ry="12"
+          fill="none"
+          stroke="rgba(255, 222, 102, 0.95)"
+          strokeWidth="2.5"
+          transform="rotate(-24 36 36)"
+        />
+        <ellipse
+          cx="36"
+          cy="36"
+          rx="30"
+          ry="12"
+          fill="none"
+          stroke="rgba(88, 220, 255, 0.9)"
+          strokeWidth="2.5"
+          transform="rotate(52 36 36)"
+        />
+        <circle cx="11" cy="28" r="3" fill="#fff5a8" />
+        <circle cx="57" cy="48" r="3" fill="#8ef3ff" />
+      </svg>
+      <ElementBall atomicNumber={1} size={size * 0.72} atomSkin="hologram" glow />
     </div>
+  );
+}
+
+function CompoundPowerUpIcon({ size = 42 }: { size?: number }) {
+  const nodeSize = Math.max(12, size * 0.28);
+  return (
+    <div
+      aria-hidden="true"
+      style={{
+        width: size + 8,
+        height: size + 8,
+        position: "relative",
+        display: "grid",
+        placeItems: "center",
+        filter: "drop-shadow(0 0 10px rgba(83, 232, 171, 0.58))",
+      }}
+    >
+      <svg viewBox="0 0 72 72" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
+        <path d="M22 22 L50 27 L36 53 Z" fill="none" stroke="rgba(180, 255, 219, 0.82)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M22 22 L50 27 L36 53 Z" fill="none" stroke="rgba(20, 118, 103, 0.62)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+      <PowerUpAtomNode symbol="C" color="#8ee9ff" size={nodeSize} style={{ left: "16%", top: "16%" }} />
+      <PowerUpAtomNode symbol="O" color="#ff9c8d" size={nodeSize} style={{ right: "13%", top: "23%" }} />
+      <PowerUpAtomNode symbol="H" color="#f5f7ff" size={nodeSize * 0.86} style={{ left: "41%", bottom: "8%" }} />
+    </div>
+  );
+}
+
+function PowerUpAtomNode({
+  symbol,
+  color,
+  size,
+  style,
+}: {
+  symbol: string;
+  color: string;
+  size: number;
+  style: React.CSSProperties;
+}) {
+  return (
+    <span
+      style={{
+        position: "absolute",
+        width: size,
+        height: size,
+        borderRadius: "50%",
+        display: "grid",
+        placeItems: "center",
+        background: `radial-gradient(circle at 30% 24%, white, ${color} 28%, color-mix(in oklch, ${color} 62%, #102131))`,
+        border: "1px solid rgba(255,255,255,0.78)",
+        color: "#102131",
+        fontSize: Math.max(8, size * 0.42),
+        fontWeight: 1000,
+        textShadow: "0 1px 0 rgba(255,255,255,0.55)",
+        boxShadow: `0 0 10px ${color}99, inset 0 -3px 5px rgba(0,0,0,0.28)`,
+        ...style,
+      }}
+    >
+      {symbol}
+    </span>
   );
 }
 
 export function PowerUpIcon({ icon, size = 42 }: { icon: string; size?: number }) {
   if (icon === "shimmer") return <ShimmerAtomIcon size={size} />;
   if (icon === "H") return <ElementBall atomicNumber={1} size={size} />;
-  if (icon === "molecule") return <MoleculeVisual compound={COMPOUNDS[0]} size={size} />;
+  if (icon === "molecule") return <CompoundPowerUpIcon size={size} />;
   const map: Record<string, { Icon: LucideIcon; color: string }> = {
     grab: { Icon: Hand, color: "oklch(0.78 0.16 50)" },
     egun: { Icon: Zap, color: "oklch(0.85 0.18 95)" },

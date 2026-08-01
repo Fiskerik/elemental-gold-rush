@@ -772,7 +772,13 @@ function DailyCompoundGridBoard({
     reportQuestProgress,
     completeSecretCompound,
     recordGameAttemptForAd,
+    hasProPack,
+    atomSkin,
+    ownedThemeProducts,
   } = useProgress();
+  const activeAtomSkin = isAtomSkinUnlocked(atomSkin, { hasProPack, ownedThemeProducts })
+    ? atomSkin
+    : "classic";
   const isCampaignSearchFind =
     getCompoundChallengeKind(levelId) === "search-find" &&
     MOLECULE_CHALLENGE_BY_LEVEL[levelId] === secretCompoundId;
@@ -949,7 +955,10 @@ function DailyCompoundGridBoard({
   }
 
   return (
-    <div className="daily-compound-shell" style={dailyCompoundShell}>
+    <div
+      className={`daily-compound-shell atom-skin-${activeAtomSkin}-active`}
+      style={dailyCompoundShell}
+    >
       <div style={dailyCompoundHeader}>
         <button type="button" onClick={onExit} style={dailyCompoundExitBtn}>
           Exit
@@ -1016,7 +1025,13 @@ function DailyCompoundGridBoard({
                       : undefined,
                 }}
               >
-                <ElementBall atomicNumber={cell.atom} size={size} glow={selected || revealed} />
+                <ElementBall
+                  atomicNumber={cell.atom}
+                  size={size}
+                  glow={selected || revealed}
+                  atomSkin={activeAtomSkin}
+                  patternSeed={cell.id}
+                />
               </button>
             );
           })}

@@ -77,6 +77,7 @@ export const ElementBall = memo(function ElementBall({
         ? "rgba(18,10,3,0.92)"
         : "rgba(255,255,255,0.9)";
   const baseBackground = `radial-gradient(circle at 30% 28%, ${el.glowColor}, ${el.color} 65%, oklch(0 0 0 / 0.35))`;
+  const isGummy = atomSkin === "chrome";
   const skinBackground: Record<AtomSkin, string> = {
     classic: baseBackground,
     chrome: `radial-gradient(circle at 27% 22%, color-mix(in oklch, ${el.glowColor} 78%, white) 0 7%, transparent 24%), radial-gradient(circle at 35% 30%, ${el.glowColor}, ${el.color} 68%, color-mix(in oklch, ${el.color} 62%, black))`,
@@ -97,6 +98,7 @@ export const ElementBall = memo(function ElementBall({
         className,
         shimmer ? "shimmer-atom" : "",
         atomSkin !== "classic" ? `atom-skin-${atomSkin}` : "",
+        isGummy ? "atom-skin-gummy" : "",
         `atom-pattern-${patternIndex}`,
       ]
         .filter(Boolean)
@@ -107,10 +109,13 @@ export const ElementBall = memo(function ElementBall({
         borderRadius: "50%",
         position: "relative",
         background: skinBackground[atomSkin],
+        border: isGummy ? "1px solid color-mix(in oklch, var(--atom-glow-color) 62%, white)" : undefined,
         boxShadow: glow
           ? `0 0 ${size * 0.45}px ${el.glowColor}99, inset 0 -${size * 0.12}px ${size * 0.12}px oklch(0 0 0 / 0.35)`
           : atomSkin === "mineral"
             ? "none"
+            : isGummy
+              ? `0 ${size * 0.07}px ${size * 0.14}px rgba(18, 8, 32, 0.42), inset 0 -${size * 0.14}px ${size * 0.16}px rgba(30, 5, 35, 0.26), inset 0 ${size * 0.1}px ${size * 0.14}px rgba(255,255,255,0.32), 0 0 ${size * 0.18}px color-mix(in oklch, var(--atom-glow-color) 48%, transparent)`
             : `0 ${size * 0.06}px ${size * 0.12}px oklch(0 0 0 / 0.45), inset 0 -${size * 0.1}px ${size * 0.12}px oklch(0 0 0 / 0.3), inset 0 ${size * 0.08}px ${size * 0.1}px oklch(1 0 0 / 0.18)`,
         display: "flex",
         flexDirection: "column",
@@ -151,6 +156,7 @@ export const ElementBall = memo(function ElementBall({
           }}
         />
       )}
+      {isGummy && <div aria-hidden="true" className="atom-gummy-glaze" />}
       {unstableSegments > 0 && (
         <svg
           aria-hidden="true"

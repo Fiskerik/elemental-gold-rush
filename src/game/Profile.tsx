@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { ELEMENTS } from "./elements";
 import { getLevelById, MAX_LEVEL } from "./levels";
-import { useProgress, type CoinTransaction } from "./store";
+import { isAtomSkinUnlocked, useProgress, type CoinTransaction } from "./store";
 import { useIsTabletLayout } from "./responsive";
 import { SUPPORTED_LANGUAGES, t, toIntlLocale, type AppLanguage } from "./localization";
 import { COMPOUNDS } from "./compounds";
 import { BOSSES, type BossId } from "./bosses";
+import { ElementBall } from "./ElementBall";
 import { AtomSkinPicker, BoardThemePicker } from "./Settings";
 import {
   authenticateGameCenter,
@@ -86,6 +87,9 @@ export function Profile({ onBack, onOpenShop }: Props) {
   const intlLocale = toIntlLocale(appLanguage);
   const numberFormatter = new Intl.NumberFormat(intlLocale);
   const highestEl = ELEMENTS[highestElement - 1];
+  const activeAtomSkin = isAtomSkinUnlocked(atomSkin, { hasProPack, ownedThemeProducts })
+    ? atomSkin
+    : "classic";
   const totalStars = Object.values(levelStars).reduce((sum, stars) => sum + stars, 0);
   const perfectLevels = Object.values(levelStars).filter((stars) => stars >= 3).length;
   const bestChallengeEntry = Object.entries(challengeBestScores).reduce<{
@@ -208,8 +212,13 @@ export function Profile({ onBack, onOpenShop }: Props) {
         </button>
 
         <header style={heroCard}>
-          <div style={avatar}>{highestEl?.symbol ?? "H"}</div>
-          <div style={{ flex: 1 }}>
+          <div
+            style={avatar}
+            aria-label={`${highestEl?.name ?? "Hydrogen"} atom`}
+          >
+            <ElementBall atomicNumber={highestElement} size={58} glow atomSkin={activeAtomSkin} />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <div
               style={{ fontSize: 12, letterSpacing: 3, color: "var(--accent)", fontWeight: 900 }}
             >
@@ -218,7 +227,14 @@ export function Profile({ onBack, onOpenShop }: Props) {
             {gameCenterName && (
               <h1
                 className="gold-text"
-                style={{ margin: "4px 0", fontSize: 34 }}
+                style={{
+                  margin: "4px 0",
+                  fontSize: "clamp(18px, 7vw, 30px)",
+                  lineHeight: 1.05,
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
                 data-no-localize="true"
               >
                 {gameCenterName}
@@ -864,11 +880,11 @@ const avatar: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  background: "radial-gradient(circle at 30% 25%, var(--accent), var(--primary))",
-  color: "var(--primary-foreground)",
-  fontSize: 30,
-  fontWeight: 1000,
-  boxShadow: "0 0 24px var(--primary-glow)",
+  flex: "0 0 auto",
+  background: "color-mix(in oklch, var(--primary) 22%, var(--surface-high))",
+  border: "1px solid color-mix(in oklch, var(--accent) 55%, var(--border))",
+  boxShadow: "0 0 24px color-mix(in oklch, var(--primary) 42%, transparent)",
+  overflow: "visible",
 };
 
 const heroIconStack: React.CSSProperties = {
