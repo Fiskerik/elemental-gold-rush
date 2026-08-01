@@ -7,6 +7,7 @@ import { SUPPORTED_LANGUAGES, t, toIntlLocale, type AppLanguage } from "./locali
 import { COMPOUNDS } from "./compounds";
 import { BOSSES, type BossId } from "./bosses";
 import { ElementBall } from "./ElementBall";
+import { syncCloudProgressNow } from "./cloudSync";
 import { AtomSkinPicker, BoardThemePicker } from "./Settings";
 import {
   authenticateGameCenter,
@@ -156,9 +157,12 @@ export function Profile({ onBack, onOpenShop }: Props) {
       const player = await authenticateGameCenter();
       const authenticatedName = player.displayName?.trim() || player.alias?.trim() || "";
       setGameCenterName(authenticatedName || getCachedGameCenterPlayerName());
+      const cloudSync = player.authenticated ? await syncCloudProgressNow() : null;
       setGameCenterStatus(
         player.authenticated
-          ? `${tr("Signed in as")} ${player.displayName || player.alias || tr("Player")}`
+          ? `${tr("Signed in as")} ${player.displayName || player.alias || tr("Player")}${
+              cloudSync?.synced ? ` • ${tr("Cloud save synced")}` : ""
+            }`
           : tr("Game Center sign-in was not completed."),
       );
     } catch (error) {
@@ -265,7 +269,7 @@ export function Profile({ onBack, onOpenShop }: Props) {
               <div style={sectionHeading}>{tr("Game Center")}</div>
               <div style={gameCenterCopy}>
                 {gameCenterStatus ??
-                  tr("Sign in once to keep Daily Board and Daily Compound submissions connected.")}
+                  tr("Sign in once to connect leaderboards and keep progress synced across installs.")}
               </div>
             </div>
             <div style={gameCenterActions}>

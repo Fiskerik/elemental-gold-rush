@@ -6569,6 +6569,11 @@ function StandardGameBoard({
           }}
         >
           <div aria-hidden="true" className="game-board-background-art" />
+          <div aria-hidden="true" className="crystal-border-formations">
+            {Array.from({ length: 14 }, (_, index) => (
+              <span key={index} className="crystal-border-shard" />
+            ))}
+          </div>
           <div aria-hidden="true" className="game-board-theme-emblem" />
           {/* danger zone shading near the launcher (bottom) */}
           <div

@@ -41,6 +41,14 @@ export interface GameCenterSubmitResult {
   verifiedTotalPlayerCount?: number;
 }
 
+export interface CloudSaveRecord {
+  found: boolean;
+  payload?: string;
+  version?: number;
+  updatedAt?: string;
+  gameCenterPlayerID?: string;
+}
+
 export interface GameCenterDiagnosticEvent {
   action: "submit" | "load";
   ok: boolean;
@@ -59,6 +67,9 @@ export interface GameCenterDiagnosticEvent {
 
 interface GameCenterPlugin {
   authenticate(): Promise<GameCenterPlayer>;
+  getCurrentPlayer(): Promise<GameCenterPlayer>;
+  saveCloudSave(options: { payload: string; version: number }): Promise<{ saved: boolean; version: number }>;
+  loadCloudSave(): Promise<CloudSaveRecord>;
   submitScore(options: {
     leaderboardId?: string;
     leaderboardIds?: string[];
@@ -186,6 +197,24 @@ export async function authenticateGameCenter(): Promise<GameCenterPlayer> {
   const player = await GameCenterNative.authenticate();
   cachedGameCenterPlayer = player;
   return player;
+}
+
+export async function getCurrentGameCenterPlayer(): Promise<GameCenterPlayer> {
+  if (!isGameCenterAvailable()) return { authenticated: false };
+  return GameCenterNative.getCurrentPlayer();
+}
+
+export async function saveGameCloudSave(
+  payload: string,
+  version: number,
+): Promise<{ saved: boolean; version: number }> {
+  if (!isGameCenterAvailable()) return { saved: false, version };
+  return GameCenterNative.saveCloudSave({ payload, version });
+}
+
+export async function loadGameCloudSave(): Promise<CloudSaveRecord> {
+  if (!isGameCenterAvailable()) return { found: false };
+  return GameCenterNative.loadCloudSave();
 }
 
 export function getCachedGameCenterPlayerName(): string {

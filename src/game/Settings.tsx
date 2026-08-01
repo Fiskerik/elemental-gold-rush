@@ -146,6 +146,7 @@ const BOARD_THEME_LABELS: Record<BoardTheme, string> = {
   goldLab: "Gummy Lab",
   neonPeriodic: "Cloud Nine",
   quantumVoid: "Crystal Cove",
+  verdantCrystal: "Verdant Crystal",
   biohazard: "Radioactive",
 };
 
@@ -156,6 +157,7 @@ const BOARD_THEME_UNLOCK_KIND: Record<BoardTheme, "free" | "pro" | "buy"> = {
   goldLab: "buy",
   neonPeriodic: "buy",
   quantumVoid: "buy",
+  verdantCrystal: "buy",
   biohazard: "buy",
 };
 
@@ -276,6 +278,7 @@ const ATOM_SKIN_LABELS: Record<AtomSkin, string> = {
   hologram: "Cloud Glass",
   crystal: "Crystal Core",
   mineral: "Mineral",
+  verdantCrystal: "Verdant Glass",
   toxic: "Irradiated",
 };
 
@@ -404,6 +407,8 @@ function AtomSkinSwatch({ skin }: { skin: AtomSkin }) {
       "linear-gradient(55deg, transparent 46%, rgba(255,255,255,.5) 48% 50%, transparent 52%), conic-gradient(from 25deg, transparent, rgba(255,255,255,.38), transparent 28% 62%, rgba(120,225,255,.22), transparent 78%), radial-gradient(circle at 32% 28%, #ffe9a8, #d68a2c 65%, #241505)",
     mineral:
       "linear-gradient(125deg, rgba(255,255,255,.45) 0 17%, transparent 18% 54%, rgba(75,34,8,.28) 55%), conic-gradient(from 12deg, #ffd775, #b86b24, #ffe6a5, #8f4c17, #ffd775)",
+    verdantCrystal:
+      "linear-gradient(55deg, transparent 42%, rgba(255,255,255,.72) 44% 48%, transparent 50%), linear-gradient(140deg, rgba(255,255,255,.54), transparent 28% 56%, rgba(34,119,101,.3)), radial-gradient(circle at 32% 28%, #edfff7, #62c7a5 64%, #1e5a55)",
     toxic:
       "radial-gradient(circle at 67% 68%, rgba(14,30,10,.55) 0 7%, transparent 9%), radial-gradient(circle at 42% 72%, rgba(205,255,105,.42) 0 6%, transparent 8%), linear-gradient(145deg, rgba(184,255,76,.3), transparent 42%), radial-gradient(circle at 32% 28%, #ffe9a8, #d68a2c 65%, #241505)",
   };
@@ -433,6 +438,8 @@ function ThemeSwatch({ theme }: { theme: BoardTheme }) {
     goldLab: "url('/themes/gummy-lab.webp') center 58% / cover no-repeat",
     neonPeriodic: "url('/themes/cloud-nine.webp') center 46% / cover no-repeat",
     quantumVoid: "url('/themes/crystal-cove.webp') center 58% / cover no-repeat",
+    verdantCrystal:
+      "radial-gradient(circle at 15% 20%, #ffffff 0 4%, transparent 19%), linear-gradient(135deg, #f2fff8, #b8f1d7 45%, #4d9f8c 78%, #183d45)",
     biohazard: "url('/themes/radioactive-reactor.webp') center 58% / cover no-repeat",
   };
   return (

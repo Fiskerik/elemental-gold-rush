@@ -132,6 +132,7 @@ export const BOARD_THEMES = [
   "goldLab",
   "neonPeriodic",
   "quantumVoid",
+  "verdantCrystal",
   "biohazard",
 ] as const;
 export type BoardTheme = (typeof BOARD_THEMES)[number];
@@ -140,7 +141,15 @@ export function isBoardTheme(value: unknown): value is BoardTheme {
   return typeof value === "string" && (BOARD_THEMES as readonly string[]).includes(value);
 }
 
-export const ATOM_SKINS = ["classic", "chrome", "hologram", "crystal", "mineral", "toxic"] as const;
+export const ATOM_SKINS = [
+  "classic",
+  "chrome",
+  "hologram",
+  "crystal",
+  "mineral",
+  "verdantCrystal",
+  "toxic",
+] as const;
 export type AtomSkin = (typeof ATOM_SKINS)[number];
 
 export function isAtomSkin(value: unknown): value is AtomSkin {
@@ -151,6 +160,7 @@ export const THEME_PRODUCT_BY_BOARD_THEME: Partial<Record<BoardTheme, ProductId>
   goldLab: PRODUCT_IDS.themeGoldLab,
   neonPeriodic: PRODUCT_IDS.themeNeonPeriodic,
   quantumVoid: PRODUCT_IDS.themeQuantumVoid,
+  verdantCrystal: PRODUCT_IDS.themeVerdantCrystal,
   biohazard: PRODUCT_IDS.themeBiohazard,
 };
 
@@ -158,6 +168,7 @@ export const ATOM_SKIN_BY_BOARD_THEME: Partial<Record<BoardTheme, AtomSkin>> = {
   goldLab: "chrome",
   neonPeriodic: "hologram",
   quantumVoid: "crystal",
+  verdantCrystal: "verdantCrystal",
   biohazard: "toxic",
 };
 
@@ -168,6 +179,7 @@ export const BOARD_THEME_BY_ATOM_SKIN: Partial<Record<AtomSkin, BoardTheme>> = {
   hologram: "neonPeriodic",
   crystal: "quantumVoid",
   mineral: "quantumVoid",
+  verdantCrystal: "verdantCrystal",
   toxic: "biohazard",
 };
 
@@ -1371,3 +1383,33 @@ export const useProgress = create<ProgressState>()(
     },
   ),
 );
+
+export type SerializableProgressSnapshot = Record<string, unknown>;
+
+/** Returns only JSON-safe progress data; Zustand actions are omitted by JSON.stringify. */
+export function getSerializableProgressSnapshot(): SerializableProgressSnapshot {
+  return JSON.parse(JSON.stringify(useProgress.getState())) as SerializableProgressSnapshot;
+}
+
+/** Applies a cloud snapshot without replacing the live Zustand action functions. */
+export function applySerializableProgressSnapshot(
+  snapshot: SerializableProgressSnapshot,
+): boolean {
+  if (
+    !snapshot ||
+    typeof snapshot !== "object" ||
+    !Array.isArray(snapshot.discoveredElements) ||
+    typeof snapshot.unlockedLevel !== "number"
+  ) {
+    return false;
+  }
+
+  const current = useProgress.getState() as unknown as Record<string, unknown>;
+  const next: Record<string, unknown> = { ...current };
+  for (const [key, value] of Object.entries(snapshot)) {
+    if (typeof current[key] === "function") continue;
+    next[key] = value;
+  }
+  useProgress.setState(next as unknown as ProgressState);
+  return true;
+}

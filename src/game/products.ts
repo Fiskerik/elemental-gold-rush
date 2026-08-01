@@ -7,19 +7,21 @@ export const PRODUCT_IDS = {
   themeGoldLab: "theme_gold_lab",
   themeNeonPeriodic: "theme_neon_periodic",
   themeQuantumVoid: "theme_quantum_void",
+  themeVerdantCrystal: "theme_verdant_crystal",
   themeBiohazard: "theme_biohazard",
 } as const;
 
 export type ProductId = (typeof PRODUCT_IDS)[keyof typeof PRODUCT_IDS];
 
 // Keep the complete IAP wiring ready, but leave cosmetic themes free during visual testing.
-// Flip this to true when the four theme products are ready in App Store Connect and RevenueCat.
+// Flip this to true when the theme products are ready in App Store Connect and RevenueCat.
 export const COSMETIC_THEME_PURCHASES_ENABLED = false;
 
 export const THEME_BUNDLE_PRODUCT_IDS = [
   PRODUCT_IDS.themeGoldLab,
   PRODUCT_IDS.themeNeonPeriodic,
   PRODUCT_IDS.themeQuantumVoid,
+  PRODUCT_IDS.themeVerdantCrystal,
   PRODUCT_IDS.themeBiohazard,
 ] as const satisfies readonly ProductId[];
 
@@ -35,6 +37,7 @@ export const SHOP_SPEND_CENTS: Record<ProductId, number> = {
   [PRODUCT_IDS.themeGoldLab]: 199,
   [PRODUCT_IDS.themeNeonPeriodic]: 199,
   [PRODUCT_IDS.themeQuantumVoid]: 199,
+  [PRODUCT_IDS.themeVerdantCrystal]: 199,
   [PRODUCT_IDS.themeBiohazard]: 199,
 };
 
@@ -136,6 +139,17 @@ export const PRODUCTS: ProductDefinition[] = [
     benefits: [
       "Illustrated Crystal Cove board with a Mineral Cove beach-cove style.",
       "Includes glassy Crystal Core and faceted Mineral finishes, each with varied patterns.",
+      "Purely cosmetic — no gameplay changes.",
+    ],
+  },
+  {
+    id: PRODUCT_IDS.themeVerdantCrystal,
+    name: "Verdant Crystal",
+    description: "A light green crystal garden board with glassy atoms that hold mineral shards inside.",
+    type: "non_consumable",
+    benefits: [
+      "Light green crystal board with formations around the edges.",
+      "Bundled Verdant Glass atoms with translucent spheres and mineral inclusions.",
       "Purely cosmetic — no gameplay changes.",
     ],
   },

@@ -580,6 +580,39 @@
   --game-aim-target: oklch(0.84 0.14 82);
 }
 
+.game-board-shell.board-theme-verdantCrystal {
+  color: oklch(0.22 0.045 165);
+  --foreground: oklch(0.22 0.045 165);
+  --muted-foreground: oklch(0.34 0.045 165);
+  --game-shell-bg:
+    radial-gradient(circle at 14% 5%, oklch(1 0 0 / 0.9), transparent 24%),
+    radial-gradient(circle at 88% 24%, oklch(0.82 0.16 150 / 0.42), transparent 32%),
+    linear-gradient(180deg, oklch(0.96 0.045 160), oklch(0.72 0.12 165) 58%, oklch(0.39 0.105 175));
+  --game-panel-bg: linear-gradient(180deg, oklch(0.97 0.035 160 / 0.9), oklch(0.78 0.1 165 / 0.86));
+  --game-panel-accent-bg: linear-gradient(180deg, oklch(0.99 0.04 150 / 0.96), oklch(0.72 0.14 160 / 0.92));
+  --game-panel-border: oklch(0.33 0.12 165 / 0.38);
+  --game-panel-accent-border: oklch(0.28 0.15 155 / 0.58);
+  --game-board-bg:
+    radial-gradient(circle at 50% 45%, oklch(0.98 0.04 155 / 0.62), transparent 52%),
+    linear-gradient(180deg, oklch(0.88 0.1 160), oklch(0.58 0.12 170));
+  --game-board-art: none;
+  --game-board-art-opacity: 0;
+  --game-board-border: oklch(0.25 0.15 160 / 0.54);
+  --game-board-shadow:
+    inset 0 0 0 1px oklch(1 0 0 / 0.72), inset 0 0 56px oklch(0.34 0.16 160 / 0.18),
+    0 18px 50px oklch(0.1 0.08 165 / 0.3);
+  --game-meter-track: oklch(0.29 0.08 165 / 0.26);
+  --game-meter-fill: linear-gradient(90deg, oklch(0.42 0.16 175), oklch(0.72 0.17 145));
+  --game-meter-fill-ready: linear-gradient(90deg, oklch(0.72 0.17 145), oklch(0.88 0.14 95));
+  --game-meter-hot: oklch(0.42 0.16 150);
+  --game-aim-color: oklch(0.34 0.16 170);
+  --game-aim-target: oklch(0.52 0.17 145);
+  --game-board-emblem: "";
+  --game-board-motif:
+    radial-gradient(circle at 50% 45%, oklch(1 0 0 / 0.28), transparent 40%),
+    linear-gradient(120deg, transparent 0 43%, oklch(0.28 0.14 165 / 0.08) 44% 45%, transparent 46% 100%);
+}
+
 .game-board-shell.board-theme-biohazard {
   --game-shell-bg:
     radial-gradient(circle at 50% 16%, oklch(0.62 0.2 140 / 0.18), transparent 30%),
@@ -617,6 +650,7 @@
     .board-theme-goldLab,
     .board-theme-neonPeriodic,
     .board-theme-quantumVoid,
+    .board-theme-verdantCrystal,
     .board-theme-biohazard
   )
   .game-board-surface::before,
@@ -624,6 +658,7 @@
     .board-theme-goldLab,
     .board-theme-neonPeriodic,
     .board-theme-quantumVoid,
+    .board-theme-verdantCrystal,
     .board-theme-biohazard
   )
   .game-board-theme-emblem {
@@ -718,6 +753,49 @@
     inset 0 1px 0 oklch(1 0 0 / 0.1),
     inset 0 -1px 0 oklch(0 0 0 / 0.36);
 }
+
+.crystal-border-formations {
+  display: none;
+  position: absolute;
+  inset: -3px;
+  z-index: 1;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.crystal-border-shard {
+  position: absolute;
+  display: block;
+  width: 30px;
+  height: 52px;
+  border: 1px solid oklch(1 0 0 / 0.72);
+  background:
+    linear-gradient(135deg, oklch(1 0 0 / 0.9) 0 12%, transparent 13% 42%, oklch(0.66 0.18 165 / 0.78) 43% 63%, transparent 64%),
+    linear-gradient(160deg, oklch(0.95 0.08 150), oklch(0.48 0.16 170));
+  clip-path: polygon(48% 0, 100% 24%, 78% 100%, 22% 83%, 0 29%);
+  box-shadow: 0 0 12px oklch(0.72 0.2 150 / 0.55);
+  opacity: 0.78;
+  filter: drop-shadow(0 3px 3px oklch(0.1 0.08 165 / 0.26));
+}
+
+.game-board-shell.board-theme-verdantCrystal .crystal-border-formations {
+  display: block;
+}
+
+.game-board-shell.board-theme-verdantCrystal .crystal-border-shard:nth-child(1) { top: -13px; left: 6%; transform: rotate(-22deg) scale(0.9); }
+.game-board-shell.board-theme-verdantCrystal .crystal-border-shard:nth-child(2) { top: -18px; left: 24%; transform: rotate(18deg) scale(0.72); }
+.game-board-shell.board-theme-verdantCrystal .crystal-border-shard:nth-child(3) { top: -12px; right: 28%; transform: rotate(-8deg) scale(1.08); }
+.game-board-shell.board-theme-verdantCrystal .crystal-border-shard:nth-child(4) { top: -20px; right: 7%; transform: rotate(28deg) scale(0.78); }
+.game-board-shell.board-theme-verdantCrystal .crystal-border-shard:nth-child(5) { top: 18%; left: -17px; transform: rotate(-58deg) scale(0.82); }
+.game-board-shell.board-theme-verdantCrystal .crystal-border-shard:nth-child(6) { top: 45%; left: -20px; transform: rotate(-73deg) scale(1.12); }
+.game-board-shell.board-theme-verdantCrystal .crystal-border-shard:nth-child(7) { bottom: 12%; left: -15px; transform: rotate(-34deg) scale(0.72); }
+.game-board-shell.board-theme-verdantCrystal .crystal-border-shard:nth-child(8) { top: 13%; right: -17px; transform: rotate(56deg) scale(0.8); }
+.game-board-shell.board-theme-verdantCrystal .crystal-border-shard:nth-child(9) { top: 53%; right: -20px; transform: rotate(76deg) scale(1.1); }
+.game-board-shell.board-theme-verdantCrystal .crystal-border-shard:nth-child(10) { bottom: 8%; right: -14px; transform: rotate(34deg) scale(0.76); }
+.game-board-shell.board-theme-verdantCrystal .crystal-border-shard:nth-child(11) { bottom: -18px; left: 16%; transform: rotate(204deg) scale(0.82); }
+.game-board-shell.board-theme-verdantCrystal .crystal-border-shard:nth-child(12) { bottom: -14px; left: 42%; transform: rotate(178deg) scale(0.66); }
+.game-board-shell.board-theme-verdantCrystal .crystal-border-shard:nth-child(13) { bottom: -19px; right: 26%; transform: rotate(192deg) scale(1.02); }
+.game-board-shell.board-theme-verdantCrystal .crystal-border-shard:nth-child(14) { bottom: -15px; right: 5%; transform: rotate(160deg) scale(0.78); }
 
 @media (min-width: 768px) {
   .app-shell {
@@ -1875,6 +1953,7 @@
   box-shadow:
     inset 4px 4px 8px oklch(1 0 0 / 0.24),
     inset -6px -6px 10px oklch(0.08 0.03 275 / 0.24);
+  opacity: 0.62;
 }
 
 .atom-crystal-core {
@@ -1901,6 +1980,24 @@
     );
   opacity: 0.72;
   box-shadow: inset -4px -5px 8px oklch(0 0 0 / 0.24);
+  overflow: visible;
+  filter: drop-shadow(0 2px 3px oklch(0.06 0.04 250 / 0.28));
+}
+
+.atom-crystal-shards {
+  position: absolute;
+  inset: -7%;
+  width: 114%;
+  height: 114%;
+  overflow: visible;
+  transform: translateZ(0);
+  filter: drop-shadow(0 0 2px oklch(1 0 0 / 0.42));
+}
+
+.atom-crystal-shards polygon {
+  stroke: oklch(1 0 0 / 0.46);
+  stroke-width: 1.2;
+  stroke-linejoin: round;
 }
 
 /* Crystal Cove and Mineral Cove use deterministic facets so every atom keeps
@@ -1945,6 +2042,33 @@
   transform: rotate(22deg) scale(0.88);
 }
 
+.atom-skin-verdantCrystal .atom-crystal-core {
+  background:
+    linear-gradient(128deg, oklch(1 0 0 / 0.72) 0 18%, transparent 19% 48%, oklch(0.08 0.08 165 / 0.18) 49%),
+    conic-gradient(
+      from 18deg,
+      color-mix(in oklch, var(--atom-glow-color) 78%, white),
+      color-mix(in oklch, var(--atom-color) 72%, #83e5bd) 25%,
+      oklch(1 0 0 / 0.64) 26% 31%,
+      color-mix(in oklch, var(--atom-dark-color) 76%, #164f46) 50%,
+      color-mix(in oklch, var(--atom-color) 76%, #61c99f) 72%,
+      color-mix(in oklch, var(--atom-glow-color) 84%, white)
+    );
+  opacity: 0.82;
+}
+
+.atom-skin-verdantCrystal.atom-pattern-1 .atom-crystal-core {
+  transform: rotate(12deg) scale(0.92);
+}
+
+.atom-skin-verdantCrystal.atom-pattern-2 .atom-crystal-core {
+  transform: rotate(-10deg) scale(1.06);
+}
+
+.atom-skin-verdantCrystal.atom-pattern-3 .atom-crystal-core {
+  transform: rotate(22deg) scale(0.88);
+}
+
 .atom-skin-overlay-crystal::before {
   content: "";
   position: absolute;
@@ -1954,6 +2078,18 @@
   height: 14%;
   border-radius: 50%;
   background: oklch(1 0 0 / 0.78);
+}
+
+.atom-skin-overlay-crystal::after {
+  content: "";
+  position: absolute;
+  top: -10%;
+  left: 18%;
+  width: 26%;
+  height: 120%;
+  transform: rotate(28deg);
+  background: linear-gradient(90deg, transparent, oklch(1 0 0 / 0.24), transparent);
+  filter: blur(1px);
 }
 
 .atom-skin-overlay-toxic {

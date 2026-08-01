@@ -129,6 +129,15 @@ const THEME_BUNDLE_VISUALS: Partial<
     theme: "quantumVoid",
     atomSkins: ["crystal", "mineral"],
   },
+  [PRODUCT_IDS.themeVerdantCrystal]: {
+    board:
+      "radial-gradient(circle at 14% 5%, rgba(255,255,255,.9), transparent 24%), radial-gradient(circle at 88% 24%, rgba(105,224,170,.42), transparent 32%), linear-gradient(180deg, #effff7, #a9e8cb 58%, #397e72)",
+    atom:
+      "linear-gradient(55deg, transparent 42%, rgba(255,255,255,.72) 44% 48%, transparent 50%), radial-gradient(circle at 28% 20%, #ffffff, #65cda7 58%, #1c5e56)",
+    skin: "Verdant Glass atoms",
+    theme: "verdantCrystal",
+    atomSkins: ["verdantCrystal"],
+  },
   [PRODUCT_IDS.themeBiohazard]: {
     board: "url('/themes/radioactive-reactor.webp') center / cover no-repeat",
     atom:
