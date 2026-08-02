@@ -793,7 +793,10 @@ export function Shop({ onBack }: { onBack: () => void }) {
     let active = true;
     void setCustomerInfoListener((hasEntitlement) => {
       if (!active || !hasEntitlement) return;
-      grantProPack();
+      // RevenueCat can emit the active entitlement when the app starts or
+      // after restore. It is not a new purchase, so never grant starter coins
+      // from this listener.
+      grantProPack({ fromRestore: true });
       setProPackMessage("Pro Lab Pack unlocked from offer code.");
     });
     return () => {
@@ -1510,7 +1513,7 @@ export function Shop({ onBack }: { onBack: () => void }) {
                     marginBottom: 6,
                   }}
                 >
-                  {COSMETIC_THEME_PURCHASES_ENABLED ? "COSMETIC BUNDLES" : "FREE THEME PREVIEW"}
+                  Themes and skins
                 </div>
                 <h2 style={{ margin: 0, fontSize: 22, fontWeight: 900 }}>
                   Boards + atom skins
@@ -1532,9 +1535,8 @@ export function Shop({ onBack }: { onBack: () => void }) {
               )}
             </div>
             <p style={{ margin: "0 0 14px", color: "var(--muted-foreground)", fontSize: 13 }}>
-              {COSMETIC_THEME_PURCHASES_ENABLED
-                ? "Each one-time purchase unlocks a board and its matching atom finish. Element colors and gameplay remain unchanged. Shop support also unlocks Researcher at $5 and Developer at $20."
-                : "All board themes and atom finishes are unlocked for testing. Element colors and gameplay remain unchanged."}
+              Support the developer by purchasing custom skins. Each one-time purchase unlocks a
+              board and its matching atom finish; element colors and gameplay remain unchanged.
             </p>
             <div
               style={{

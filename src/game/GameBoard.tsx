@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import type { MouseEvent as ReactMouseEvent, ReactNode } from "react";
 import { Capacitor } from "@capacitor/core";
-import { Coins, Settings as SettingsIcon } from "lucide-react";
+import { Coins, Info, Settings as SettingsIcon } from "lucide-react";
 import { ELEMENTS } from "./elements";
 import {
   LEVELS,
@@ -60,6 +60,7 @@ import { useIsTabletLayout, useWideBoardLayout } from "./responsive";
 import { ElementalBossBoard } from "./ElementalBossBoard";
 import { PeriodicGuardianBoard } from "./PeriodicGuardianBoard";
 import { NucleusCoreBoard } from "./NucleusCoreBoard";
+import { HowToPlay } from "./HowToPlay";
 import {
   submitDailyBoardLeaderboardScore,
   submitDailyCompoundLeaderboardScore,
@@ -804,6 +805,7 @@ function DailyCompoundGridBoard({
     tone: "right" | "wrong";
     text: string;
   }>(null);
+  const [howToPlayOpen, setHowToPlayOpen] = useState(false);
   const [elapsedMs, setElapsedMs] = useState(0);
   const [result, setResult] = useState<null | {
     score: number;
@@ -982,9 +984,20 @@ function DailyCompoundGridBoard({
       style={dailyCompoundShell}
     >
       <div style={dailyCompoundHeader}>
-        <button type="button" onClick={onExit} style={dailyCompoundExitBtn}>
-          Exit
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <button type="button" onClick={onExit} style={dailyCompoundExitBtn}>
+            Exit
+          </button>
+          <button
+            type="button"
+            onClick={() => setHowToPlayOpen(true)}
+            title="How to play"
+            aria-label="How to play Daily Compound"
+            style={dailyCompoundInfoBtn}
+          >
+            <Info size={16} aria-hidden="true" />
+          </button>
+        </div>
         <div style={{ minWidth: 0 }}>
           <div style={dailyCompoundKicker}>DAILY COMPOUND</div>
           <div style={dailyCompoundTitle}>
@@ -1145,6 +1158,13 @@ function DailyCompoundGridBoard({
             </button>
           </div>
         </Modal>
+      )}
+      {howToPlayOpen && (
+        <HowToPlay
+          mode="daily-compound"
+          atomSkin={activeAtomSkin}
+          onClose={() => setHowToPlayOpen(false)}
+        />
       )}
     </div>
   );
@@ -1483,6 +1503,7 @@ function StandardGameBoard({
   const [popups, setPopups] = useState<{ id: number; text: string; x: number; y: number }[]>([]);
   const [busy, setBusy] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [howToPlayOpen, setHowToPlayOpen] = useState(false);
   const [gameOver, setGameOver] = useState(false);
   const [gameOverContinueOpen, setGameOverContinueOpen] = useState(false);
   const [gameOverContinueUsed, setGameOverContinueUsed] = useState(false);
@@ -5217,11 +5238,19 @@ function StandardGameBoard({
   function triggerTransmutePowerUp() {
     if (busy || gameOver || won || transmuteCharges <= 0 || pendingReversiblePowerUp) return;
     if (currentIsEGun || currentIsBlank) return;
-    const maxTier = Math.min(118, Math.max(current + 1, target - 1));
+    const dailyMaxTier = Math.max(1, target - 2);
+    const maxTier = isDailyAtomChallenge
+      ? Math.min(118, dailyMaxTier)
+      : Math.min(118, Math.max(current + 1, target - 1));
     if (current >= maxTier) return;
-    // Only reroll into atoms the player has already discovered, so Transmute
-    // never hands out a fresh element for free.
-    const candidates = discoveredElements.filter((n) => n > current && n <= maxTier);
+    // Campaign Transmute stays discovery-gated. Daily Board instead uses the
+    // day's seeded atom pool, so a new player can still use the power-up.
+    const dailyPool = isDailyAtomChallenge
+      ? uniqueAtomList([...dailyTargetAtomPlan().queueAtoms, dailyMaxTier])
+      : [];
+    const candidates = (isDailyAtomChallenge ? dailyPool : discoveredElements).filter(
+      (n) => n > current && n <= maxTier,
+    );
     if (candidates.length === 0 && powerUpStage !== "transmute") {
       spawnPopup("🔀 NO HIGHER DISCOVERED");
       return;
@@ -5230,14 +5259,12 @@ function StandardGameBoard({
     const transmuteStep = skipTier ? 2 : 1;
     const preferredMinTier = Math.min(maxTier, current + transmuteStep);
     const preferredCandidates = candidates.filter((n) => n >= preferredMinTier);
+    const candidatePool = preferredCandidates.length > 0 ? preferredCandidates : candidates;
     const atom =
       powerUpStage === "transmute"
         ? preferredMinTier
-        : (preferredCandidates.length > 0 ? preferredCandidates : candidates)[
-            Math.floor(
-              Math.random() *
-                (preferredCandidates.length > 0 ? preferredCandidates : candidates).length,
-            )
+        : candidatePool[
+            Math.floor((isDailyAtomChallenge ? dailyRandom() : Math.random()) * candidatePool.length)
           ];
     setTransmuteCharges((g) => Math.max(0, g - 1));
     runPowerUpsUsedRef.current += 1;
@@ -6288,6 +6315,15 @@ function StandardGameBoard({
               style={{ ...iconBtn, minWidth: 0, padding: "6px 8px" }}
             >
               <SettingsIcon size={17} aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setHowToPlayOpen(true)}
+              title="How to play"
+              aria-label={isMoleculeChallenge ? "How to play compound levels" : "How to play"}
+              style={{ ...iconBtn, minWidth: 0, padding: "6px 8px" }}
+            >
+              <Info size={17} aria-hidden="true" />
             </button>
             <button
               type="button"
@@ -7768,6 +7804,13 @@ function StandardGameBoard({
             onClose={() => setSettingsOpen(false)}
             onRestart={() => setConfirmAction("restart")}
             onLeave={() => setConfirmAction("leave")}
+          />
+        )}
+        {howToPlayOpen && !gameOver && !won && (
+          <HowToPlay
+            mode={isMoleculeChallenge ? "compound" : "normal"}
+            atomSkin={activeAtomSkin}
+            onClose={() => setHowToPlayOpen(false)}
           />
         )}
         {paused && !gameOver && !won && (
@@ -9824,6 +9867,19 @@ const dailyCompoundExitBtn: React.CSSProperties = {
   background: "var(--surface)",
   color: "var(--foreground)",
   fontWeight: 850,
+  cursor: "pointer",
+};
+
+const dailyCompoundInfoBtn: React.CSSProperties = {
+  width: 38,
+  height: 38,
+  display: "grid",
+  placeItems: "center",
+  border: "1px solid var(--border)",
+  borderRadius: 10,
+  padding: 0,
+  background: "var(--surface)",
+  color: "var(--foreground)",
   cursor: "pointer",
 };
 

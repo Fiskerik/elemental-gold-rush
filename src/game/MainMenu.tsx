@@ -41,6 +41,7 @@ import { PodiumMark } from "./DailyCompoundLeaderboard";
 import { openAppStoreReview } from "./appReview";
 import { toast } from "sonner";
 import { getTimeUntilDailyResetMs } from "./quests";
+import { AtomSkinPicker, BoardThemePicker } from "./Settings";
 
 const POWER_UP_STAGE_LABELS: Record<PowerUpStageId, string> = {
   shimmer: "Merge the shimmering queued atom",
@@ -125,6 +126,11 @@ export function MainMenu({
     appLanguage,
     bestCombo,
     hasProPack,
+    boardTheme,
+    atomSkin,
+    ownedThemeProducts,
+    setBoardTheme,
+    setAtomSkin,
     refreshDailyLab,
     refreshDailyFeatures,
     claimDailyReward,
@@ -506,6 +512,38 @@ export function MainMenu({
             }}
           />
         </nav>
+
+        <section
+          style={{
+            display: "grid",
+            gap: 10,
+            padding: isTabletLayout ? 18 : 14,
+            borderRadius: 18,
+            background: "var(--surface-elevated)",
+            border: "1px solid var(--border)",
+          }}
+        >
+          <div>
+            <div style={sectionLabel}>THEMES &amp; SKINS</div>
+            <div style={{ color: "var(--muted-foreground)", fontSize: 12, lineHeight: 1.35 }}>
+              Change between your unlocked board themes and atom skins.
+            </div>
+          </div>
+          <BoardThemePicker
+            value={boardTheme}
+            hasProPack={hasProPack}
+            ownedThemeProducts={ownedThemeProducts}
+            onChange={setBoardTheme}
+            onOpenShop={onShop}
+          />
+          <AtomSkinPicker
+            value={atomSkin}
+            hasProPack={hasProPack}
+            ownedThemeProducts={ownedThemeProducts}
+            onChange={setAtomSkin}
+            onOpenShop={onShop}
+          />
+        </section>
 
         <section style={weeklyBonusCard}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>

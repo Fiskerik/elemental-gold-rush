@@ -81,7 +81,6 @@ export function Profile({ onBack, onOpenShop }: Props) {
     setBoardTheme,
     setAtomSkin,
     setAppLanguage,
-    toggleProPack,
   } = useProgress();
   const tr = (text: string) => t(text, appLanguage);
   const intlLocale = toIntlLocale(appLanguage);
@@ -531,7 +530,7 @@ export function Profile({ onBack, onOpenShop }: Props) {
           />
           <div style={preferenceRow}>
             <span style={preferenceLabel}>{tr("Theme")}</span>
-            <div style={{ display: "inline-grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+            <div style={{ display: "inline-grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
               {(["dark", "light"] as const).map((theme) => (
                 <button
                   key={theme}
@@ -565,29 +564,6 @@ export function Profile({ onBack, onOpenShop }: Props) {
               ))}
             </select>
           </label>
-        </section>
-
-        <section
-          style={{
-            ...card,
-            borderColor: "color-mix(in oklch, var(--warning) 52%, var(--border))",
-          }}
-        >
-          <div style={sectionHeading}>DEBUG</div>
-          <div style={{ color: "var(--muted-foreground)", fontSize: 12, lineHeight: 1.4 }}>
-            Temporarily toggle the local Pro Lab Pack entitlement while comparing game performance.
-          </div>
-          <button
-            type="button"
-            onClick={toggleProPack}
-            style={{
-              ...debugToggleButton,
-              color: hasProPack ? "var(--destructive)" : "var(--success)",
-              borderColor: hasProPack ? "var(--destructive)" : "var(--success)",
-            }}
-          >
-            {hasProPack ? "Remove Lab Pro pack" : "Restore Lab Pro pack"}
-          </button>
         </section>
 
         {transactionsOpen && (
@@ -999,7 +975,8 @@ const statIcon: React.CSSProperties = {
 
 const proBadge: React.CSSProperties = {
   marginTop: 8,
-  display: "inline-block",
+  display: "block",
+  width: "fit-content",
   padding: "4px 10px",
   borderRadius: 999,
   background:
@@ -1009,6 +986,7 @@ const proBadge: React.CSSProperties = {
   fontSize: 10,
   letterSpacing: 1.4,
   fontWeight: 900,
+  textAlign: "center",
 };
 
 const grid: React.CSSProperties = {

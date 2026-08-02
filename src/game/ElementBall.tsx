@@ -180,9 +180,9 @@ export const ElementBall = memo(function ElementBall({
         width: size,
         height: size,
         borderRadius: isMineral ? "18%" : isGummy ? gummyRadius : "50%",
-        clipPath: isMineral
-          ? "polygon(50% 0%, 82% 12%, 100% 42%, 88% 78%, 58% 100%, 22% 91%, 0% 58%, 12% 23%)"
-          : undefined,
+        // Keep the mineral silhouette on its dedicated surface layer so the
+        // shimmer ring and unstable-isotope shell can render outside the facets.
+        clipPath: undefined,
         position: "relative",
         background: skinBackground[atomSkin],
         border: isGummy

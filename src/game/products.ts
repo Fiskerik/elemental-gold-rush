@@ -4,18 +4,18 @@ export const PRODUCT_IDS = {
   coins20: "coins_20",
   coins50: "coins_50",
   coins100: "coins_100",
-  themeGoldLab: "theme_gold_lab",
-  themeNeonPeriodic: "theme_neon_periodic",
-  themeQuantumVoid: "theme_quantum_void",
-  themeVerdantCrystal: "theme_verdant_crystal",
-  themeBiohazard: "theme_biohazard",
+  themeGoldLab: "theme_gummy_pack",
+  themeNeonPeriodic: "theme_cloud_pack",
+  themeQuantumVoid: "theme_crystal_pack",
+  themeVerdantCrystal: "theme_versant_pack",
+  themeBiohazard: "theme_radioactive_pack",
 } as const;
 
 export type ProductId = (typeof PRODUCT_IDS)[keyof typeof PRODUCT_IDS];
 
-// Keep the complete IAP wiring ready, but leave cosmetic themes free during visual testing.
-// Flip this to true when the theme products are ready in App Store Connect and RevenueCat.
-export const COSMETIC_THEME_PURCHASES_ENABLED = false;
+// The themed bundles are non-consumable products configured in App Store Connect
+// and RevenueCat, so purchases and restores are handled by the normal IAP flow.
+export const COSMETIC_THEME_PURCHASES_ENABLED = true;
 
 export const THEME_BUNDLE_PRODUCT_IDS = [
   PRODUCT_IDS.themeGoldLab,
