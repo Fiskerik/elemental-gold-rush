@@ -7,9 +7,9 @@ export const PRODUCT_IDS = {
   themeGoldLab: "theme_gummy_pack",
   themeNeonPeriodic: "theme_cloud_pack",
   themeQuantumVoid: "theme_crystal_pack",
-  themeVerdantCrystal: "theme_versant_pack",
+  themeVerdantCrystal: "theme_verdant_pack",
   themeBiohazard: "theme_radioactive_pack",
-  themeMossHollow: "theme_moss_hollow_pack",
+  themeMossHollow: "theme_moss_pack",
 } as const;
 
 export type ProductId = (typeof PRODUCT_IDS)[keyof typeof PRODUCT_IDS];

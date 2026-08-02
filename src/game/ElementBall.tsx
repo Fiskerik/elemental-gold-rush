@@ -135,11 +135,15 @@ export const ElementBall = memo(function ElementBall({
     atomSkin === "toxic" ||
     atomSkin === "moss";
   const textColor =
-    atomSkin === "crystal" || atomSkin === "mineral" || atomSkin === "verdantCrystal" || atomSkin === "moss"
-      ? "#fff8e8"
+    atomSkin === "moss"
+      ? "#102017"
+      : atomSkin === "crystal" || atomSkin === "mineral" || atomSkin === "verdantCrystal"
+        ? "#fff8e8"
       : "#0A0A1A";
   const textStrokeColor =
-    atomSkin === "crystal" || atomSkin === "verdantCrystal"
+    atomSkin === "moss"
+      ? "rgba(232,255,194,0.98)"
+      : atomSkin === "crystal" || atomSkin === "verdantCrystal"
       ? "rgba(0,0,0,0.96)"
       : atomSkin === "mineral"
         ? "rgba(18,10,3,0.92)"
@@ -157,7 +161,7 @@ export const ElementBall = memo(function ElementBall({
     mineral: "transparent",
     verdantCrystal: `radial-gradient(circle at 26% 18%, oklch(1 0 0 / 0.9) 0 5%, transparent 18%), radial-gradient(circle at 31% 25%, color-mix(in oklch, ${el.glowColor} 70%, white) 0 9%, transparent 30%), radial-gradient(circle at 52% 58%, color-mix(in oklch, ${el.color} 44%, white), color-mix(in oklch, ${el.color} 72%, #7fe0ba) 54%, color-mix(in oklch, ${el.color} 42%, #16463f) 100%)`,
     toxic: `radial-gradient(circle at 30% 24%, ${el.glowColor}, ${el.color} 58%, color-mix(in oklch, ${el.color} 55%, #12220c))`,
-    moss: `radial-gradient(circle at 27% 20%, oklch(1 0 0 / 0.62) 0 5%, transparent 18%), radial-gradient(circle at 70% 72%, color-mix(in oklch, ${el.glowColor} 60%, #c8e88d) 0 9%, transparent 20%), radial-gradient(circle at 42% 42%, color-mix(in oklch, ${el.color} 50%, #a8d86f), color-mix(in oklch, ${el.color} 82%, #355c2f) 62%, color-mix(in oklch, ${el.color} 48%, #102719))`,
+    moss: `radial-gradient(circle at 27% 20%, oklch(1 0 0 / 0.58) 0 5%, transparent 18%), radial-gradient(circle at 70% 72%, oklch(0.9 0.18 92 / 0.78) 0 5%, oklch(0.84 0.16 105 / 0.22) 8% 18%, transparent 26%), radial-gradient(circle at 42% 42%, color-mix(in oklch, ${el.color} 42%, #a5c86b), color-mix(in oklch, ${el.color} 56%, #294c2a) 58%, color-mix(in oklch, ${el.color} 28%, #0d2118) 100%)`,
   };
   const materialVariables = {
     "--atom-color": el.color,
@@ -248,6 +252,13 @@ export const ElementBall = memo(function ElementBall({
             overflow: "hidden",
           }}
         />
+      )}
+      {atomSkin === "moss" && (
+        <div aria-hidden="true" className="atom-moss-mushrooms">
+          <span />
+          <span />
+          <span />
+        </div>
       )}
       {isGummy && (
         <>

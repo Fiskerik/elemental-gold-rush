@@ -1614,11 +1614,26 @@ export function Shop({ onBack }: { onBack: () => void }) {
                       >
                         {product.description}
                       </p>
-                      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 0.8fr) minmax(0, 1.2fr)", gap: 8 }}>
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: "minmax(0, 0.8fr) minmax(0, 1.2fr)",
+                          gap: 8,
+                          minWidth: 0,
+                        }}
+                      >
                         <button
                           type="button"
                           onClick={() => setPreviewProductId(productId)}
-                          style={{ ...secondaryShopButton, padding: "8px 10px" }}
+                          style={{
+                            ...secondaryShopButton,
+                            minWidth: 0,
+                            width: "100%",
+                            padding: "8px 6px",
+                            whiteSpace: "normal",
+                            overflowWrap: "anywhere",
+                            lineHeight: 1.15,
+                          }}
                         >
                           Preview
                         </button>
@@ -1628,7 +1643,12 @@ export function Shop({ onBack }: { onBack: () => void }) {
                           disabled={disabled}
                           style={{
                             ...(owned ? secondaryShopButton : shopButton),
-                            padding: "8px 10px",
+                            minWidth: 0,
+                            width: "100%",
+                            padding: "8px 6px",
+                            whiteSpace: "normal",
+                            overflowWrap: "anywhere",
+                            lineHeight: 1.15,
                             opacity: disabled && !owned ? 0.55 : 1,
                             cursor: disabled ? "not-allowed" : "pointer",
                           }}
@@ -1639,7 +1659,7 @@ export function Shop({ onBack }: { onBack: () => void }) {
                               : "Free for testing"
                             : pending
                               ? "Opening..."
-                              : "Buy in App Store"}
+                              : "Buy"}
                         </button>
                       </div>
                     </div>
