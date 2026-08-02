@@ -277,6 +277,8 @@ function PowerUpIllustratedIcon({
 
 export function PowerUpBadge({ icon, size = 42 }: { icon: string; size?: number }) {
   const style = POWER_UP_BADGE_STYLES[icon] ?? POWER_UP_BADGE_STYLES.default;
+  const denseArtwork = icon === "molecule" || icon === "shimmer";
+  const innerSize = Math.max(22, size * (denseArtwork ? 0.58 : 0.74));
   return (
     <div
       style={{
@@ -291,7 +293,7 @@ export function PowerUpBadge({ icon, size = 42 }: { icon: string; size?: number 
         color: "var(--primary-foreground)",
       }}
     >
-      <PowerUpIcon icon={icon} size={Math.max(22, size * 0.58)} />
+      <PowerUpIcon icon={icon} size={innerSize} />
     </div>
   );
 }
@@ -346,10 +348,9 @@ export function PowerUpLibrary({ onBack }: Props) {
                   >
                     {powerUp.effect}
                   </p>
-                  <div
-                    style={{ marginTop: 6, color: "var(--accent)", fontSize: 11, fontWeight: 800 }}
-                  >
-                    {`Obtained: ${powerUp.unlock}`}
+                  <div style={unlockDetails}>
+                    <span>{`Unlocked at level: ${powerUp.unlock.replace(/^Level /, "").split(" /")[0]}`}</span>
+                    <span>{`Obtained by ${powerUp.obtainedBy}`}</span>
                   </div>
                 </div>
               </article>
@@ -410,6 +411,16 @@ const ownedPill: React.CSSProperties = {
   fontSize: 10,
   fontWeight: 900,
   whiteSpace: "nowrap",
+};
+
+const unlockDetails: React.CSSProperties = {
+  display: "grid",
+  gap: 2,
+  marginTop: 6,
+  color: "var(--accent)",
+  fontSize: 11,
+  fontWeight: 800,
+  lineHeight: 1.25,
 };
 
 const POWER_UP_BADGE_STYLES: Record<string, { background: string; border: string; shadow: string }> = {

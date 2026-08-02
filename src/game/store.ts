@@ -445,7 +445,7 @@ interface ProgressState {
     totalPlayerCount: number,
     date?: string,
   ) => void;
-  grantProPack: () => void;
+  grantProPack: (options?: { fromRestore?: boolean }) => void;
   toggleProPack: () => void;
   recordGameAttemptForAd: () => void;
   markInterstitialShown: () => void;
@@ -1071,9 +1071,12 @@ export const useProgress = create<ProgressState>()(
             ].slice(-MAX_LEADERBOARD_ACHIEVEMENT_RECORDS),
           };
         }),
-      grantProPack: () =>
+      grantProPack: (options) =>
         set((s) => {
-          const shouldGrantStarter = !s.proStarterCoinsGranted;
+          // Restoring a non-consumable entitlement must never mint coins. The
+          // restore path may run after a reinstall, where this local flag is
+          // necessarily false even though the entitlement was already used.
+          const shouldGrantStarter = !options?.fromRestore && !s.proStarterCoinsGranted;
           const normalizedLevels = normalizeLabUpgradeLevels(s.labUpgradeLevels);
           // Refund the coins spent on any power-up already upgraded to Level 1,
           // since the Pro Lab Pack now grants that first level for free.

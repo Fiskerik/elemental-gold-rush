@@ -89,7 +89,10 @@ export function GameLibrary({ onBack }: Props) {
                 <div style={readerIcon}><PowerUpBadge icon={selectedPowerUp.icon} size={54} /></div>
                 <h2 style={readerTitle}>{tr(selectedPowerUp.name)}</h2>
                 <p style={description}>{tr(selectedPowerUp.description)}</p>
-                <div style={readerMeta}>{tr(`Obtained: ${selectedPowerUp.unlock}`)}</div>
+                <div style={unlockDetails}>
+                  <span>{tr("Unlocked at level:")} {selectedPowerUp.unlock.replace(/^Level /, "").split(" /")[0]}</span>
+                  <span>{tr("Obtained by")} {tr(selectedPowerUp.obtainedBy)}</span>
+                </div>
               </>
             }
             isTabletLayout={isTabletLayout}
@@ -182,7 +185,7 @@ export function GameLibrary({ onBack }: Props) {
                 const defeated = (levelStats[selectedBossConfig.levelId]?.bestShots ?? null) != null;
                 return (
                   <>
-                    <div style={readerIcon}><BossIcon id={selectedBoss.id} defeated={defeated} /></div>
+                    <div style={readerIcon}><BossIcon id={selectedBoss.id} defeated={defeated} size={58} /></div>
                     <div style={readerHeaderRow}>
                       <h2 style={readerTitle}>{tr(defeated ? selectedBossConfig.name : "Unknown Boss")}</h2>
                       <span style={readerMeta}>{tr(defeated ? `LEVEL ${selectedBossConfig.levelId}` : `LOCKED LV ${selectedBossConfig.levelId}`)}</span>
@@ -294,10 +297,69 @@ const CHALLENGE_ICONS: Record<string, LucideIcon> = {
   "daily-compound": Atom,
 };
 
-function BossIcon({ id, defeated = true }: { id: BossId; defeated?: boolean }) {
+function BossIcon({ id, defeated = true, size = 42 }: { id: BossId; defeated?: boolean; size?: number }) {
   const Icon = id === "periodic-guardian" ? Sparkles : id === "nucleus-core" ? Orbit : Eye;
-  return <Icon size={30} color={defeated ? "var(--accent)" : "var(--muted-foreground)"} strokeWidth={2.7} />;
+  const style = BOSS_BADGE_STYLES[id];
+  const innerSize = Math.round(size * 0.62);
+  return (
+    <div
+      aria-hidden="true"
+      style={{
+        width: size,
+        height: size,
+        display: "grid",
+        placeItems: "center",
+        borderRadius: "50%",
+        background: style.background,
+        border: `1px solid ${style.border}`,
+        boxShadow: `${style.shadow}, inset 0 1px 0 rgba(255,255,255,0.3), inset 0 -10px 18px rgba(0,0,0,0.22)`,
+        opacity: defeated ? 1 : 0.58,
+      }}
+    >
+      <div
+        style={{
+          width: innerSize,
+          height: innerSize,
+          display: "grid",
+          placeItems: "center",
+          borderRadius: "50%",
+          background: `radial-gradient(circle at 30% 24%, rgba(255,255,255,.9), transparent 22%), ${style.innerBackground}`,
+          border: `1px solid ${style.innerBorder}`,
+          boxShadow: `inset 2px 2px 4px rgba(255,255,255,.3), inset -3px -4px 6px rgba(0,0,0,.28), 0 0 8px ${style.glow}`,
+        }}
+      >
+        <Icon size={Math.round(innerSize * 0.54)} color="white" strokeWidth={2.7} style={{ filter: "drop-shadow(0 1px 1px rgba(0,0,0,.96))" }} />
+      </div>
+    </div>
+  );
 }
+
+const BOSS_BADGE_STYLES: Record<BossId, { background: string; border: string; shadow: string; innerBackground: string; innerBorder: string; glow: string }> = {
+  "elemental-boss": {
+    background: "linear-gradient(135deg, oklch(0.58 0.18 155), oklch(0.34 0.14 205))",
+    border: "oklch(0.75 0.18 155)",
+    shadow: "0 0 14px oklch(0.68 0.18 155 / 0.52)",
+    innerBackground: "linear-gradient(145deg, oklch(0.54 0.18 155), oklch(0.28 0.12 205))",
+    innerBorder: "oklch(0.78 0.16 155)",
+    glow: "oklch(0.7 0.18 155 / 0.62)",
+  },
+  "periodic-guardian": {
+    background: "linear-gradient(135deg, oklch(0.68 0.2 55), oklch(0.42 0.16 330))",
+    border: "oklch(0.85 0.18 60)",
+    shadow: "0 0 14px oklch(0.76 0.2 55 / 0.55)",
+    innerBackground: "linear-gradient(145deg, oklch(0.64 0.2 55), oklch(0.34 0.15 330))",
+    innerBorder: "oklch(0.9 0.17 75)",
+    glow: "oklch(0.78 0.2 55 / 0.66)",
+  },
+  "nucleus-core": {
+    background: "linear-gradient(135deg, oklch(0.62 0.19 300), oklch(0.36 0.16 250))",
+    border: "oklch(0.8 0.18 300)",
+    shadow: "0 0 14px oklch(0.7 0.18 300 / 0.55)",
+    innerBackground: "linear-gradient(145deg, oklch(0.56 0.18 300), oklch(0.28 0.13 250))",
+    innerBorder: "oklch(0.82 0.16 300)",
+    glow: "oklch(0.72 0.18 300 / 0.66)",
+  },
+};
 
 const POWER_UP_OCCURRENCE: Record<string, number> = {
   molecule: 1,
@@ -472,6 +534,17 @@ const readerMeta: React.CSSProperties = {
   fontWeight: 900,
   letterSpacing: 0.6,
   textAlign: "right",
+};
+
+const unlockDetails: React.CSSProperties = {
+  display: "grid",
+  gap: 3,
+  marginTop: 10,
+  color: "var(--accent)",
+  fontSize: 10,
+  fontWeight: 900,
+  letterSpacing: 0.35,
+  lineHeight: 1.3,
 };
 
 const tabBar: React.CSSProperties = {

@@ -885,7 +885,7 @@ export function Shop({ onBack }: { onBack: () => void }) {
     try {
       const restored = await restorePurchases();
       if (restored.includes(PRODUCT_IDS.proLabPack)) {
-        grantProPack();
+        grantProPack({ fromRestore: true });
         setProPackMessage("Pro Lab Pack restored.");
         return;
       }
@@ -1000,7 +1000,7 @@ export function Shop({ onBack }: { onBack: () => void }) {
     setCosmeticMessage("Checking App Store purchases...");
     try {
       const restored = await restorePurchases();
-      if (restored.includes(PRODUCT_IDS.proLabPack)) grantProPack();
+      if (restored.includes(PRODUCT_IDS.proLabPack)) grantProPack({ fromRestore: true });
       const restoredThemes = restored.filter((productId) =>
         (THEME_BUNDLE_PRODUCT_IDS as readonly ProductId[]).includes(productId),
       );

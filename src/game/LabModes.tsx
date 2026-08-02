@@ -274,8 +274,9 @@ export function LabModes({ onBack, onStart }: Props) {
               <p style={{ margin: "0 0 8px", color: "var(--muted-foreground)", fontSize: 13, lineHeight: 1.45 }}>
                 {tr(infoPowerUp.effect)}
               </p>
-              <div style={{ color: "var(--accent)", fontSize: 11, fontWeight: 900, marginBottom: 12 }}>
-                {tr(`Obtained: ${infoPowerUp.unlock}`)}
+              <div style={{ display: "grid", gap: 3, color: "var(--accent)", fontSize: 11, fontWeight: 900, lineHeight: 1.3, marginBottom: 12 }}>
+                <span>{tr("Unlocked at level:")} {infoPowerUp.unlock.replace(/^Level /, "").split(" /")[0]}</span>
+                <span>{tr("Obtained by")} {tr(infoPowerUp.obtainedBy)}</span>
               </div>
               <button type="button" onClick={() => setInfoPowerUpId(null)} style={startBtn}>
                 {tr("Got it")}

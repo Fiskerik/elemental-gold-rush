@@ -229,11 +229,13 @@ export function Profile({ onBack, onOpenShop }: Props) {
                 className="gold-text"
                 style={{
                   margin: "4px 0",
-                  fontSize: "clamp(18px, 7vw, 30px)",
+                  fontSize: "clamp(16px, 5.5vw, 30px)",
                   lineHeight: 1.05,
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
+                  minWidth: 0,
+                  maxWidth: "100%",
+                  whiteSpace: "normal",
+                  overflowWrap: "anywhere",
+                  wordBreak: "break-word",
                 }}
                 data-no-localize="true"
               >

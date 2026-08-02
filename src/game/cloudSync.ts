@@ -29,7 +29,9 @@ export interface CloudSyncResult {
 
 let authenticatedPlayerID: string | null = null;
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
+let retryTimer: ReturnType<typeof setTimeout> | null = null;
 let stopSubscription: (() => void) | null = null;
+let stopLifecycleListeners: (() => void) | null = null;
 let syncInFlight: Promise<CloudSyncResult> | null = null;
 
 function isNativeIos(): boolean {
@@ -143,7 +145,7 @@ function makeEnvelope(playerID: string): string {
   return JSON.stringify(envelope);
 }
 
-async function saveCurrentProgress(): Promise<void> {
+export async function flushCloudProgress(): Promise<void> {
   if (!authenticatedPlayerID) return;
   try {
     await saveGameCloudSave(makeEnvelope(authenticatedPlayerID), CLOUD_SAVE_SCHEMA_VERSION);
@@ -157,7 +159,7 @@ function scheduleSave(): void {
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     saveTimer = null;
-    void saveCurrentProgress();
+    void flushCloudProgress();
   }, CLOUD_SAVE_DEBOUNCE_MS);
 }
 
@@ -191,7 +193,7 @@ export async function syncCloudProgressNow(): Promise<CloudSyncResult> {
         restored = applySerializableProgressSnapshot(nextState);
       }
 
-      await saveCurrentProgress();
+      await flushCloudProgress();
       return { synced: true, restored };
     } catch (error) {
       console.warn("Cloud progress sync failed.", error);
@@ -206,10 +208,39 @@ export async function syncCloudProgressNow(): Promise<CloudSyncResult> {
 export function startCloudProgressSync(): () => void {
   if (!isNativeIos()) return () => {};
   ensureSubscription();
-  void syncCloudProgressNow();
+  const retryDelays = [1500, 5000, 12000];
+  let retryIndex = 0;
+  let active = true;
+  const syncWithRetry = () => {
+    void syncCloudProgressNow().then((result) => {
+      if (!active || result.synced || retryIndex >= retryDelays.length) return;
+      retryTimer = setTimeout(() => {
+        retryTimer = null;
+        retryIndex += 1;
+        syncWithRetry();
+      }, retryDelays[retryIndex]);
+    });
+  };
+  syncWithRetry();
+
+  const flushWhenBackgrounded = () => {
+    if (document.visibilityState === "hidden") void flushCloudProgress();
+  };
+  document.addEventListener("visibilitychange", flushWhenBackgrounded);
+  window.addEventListener("pagehide", flushWhenBackgrounded);
+  stopLifecycleListeners = () => {
+    document.removeEventListener("visibilitychange", flushWhenBackgrounded);
+    window.removeEventListener("pagehide", flushWhenBackgrounded);
+    stopLifecycleListeners = null;
+  };
+
   return () => {
+    active = false;
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = null;
+    if (retryTimer) clearTimeout(retryTimer);
+    retryTimer = null;
+    stopLifecycleListeners?.();
     stopSubscription?.();
     stopSubscription = null;
     authenticatedPlayerID = null;

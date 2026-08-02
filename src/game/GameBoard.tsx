@@ -49,7 +49,6 @@ import {
   findCompoundByElements,
   getDailyCompoundClue,
   getCompoundHint,
-  getCompoundSecondaryHint,
 } from "./compounds";
 import { MoleculeVisual } from "./MoleculeVisual";
 import { PowerUpBadge } from "./PowerUpLibrary";
@@ -797,7 +796,7 @@ function DailyCompoundGridBoard({
   );
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [revealedIds, setRevealedIds] = useState<Set<number>>(new Set());
-  const [moleculeHintUsed, setMoleculeHintUsed] = useState(false);
+  const [hintedIds, setHintedIds] = useState<Set<number>>(new Set());
   const [wrongGuesses, setWrongGuesses] = useState(0);
   const [message, setMessage] = useState("Find the hidden compound atoms.");
   const [checkFx, setCheckFx] = useState<null | {
@@ -851,13 +850,13 @@ function DailyCompoundGridBoard({
       }, {}),
     [selectedCells],
   );
-  const hintsAvailable = wrongGuesses >= 3 ? 1 : 0;
-  const hintsUsed = moleculeHintUsed ? 1 : 0;
+  const hintsAvailable = Math.min(2, Math.floor(wrongGuesses / 2));
+  const hintsUsed = hintedIds.size;
   const canRevealHint = !result && hintsAvailable > hintsUsed;
   const elapsedSec = Math.floor(elapsedMs / 1000);
 
   function toggleCell(cell: DailyCompoundCell) {
-    if (result || revealedIds.has(cell.id)) return;
+    if (result || revealedIds.has(cell.id) || hintedIds.has(cell.id)) return;
     setSelectedIds((current) => {
       const next = new Set(current);
       if (next.has(cell.id)) next.delete(cell.id);
@@ -868,9 +867,23 @@ function DailyCompoundGridBoard({
   }
 
   function revealHint() {
-    if (!canRevealHint || !compound) return;
-    setMoleculeHintUsed(true);
-    setMessage(getCompoundSecondaryHint(compound));
+    if (result || !compound) return;
+    if (!canRevealHint) {
+      const unlockAt = hintsUsed === 0 ? 2 : 4;
+      showCompoundCheck("wrong", `Hint unlocks after ${unlockAt} wrong guesses`);
+      setMessage(`Make ${unlockAt - wrongGuesses} more wrong guess${unlockAt - wrongGuesses === 1 ? "" : "es"} to unlock a hint.`);
+      if (hapticsEnabled) vibrate(12);
+      return;
+    }
+    const nextHint = cells.find((cell) => cell.secret && !hintedIds.has(cell.id));
+    if (!nextHint) return;
+    setHintedIds((current) => new Set([...current, nextHint.id]));
+    setSelectedIds((current) => new Set([...current, nextHint.id]));
+    setMessage(
+      hintsUsed === 0
+        ? "A correct atom was marked. Your final score will be reduced."
+        : "A second correct atom was marked. Your final score will be reduced.",
+    );
     if (hapticsEnabled) vibrate([15, 25, 15]);
   }
 
@@ -896,10 +909,10 @@ function DailyCompoundGridBoard({
     if (compoundKey(selectedCounts) !== compoundKey(compound.elements)) {
       const nextWrong = wrongGuesses + 1;
       setWrongGuesses(nextWrong);
-      setSelectedIds(new Set());
+      setSelectedIds(new Set(hintedIds));
       setMessage(
-        nextWrong === 3
-          ? "Not the compound. An optional hint is now available."
+        nextWrong === 2 || nextWrong === 4
+          ? "Not the compound. A reveal hint is now available."
           : "Not the compound. Adjust your marked atoms.",
       );
       showCompoundCheck("wrong", "Wrong");
@@ -909,10 +922,10 @@ function DailyCompoundGridBoard({
     if (!isLinkedCompoundSelection(selectedCells, secretAtoms, DAILY_COMPOUND_GRID_COLS)) {
       const nextWrong = wrongGuesses + 1;
       setWrongGuesses(nextWrong);
-      setSelectedIds(new Set());
+      setSelectedIds(new Set(hintedIds));
       setMessage(
-        nextWrong === 3
-          ? "Those atoms match the formula, but not the hidden compound. An optional hint is available."
+        nextWrong === 2 || nextWrong === 4
+          ? "Those atoms match the formula, but not the hidden compound. A reveal hint is now available."
           : "Those atoms match the formula, but they are not linked in the compound pattern.",
       );
       showCompoundCheck("wrong", "Wrong");
@@ -1006,6 +1019,7 @@ function DailyCompoundGridBoard({
           {cells.map((cell) => {
             const selected = selectedIds.has(cell.id);
             const revealed = revealedIds.has(cell.id);
+            const hinted = hintedIds.has(cell.id);
             const size = Math.max(22, Math.min(38, Math.floor(520 / DAILY_COMPOUND_GRID_ROWS)));
             return (
               <button
@@ -1018,7 +1032,7 @@ function DailyCompoundGridBoard({
                   minHeight: 0,
                   borderRadius: 8,
                   border: selected
-                    ? `2px solid ${revealed ? "var(--success, var(--accent))" : "var(--accent)"}`
+                    ? `2px solid ${revealed || hinted ? "var(--success, var(--accent))" : "var(--accent)"}`
                     : "1px solid color-mix(in oklch, var(--border) 80%, transparent)",
                   background: selected
                     ? "color-mix(in oklch, var(--accent) 18%, var(--surface-high))"
@@ -1029,6 +1043,8 @@ function DailyCompoundGridBoard({
                   cursor: result || revealed ? "default" : "pointer",
                   boxShadow: revealed
                     ? "0 0 18px var(--success, var(--accent))"
+                    : hinted
+                      ? "0 0 18px var(--success, var(--accent))"
                     : selected
                       ? "0 0 12px var(--accent-glow)"
                       : undefined,
@@ -1060,18 +1076,20 @@ function DailyCompoundGridBoard({
         )}
         <div style={dailyCompoundMessage}>{message}</div>
         <div style={{ display: "flex", gap: 8 }}>
-          <button
-            type="button"
-            onClick={revealHint}
-            disabled={!canRevealHint}
-            style={{
-              ...dailyCompoundSecondaryBtn,
-              opacity: canRevealHint ? 1 : 0.5,
-              cursor: canRevealHint ? "pointer" : "not-allowed",
-            }}
-          >
-            Compound Hint
-          </button>
+          {hintsUsed < 2 && (
+            <button
+              type="button"
+              onClick={revealHint}
+              disabled={Boolean(result)}
+              style={{
+                ...dailyCompoundSecondaryBtn,
+                opacity: result ? 0.5 : canRevealHint ? 1 : 0.72,
+                cursor: result ? "not-allowed" : "pointer",
+              }}
+            >
+              Reveal atom hint
+            </button>
+          )}
           <button
             type="button"
             onClick={formCompound}
