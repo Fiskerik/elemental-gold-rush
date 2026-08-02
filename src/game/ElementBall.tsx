@@ -265,6 +265,7 @@ export const ElementBall = memo(function ElementBall({
             overflow: "visible",
             pointerEvents: "none",
             transform: "rotate(-90deg)",
+            zIndex: 4,
             filter: "drop-shadow(0 0 5px oklch(0.78 0.2 55 / 0.8))",
           }}
         >

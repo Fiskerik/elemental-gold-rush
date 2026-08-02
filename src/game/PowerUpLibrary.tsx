@@ -167,7 +167,7 @@ function PowerUpIllustratedIcon({
   motif: PowerUpMotif;
   size: number;
 }) {
-  const coreSize = Math.max(18, size * 0.56);
+  const coreSize = Math.max(18, size * 0.78);
   return (
     <div
       aria-hidden="true"
@@ -278,7 +278,7 @@ function PowerUpIllustratedIcon({
 export function PowerUpBadge({ icon, size = 42 }: { icon: string; size?: number }) {
   const style = POWER_UP_BADGE_STYLES[icon] ?? POWER_UP_BADGE_STYLES.default;
   const denseArtwork = icon === "molecule" || icon === "shimmer";
-  const innerSize = Math.max(22, size * (denseArtwork ? 0.58 : 0.74));
+  const innerSize = Math.max(22, size * (denseArtwork ? 0.58 : 0.82));
   return (
     <div
       style={{
