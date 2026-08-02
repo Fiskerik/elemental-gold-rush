@@ -64,7 +64,6 @@ const MAX_DAILY_COMPOUND_SECONDS = 24 * 60 * 60;
 const DAILY_BOARD_FAST_CLEAR_MS = 90_000;
 const DAILY_BOARD_SLOW_CLEAR_MS = 8 * 60_000;
 const DAILY_BOARD_IDEAL_SHOTS = 10;
-const DAILY_BOARD_SOFT_SHOT_LIMIT = 38;
 
 function normalizeCountryCode(value: string | undefined): string {
   const upper = (value ?? "").trim().toUpperCase();
@@ -197,17 +196,19 @@ export function calculateDailyBoardLeaderboardScore(input: DailyBoardScoreInput)
       (elapsedMs - DAILY_BOARD_FAST_CLEAR_MS) /
         (DAILY_BOARD_SLOW_CLEAR_MS - DAILY_BOARD_FAST_CLEAR_MS),
   );
-  const shotRatio = clamp01(
-    1 - (shots - DAILY_BOARD_IDEAL_SHOTS) / (DAILY_BOARD_SOFT_SHOT_LIMIT - DAILY_BOARD_IDEAL_SHOTS),
-  );
   const timeBonus = Math.round(12000 * timeRatio);
-  const shotBonus = Math.round(9000 * shotRatio);
   const comboBonus = Math.round(
     Math.min(14000, bestCombo * bestCombo * 450 + mergeCount * 120 + comboScore * 0.18),
   );
+  // Daily Board is a fixed seed, so shot efficiency should be monotonic:
+  // ten shots or fewer keep full value, while extra shots reduce the value
+  // of the raw score instead of merely exhausting a capped bonus.
+  const shotEfficiency = Math.min(1, DAILY_BOARD_IDEAL_SHOTS / shots);
+  const efficiencyAdjustedScore = Math.round((baseScore + comboBonus) * shotEfficiency);
+  const fastClearBonus = Math.round(9000 * shotEfficiency);
   const powerUpPenalty = Math.min(2500, powerUpsUsed * 350);
 
-  return Math.max(1, baseScore + timeBonus + shotBonus + comboBonus - powerUpPenalty);
+  return Math.max(1, efficiencyAdjustedScore + timeBonus + fastClearBonus - powerUpPenalty);
 }
 
 function recordDailyLeaderboardRun(kind: LeaderboardKind, score: number, shots: number): boolean {
