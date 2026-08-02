@@ -155,6 +155,14 @@ const THEME_BUNDLE_VISUALS: Partial<Record<ProductId, ThemeBundleVisual>> = {
     theme: "biohazard",
     atomSkins: ["toxic"],
   },
+  [PRODUCT_IDS.themeMossHollow]: {
+    board: "url('/themes/moss-hollow.png') center / cover no-repeat",
+    atom:
+      "radial-gradient(circle at 28% 20%, rgba(226,255,176,.72) 0 6%, transparent 17%), radial-gradient(circle at 70% 72%, rgba(176,224,101,.4) 0 10%, transparent 13%), radial-gradient(circle at 32% 28%, #d9f4a2, #6f9c42 62%, #17351f)",
+    skin: "Moss Velvet atoms",
+    theme: "mossHollow",
+    atomSkins: ["moss"],
+  },
 };
 
 const THEME_PREVIEW_ATOMS = [1, 6, 8, 10, 14, 17, 26, 79];
@@ -1261,10 +1269,11 @@ export function Shop({ onBack }: { onBack: () => void }) {
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: hasProPack ? "center" : "start",
-                gap: 12,
+                gap: 16,
+                flexWrap: "wrap",
               }}
             >
-              <div>
+              <div style={{ minWidth: 0, flex: "1 1 190px" }}>
                 <div
                   style={{
                     fontSize: 11,
@@ -1311,7 +1320,7 @@ export function Shop({ onBack }: { onBack: () => void }) {
               <div
                 style={{
                   ...proPackActive,
-                  margin: 0,
+                  margin: "10px 0 0",
                   padding: "8px 10px",
                   fontSize: 12,
                 }}
@@ -1541,9 +1550,7 @@ export function Shop({ onBack }: { onBack: () => void }) {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: isTabletLayout
-                  ? "repeat(2, minmax(0, 1fr))"
-                  : "1fr",
+                gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
                 gap: 10,
               }}
             >
@@ -1560,8 +1567,8 @@ export function Shop({ onBack }: { onBack: () => void }) {
                     key={productId}
                     style={{
                       display: "grid",
-                      gridTemplateColumns: "132px minmax(0, 1fr)",
-                      gap: 12,
+                      gridTemplateColumns: "1fr",
+                      gap: 9,
                       padding: 12,
                       borderRadius: 14,
                       border: `1px solid ${owned ? "var(--accent)" : "var(--border)"}`,
@@ -1571,7 +1578,7 @@ export function Shop({ onBack }: { onBack: () => void }) {
                     <div
                       style={{
                         position: "relative",
-                        minHeight: 108,
+                        minHeight: 124,
                         borderRadius: 12,
                         background: visual.board,
                         boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.14)",

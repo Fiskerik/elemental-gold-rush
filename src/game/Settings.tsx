@@ -148,6 +148,7 @@ const BOARD_THEME_LABELS: Record<BoardTheme, string> = {
   quantumVoid: "Crystal Cove",
   verdantCrystal: "Verdant Crystal",
   biohazard: "Radioactive",
+  mossHollow: "Moss Hollow",
 };
 
 const BOARD_THEME_UNLOCK_KIND: Record<BoardTheme, "free" | "pro" | "buy"> = {
@@ -159,6 +160,7 @@ const BOARD_THEME_UNLOCK_KIND: Record<BoardTheme, "free" | "pro" | "buy"> = {
   quantumVoid: "buy",
   verdantCrystal: "buy",
   biohazard: "buy",
+  mossHollow: "buy",
 };
 
 export function BoardThemePicker({
@@ -280,6 +282,7 @@ const ATOM_SKIN_LABELS: Record<AtomSkin, string> = {
   mineral: "Mineral",
   verdantCrystal: "Verdant Glass",
   toxic: "Irradiated",
+  moss: "Moss Velvet",
 };
 
 export function AtomSkinPicker({
@@ -411,6 +414,8 @@ function AtomSkinSwatch({ skin }: { skin: AtomSkin }) {
       "linear-gradient(55deg, transparent 42%, rgba(255,255,255,.72) 44% 48%, transparent 50%), linear-gradient(140deg, rgba(255,255,255,.54), transparent 28% 56%, rgba(34,119,101,.3)), radial-gradient(circle at 32% 28%, #edfff7, #62c7a5 64%, #1e5a55)",
     toxic:
       "radial-gradient(circle at 67% 68%, rgba(14,30,10,.55) 0 7%, transparent 9%), radial-gradient(circle at 42% 72%, rgba(205,255,105,.42) 0 6%, transparent 8%), linear-gradient(145deg, rgba(184,255,76,.3), transparent 42%), radial-gradient(circle at 32% 28%, #ffe9a8, #d68a2c 65%, #241505)",
+    moss:
+      "radial-gradient(circle at 27% 22%, rgba(226,255,176,.72) 0 6%, transparent 17%), radial-gradient(circle at 72% 68%, rgba(176,224,101,.4) 0 10%, transparent 13%), radial-gradient(circle at 32% 28%, #d9f4a2, #6f9c42 62%, #17351f)",
   };
   return (
     <span
@@ -441,6 +446,7 @@ function ThemeSwatch({ theme }: { theme: BoardTheme }) {
     verdantCrystal:
       "radial-gradient(circle at 15% 20%, #ffffff 0 4%, transparent 19%), linear-gradient(135deg, #f2fff8, #b8f1d7 45%, #4d9f8c 78%, #183d45)",
     biohazard: "url('/themes/radioactive-reactor.webp') center 58% / cover no-repeat",
+    mossHollow: "url('/themes/moss-hollow.png') center 50% / cover no-repeat",
   };
   return (
     <span

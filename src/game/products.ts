@@ -9,6 +9,7 @@ export const PRODUCT_IDS = {
   themeQuantumVoid: "theme_crystal_pack",
   themeVerdantCrystal: "theme_versant_pack",
   themeBiohazard: "theme_radioactive_pack",
+  themeMossHollow: "theme_moss_hollow_pack",
 } as const;
 
 export type ProductId = (typeof PRODUCT_IDS)[keyof typeof PRODUCT_IDS];
@@ -23,6 +24,7 @@ export const THEME_BUNDLE_PRODUCT_IDS = [
   PRODUCT_IDS.themeQuantumVoid,
   PRODUCT_IDS.themeVerdantCrystal,
   PRODUCT_IDS.themeBiohazard,
+  PRODUCT_IDS.themeMossHollow,
 ] as const satisfies readonly ProductId[];
 
 // Base US App Store tiers used for the lifetime Researcher / Developer badge.
@@ -39,6 +41,7 @@ export const SHOP_SPEND_CENTS: Record<ProductId, number> = {
   [PRODUCT_IDS.themeQuantumVoid]: 199,
   [PRODUCT_IDS.themeVerdantCrystal]: 199,
   [PRODUCT_IDS.themeBiohazard]: 199,
+  [PRODUCT_IDS.themeMossHollow]: 199,
 };
 
 export const APP_STORE_PURCHASE_PRODUCT_IDS = [
@@ -162,6 +165,17 @@ export const PRODUCTS: ProductDefinition[] = [
       "Illustrated radioactive-reactor board theme.",
       "Bundled Irradiated finish layered inside every atom's original color.",
       "Purely cosmetic — no gameplay changes.",
+    ],
+  },
+  {
+    id: PRODUCT_IDS.themeMossHollow,
+    name: "Moss Hollow",
+    description: "A bioluminescent moss forest hollow with a soft, velvety Moss atom finish.",
+    type: "non_consumable",
+    benefits: [
+      "Mossy forest board with firefly-like lights and a clear play area.",
+      "Bundled Moss finish with velvety texture and dew-like highlights.",
+      "Purely cosmetic - no gameplay changes.",
     ],
   },
 ];

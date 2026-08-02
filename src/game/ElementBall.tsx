@@ -132,9 +132,10 @@ export const ElementBall = memo(function ElementBall({
     atomSkin === "crystal" ||
     atomSkin === "mineral" ||
     atomSkin === "verdantCrystal" ||
-    atomSkin === "toxic";
+    atomSkin === "toxic" ||
+    atomSkin === "moss";
   const textColor =
-    atomSkin === "crystal" || atomSkin === "mineral" || atomSkin === "verdantCrystal"
+    atomSkin === "crystal" || atomSkin === "mineral" || atomSkin === "verdantCrystal" || atomSkin === "moss"
       ? "#fff8e8"
       : "#0A0A1A";
   const textStrokeColor =
@@ -156,6 +157,7 @@ export const ElementBall = memo(function ElementBall({
     mineral: "transparent",
     verdantCrystal: `radial-gradient(circle at 26% 18%, oklch(1 0 0 / 0.9) 0 5%, transparent 18%), radial-gradient(circle at 31% 25%, color-mix(in oklch, ${el.glowColor} 70%, white) 0 9%, transparent 30%), radial-gradient(circle at 52% 58%, color-mix(in oklch, ${el.color} 44%, white), color-mix(in oklch, ${el.color} 72%, #7fe0ba) 54%, color-mix(in oklch, ${el.color} 42%, #16463f) 100%)`,
     toxic: `radial-gradient(circle at 30% 24%, ${el.glowColor}, ${el.color} 58%, color-mix(in oklch, ${el.color} 55%, #12220c))`,
+    moss: `radial-gradient(circle at 27% 20%, oklch(1 0 0 / 0.62) 0 5%, transparent 18%), radial-gradient(circle at 70% 72%, color-mix(in oklch, ${el.glowColor} 60%, #c8e88d) 0 9%, transparent 20%), radial-gradient(circle at 42% 42%, color-mix(in oklch, ${el.color} 50%, #a8d86f), color-mix(in oklch, ${el.color} 82%, #355c2f) 62%, color-mix(in oklch, ${el.color} 48%, #102719))`,
   };
   const materialVariables = {
     "--atom-color": el.color,

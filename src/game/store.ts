@@ -134,6 +134,7 @@ export const BOARD_THEMES = [
   "quantumVoid",
   "verdantCrystal",
   "biohazard",
+  "mossHollow",
 ] as const;
 export type BoardTheme = (typeof BOARD_THEMES)[number];
 
@@ -149,6 +150,7 @@ export const ATOM_SKINS = [
   "mineral",
   "verdantCrystal",
   "toxic",
+  "moss",
 ] as const;
 export type AtomSkin = (typeof ATOM_SKINS)[number];
 
@@ -162,6 +164,7 @@ export const THEME_PRODUCT_BY_BOARD_THEME: Partial<Record<BoardTheme, ProductId>
   quantumVoid: PRODUCT_IDS.themeQuantumVoid,
   verdantCrystal: PRODUCT_IDS.themeVerdantCrystal,
   biohazard: PRODUCT_IDS.themeBiohazard,
+  mossHollow: PRODUCT_IDS.themeMossHollow,
 };
 
 export const ATOM_SKIN_BY_BOARD_THEME: Partial<Record<BoardTheme, AtomSkin>> = {
@@ -170,6 +173,7 @@ export const ATOM_SKIN_BY_BOARD_THEME: Partial<Record<BoardTheme, AtomSkin>> = {
   quantumVoid: "crystal",
   verdantCrystal: "verdantCrystal",
   biohazard: "toxic",
+  mossHollow: "moss",
 };
 
 // A theme may unlock more than its automatically selected skin. Crystal Cove
@@ -181,6 +185,7 @@ export const BOARD_THEME_BY_ATOM_SKIN: Partial<Record<AtomSkin, BoardTheme>> = {
   mineral: "quantumVoid",
   verdantCrystal: "verdantCrystal",
   toxic: "biohazard",
+  moss: "mossHollow",
 };
 
 export function isBoardThemeUnlocked(

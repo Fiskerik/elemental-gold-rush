@@ -530,7 +530,16 @@ export function Profile({ onBack, onOpenShop }: Props) {
           />
           <div style={preferenceRow}>
             <span style={preferenceLabel}>{tr("Theme")}</span>
-            <div style={{ display: "inline-grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 12,
+                padding: 3,
+                borderRadius: 999,
+                background: "color-mix(in oklch, var(--surface) 70%, transparent)",
+              }}
+            >
               {(["dark", "light"] as const).map((theme) => (
                 <button
                   key={theme}
