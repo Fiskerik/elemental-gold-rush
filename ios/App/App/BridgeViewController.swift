@@ -6,6 +6,5 @@ open class BridgeViewController: CAPBridgeViewController {
         super.capacitorDidLoad()
         bridge?.registerPluginInstance(AppReviewPlugin())
         bridge?.registerPluginInstance(GameCenterPlugin())
-        bridge?.registerPluginInstance(UnityAdsPlugin())
     }
 }

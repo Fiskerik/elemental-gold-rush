@@ -10,7 +10,7 @@ import {
 } from "./store";
 import type { ProductId } from "./products";
 import { setMusicVolume, setSfxVolume, startAmbientMusic, stopAmbientMusic } from "./audio";
-import { isNativePlatform, useIsTabletLayout } from "./responsive";
+import { useIsTabletLayout } from "./responsive";
 
 export type ShopSection = "themes";
 
@@ -24,7 +24,6 @@ export function Settings({ onBack }: { onBack: () => void; onOpenShop?: (section
     musicVolume,
     appTheme,
     shootingStyle,
-    webBoardWide,
     toggleSound,
     toggleMusic,
     toggleHaptics,
@@ -32,10 +31,8 @@ export function Settings({ onBack }: { onBack: () => void; onOpenShop?: (section
     setMusicVolume: setMusicVolumeStore,
     toggleAppTheme,
     setShootingStyle,
-    setWebBoardWide,
     reset,
   } = useProgress();
-  const isWeb = !isNativePlatform();
   const handleMusicToggle = () => {
     if (!musicEnabled) startAmbientMusic();
     else stopAmbientMusic();
@@ -104,13 +101,6 @@ export function Settings({ onBack }: { onBack: () => void; onOpenShop?: (section
             value={shootingStyle === "press"}
             onToggle={() => setShootingStyle(shootingStyle === "hold" ? "press" : "hold")}
           />
-          {isWeb && (
-            <Row
-              label={`Board view: ${webBoardWide ? "Broad" : "Mobile"}`}
-              value={webBoardWide}
-              onToggle={() => setWebBoardWide(!webBoardWide)}
-            />
-          )}
           <button
             onClick={() => {
               if (!confirm("Reset all progress? This cannot be undone.")) return;

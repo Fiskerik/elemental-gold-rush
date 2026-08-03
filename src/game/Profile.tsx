@@ -149,6 +149,7 @@ export function Profile({ onBack, onOpenShop }: Props) {
       minute: "2-digit",
       });
   const isNativeIos = Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios";
+  const nativeStoreOpener = isNativeIos ? onOpenShop : undefined;
   const [restoreBusy, setRestoreBusy] = useState(false);
   const [restoreMessage, setRestoreMessage] = useState("");
   async function handleGameCenterSignIn() {
@@ -549,7 +550,7 @@ export function Profile({ onBack, onOpenShop }: Props) {
               hasProPack={hasProPack}
               ownedThemeProducts={ownedThemeProducts}
               onChange={setBoardTheme}
-              onOpenShop={onOpenShop}
+              onOpenShop={nativeStoreOpener}
             />
           </div>
           <AtomSkinPicker
@@ -557,7 +558,7 @@ export function Profile({ onBack, onOpenShop }: Props) {
             hasProPack={hasProPack}
             ownedThemeProducts={ownedThemeProducts}
             onChange={setAtomSkin}
-            onOpenShop={onOpenShop}
+            onOpenShop={nativeStoreOpener}
           />
           {isNativeIos && (
             <div style={restorePurchasesRow}>

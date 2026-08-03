@@ -1546,7 +1546,9 @@ function StandardGameBoard({
   const [grabMode, setGrabMode] = useState(false);
   const [grabbing, setGrabbing] = useState<{ id: number; x: number; y: number } | null>(null);
 
-  const [compoundCharges, setCompoundCharges] = useState(() => loadCompoundChargeState().charges);
+  const [compoundCharges, setCompoundCharges] = useState(() =>
+    isCompoundFormationLevel(level) ? 1 : loadCompoundChargeState().charges,
+  );
   const [compoundMode, setCompoundMode] = useState(false);
   const [selectedCompoundIds, setSelectedCompoundIds] = useState<Set<number>>(new Set());
   const [secretCompoundFormulaRevealed, setSecretCompoundFormulaRevealed] = useState(false);
@@ -2452,7 +2454,9 @@ function StandardGameBoard({
     runRecordedRef.current = false;
     if (!preview) incrementLevelAttempt(levelId);
     setSelectedInventoryPowerUps(emptyPowerUpInventory());
-    setInventoryPickerOpen(!preview && !isPowerUpStage && hasPowerUps(powerUpInventory));
+    setInventoryPickerOpen(
+      !preview && !isPowerUpStage && !isMoleculeChallenge && hasPowerUps(powerUpInventory),
+    );
     setShotHistory([]);
     setHistoryOpen(false);
     setGammaCharges((powerUpStage === "gamma" ? 1 : 0) + initialLabCharge("gamma", 3));

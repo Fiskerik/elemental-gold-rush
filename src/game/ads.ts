@@ -1,47 +1,21 @@
-import { Capacitor, registerPlugin } from "@capacitor/core";
+import { Capacitor } from "@capacitor/core";
+import { AdMob } from "@capacitor-community/admob";
 
 export type RewardedAdResult = {
   rewarded: boolean;
   reason?: string;
 };
 
-type LevelPlayInitializeOptions = {
-  appKey: string;
-};
-
-type LevelPlayAdUnitOptions = {
-  adUnitId: string;
-};
-
-type LevelPlayShowResult = {
-  completed?: boolean;
-  skipped?: boolean;
-};
-
-interface LevelPlayPlugin {
-  initializeAds(options: LevelPlayInitializeOptions): Promise<{ initialized: boolean }>;
-  loadInterstitial(options: LevelPlayAdUnitOptions): Promise<{ loaded: boolean }>;
-  loadRewarded(options: LevelPlayAdUnitOptions): Promise<{ loaded: boolean }>;
-  showInterstitial(options: LevelPlayAdUnitOptions): Promise<LevelPlayShowResult>;
-  showRewarded(options: LevelPlayAdUnitOptions): Promise<LevelPlayShowResult>;
-}
-
-// The native bridge keeps this legacy JS name so existing Capacitor registration
-// stays stable while the implementation moves from Unity Ads to LevelPlay.
-const LevelPlayNative = registerPlugin<LevelPlayPlugin>("UnityAdsPlugin");
-
-const DEFAULT_LEVELPLAY_APP_KEY = "26b8f239d";
-const DEFAULT_IOS_INTERSTITIAL_AD_UNIT_ID = "czf0jlk6mnbenyh0";
-const DEFAULT_IOS_REWARDED_AD_UNIT_ID = "g3kygieiv8izpje1";
-
 let initialized = false;
 let initFailed = false;
+let canRequestAds = false;
 let interstitialReady = false;
 let interstitialLoading = false;
 let rewardedReady = false;
 let rewardedLoading = false;
 let initFailureReason = "";
 let lastRewardedError = "";
+let initializationPromise: Promise<void> | null = null;
 let rewardedLoadPromise: Promise<void> | null = null;
 let interstitialLoadPromise: Promise<void> | null = null;
 
@@ -51,63 +25,24 @@ function configuredEnvValue(value: unknown): string {
   return trimmed && trimmed !== "undefined" && trimmed !== "null" ? trimmed : "";
 }
 
-function firstConfiguredEnvValue(...values: unknown[]): string {
-  for (const value of values) {
-    const configured = configuredEnvValue(value);
-    if (configured) return configured;
-  }
-  return "";
-}
-
-function getLevelPlayAppKey(): string {
-  return (
-    firstConfiguredEnvValue(
-      import.meta.env.VITE_LEVELPLAY_IOS_APP_KEY,
-      import.meta.env.VITE_LEVELPLAY_APP_KEY,
-      import.meta.env.VITE_IRONSOURCE_IOS_APP_KEY,
-      import.meta.env.VITE_IRONSOURCE_APP_KEY,
-    ) || DEFAULT_LEVELPLAY_APP_KEY
-  );
+function envFlagEnabled(value: unknown): boolean {
+  return ["1", "true", "yes", "on"].includes(configuredEnvValue(value).toLowerCase());
 }
 
 function getInterstitialAdUnitId(): string {
-  return (
-    firstConfiguredEnvValue(
-      import.meta.env.VITE_LEVELPLAY_IOS_INTERSTITIAL_AD_UNIT_ID,
-      import.meta.env.VITE_LEVELPLAY_INTERSTITIAL_AD_UNIT_ID,
-      import.meta.env.VITE_IRONSOURCE_IOS_INTERSTITIAL_AD_UNIT_ID,
-      import.meta.env.VITE_IRONSOURCE_INTERSTITIAL_AD_UNIT_ID,
-      import.meta.env.VITE_UNITY_ADS_IOS_INTERSTITIAL_ID,
-      import.meta.env.VITE_UNITY_ADS_IOS_INTERSTITIAL_PLACEMENT_ID,
-      import.meta.env.VITE_UNITY_ADS_INTERSTITIAL_ID,
-      import.meta.env.VITE_UNITY_ADS_INTERSTITIAL_PLACEMENT_ID,
-      import.meta.env.VITE_UNITYADS_IOS_INTERSTITIAL_ID,
-      import.meta.env.VITE_UNITYADS_INTERSTITIAL_ID,
-      import.meta.env.VITE_UNITY_IOS_INTERSTITIAL_ID,
-      import.meta.env.VITE_UNITY_INTERSTITIAL_ID,
-      import.meta.env.VITE_UNITY_INTERSTITIAL_PLACEMENT_ID,
-    ) || DEFAULT_IOS_INTERSTITIAL_AD_UNIT_ID
-  );
+  return configuredEnvValue(import.meta.env.VITE_ADMOB_IOS_INTERSTITIAL_ID);
 }
 
 function getRewardedAdUnitId(): string {
-  return (
-    firstConfiguredEnvValue(
-      import.meta.env.VITE_LEVELPLAY_IOS_REWARDED_AD_UNIT_ID,
-      import.meta.env.VITE_LEVELPLAY_REWARDED_AD_UNIT_ID,
-      import.meta.env.VITE_IRONSOURCE_IOS_REWARDED_AD_UNIT_ID,
-      import.meta.env.VITE_IRONSOURCE_REWARDED_AD_UNIT_ID,
-      import.meta.env.VITE_UNITY_ADS_IOS_REWARDED_ID,
-      import.meta.env.VITE_UNITY_ADS_IOS_REWARDED_PLACEMENT_ID,
-      import.meta.env.VITE_UNITY_ADS_REWARDED_ID,
-      import.meta.env.VITE_UNITY_ADS_REWARDED_PLACEMENT_ID,
-      import.meta.env.VITE_UNITYADS_IOS_REWARDED_ID,
-      import.meta.env.VITE_UNITYADS_REWARDED_ID,
-      import.meta.env.VITE_UNITY_IOS_REWARDED_ID,
-      import.meta.env.VITE_UNITY_REWARDED_ID,
-      import.meta.env.VITE_UNITY_REWARDED_PLACEMENT_ID,
-    ) || DEFAULT_IOS_REWARDED_AD_UNIT_ID
-  );
+  return configuredEnvValue(import.meta.env.VITE_ADMOB_IOS_REWARDED_ID);
+}
+
+function isTestingEnabled(): boolean {
+  return envFlagEnabled(import.meta.env.VITE_ADMOB_TEST_MODE);
+}
+
+function isAdMobAvailable(): boolean {
+  return Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios";
 }
 
 function describeAdError(error: unknown): string {
@@ -132,54 +67,60 @@ function describeAdError(error: unknown): string {
   return [code, message].filter(Boolean).join(": ");
 }
 
-function describeLevelPlayConfig(): string {
-  return [
-    `appKey=${getLevelPlayAppKey() || "missing"}`,
-    `interstitial=${getInterstitialAdUnitId()}`,
-    `rewarded=${getRewardedAdUnitId()}`,
-  ].join(", ");
-}
-
-function isLevelPlayAvailable(): boolean {
-  return Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios";
-}
-
 export async function initAds(hasProPack: boolean): Promise<void> {
-  if (hasProPack || initialized || !isLevelPlayAvailable()) return;
-
-  const appKey = getLevelPlayAppKey();
-  if (!appKey) {
-    initFailed = true;
-    initFailureReason = "LevelPlay iOS app key is missing from this build.";
+  if (hasProPack || initialized || initFailed || !isAdMobAvailable()) return;
+  if (initializationPromise) {
+    await initializationPromise;
     return;
   }
 
-  try {
-    initFailed = false;
-    initFailureReason = "";
-    console.info(`[ads] Initializing LevelPlay (${describeLevelPlayConfig()})`);
-    await LevelPlayNative.initializeAds({ appKey });
-    initialized = true;
-    initFailureReason = "";
-  } catch (error) {
-    initFailureReason = describeAdError(error) || "LevelPlay initialization failed.";
-    console.warn(`[ads] LevelPlay initialization failed: ${initFailureReason}`);
-    initFailed = true;
-    initialized = false;
-  }
+  initializationPromise = (async () => {
+    try {
+      initFailureReason = "";
+      await AdMob.initialize({ initializeForTesting: isTestingEnabled() });
+
+      let consentInfo = await AdMob.requestConsentInfo();
+      if (!consentInfo.canRequestAds && consentInfo.isConsentFormAvailable) {
+        consentInfo = await AdMob.showConsentForm();
+      }
+
+      if (!consentInfo.canRequestAds) {
+        initFailureReason = "Ad consent is required before ads can be requested.";
+        initFailed = true;
+        return;
+      }
+
+      canRequestAds = true;
+      initialized = true;
+      initFailed = false;
+    } catch (error) {
+      initFailureReason = describeAdError(error) || "AdMob initialization failed.";
+      console.warn(`[ads] ${initFailureReason}`);
+      initFailed = true;
+      initialized = false;
+      canRequestAds = false;
+    } finally {
+      initializationPromise = null;
+    }
+  })();
+
+  await initializationPromise;
 }
 
 export async function preloadInterstitial(): Promise<void> {
-  if (interstitialReady || !isLevelPlayAvailable()) return;
+  if (interstitialReady || !initialized || !canRequestAds || !isAdMobAvailable()) return;
   if (interstitialLoading && interstitialLoadPromise) {
     await interstitialLoadPromise;
     return;
   }
 
+  const adId = getInterstitialAdUnitId();
+  if (!adId) return;
+
   interstitialLoading = true;
   interstitialLoadPromise = (async () => {
     try {
-      await LevelPlayNative.loadInterstitial({ adUnitId: getInterstitialAdUnitId() });
+      await AdMob.prepareInterstitial({ adId, isTesting: isTestingEnabled() });
       interstitialReady = true;
     } catch {
       interstitialReady = false;
@@ -192,9 +133,15 @@ export async function preloadInterstitial(): Promise<void> {
 }
 
 export async function preloadRewarded(): Promise<void> {
-  if (rewardedReady || !isLevelPlayAvailable()) return;
+  if (rewardedReady || !initialized || !canRequestAds || !isAdMobAvailable()) return;
   if (rewardedLoading && rewardedLoadPromise) {
     await rewardedLoadPromise;
+    return;
+  }
+
+  const adId = getRewardedAdUnitId();
+  if (!adId) {
+    lastRewardedError = "AdMob rewarded ad unit ID is missing from this build.";
     return;
   }
 
@@ -202,11 +149,11 @@ export async function preloadRewarded(): Promise<void> {
   lastRewardedError = "";
   rewardedLoadPromise = (async () => {
     try {
-      await LevelPlayNative.loadRewarded({ adUnitId: getRewardedAdUnitId() });
+      await AdMob.prepareRewardVideoAd({ adId, isTesting: isTestingEnabled() });
       rewardedReady = true;
     } catch (error) {
       rewardedReady = false;
-      lastRewardedError = `${describeAdError(error) || "Rewarded ad failed to load."} [${describeLevelPlayConfig()}]`;
+      lastRewardedError = describeAdError(error) || "Rewarded ad failed to load.";
     } finally {
       rewardedLoading = false;
       rewardedLoadPromise = null;
@@ -216,9 +163,9 @@ export async function preloadRewarded(): Promise<void> {
 }
 
 export async function showInterstitialIfReady(hasProPack: boolean): Promise<boolean> {
-  if (hasProPack || !isLevelPlayAvailable()) return false;
+  if (hasProPack || !isAdMobAvailable()) return false;
   if (!initialized) await initAds(false);
-  if (initFailed) return false;
+  if (initFailed || !canRequestAds) return false;
 
   if (!interstitialReady) {
     await preloadInterstitial();
@@ -227,7 +174,7 @@ export async function showInterstitialIfReady(hasProPack: boolean): Promise<bool
 
   interstitialReady = false;
   try {
-    await LevelPlayNative.showInterstitial({ adUnitId: getInterstitialAdUnitId() });
+    await AdMob.showInterstitial();
     void preloadInterstitial();
     return true;
   } catch {
@@ -237,15 +184,15 @@ export async function showInterstitialIfReady(hasProPack: boolean): Promise<bool
 }
 
 export async function showRewardedForCoin(_hasProPack: boolean): Promise<RewardedAdResult> {
-  if (!isLevelPlayAvailable()) {
+  if (!isAdMobAvailable()) {
     return { rewarded: false, reason: "Rewarded ads are available in the iPhone app." };
   }
 
   if (!initialized) await initAds(false);
-  if (initFailed) {
+  if (initFailed || !canRequestAds) {
     return {
       rewarded: false,
-      reason: initFailureReason || "LevelPlay could not initialize in this build.",
+      reason: initFailureReason || "AdMob could not initialize in this build.",
     };
   }
 
@@ -261,11 +208,9 @@ export async function showRewardedForCoin(_hasProPack: boolean): Promise<Rewarde
 
   rewardedReady = false;
   try {
-    const result = await LevelPlayNative.showRewarded({ adUnitId: getRewardedAdUnitId() });
+    await AdMob.showRewardVideoAd();
     void preloadRewarded();
-    return result.completed
-      ? { rewarded: true }
-      : { rewarded: false, reason: "Rewarded ad was not completed." };
+    return { rewarded: true };
   } catch (error) {
     const reason = describeAdError(error) || "Rewarded ad could not be shown.";
     lastRewardedError = reason;

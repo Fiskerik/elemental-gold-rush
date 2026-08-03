@@ -341,18 +341,16 @@ export function MainMenu({
                   <Star size={18} fill="currentColor" aria-hidden="true" />
                 </button>
               )}
-              {isNativeIos && (
-                <button
-                  onClick={() => {
-                    trackMenuAction("leaderboard");
-                    onLeaderboard();
-                  }}
-                  style={{ ...chooseLevelBtn, paddingInline: 9 }}
-                  aria-label="Open leaderboard"
-                >
-                  <PodiumMark size={20} />
-                </button>
-              )}
+              <button
+                onClick={() => {
+                  trackMenuAction("leaderboard");
+                  onLeaderboard();
+                }}
+                style={{ ...chooseLevelBtn, paddingInline: 9 }}
+                aria-label="Open leaderboard"
+              >
+                <PodiumMark size={20} />
+              </button>
               <button
                 onClick={() => {
                   trackMenuAction("levels");
@@ -469,23 +467,25 @@ export function MainMenu({
           </div>
         </section>
 
-        <button
-          type="button"
-          onClick={() => onShop("themes")}
-          style={newThemesBanner}
-          aria-label="Open new themes in the shop"
-        >
-          <span style={{ minWidth: 0 }}>
-            <span style={newThemesEyebrow}>NEW IN SHOP</span>
-            <strong style={newThemesTitle}>Fresh themes are available</strong>
-            <span style={newThemesLink}>View themes →</span>
-          </span>
-          <span style={newThemesThumbnails} aria-hidden="true">
-            {NEW_THEME_ITEMS.map((item) => (
-              <img key={item.name} src={item.image} alt="" style={newThemesThumbnail} />
-            ))}
-          </span>
-        </button>
+        {isNativeIos && (
+          <button
+            type="button"
+            onClick={() => onShop("themes")}
+            style={newThemesBanner}
+            aria-label="Open new themes in the shop"
+          >
+            <span style={{ minWidth: 0 }}>
+              <span style={newThemesEyebrow}>NEW IN SHOP</span>
+              <strong style={newThemesTitle}>Fresh themes are available</strong>
+              <span style={newThemesLink}>View themes →</span>
+            </span>
+            <span style={newThemesThumbnails} aria-hidden="true">
+              {NEW_THEME_ITEMS.map((item) => (
+                <img key={item.name} src={item.image} alt="" style={newThemesThumbnail} />
+              ))}
+            </span>
+          </button>
+        )}
 
         <nav
           style={{
