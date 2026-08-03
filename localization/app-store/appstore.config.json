@@ -1,0 +1,24 @@
+{
+  "bundleId": "com.eaconsulting.atomicfusion",
+  "platform": "IOS",
+  "releaseNotesLocaleOrder": [
+    "ar",
+    "zh-Hans",
+    "en-US",
+    "fr-FR",
+    "de-DE",
+    "hi",
+    "id",
+    "it",
+    "ja",
+    "ko",
+    "pt-BR",
+    "ru",
+    "es-ES",
+    "tr",
+    "vi"
+  ],
+  "releaseNotesPath": "localization/app-store/release-notes/{version}.md",
+  "sourceMetadataPath": "localization/app-store/packages.json",
+  "privacyPolicyUrl": "https://atomic-fusion.lovable.app/privacy"
+}
