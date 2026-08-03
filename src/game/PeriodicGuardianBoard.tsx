@@ -243,6 +243,7 @@ export function PeriodicGuardianBoard({
   const isTabletLayout = useIsTabletLayout();
   const arenaRef = useRef<HTMLDivElement | null>(null);
   const projectileRef = useRef<ProjectileAnim | null>(null);
+  const projectileVisualRef = useRef<HTMLDivElement | null>(null);
   const groupBagRef = useRef<GuardianGroup[]>(makeGroupBag());
   const closedGroupsRef = useRef<Record<GuardianGroup, number>>({
     metals: 0,
@@ -598,7 +599,9 @@ export function PeriodicGuardianBoard({
         y: active.startY + (active.endY - active.startY) * progress,
       };
       projectileRef.current = next;
-      setProjectile(next);
+      if (projectileVisualRef.current) {
+        projectileVisualRef.current.style.transform = `translate3d(${next.x - 20}px, ${next.y - 20}px, 0)`;
+      }
       if (progress < 1) {
         rafId = window.requestAnimationFrame(update);
         return;
@@ -1120,12 +1123,16 @@ export function PeriodicGuardianBoard({
 
           {projectile && (
             <div
+              ref={projectileVisualRef}
               style={{
                 position: "absolute",
-                left: projectile.x - 20,
-                top: projectile.y - 20,
+                left: 0,
+                top: 0,
                 pointerEvents: "none",
                 zIndex: 5,
+                transform: `translate3d(${projectile.x - 20}px, ${projectile.y - 20}px, 0)`,
+                willChange: "transform",
+                backfaceVisibility: "hidden",
               }}
             >
               <GroupBall atom={projectile.atom.atom} group={projectile.atom.group} size={40} />

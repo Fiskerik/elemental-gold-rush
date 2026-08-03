@@ -204,6 +204,7 @@ export function ElementalBossBoard({
   const isTabletLayout = useIsTabletLayout();
   const arenaRef = useRef<HTMLDivElement | null>(null);
   const projectileRef = useRef<ProjectileAnim | null>(null);
+  const projectileVisualRef = useRef<HTMLDivElement | null>(null);
   const outerClosedUntilRef = useRef<Record<OuterEyeId, number>>({
     "north-west": 0,
     "north-east": 0,
@@ -476,7 +477,9 @@ export function ElementalBossBoard({
           y: live.startY + (live.endY - live.startY) * progress,
         };
         projectileRef.current = next;
-        setProjectile(next);
+        if (projectileVisualRef.current) {
+          projectileVisualRef.current.style.transform = `translate3d(${next.x - 18}px, ${next.y - 18}px, 0)${next.blank ? " scale(0.92)" : ""}`;
+        }
         if (progress >= 1) {
           projectileRef.current = null;
           setProjectile(null);
@@ -1124,16 +1127,19 @@ export function ElementalBossBoard({
 
             {projectile && (
               <div
+                ref={projectileVisualRef}
                 style={{
                   position: "absolute",
-                  left: projectile.x - 18,
-                  top: projectile.y - 18,
+                  left: 0,
+                  top: 0,
                   width: 36,
                   height: 36,
                   display: "grid",
                   placeItems: "center",
                   pointerEvents: "none",
-                  transform: projectile.blank ? "scale(0.92)" : undefined,
+                  transform: `translate3d(${projectile.x - 18}px, ${projectile.y - 18}px, 0)${projectile.blank ? " scale(0.92)" : ""}`,
+                  willChange: "transform",
+                  backfaceVisibility: "hidden",
                 }}
               >
                 {projectile.blank ? (

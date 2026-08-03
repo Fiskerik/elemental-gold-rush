@@ -1,11 +1,16 @@
 import { useState } from "react";
+import { Capacitor } from "@capacitor/core";
 import { ELEMENTS } from "./elements";
 import { getLevelById, MAX_LEVEL } from "./levels";
-import { useProgress, type CoinTransaction } from "./store";
+import { isAtomSkinUnlocked, useProgress, type CoinTransaction } from "./store";
 import { useIsTabletLayout } from "./responsive";
 import { SUPPORTED_LANGUAGES, t, toIntlLocale, type AppLanguage } from "./localization";
 import { COMPOUNDS } from "./compounds";
 import { BOSSES, type BossId } from "./bosses";
+import { ElementBall } from "./ElementBall";
+import { AtomSkinPicker, BoardThemePicker } from "./Settings";
+import { COSMETIC_THEME_PURCHASES_ENABLED, PRODUCT_IDS, THEME_BUNDLE_PRODUCT_IDS } from "./products";
+import { restorePurchases } from "./purchases";
 import {
   authenticateGameCenter,
   getCachedGameCenterPlayerName,
@@ -36,9 +41,10 @@ import {
 
 interface Props {
   onBack: () => void;
+  onOpenShop?: (section?: "themes") => void;
 }
 
-export function Profile({ onBack }: Props) {
+export function Profile({ onBack, onOpenShop }: Props) {
   const isTabletLayout = useIsTabletLayout();
   const [transactionsOpen, setTransactionsOpen] = useState(false);
   const [gameCenterBusy, setGameCenterBusy] = useState(false);
@@ -70,14 +76,24 @@ export function Profile({ onBack }: Props) {
     dailyCompoundBestScore,
     dailyBoardLeaderboardAchievementCounts,
     appTheme,
+    boardTheme,
+    atomSkin,
+    ownedThemeProducts,
     appLanguage,
     setAppTheme,
+    setBoardTheme,
+    setAtomSkin,
     setAppLanguage,
+    grantProPack,
+    grantThemeProduct,
   } = useProgress();
   const tr = (text: string) => t(text, appLanguage);
   const intlLocale = toIntlLocale(appLanguage);
   const numberFormatter = new Intl.NumberFormat(intlLocale);
   const highestEl = ELEMENTS[highestElement - 1];
+  const activeAtomSkin = isAtomSkinUnlocked(atomSkin, { hasProPack, ownedThemeProducts })
+    ? atomSkin
+    : "classic";
   const totalStars = Object.values(levelStars).reduce((sum, stars) => sum + stars, 0);
   const perfectLevels = Object.values(levelStars).filter((stars) => stars >= 3).length;
   const bestChallengeEntry = Object.entries(challengeBestScores).reduce<{
@@ -131,7 +147,10 @@ export function Profile({ onBack }: Props) {
       day: "numeric",
       hour: "2-digit",
       minute: "2-digit",
-    });
+      });
+  const isNativeIos = Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios";
+  const [restoreBusy, setRestoreBusy] = useState(false);
+  const [restoreMessage, setRestoreMessage] = useState("");
   async function handleGameCenterSignIn() {
     if (gameCenterBusy) return;
     if (!isGameCenterAvailable()) {
@@ -178,6 +197,29 @@ export function Profile({ onBack }: Props) {
     }
   }
 
+  async function handleRestorePurchases() {
+    if (restoreBusy) return;
+    setRestoreBusy(true);
+    setRestoreMessage("Checking App Store purchases...");
+    try {
+      const restored = await restorePurchases();
+      if (restored.includes(PRODUCT_IDS.proLabPack)) grantProPack({ fromRestore: true });
+      const restoredThemes = restored.filter((productId) =>
+        THEME_BUNDLE_PRODUCT_IDS.includes(productId as (typeof THEME_BUNDLE_PRODUCT_IDS)[number]),
+      );
+      if (COSMETIC_THEME_PURCHASES_ENABLED) restoredThemes.forEach(grantThemeProduct);
+      setRestoreMessage(
+        restored.length
+          ? `${restored.length} purchase${restored.length === 1 ? "" : "s"} restored.`
+          : "No purchases were found.",
+      );
+    } catch (error) {
+      setRestoreMessage(error instanceof Error ? error.message : "Purchases could not be restored.");
+    } finally {
+      setRestoreBusy(false);
+    }
+  }
+
   return (
     <div
       className="app-shell"
@@ -200,8 +242,13 @@ export function Profile({ onBack }: Props) {
         </button>
 
         <header style={heroCard}>
-          <div style={avatar}>{highestEl?.symbol ?? "H"}</div>
-          <div style={{ flex: 1 }}>
+          <div
+            style={avatar}
+            aria-label={`${highestEl?.name ?? "Hydrogen"} atom`}
+          >
+            <ElementBall atomicNumber={highestElement} size={58} glow atomSkin={activeAtomSkin} />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <div
               style={{ fontSize: 12, letterSpacing: 3, color: "var(--accent)", fontWeight: 900 }}
             >
@@ -210,7 +257,16 @@ export function Profile({ onBack }: Props) {
             {gameCenterName && (
               <h1
                 className="gold-text"
-                style={{ margin: "4px 0", fontSize: 34 }}
+                style={{
+                  margin: "4px 0",
+                  fontSize: "clamp(16px, 5.5vw, 30px)",
+                  lineHeight: 1.05,
+                  minWidth: 0,
+                  maxWidth: "100%",
+                  whiteSpace: "normal",
+                  overflowWrap: "anywhere",
+                  wordBreak: "break-word",
+                }}
                 data-no-localize="true"
               >
                 {gameCenterName}
@@ -241,7 +297,7 @@ export function Profile({ onBack }: Props) {
               <div style={sectionHeading}>{tr("Game Center")}</div>
               <div style={gameCenterCopy}>
                 {gameCenterStatus ??
-                  tr("Sign in once to keep Daily Board and Daily Compound submissions connected.")}
+                  tr("Sign in once to connect leaderboards and keep progress synced across installs.")}
               </div>
             </div>
             <div style={gameCenterActions}>
@@ -426,12 +482,14 @@ export function Profile({ onBack }: Props) {
             label={tr("Total Score")}
             value={exactScore(totalScore)}
             sub={tr("career")}
+            tone="oklch(0.86 0.18 88)"
           />
           <ProfileStat
             icon={Zap}
             label={tr("Best Shot")}
             value={exactScore(highestSingleShotScore)}
             sub={formatDate(highestSingleShotScoreDate)}
+            tone="oklch(0.78 0.18 205)"
           />
           <CoinProfileStat
             value={`${goldCoins}`}
@@ -443,6 +501,7 @@ export function Profile({ onBack }: Props) {
             label={tr("Daily Streak")}
             value={`${dailyStreak}`}
             sub={tr(claimedDailyReward ? "claimed" : "active")}
+            tone="oklch(0.78 0.18 150)"
           />
           <ProfileStat
             icon={Zap}
@@ -457,32 +516,80 @@ export function Profile({ onBack }: Props) {
                   })
                 : tr("no record yet")
             }
+            tone="oklch(0.86 0.18 48)"
           />
           <ProfileStat
             icon={Atom}
             label={tr("Highest Atom")}
             value={tr(highestEl?.name ?? "Hydrogen")}
             sub={`${highestEl?.symbol ?? "H"} • #${highestElement}`}
+            tone="oklch(0.78 0.16 250)"
           />
           <ProfileStat
             icon={FlaskConical}
             label={tr("Elements")}
             value={`${discoveredElements.length}`}
             sub={tr(`${completionPercent}% found`)}
+            tone="oklch(0.78 0.18 320)"
           />
           <ProfileStat
             icon={Star}
             label={tr("Stars")}
             value={`${totalStars}`}
             sub={tr(`${perfectLevels} perfect`)}
+            tone="oklch(0.9 0.18 82)"
           />
         </section>
 
         <section style={card}>
           <div style={sectionHeading}>{tr("Display")}</div>
+          <div style={{ marginBottom: 14 }}>
+            <BoardThemePicker
+              value={boardTheme}
+              hasProPack={hasProPack}
+              ownedThemeProducts={ownedThemeProducts}
+              onChange={setBoardTheme}
+              onOpenShop={onOpenShop}
+            />
+          </div>
+          <AtomSkinPicker
+            value={atomSkin}
+            hasProPack={hasProPack}
+            ownedThemeProducts={ownedThemeProducts}
+            onChange={setAtomSkin}
+            onOpenShop={onOpenShop}
+          />
+          {isNativeIos && (
+            <div style={restorePurchasesRow}>
+              <div>
+                <strong>Purchases</strong>
+                <div style={{ color: "var(--muted-foreground)", fontSize: 11 }}>
+                  Restore your App Store purchases on this device.
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleRestorePurchases}
+                disabled={restoreBusy}
+                style={{ ...themeChoiceButton, opacity: restoreBusy ? 0.6 : 1 }}
+              >
+                {restoreBusy ? "Checking..." : "Restore Purchases"}
+              </button>
+              {restoreMessage && <div style={restoreMessageStyle}>{restoreMessage}</div>}
+            </div>
+          )}
           <div style={preferenceRow}>
             <span style={preferenceLabel}>{tr("Theme")}</span>
-            <div style={{ display: "inline-grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 12,
+                padding: 3,
+                borderRadius: 999,
+                background: "color-mix(in oklch, var(--surface) 70%, transparent)",
+              }}
+            >
               {(["dark", "light"] as const).map((theme) => (
                 <button
                   key={theme}
@@ -580,16 +687,26 @@ function ProfileStat({
   label,
   value,
   sub,
+  tone = "var(--primary)",
 }: {
   icon?: LucideIcon;
   label: string;
   value: string;
   sub: string;
+  tone?: string;
 }) {
   return (
     <div style={statCard}>
       {Icon && (
-        <div style={statIcon}>
+        <div
+          style={{
+            ...statIcon,
+            background: `color-mix(in oklch, ${tone} 18%, var(--surface-high))`,
+            color: tone,
+            borderColor: `color-mix(in oklch, ${tone} 42%, var(--border))`,
+            boxShadow: `0 0 14px color-mix(in oklch, ${tone} 22%, transparent)`,
+          }}
+        >
           <Icon size={18} aria-hidden="true" />
         </div>
       )}
@@ -606,7 +723,7 @@ function ProfileStat({
       <div
         style={{
           fontSize: value.length > 9 ? 16 : value.length > 6 ? 20 : 24,
-          color: "var(--primary)",
+          color: tone,
           fontWeight: 900,
           marginTop: 3,
           lineHeight: 1.1,
@@ -629,9 +746,18 @@ function CoinProfileStat({
   sub: string;
   onTransactions: () => void;
 }) {
+  const tone = "oklch(0.86 0.18 88)";
   return (
     <div style={statCard}>
-      <div style={statIcon}>
+      <div
+        style={{
+          ...statIcon,
+          background: `color-mix(in oklch, ${tone} 18%, var(--surface-high))`,
+          color: tone,
+          borderColor: `color-mix(in oklch, ${tone} 42%, var(--border))`,
+          boxShadow: `0 0 14px color-mix(in oklch, ${tone} 22%, transparent)`,
+        }}
+      >
         <Coins size={18} aria-hidden="true" />
       </div>
       <div
@@ -647,7 +773,7 @@ function CoinProfileStat({
       <div
         style={{
           fontSize: value.length > 9 ? 16 : value.length > 6 ? 20 : 24,
-          color: "var(--primary)",
+          color: tone,
           fontWeight: 900,
           marginTop: 3,
           lineHeight: 1.1,
@@ -791,11 +917,11 @@ const avatar: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  background: "radial-gradient(circle at 30% 25%, var(--accent), var(--primary))",
-  color: "var(--primary-foreground)",
-  fontSize: 30,
-  fontWeight: 1000,
-  boxShadow: "0 0 24px var(--primary-glow)",
+  flex: "0 0 auto",
+  background: "color-mix(in oklch, var(--primary) 22%, var(--surface-high))",
+  border: "1px solid color-mix(in oklch, var(--accent) 55%, var(--border))",
+  boxShadow: "0 0 24px color-mix(in oklch, var(--primary) 42%, transparent)",
+  overflow: "visible",
 };
 
 const heroIconStack: React.CSSProperties = {
@@ -908,7 +1034,8 @@ const statIcon: React.CSSProperties = {
 
 const proBadge: React.CSSProperties = {
   marginTop: 8,
-  display: "inline-block",
+  display: "block",
+  width: "fit-content",
   padding: "4px 10px",
   borderRadius: 999,
   background:
@@ -918,6 +1045,7 @@ const proBadge: React.CSSProperties = {
   fontSize: 10,
   letterSpacing: 1.4,
   fontWeight: 900,
+  textAlign: "center",
 };
 
 const grid: React.CSSProperties = {
@@ -1045,6 +1173,22 @@ const themeChoiceButton: React.CSSProperties = {
   cursor: "pointer",
 };
 
+const restorePurchasesRow: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "minmax(0, 1fr) auto",
+  alignItems: "center",
+  gap: 10,
+  marginTop: 12,
+  padding: "12px 0 0",
+  borderTop: "1px solid var(--border)",
+};
+
+const restoreMessageStyle: React.CSSProperties = {
+  gridColumn: "1 / -1",
+  color: "var(--muted-foreground)",
+  fontSize: 11,
+};
+
 const languageSelect: React.CSSProperties = {
   minWidth: 190,
   maxWidth: "min(100%, 250px)",
@@ -1065,6 +1209,18 @@ const sectionHeading: React.CSSProperties = {
   color: "var(--accent)",
   fontWeight: 900,
   marginBottom: 8,
+};
+
+const debugToggleButton: React.CSSProperties = {
+  width: "100%",
+  marginTop: 12,
+  minHeight: 38,
+  border: "1px dashed var(--border)",
+  borderRadius: 10,
+  background: "transparent",
+  fontSize: 12,
+  fontWeight: 900,
+  cursor: "pointer",
 };
 
 const transactionButton: React.CSSProperties = {

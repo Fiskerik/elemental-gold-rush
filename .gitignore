@@ -34,3 +34,7 @@ dist-ssr
 /.playwright
 /appstore-screenshots-v2
 /appstore-screenshots
+
+# App Store Connect private keys and local credential files
+*.p8
+.env.appstore*

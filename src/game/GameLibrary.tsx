@@ -18,10 +18,22 @@ export function GameLibrary({ onBack }: Props) {
   const levelStats = useProgress((s) => s.levelStats);
   const appLanguage = useProgress((s) => s.appLanguage);
   const [tab, setTab] = useState<"challenges" | "powerups" | "bosses">("powerups");
+  const [selectedPowerUpId, setSelectedPowerUpId] = useState(POWER_UPS[0]?.icon ?? "molecule");
+  const [selectedChallengeId, setSelectedChallengeId] = useState("daily-board");
+  const [selectedBossId, setSelectedBossId] = useState<BossId>("elemental-boss");
   const tr = (text: string) => t(text, appLanguage);
   const powerUpsByOccurrence = [...POWER_UPS].sort(
     (a, b) => POWER_UP_OCCURRENCE[a.icon] - POWER_UP_OCCURRENCE[b.icon],
   );
+  const challengeModes = GAME_MODES.filter(
+    (mode) => mode.kind !== "campaign" && mode.id !== "daily-challenge",
+  );
+  const selectedPowerUp =
+    powerUpsByOccurrence.find((powerUp) => powerUp.icon === selectedPowerUpId) ??
+    powerUpsByOccurrence[0];
+  const selectedChallenge = challengeModes.find((mode) => mode.id === selectedChallengeId);
+  const selectedBoss = BOSS_LIBRARY.find((boss) => boss.id === selectedBossId) ?? BOSS_LIBRARY[0];
+  const selectedBossConfig = selectedBoss ? BOSSES[selectedBoss.id] : null;
 
   return (
     <div className="app-shell" style={{ padding: isTabletLayout ? 28 : 20, paddingTop: isTabletLayout ? 36 : 32, minHeight: "100dvh" }}>
@@ -62,95 +74,192 @@ export function GameLibrary({ onBack }: Props) {
           </button>
         </div>
 
+        {tab === "powerups" && selectedPowerUp && (
+          <LibrarySplitPane
+            label={tr("Select a power-up")}
+            tiles={powerUpsByOccurrence.map((powerUp) => ({
+              id: powerUp.icon,
+              label: tr(powerUp.name),
+              active: powerUp.icon === selectedPowerUp.icon,
+              icon: <PowerUpBadge icon={powerUp.icon} size={44} />,
+              onClick: () => setSelectedPowerUpId(powerUp.icon),
+            }))}
+            reader={
+              <>
+                <div style={readerIcon}><PowerUpBadge icon={selectedPowerUp.icon} size={54} /></div>
+                <h2 style={readerTitle}>{tr(selectedPowerUp.name)}</h2>
+                <p style={description}>{tr(selectedPowerUp.description)}</p>
+                <div style={unlockDetails}>
+                  <span>{tr("Unlocked at level:")} {selectedPowerUp.unlock.replace(/^Level /, "").split(" /")[0]}</span>
+                  <span>{tr("Obtained by")} {tr(selectedPowerUp.obtainedBy)}</span>
+                </div>
+              </>
+            }
+            isTabletLayout={isTabletLayout}
+          />
+        )}
+
         {tab === "challenges" && (
-          <section style={sectionCard}>
-            <div style={{ display: "grid", gridTemplateColumns: isTabletLayout ? "1fr 1fr" : "1fr", gap: isTabletLayout ? 16 : 12 }}>
-            {GAME_MODES.filter((mode) => mode.kind !== "campaign").map((mode) => {
-              const locked = unlockedLevel < mode.unlockedAtLevel;
-              return (
-                <article key={mode.id} style={{ ...rowCard, opacity: locked ? 0.58 : 1 }}>
-                  <div style={iconWrap}>
-                    <ChallengeIcon id={mode.id} />
+          <LibrarySplitPane
+            label={tr("Select a challenge")}
+            tiles={[
+              {
+                id: "daily-board",
+                label: tr("Daily Board"),
+                active: selectedChallengeId === "daily-board",
+                icon: <ChallengeIcon id="daily-challenge" />,
+                onClick: () => setSelectedChallengeId("daily-board"),
+              },
+              {
+                id: "daily-compound",
+                label: tr("Daily Compound"),
+                active: selectedChallengeId === "daily-compound",
+                icon: <ChallengeIcon id="daily-compound" />,
+                onClick: () => setSelectedChallengeId("daily-compound"),
+              },
+              ...challengeModes.map((mode) => ({
+                id: mode.id,
+                label: tr(mode.name),
+                active: selectedChallengeId === mode.id,
+                locked: unlockedLevel < mode.unlockedAtLevel,
+                icon: <ChallengeIcon id={mode.id} />,
+                onClick: () => setSelectedChallengeId(mode.id),
+              })),
+            ]}
+            reader={
+              selectedChallengeId === "daily-board" ? (
+                <>
+                  <div style={readerIcon}><ChallengeIcon id="daily-challenge" /></div>
+                  <h2 style={readerTitle}>{tr("Daily Board")}</h2>
+                  <p style={description}>{tr("Play today's seeded Round or Compound challenge and replay it for better records.")}</p>
+                  <ul style={rulesList}>
+                    <li>{tr("Choose today's Round or Compound seed")}</li>
+                    <li>{tr("The coin reward pays once; reruns are for records")}</li>
+                    <li>{tr("Daily seed resets at midnight")}</li>
+                  </ul>
+                </>
+              ) : selectedChallengeId === "daily-compound" ? (
+                <>
+                  <div style={readerIcon}><ChallengeIcon id="daily-compound" /></div>
+                  <h2 style={readerTitle}>{tr("Daily Compound")}</h2>
+                  <p style={description}>{tr("Reveal today's hidden compound by selecting the right atoms from the seeded grid.")}</p>
+                  <ul style={rulesList}>
+                    <li>{tr("Find the compound formula in the grid")}</li>
+                    <li>{tr("Hints unlock after wrong guesses")}</li>
+                    <li>{tr("The daily challenge can be replayed for records")}</li>
+                  </ul>
+                </>
+              ) : selectedChallenge ? (
+                <>
+                  <div style={readerIcon}><ChallengeIcon id={selectedChallenge.id} /></div>
+                  <div style={readerHeaderRow}>
+                    <h2 style={readerTitle}>{tr(selectedChallenge.name)}</h2>
+                    <span style={readerMeta}>{tr(unlockedLevel < selectedChallenge.unlockedAtLevel ? `UNLOCKS LV ${selectedChallenge.unlockedAtLevel}` : selectedChallenge.kind.toUpperCase())}</span>
                   </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
-                      <h2 style={{ margin: 0, fontSize: 16 }}>{tr(mode.name)}</h2>
-                      <span style={{ color: "var(--accent)", fontSize: 11, fontWeight: 900 }}>
-                        {tr(locked ? `UNLOCKS LV ${mode.unlockedAtLevel}` : mode.kind.toUpperCase())}
-                      </span>
-                    </div>
-                    <p style={description}>{tr(mode.description)}</p>
-                    <ul style={rulesList}>
-                      {mode.rules.map((rule) => (
-                        <li key={rule}>{tr(rule)}</li>
-                      ))}
-                    </ul>
-                  </div>
-                </article>
-              );
+                  <p style={description}>{tr(selectedChallenge.description)}</p>
+                  <ul style={rulesList}>{selectedChallenge.rules.map((rule) => <li key={rule}>{tr(rule)}</li>)}</ul>
+                </>
+              ) : null
+            }
+            isTabletLayout={isTabletLayout}
+          />
+        )}
+
+        {tab === "bosses" && selectedBoss && selectedBossConfig && (
+          <LibrarySplitPane
+            label={tr("Select a boss")}
+            tiles={BOSS_LIBRARY.map((boss) => {
+              const config = BOSSES[boss.id];
+              const defeated = (levelStats[config.levelId]?.bestShots ?? null) != null;
+              return {
+                id: boss.id,
+                label: tr(defeated ? config.name : "Unknown Boss"),
+                active: selectedBossId === boss.id,
+                locked: !defeated,
+                icon: <BossIcon id={boss.id} defeated={defeated} />,
+                onClick: () => setSelectedBossId(boss.id),
+              };
             })}
-            </div>
-          </section>
-        )}
-
-        {tab === "powerups" && (
-          <section style={sectionCard}>
-            <div style={{ display: "grid", gridTemplateColumns: isTabletLayout ? "1fr 1fr" : "1fr", gap: isTabletLayout ? 16 : 12 }}>
-            {powerUpsByOccurrence.map((powerUp) => (
-              <article key={powerUp.name} style={rowCard}>
-                <div style={iconWrap}>
-                  <PowerUpBadge icon={powerUp.icon} size={46} />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
-                    <h2 style={{ margin: 0, fontSize: 16 }}>{tr(powerUp.name)}</h2>
-                  </div>
-                  <p style={{ ...description, marginBottom: 0 }}>{tr(powerUp.description)}</p>
-                  <div style={{ color: "var(--accent)", fontSize: 11, fontWeight: 900 }}>
-                    {tr(`Obtained: ${powerUp.unlock}`)}
-                  </div>
-                </div>
-              </article>
-            ))}
-            </div>
-          </section>
-        )}
-
-        {tab === "bosses" && (
-          <section style={sectionCard}>
-            <div style={{ display: "grid", gridTemplateColumns: isTabletLayout ? "1fr 1fr" : "1fr", gap: isTabletLayout ? 16 : 12 }}>
-              {BOSS_LIBRARY.map((boss) => {
-                const config = BOSSES[boss.id];
-                const defeated = (levelStats[config.levelId]?.bestShots ?? null) != null;
+            reader={
+              (() => {
+                const defeated = (levelStats[selectedBossConfig.levelId]?.bestShots ?? null) != null;
                 return (
-                  <article key={boss.id} style={{ ...rowCard, opacity: defeated ? 1 : 0.56 }}>
-                    <div style={iconWrap}>
-                      <BossIcon id={boss.id} />
+                  <>
+                    <div style={readerIcon}><BossIcon id={selectedBoss.id} defeated={defeated} size={58} /></div>
+                    <div style={readerHeaderRow}>
+                      <h2 style={readerTitle}>{tr(defeated ? selectedBossConfig.name : "Unknown Boss")}</h2>
+                      <span style={readerMeta}>{tr(defeated ? `LEVEL ${selectedBossConfig.levelId}` : `LOCKED LV ${selectedBossConfig.levelId}`)}</span>
                     </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
-                        <h2 style={{ margin: 0, fontSize: 16 }}>{tr(defeated ? config.name : "Unknown Boss")}</h2>
-                        <span style={{ color: "var(--accent)", fontSize: 11, fontWeight: 900 }}>
-                          {tr(defeated ? `LEVEL ${config.levelId}` : `LOCKED LV ${config.levelId}`)}
-                        </span>
-                      </div>
-                      <p style={description}>{tr(defeated ? boss.lore : "Defeat this boss in Campaign to archive its field notes.")}</p>
-                      {defeated && (
-                        <ul style={rulesList}>
-                          {boss.mechanics.map((rule) => (
-                            <li key={rule}>{tr(rule)}</li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                  </article>
+                    <p style={description}>{tr(defeated ? selectedBoss.lore : "Defeat this boss in Campaign to archive its field notes.")}</p>
+                    {defeated && <ul style={rulesList}>{selectedBoss.mechanics.map((rule) => <li key={rule}>{tr(rule)}</li>)}</ul>}
+                  </>
                 );
-              })}
-            </div>
-          </section>
+              })()
+            }
+            isTabletLayout={isTabletLayout}
+          />
         )}
       </div>
     </div>
+  );
+}
+
+type LibraryTile = {
+  id: string;
+  label: string;
+  active: boolean;
+  locked?: boolean;
+  icon: React.ReactNode;
+  onClick: () => void;
+};
+
+function LibrarySplitPane({
+  label,
+  tiles,
+  reader,
+  isTabletLayout,
+}: {
+  label: string;
+  tiles: LibraryTile[];
+  reader: React.ReactNode;
+  isTabletLayout: boolean;
+}) {
+  return (
+    <section style={sectionCard}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: isTabletLayout ? "minmax(0, 1.08fr) minmax(260px, 0.92fr)" : "1fr",
+          gap: 14,
+        }}
+      >
+        <div>
+          <div style={paneLabel}>{label}</div>
+          <div style={iconGrid}>
+            {tiles.map((tile) => (
+              <button
+                key={tile.id}
+                type="button"
+                onClick={tile.onClick}
+                aria-label={tile.label}
+                title={tile.label}
+                style={{
+                  ...iconTile,
+                  ...(tile.active ? iconTileActive : {}),
+                  opacity: tile.locked ? 0.48 : 1,
+                  filter: tile.locked ? "grayscale(0.35)" : undefined,
+                }}
+              >
+                {tile.icon}
+              </button>
+            ))}
+          </div>
+        </div>
+        <aside style={readerPane} aria-live="polite">
+          {reader}
+        </aside>
+      </div>
+    </section>
   );
 }
 
@@ -184,12 +293,73 @@ const CHALLENGE_ICONS: Record<string, LucideIcon> = {
   "noble-gas-lock": LockKeyhole,
   "gold-rush-timer": Clock,
   "isotope-decay": Atom,
+  "daily-challenge": FlaskConical,
+  "daily-compound": Atom,
 };
 
-function BossIcon({ id }: { id: BossId }) {
+function BossIcon({ id, defeated = true, size = 42 }: { id: BossId; defeated?: boolean; size?: number }) {
   const Icon = id === "periodic-guardian" ? Sparkles : id === "nucleus-core" ? Orbit : Eye;
-  return <Icon size={30} color="var(--accent)" strokeWidth={2.7} />;
+  const style = BOSS_BADGE_STYLES[id];
+  const innerSize = Math.round(size * 0.62);
+  return (
+    <div
+      aria-hidden="true"
+      style={{
+        width: size,
+        height: size,
+        display: "grid",
+        placeItems: "center",
+        borderRadius: "50%",
+        background: style.background,
+        border: `1px solid ${style.border}`,
+        boxShadow: `${style.shadow}, inset 0 1px 0 rgba(255,255,255,0.3), inset 0 -10px 18px rgba(0,0,0,0.22)`,
+        opacity: defeated ? 1 : 0.58,
+      }}
+    >
+      <div
+        style={{
+          width: innerSize,
+          height: innerSize,
+          display: "grid",
+          placeItems: "center",
+          borderRadius: "50%",
+          background: `radial-gradient(circle at 30% 24%, rgba(255,255,255,.9), transparent 22%), ${style.innerBackground}`,
+          border: `1px solid ${style.innerBorder}`,
+          boxShadow: `inset 2px 2px 4px rgba(255,255,255,.3), inset -3px -4px 6px rgba(0,0,0,.28), 0 0 8px ${style.glow}`,
+        }}
+      >
+        <Icon size={Math.round(innerSize * 0.54)} color="white" strokeWidth={2.7} style={{ filter: "drop-shadow(0 1px 1px rgba(0,0,0,.96))" }} />
+      </div>
+    </div>
+  );
 }
+
+const BOSS_BADGE_STYLES: Record<BossId, { background: string; border: string; shadow: string; innerBackground: string; innerBorder: string; glow: string }> = {
+  "elemental-boss": {
+    background: "linear-gradient(135deg, oklch(0.58 0.18 155), oklch(0.34 0.14 205))",
+    border: "oklch(0.75 0.18 155)",
+    shadow: "0 0 14px oklch(0.68 0.18 155 / 0.52)",
+    innerBackground: "linear-gradient(145deg, oklch(0.54 0.18 155), oklch(0.28 0.12 205))",
+    innerBorder: "oklch(0.78 0.16 155)",
+    glow: "oklch(0.7 0.18 155 / 0.62)",
+  },
+  "periodic-guardian": {
+    background: "linear-gradient(135deg, oklch(0.68 0.2 55), oklch(0.42 0.16 330))",
+    border: "oklch(0.85 0.18 60)",
+    shadow: "0 0 14px oklch(0.76 0.2 55 / 0.55)",
+    innerBackground: "linear-gradient(145deg, oklch(0.64 0.2 55), oklch(0.34 0.15 330))",
+    innerBorder: "oklch(0.9 0.17 75)",
+    glow: "oklch(0.78 0.2 55 / 0.66)",
+  },
+  "nucleus-core": {
+    background: "linear-gradient(135deg, oklch(0.62 0.19 300), oklch(0.36 0.16 250))",
+    border: "oklch(0.8 0.18 300)",
+    shadow: "0 0 14px oklch(0.7 0.18 300 / 0.55)",
+    innerBackground: "linear-gradient(145deg, oklch(0.56 0.18 300), oklch(0.28 0.13 250))",
+    innerBorder: "oklch(0.82 0.16 300)",
+    glow: "oklch(0.72 0.18 300 / 0.66)",
+  },
+};
 
 const POWER_UP_OCCURRENCE: Record<string, number> = {
   molecule: 1,
@@ -209,6 +379,16 @@ const POWER_UP_OCCURRENCE: Record<string, number> = {
 };
 
 const CHALLENGE_ICON_STYLES: Record<string, { color: string; background: string; glow: string }> = {
+  "daily-challenge": {
+    color: "oklch(0.9 0.18 90)",
+    background: "radial-gradient(circle at 30% 24%, oklch(0.96 0.16 95), transparent 34%), linear-gradient(135deg, oklch(0.54 0.16 82), oklch(0.32 0.12 230))",
+    glow: "oklch(0.78 0.16 90 / 0.5)",
+  },
+  "daily-compound": {
+    color: "oklch(0.92 0.16 145)",
+    background: "radial-gradient(circle at 30% 22%, oklch(0.9 0.19 150), transparent 34%), linear-gradient(135deg, oklch(0.46 0.18 155), oklch(0.3 0.12 200))",
+    glow: "oklch(0.72 0.16 155 / 0.5)",
+  },
   survival: {
     color: "oklch(0.88 0.18 150)",
     background: "radial-gradient(circle at 30% 22%, oklch(0.9 0.19 150), transparent 34%), linear-gradient(135deg, oklch(0.46 0.18 155), oklch(0.3 0.12 200))",
@@ -285,6 +465,86 @@ const sectionCard: React.CSSProperties = {
   border: "1px solid var(--border)",
   boxShadow: "0 12px 28px rgba(0,0,0,0.24)",
   marginBottom: 16,
+};
+
+const paneLabel: React.CSSProperties = {
+  marginBottom: 10,
+  color: "var(--muted-foreground)",
+  fontSize: 11,
+  fontWeight: 900,
+  letterSpacing: 1.5,
+  textTransform: "uppercase",
+};
+
+const iconGrid: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+  gap: 8,
+};
+
+const iconTile: React.CSSProperties = {
+  minWidth: 0,
+  minHeight: 68,
+  display: "grid",
+  placeItems: "center",
+  padding: 8,
+  borderRadius: 14,
+  border: "1px solid var(--border)",
+  background: "color-mix(in oklch, var(--surface) 86%, transparent)",
+  cursor: "pointer",
+};
+
+const iconTileActive: React.CSSProperties = {
+  borderColor: "var(--accent)",
+  background: "color-mix(in oklch, var(--accent) 14%, var(--surface-high))",
+  boxShadow: "0 0 18px var(--accent-glow)",
+};
+
+const readerPane: React.CSSProperties = {
+  minHeight: 220,
+  padding: 16,
+  borderRadius: 16,
+  background: "color-mix(in oklch, var(--surface) 88%, transparent)",
+  border: "1px solid color-mix(in oklch, var(--accent) 36%, var(--border))",
+};
+
+const readerIcon: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  minHeight: 56,
+  marginBottom: 10,
+};
+
+const readerTitle: React.CSSProperties = {
+  margin: 0,
+  fontSize: 19,
+  lineHeight: 1.15,
+};
+
+const readerHeaderRow: React.CSSProperties = {
+  display: "flex",
+  alignItems: "flex-start",
+  justifyContent: "space-between",
+  gap: 10,
+};
+
+const readerMeta: React.CSSProperties = {
+  color: "var(--accent)",
+  fontSize: 10,
+  fontWeight: 900,
+  letterSpacing: 0.6,
+  textAlign: "right",
+};
+
+const unlockDetails: React.CSSProperties = {
+  display: "grid",
+  gap: 3,
+  marginTop: 10,
+  color: "var(--accent)",
+  fontSize: 10,
+  fontWeight: 900,
+  letterSpacing: 0.35,
+  lineHeight: 1.3,
 };
 
 const tabBar: React.CSSProperties = {

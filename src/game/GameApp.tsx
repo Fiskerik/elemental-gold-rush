@@ -5,6 +5,7 @@ import { StatusBar, Style } from "@capacitor/status-bar";
 import { Coins } from "lucide-react";
 import { MainMenu } from "@/game/MainMenu";
 import { openAppStoreReview } from "@/game/appReview";
+import { startCloudProgressSync } from "@/game/cloudSync";
 import { clearSavedRun, GameBoard, getSavedRunSummary } from "@/game/GameBoard";
 import { setMusicVolume, setSfxVolume } from "@/game/audio";
 import { LevelSelect } from "@/game/LevelSelect";
@@ -17,8 +18,15 @@ import { Profile } from "@/game/Profile";
 import { Leaderboard } from "@/game/DailyCompoundLeaderboard";
 import { GameModeId } from "@/game/challenges";
 import { MOLECULE_CHALLENGE_BY_LEVEL, getCompoundChallengeKind, getLevelById } from "@/game/levels";
+import type { HowToPlayMode } from "@/game/HowToPlay";
 import { useProgress } from "@/game/store";
 import { useDomLocalization } from "@/game/useDomLocalization";
+
+const FIRST_ENTRY_TUTORIAL_TIP_IDS: Record<HowToPlayMode, string> = {
+  normal: "onboarding-normal-game",
+  compound: "onboarding-compound-level",
+  "daily-compound": "onboarding-daily-compound",
+};
 
 type Screen =
   | { name: "menu" }
@@ -29,9 +37,10 @@ type Screen =
       mode?: GameModeId;
       resumeSavedRun?: boolean;
       secretCompoundId?: string;
+      initialHowToPlay?: HowToPlayMode;
     }
   | { name: "collection" }
-  | { name: "shop" }
+  | { name: "shop"; section?: "themes" }
   | { name: "lab" }
   | { name: "library" }
   | { name: "profile" }
@@ -60,6 +69,11 @@ export function GameApp() {
   const isNativeIos = Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios";
 
   useDomLocalization(appLanguage);
+
+  useEffect(() => {
+    if (!isNativeIos) return;
+    return startCloudProgressSync();
+  }, [isNativeIos]);
 
   useEffect(() => {
     setSfxVolume(soundVolume / 100);
@@ -142,6 +156,24 @@ export function GameApp() {
     setAppReviewMilestonePromptOpen(true);
   }
 
+  function startGameWithFirstTutorial(
+    tutorialMode: HowToPlayMode | undefined,
+    startGame: (initialHowToPlay?: HowToPlayMode) => void,
+  ) {
+    startGameWithAppReviewMilestone(() => {
+      if (tutorialMode) {
+        const tipId = FIRST_ENTRY_TUTORIAL_TIP_IDS[tutorialMode];
+        const progress = useProgress.getState();
+        if (!progress.seenTips.includes(tipId)) {
+          progress.markTipSeen(tipId);
+          startGame(tutorialMode);
+          return;
+        }
+      }
+      startGame();
+    });
+  }
+
   function startCampaign() {
     const saved = getSavedRunSummary();
     if (saved) {
@@ -154,14 +186,19 @@ export function GameApp() {
   function startDailyChallenge() {
     refreshDailyFeatures();
     const dailyChallenge = useProgress.getState().dailyChallenge;
-    startGameWithAppReviewMilestone(() =>
-      setScreen({ name: "game", levelId: dailyChallenge.levelId, mode: "daily-challenge" }),
+    startGameWithFirstTutorial("normal", (initialHowToPlay) =>
+      setScreen({
+        name: "game",
+        levelId: dailyChallenge.levelId,
+        mode: "daily-challenge",
+        initialHowToPlay,
+      }),
     );
   }
 
   function startSecretCompound() {
     refreshDailyFeatures();
-    startGameWithAppReviewMilestone(() => {
+    startGameWithFirstTutorial("daily-compound", (initialHowToPlay) => {
       const { secretCompound, revealSecretCompound } = useProgress.getState();
       revealSecretCompound();
       setScreen({
@@ -169,17 +206,20 @@ export function GameApp() {
         levelId: getLevelById(unlockedLevel)?.id ?? 1,
         mode: "campaign",
         secretCompoundId: secretCompound.compoundId,
+        initialHowToPlay,
       });
     });
   }
 
   function startCampaignLevel(levelId: number) {
-    startGameWithAppReviewMilestone(() => {
+    const tutorialMode = levelId === 1 ? "normal" : levelId === 5 ? "compound" : undefined;
+    startGameWithFirstTutorial(tutorialMode, (initialHowToPlay) => {
       const compoundId = MOLECULE_CHALLENGE_BY_LEVEL[levelId];
       setScreen({
         name: "game",
         levelId,
         mode: "campaign",
+        initialHowToPlay,
         secretCompoundId:
           compoundId && getCompoundChallengeKind(levelId) === "search-find"
             ? compoundId
@@ -197,7 +237,7 @@ export function GameApp() {
             onLevels={() => setScreen({ name: "levels" })}
             onCollection={() => setScreen({ name: "collection" })}
             onSettings={() => setScreen({ name: "settings" })}
-            onShop={() => setScreen({ name: "shop" })}
+            onShop={(section) => setScreen({ name: "shop", section })}
             onLab={() => setScreen({ name: "lab" })}
             onLibrary={() => setScreen({ name: "library" })}
             onProfile={() => setScreen({ name: "profile" })}
@@ -248,6 +288,7 @@ export function GameApp() {
           mode={screen.mode}
           resumeSavedRun={screen.resumeSavedRun}
           secretCompoundId={screen.secretCompoundId}
+          initialHowToPlay={screen.initialHowToPlay}
           onExit={() => setScreen({ name: "menu" })}
           onMap={() => setScreen({ name: "levels" })}
           onWin={(nextId) => {
@@ -274,7 +315,12 @@ export function GameApp() {
     case "collection":
       return withGlobalModals(<Collection onBack={() => setScreen({ name: "menu" })} />);
     case "shop":
-      return withGlobalModals(<Shop onBack={() => setScreen({ name: "menu" })} />);
+      return withGlobalModals(
+        <Shop
+          initialSection={screen.section}
+          onBack={() => setScreen({ name: "menu" })}
+        />,
+      );
     case "lab":
       return withGlobalModals(
         <LabModes
@@ -294,11 +340,21 @@ export function GameApp() {
     case "library":
       return withGlobalModals(<GameLibrary onBack={() => setScreen({ name: "menu" })} />);
     case "profile":
-      return withGlobalModals(<Profile onBack={() => setScreen({ name: "menu" })} />);
+      return withGlobalModals(
+        <Profile
+          onBack={() => setScreen({ name: "menu" })}
+          onOpenShop={(section) => setScreen({ name: "shop", section })}
+        />,
+      );
     case "leaderboard":
       return withGlobalModals(<Leaderboard onBack={() => setScreen({ name: "menu" })} />);
     case "settings":
-      return withGlobalModals(<Settings onBack={() => setScreen({ name: "menu" })} />);
+      return withGlobalModals(
+        <Settings
+          onBack={() => setScreen({ name: "menu" })}
+          onOpenShop={(section) => setScreen({ name: "shop", section })}
+        />,
+      );
   }
 }
 

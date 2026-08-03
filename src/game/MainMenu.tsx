@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { Capacitor } from "@capacitor/core";
 import {
   Atom,
-  BookOpen,
   CheckCircle2,
   Clapperboard,
   FlaskConical,
@@ -64,7 +63,7 @@ interface Props {
   onLevels: () => void;
   onCollection: () => void;
   onSettings: () => void;
-  onShop: () => void;
+  onShop: (section?: "themes") => void;
   onLab: () => void;
   onLibrary: () => void;
   onProfile: () => void;
@@ -77,6 +76,13 @@ type NextRunGoal =
   | { kind: "atom"; text: string }
   | { kind: "compound"; text: string; compound: (typeof COMPOUNDS)[number] }
   | { kind: "powerup"; text: string; powerUp: PowerUpStageId };
+
+const NEW_THEME_ITEMS = [
+  { name: "Gummy Lab", image: "/themes/gummy-lab.webp" },
+  { name: "Cloud Nine", image: "/themes/cloud-nine.webp" },
+  { name: "Crystal Cove", image: "/themes/crystal-cove.webp" },
+  { name: "Moss Hollow", image: "/themes/moss-hollow.png" },
+] as const;
 
 function getNextRunGoal(level: (typeof LEVELS)[number]): NextRunGoal {
   if (level.powerUpStage) {
@@ -463,6 +469,24 @@ export function MainMenu({
           </div>
         </section>
 
+        <button
+          type="button"
+          onClick={() => onShop("themes")}
+          style={newThemesBanner}
+          aria-label="Open new themes in the shop"
+        >
+          <span style={{ minWidth: 0 }}>
+            <span style={newThemesEyebrow}>NEW IN SHOP</span>
+            <strong style={newThemesTitle}>Fresh themes are available</strong>
+            <span style={newThemesLink}>View themes →</span>
+          </span>
+          <span style={newThemesThumbnails} aria-hidden="true">
+            {NEW_THEME_ITEMS.map((item) => (
+              <img key={item.name} src={item.image} alt="" style={newThemesThumbnail} />
+            ))}
+          </span>
+        </button>
+
         <nav
           style={{
             ...subpageRow,
@@ -498,8 +522,8 @@ export function MainMenu({
             }}
           />
           <NavPill
-            icon={hasProPack ? BookOpen : ShoppingBag}
-            label={hasProPack ? "Pro" : "Shop"}
+            icon={ShoppingBag}
+            label="Shop"
             tone="shop"
             onClick={() => {
               trackMenuAction("shop");
@@ -767,12 +791,12 @@ const topBar: CSSProperties = {
 };
 
 const brandTitle: CSSProperties = {
-  fontSize: 22,
+  fontSize: "clamp(13px, 4.2vw, 22px)",
   fontWeight: 1000,
   lineHeight: 1,
   overflow: "hidden",
-  textOverflow: "ellipsis",
   whiteSpace: "nowrap",
+  letterSpacing: "-0.25px",
 };
 
 const brandSubline: CSSProperties = {
@@ -855,6 +879,60 @@ const heroPlayBtn: CSSProperties = {
   fontSize: 20,
   cursor: "pointer",
   marginTop: 16,
+};
+
+const newThemesBanner: CSSProperties = {
+  width: "100%",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 12,
+  marginTop: 12,
+  padding: "12px 13px",
+  border: "1px solid color-mix(in oklch, var(--accent) 48%, var(--border))",
+  borderRadius: 14,
+  background: "linear-gradient(135deg, color-mix(in oklch, var(--accent) 15%, var(--surface)), var(--surface))",
+  color: "var(--foreground)",
+  textAlign: "left",
+  cursor: "pointer",
+};
+
+const newThemesEyebrow: CSSProperties = {
+  display: "block",
+  color: "var(--accent)",
+  fontSize: 9,
+  letterSpacing: 1.8,
+  fontWeight: 900,
+};
+
+const newThemesTitle: CSSProperties = {
+  display: "block",
+  marginTop: 3,
+  fontSize: 13,
+};
+
+const newThemesLink: CSSProperties = {
+  display: "block",
+  marginTop: 5,
+  color: "var(--accent)",
+  fontSize: 11,
+  fontWeight: 900,
+};
+
+const newThemesThumbnails: CSSProperties = {
+  display: "flex",
+  flexShrink: 0,
+  paddingLeft: 8,
+};
+
+const newThemesThumbnail: CSSProperties = {
+  width: 42,
+  height: 42,
+  objectFit: "cover",
+  borderRadius: 10,
+  border: "2px solid var(--surface)",
+  marginLeft: -8,
+  boxShadow: "0 4px 10px rgba(0,0,0,.28)",
 };
 
 const chooseLevelBtn: CSSProperties = {

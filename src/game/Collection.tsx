@@ -10,6 +10,20 @@ import { useIsTabletLayout } from "./responsive";
 import { getElementCollectionDetails } from "./elementDetails";
 import { t } from "./localization";
 
+const BADGE_TONES = [
+  "oklch(0.9 0.18 88)",
+  "oklch(0.82 0.18 35)",
+  "oklch(0.82 0.16 205)",
+  "oklch(0.8 0.18 145)",
+  "oklch(0.82 0.14 285)",
+  "oklch(0.86 0.16 330)",
+];
+
+function badgeTone(id: string): string {
+  const value = Array.from(id).reduce((sum, character) => sum + character.charCodeAt(0), 0);
+  return BADGE_TONES[value % BADGE_TONES.length] ?? BADGE_TONES[0];
+}
+
 export function Collection({ onBack }: { onBack: () => void }) {
   const isTabletLayout = useIsTabletLayout();
   const {
@@ -17,6 +31,7 @@ export function Collection({ onBack }: { onBack: () => void }) {
     discoveredCompounds,
     compoundCounts,
     earnedBadges,
+    shopSpendCents,
     appLanguage,
     goldCoins,
     unlockLockedElementsForCoins,
@@ -366,9 +381,13 @@ export function Collection({ onBack }: { onBack: () => void }) {
                   >
                     {visibleBadges.map((badge) => {
                       const unlocked = earned.has(badge.id);
+                      const tone = badgeTone(badge.id);
                       const progress = badge.requiredAtomicNumbers.filter((atomicNumber) =>
                         found.has(atomicNumber),
                       ).length;
+                      const shopProgress = badge.requiredShopSpendCents
+                        ? `$${(shopSpendCents / 100).toFixed(2)} / $${(badge.requiredShopSpendCents / 100).toFixed(2)}`
+                        : `${progress}/${badge.requiredAtomicNumbers.length}`;
                       return (
                         <div
                           key={badge.id}
@@ -378,9 +397,9 @@ export function Collection({ onBack }: { onBack: () => void }) {
                             alignItems: "center",
                             padding: 10,
                             borderRadius: 12,
-                            border: `1px solid ${unlocked ? "var(--accent)" : "var(--border)"}`,
+                            border: `1px solid ${unlocked ? tone : "var(--border)"}`,
                             background: unlocked
-                              ? "color-mix(in oklch, var(--accent) 15%, var(--surface))"
+                              ? `color-mix(in oklch, ${tone} 15%, var(--surface))`
                               : "var(--surface)",
                             opacity: unlocked ? 1 : 0.65,
                           }}
@@ -393,7 +412,7 @@ export function Collection({ onBack }: { onBack: () => void }) {
                                 size={22}
                                 strokeWidth={2}
                                 aria-hidden="true"
-                                color={unlocked ? "var(--accent)" : "var(--muted-foreground)"}
+                                color={unlocked ? tone : "var(--muted-foreground)"}
                               />
                             ) : (
                               badge.icon
@@ -413,13 +432,13 @@ export function Collection({ onBack }: { onBack: () => void }) {
                             <div
                               style={{
                                 fontSize: 10,
-                                color: unlocked ? "var(--accent)" : "var(--muted-foreground)",
+                                color: unlocked ? tone : "var(--muted-foreground)",
                                 marginTop: 2,
                               }}
                             >
                               {unlocked
                                 ? "Unlocked"
-                                : `${progress}/${badge.requiredAtomicNumbers.length}`}
+                                : shopProgress}
                             </div>
                           </div>
                         </div>
