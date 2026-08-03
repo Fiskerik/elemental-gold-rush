@@ -79,15 +79,15 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         content:
           "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover",
       },
-      { title: "Lovable App" },
+      { title: "Atomic Fusion Rush - Periodic Table Puzzle Game" },
       { name: "description", content: "Atomic Fusion Rush is a mobile puzzle game where players merge elements to progress through the periodic table." },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
+      { name: "author", content: "EA Consulting" },
+      { property: "og:title", content: "Atomic Fusion Rush" },
       { property: "og:description", content: "Atomic Fusion Rush is a mobile puzzle game where players merge elements to progress through the periodic table." },
       { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@Lovable" },
-      { name: "twitter:title", content: "Lovable App" },
+      { property: "og:site_name", content: "Atomic Fusion Rush" },
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "Atomic Fusion Rush" },
       { name: "twitter:description", content: "Atomic Fusion Rush is a mobile puzzle game where players merge elements to progress through the periodic table." },
       { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/96b7dab8-6bea-45f2-9458-357106f22801/id-preview-5ae28a15--a7f1def7-b935-44fb-a197-7b4e163d699c.lovable.app-1778691171983.png" },
       { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/96b7dab8-6bea-45f2-9458-357106f22801/id-preview-5ae28a15--a7f1def7-b935-44fb-a197-7b4e163d699c.lovable.app-1778691171983.png" },
@@ -107,6 +107,26 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         href: appCss,
       },
     ],
+    scripts: [
+      {
+        type: "application/ld+json",
+        children: JSON.stringify({
+          "@context": "https://schema.org",
+          "@graph": [
+            {
+              "@type": "WebSite",
+              name: "Atomic Fusion Rush",
+              url: "https://atomic-fusion.lovable.app",
+            },
+            {
+              "@type": "Organization",
+              name: "EA Consulting",
+              url: "https://atomic-fusion.lovable.app",
+            },
+          ],
+        }),
+      },
+    ],
   }),
   component: RootComponent,
   notFoundComponent: NotFoundComponent,
@@ -116,7 +136,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootDocument({ children }: { children: ReactNode }) {
   return (
-    <html>
+    <html lang="en">
       <head>
         <HeadContent />
       </head>
