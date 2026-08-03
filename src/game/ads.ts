@@ -19,6 +19,8 @@ let initializationPromise: Promise<void> | null = null;
 let rewardedLoadPromise: Promise<void> | null = null;
 let interstitialLoadPromise: Promise<void> | null = null;
 
+const consentRetryDelaysMs = [0, 1200, 3000];
+
 function configuredEnvValue(value: unknown): string {
   if (typeof value !== "string") return "";
   const trimmed = value.trim();
@@ -67,8 +69,30 @@ function describeAdError(error: unknown): string {
   return [code, message].filter(Boolean).join(": ");
 }
 
+function isConsentRequestFailure(reason: string): boolean {
+  return reason.toLowerCase().includes("request consent info failed");
+}
+
+async function requestConsentInfoWithRetry() {
+  let lastError: unknown;
+
+  for (const delayMs of consentRetryDelaysMs) {
+    if (delayMs > 0) {
+      await new Promise((resolve) => window.setTimeout(resolve, delayMs));
+    }
+
+    try {
+      return await AdMob.requestConsentInfo();
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError;
+}
+
 export async function initAds(hasProPack: boolean): Promise<void> {
-  if (hasProPack || initialized || initFailed || !isAdMobAvailable()) return;
+  if (hasProPack || initialized || !isAdMobAvailable()) return;
   if (initializationPromise) {
     await initializationPromise;
     return;
@@ -79,7 +103,7 @@ export async function initAds(hasProPack: boolean): Promise<void> {
       initFailureReason = "";
       await AdMob.initialize({ initializeForTesting: isTestingEnabled() });
 
-      let consentInfo = await AdMob.requestConsentInfo();
+      let consentInfo = await requestConsentInfoWithRetry();
       if (!consentInfo.canRequestAds && consentInfo.isConsentFormAvailable) {
         consentInfo = await AdMob.showConsentForm();
       }
@@ -94,7 +118,10 @@ export async function initAds(hasProPack: boolean): Promise<void> {
       initialized = true;
       initFailed = false;
     } catch (error) {
-      initFailureReason = describeAdError(error) || "AdMob initialization failed.";
+      const reason = describeAdError(error);
+      initFailureReason = isConsentRequestFailure(reason)
+        ? "Ad consent could not be loaded. Check your connection and try again."
+        : reason || "AdMob initialization failed.";
       console.warn(`[ads] ${initFailureReason}`);
       initFailed = true;
       initialized = false;
