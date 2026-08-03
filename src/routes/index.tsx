@@ -24,6 +24,25 @@ export const Route = createFileRoute("/")({
         content:
           "Merge hydrogen into helium, unlock power-ups, form compounds, and master the periodic table.",
       },
+      { property: "og:type", content: "website" },
+      { property: "og:url", content: "https://atomic-fusion.lovable.app/" },
+    ],
+    links: [{ rel: "canonical", href: "https://atomic-fusion.lovable.app/" }],
+    scripts: [
+      {
+        type: "application/ld+json",
+        children: JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "VideoGame",
+          name: "Atomic Fusion Rush",
+          url: "https://atomic-fusion.lovable.app/",
+          applicationCategory: "GameApplication",
+          operatingSystem: "iOS, Web",
+          genre: "Puzzle",
+          description:
+            "Fuse atoms, climb the periodic table, discover compounds, and chase Gold in Atomic Fusion Rush.",
+        }),
+      },
     ],
   }),
   component: Index,
