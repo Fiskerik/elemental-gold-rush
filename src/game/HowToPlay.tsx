@@ -16,7 +16,16 @@ interface HowToPlayProps {
 type Slide = {
   title: string;
   body: string;
-  visual: "target" | "merge" | "powerups" | "add" | "select" | "discover" | "hint" | "speed";
+  visual:
+    | "target"
+    | "merge"
+    | "powerups"
+    | "add"
+    | "select"
+    | "discover"
+    | "daily-grid"
+    | "daily-select"
+    | "daily-solve";
 };
 
 const SLIDES: Record<HowToPlayMode, Slide[]> = {
@@ -39,7 +48,7 @@ const SLIDES: Record<HowToPlayMode, Slide[]> = {
   ],
   compound: [
     {
-      title: "Build the ingredients",
+      title: "Build the elements",
       body: "Shoot atoms onto the board until the elements needed for the level's compound are present.",
       visual: "add",
     },
@@ -58,17 +67,17 @@ const SLIDES: Record<HowToPlayMode, Slide[]> = {
     {
       title: "Read the clue",
       body: "Use the hint at the top and the atom count to understand what you are looking for.",
-      visual: "hint",
+      visual: "daily-grid",
     },
     {
       title: "Find a suitable molecule",
       body: "Select a possible answer on the grid. After two wrong guesses, a hint can reveal a correct atom; a second unlocks after four.",
-      visual: "select",
+      visual: "daily-select",
     },
     {
       title: "Solve it quickly",
       body: "Find the target molecule in as little time as possible. Fewer wrong guesses and faster solves produce a better score.",
-      visual: "speed",
+      visual: "daily-solve",
     },
   ],
 };
@@ -152,7 +161,7 @@ function TutorialVisual({ kind, atomSkin }: { kind: Slide["visual"]; atomSkin: A
           <MiniAtom atomicNumber={1} left="16%" top="22%" atomSkin={atomSkin} />
           <MiniAtom atomicNumber={6} left="55%" top="34%" atomSkin={atomSkin} />
           <MiniAtom atomicNumber={8} left="31%" top="60%" atomSkin={atomSkin} />
-          <div style={targetTagStyle}>TARGET: Ne #10</div>
+          <MiniGoalBar atomSkin={atomSkin} />
           <div style={aimLineStyle} />
         </MiniBoard>
       );
@@ -170,16 +179,15 @@ function TutorialVisual({ kind, atomSkin }: { kind: Slide["visual"]; atomSkin: A
       return (
         <div style={powerupsVisualStyle}>
           {[
-            ["grab", "Move"],
-            ["gravity", "Pull"],
-            ["transmute", "Change"],
+            ["grab", "Grab"],
+            ["gravity", "Gravity"],
+            ["transmute", "Transmute"],
           ].map(([icon, label]) => (
             <div key={icon} style={powerupItemStyle}>
               <PowerUpBadge icon={icon} size={42} />
               <span>{label}</span>
             </div>
           ))}
-          <div style={powerupArrowStyle}>→ clear the board</div>
         </div>
       );
     case "add":
@@ -188,7 +196,8 @@ function TutorialVisual({ kind, atomSkin }: { kind: Slide["visual"]; atomSkin: A
           <MiniAtom atomicNumber={1} left="18%" top="25%" atomSkin={atomSkin} />
           <MiniAtom atomicNumber={8} left="52%" top="42%" atomSkin={atomSkin} />
           <MiniAtom atomicNumber={1} left="70%" top="66%" atomSkin={atomSkin} />
-          <div style={compoundNeedTagStyle}>3 ingredients present</div>
+          <MiniAtom atomicNumber={6} left="82%" top="22%" atomSkin={atomSkin} />
+          <div style={compoundNeedTagStyle}>3 elements present</div>
         </MiniBoard>
       );
     case "select":
@@ -215,7 +224,7 @@ function TutorialVisual({ kind, atomSkin }: { kind: Slide["visual"]; atomSkin: A
           </div>
         </div>
       );
-    case "hint":
+    case "daily-grid":
       return (
         <div style={dailyVisualStyle}>
           <div style={dailyTopBarStyle}>
@@ -223,18 +232,19 @@ function TutorialVisual({ kind, atomSkin }: { kind: Slide["visual"]; atomSkin: A
             <strong>0/4 atoms</strong>
           </div>
           <div style={clueStyle}>Hint: a gas used in bright welding torches</div>
-          <MiniGrid atomSkin={atomSkin} highlighted={[]} />
+          <DailyTutorialGrid atomSkin={atomSkin} state="base" />
         </div>
       );
-    case "speed":
+    case "daily-select":
       return (
         <div style={dailyVisualStyle}>
-          <div style={dailyTopBarStyle}>
-            <span>TIME 0:18</span>
-            <strong style={{ color: "var(--accent)" }}>SCORE 8.6K</strong>
-          </div>
-          <MiniGrid atomSkin={atomSkin} highlighted={[1, 4, 7]} />
-          <div style={speedCaptionStyle}>✓ target found · fewer guesses = more points</div>
+          <DailyTutorialGrid atomSkin={atomSkin} state="wrong" />
+        </div>
+      );
+    case "daily-solve":
+      return (
+        <div style={dailyVisualStyle}>
+          <DailyTutorialGrid atomSkin={atomSkin} state="correct" />
         </div>
       );
     default:
@@ -251,6 +261,24 @@ function MiniBoard({ children, atomSkin, footer }: { children: React.ReactNode; 
     <div style={miniBoardStyle}>
       <div style={miniBoardGridStyle}>{children}</div>
       {footer && <div style={miniBoardFooterStyle}>{footer}</div>}
+    </div>
+  );
+}
+
+function MiniGoalBar({ atomSkin }: { atomSkin: AtomSkin }) {
+  return (
+    <div style={miniGoalBarStyle}>
+      <ElementBall atomicNumber={6} size={28} atomSkin={atomSkin} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={miniGoalLabelsStyle}>
+          <span>Highest reached</span>
+          <span>Target: Ne (#10)</span>
+        </div>
+        <div style={miniGoalTrackStyle}>
+          <div style={miniGoalFillStyle} />
+          <span style={miniGoalMarkerStyle}>Ne</span>
+        </div>
+      </div>
     </div>
   );
 }
@@ -275,15 +303,56 @@ function MiniAtom({
   );
 }
 
-function MiniGrid({ atomSkin, highlighted }: { atomSkin: AtomSkin; highlighted: number[] }) {
-  const atoms = [1, 5, 6, 2, 8, 1, 5, 6, 2, 8, 1, 5];
+type DailyTutorialState = "base" | "wrong" | "correct";
+
+const DAILY_TUTORIAL_ATOMS = [
+  1, 5, 6, 2, 8, 5, 1, 6,
+  5, 6, 6, 1, 1, 5, 2, 8,
+  2, 8, 5, 6, 2, 8, 5, 1,
+  6, 1, 5, 2, 8, 6, 1, 5,
+] as const;
+const DAILY_TUTORIAL_TARGET = [9, 10, 11, 12];
+const DAILY_TUTORIAL_WRONG = [1, 2, 3];
+
+function DailyTutorialGrid({
+  atomSkin,
+  state,
+}: {
+  atomSkin: AtomSkin;
+  state: DailyTutorialState;
+}) {
+  const selected = state === "correct" ? DAILY_TUTORIAL_TARGET : state === "wrong" ? DAILY_TUTORIAL_WRONG : [];
   return (
-    <div style={miniGridStyle}>
-      {atoms.map((atom, index) => (
-        <div key={`${atom}-${index}`} style={highlighted.includes(index) ? highlightedCellStyle : undefined}>
-          <ElementBall atomicNumber={atom} size={31} glow={highlighted.includes(index)} atomSkin={atomSkin} />
-        </div>
-      ))}
+    <div style={dailyTutorialBoardStyle}>
+      <div style={dailyTutorialGridStyle}>
+        {DAILY_TUTORIAL_ATOMS.map((atom, index) => {
+          const isSelected = selected.includes(index);
+          const isTarget = DAILY_TUTORIAL_TARGET.includes(index);
+          return (
+            <div
+              key={`${atom}-${index}`}
+              style={{
+                ...dailyTutorialCellStyle,
+                ...(isSelected
+                  ? state === "correct"
+                    ? dailyTutorialCorrectCellStyle
+                    : dailyTutorialSelectedCellStyle
+                  : {}),
+              }}
+            >
+              <ElementBall
+                atomicNumber={atom}
+                size={25}
+                glow={isSelected || (state === "base" && isTarget)}
+                atomSkin={atomSkin}
+                patternSeed={index}
+              />
+            </div>
+          );
+        })}
+      </div>
+      {state === "wrong" && <div style={dailyTutorialHintButtonStyle}>HINT</div>}
+      {state === "correct" && <div style={dailyTutorialSolvedStyle}>ACETYLENE FOUND - C2H2</div>}
     </div>
   );
 }
@@ -329,13 +398,16 @@ const primaryButtonStyle: CSSProperties = { ...secondaryButtonStyle, border: "no
 const miniBoardStyle: CSSProperties = { width: "100%", maxWidth: 330 };
 const miniBoardGridStyle: CSSProperties = { position: "relative", height: 150, overflow: "hidden", borderRadius: 14, border: "1px solid var(--game-panel-accent-border, var(--border))", background: "radial-gradient(circle at 50% 30%, color-mix(in oklch, var(--primary) 28%, transparent), transparent 55%), var(--surface)" };
 const miniBoardFooterStyle: CSSProperties = { marginTop: 7, padding: "7px 10px", borderRadius: 8, color: "var(--accent)", background: "var(--surface)", fontSize: 11, fontWeight: 850, textAlign: "center" };
-const targetTagStyle: CSSProperties = { position: "absolute", right: 10, top: 9, padding: "5px 7px", borderRadius: 7, color: "var(--accent)", background: "var(--surface-elevated)", fontSize: 10, fontWeight: 900 };
+const miniGoalBarStyle: CSSProperties = { position: "absolute", left: 9, right: 9, top: 9, display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", borderRadius: 8, background: "var(--surface-elevated)", border: "1px solid var(--game-panel-accent-border, var(--border))" };
+const miniGoalLabelsStyle: CSSProperties = { display: "flex", justifyContent: "space-between", gap: 6, color: "var(--muted-foreground)", fontSize: 8, fontWeight: 800 };
+const miniGoalTrackStyle: CSSProperties = { position: "relative", height: 7, marginTop: 4, borderRadius: 99, background: "var(--surface-high)" };
+const miniGoalFillStyle: CSSProperties = { width: "54%", height: "100%", borderRadius: 99, background: "linear-gradient(90deg, var(--primary), var(--accent))" };
+const miniGoalMarkerStyle: CSSProperties = { position: "absolute", right: -2, top: -5, padding: "1px 3px", borderRadius: 4, background: "var(--accent)", color: "#07101c", fontSize: 7, fontWeight: 900 };
 const aimLineStyle: CSSProperties = { position: "absolute", left: "50%", bottom: 6, width: 2, height: 60, borderLeft: "2px dashed var(--accent)", opacity: 0.7 };
 const mergeVisualStyle: CSSProperties = { display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%" };
 const operatorStyle: CSSProperties = { color: "var(--accent)", fontSize: 24, fontWeight: 900 };
 const powerupsVisualStyle: CSSProperties = { display: "flex", alignItems: "center", justifyContent: "center", flexWrap: "wrap", gap: 13, width: "100%" };
 const powerupItemStyle: CSSProperties = { display: "grid", justifyItems: "center", gap: 2, color: "var(--muted-foreground)", fontSize: 10, fontWeight: 850 };
-const powerupArrowStyle: CSSProperties = { flexBasis: "100%", textAlign: "center", color: "var(--accent)", fontSize: 12, fontWeight: 900 };
 const compoundNeedTagStyle: CSSProperties = { position: "absolute", left: 10, top: 9, padding: "5px 7px", borderRadius: 7, color: "var(--success, var(--accent))", background: "var(--surface-elevated)", fontSize: 10, fontWeight: 900 };
 const selectedAtomStyle: CSSProperties = { borderRadius: "50%", boxShadow: "0 0 0 3px var(--accent), 0 0 22px var(--accent-glow)" };
 const selectionRingStyle: CSSProperties = { position: "absolute", left: "18%", top: "27%", width: 56, height: 56, border: "2px solid var(--accent)", borderRadius: "50%", transform: "translate(-50%, -50%)", opacity: 0.9 };
@@ -347,7 +419,10 @@ const checkmarkStyle: CSSProperties = { display: "grid", placeItems: "center", w
 const dailyVisualStyle: CSSProperties = { width: "100%", maxWidth: 330 };
 const dailyTopBarStyle: CSSProperties = { display: "flex", justifyContent: "space-between", padding: "8px 10px", borderRadius: 8, color: "var(--accent)", background: "var(--surface)", fontSize: 10, fontWeight: 900, letterSpacing: 1 };
 const clueStyle: CSSProperties = { margin: "8px 0", padding: "8px 10px", borderRadius: 8, color: "var(--foreground)", background: "var(--surface-elevated)", fontSize: 11, fontWeight: 750 };
-const miniGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 4, padding: 8, borderRadius: 10, background: "var(--surface)" };
-const highlightedCellStyle: CSSProperties = { display: "grid", placeItems: "center", borderRadius: 7, outline: "2px solid var(--success, var(--accent))", background: "color-mix(in oklch, var(--success, var(--accent)) 22%, transparent)" };
-const speedCaptionStyle: CSSProperties = { marginTop: 8, textAlign: "center", color: "var(--success, var(--accent))", fontSize: 11, fontWeight: 850 };
-
+const dailyTutorialBoardStyle: CSSProperties = { width: "100%", maxWidth: 330, padding: 8, borderRadius: 12, background: "var(--surface)" };
+const dailyTutorialGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(8, minmax(0, 1fr))", gap: 4 };
+const dailyTutorialCellStyle: CSSProperties = { display: "grid", placeItems: "center", minWidth: 0, aspectRatio: "1", borderRadius: 6, border: "1px solid color-mix(in oklch, var(--border) 80%, transparent)", background: "color-mix(in oklch, var(--background) 72%, var(--surface))" };
+const dailyTutorialSelectedCellStyle: CSSProperties = { border: "2px solid var(--accent)", background: "color-mix(in oklch, var(--accent) 20%, var(--surface))", boxShadow: "0 0 12px var(--accent-glow)" };
+const dailyTutorialCorrectCellStyle: CSSProperties = { border: "2px solid var(--success, #51e6a4)", background: "color-mix(in oklch, var(--success, #51e6a4) 20%, var(--surface))", boxShadow: "0 0 12px color-mix(in oklch, var(--success, #51e6a4) 60%, transparent)" };
+const dailyTutorialHintButtonStyle: CSSProperties = { marginTop: 8, padding: "7px 10px", borderRadius: 8, border: "1px solid var(--accent)", background: "color-mix(in oklch, var(--accent) 20%, var(--surface-elevated))", color: "var(--accent)", textAlign: "center", fontSize: 10, fontWeight: 900, letterSpacing: 1.5, boxShadow: "0 0 14px var(--accent-glow)" };
+const dailyTutorialSolvedStyle: CSSProperties = { marginTop: 8, padding: "7px 10px", borderRadius: 8, border: "1px solid var(--success, #51e6a4)", color: "var(--success, #51e6a4)", textAlign: "center", fontSize: 10, fontWeight: 900, letterSpacing: 1 };

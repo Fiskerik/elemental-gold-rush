@@ -161,7 +161,7 @@ export const ElementBall = memo(function ElementBall({
     mineral: "transparent",
     verdantCrystal: `radial-gradient(circle at 26% 18%, oklch(1 0 0 / 0.9) 0 5%, transparent 18%), radial-gradient(circle at 31% 25%, color-mix(in oklch, ${el.glowColor} 70%, white) 0 9%, transparent 30%), radial-gradient(circle at 52% 58%, color-mix(in oklch, ${el.color} 44%, white), color-mix(in oklch, ${el.color} 72%, #7fe0ba) 54%, color-mix(in oklch, ${el.color} 42%, #16463f) 100%)`,
     toxic: `radial-gradient(circle at 30% 24%, ${el.glowColor}, ${el.color} 58%, color-mix(in oklch, ${el.color} 55%, #12220c))`,
-    moss: `radial-gradient(circle at 27% 20%, oklch(1 0 0 / 0.58) 0 5%, transparent 18%), radial-gradient(circle at 70% 72%, oklch(0.9 0.18 92 / 0.78) 0 5%, oklch(0.84 0.16 105 / 0.22) 8% 18%, transparent 26%), radial-gradient(circle at 42% 42%, color-mix(in oklch, ${el.color} 42%, #a5c86b), color-mix(in oklch, ${el.color} 56%, #294c2a) 58%, color-mix(in oklch, ${el.color} 28%, #0d2118) 100%)`,
+     moss: `radial-gradient(circle at 27% 20%, oklch(1 0 0 / 0.58) 0 5%, transparent 18%), radial-gradient(circle at 70% 72%, color-mix(in oklch, ${el.glowColor} 62%, white) 0 5%, color-mix(in oklch, ${el.glowColor} 24%, transparent) 8% 18%, transparent 26%), radial-gradient(circle at 42% 42%, color-mix(in oklch, ${el.color} 88%, #a5c86b), color-mix(in oklch, ${el.color} 78%, #294c2a) 58%, color-mix(in oklch, ${el.color} 68%, #0d2118) 100%)`,
   };
   const materialVariables = {
     "--atom-color": el.color,
@@ -253,13 +253,7 @@ export const ElementBall = memo(function ElementBall({
           }}
         />
       )}
-      {atomSkin === "moss" && (
-        <div aria-hidden="true" className="atom-moss-mushrooms">
-          <span />
-          <span />
-          <span />
-        </div>
-      )}
+      {atomSkin === "moss" && <div aria-hidden="true" className="atom-moss-texture" />}
       {isGummy && (
         <>
           <div aria-hidden="true" className="atom-gummy-glaze" />

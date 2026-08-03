@@ -749,7 +749,13 @@ function GameBoardThemePreviewModal({
   );
 }
 
-export function Shop({ onBack }: { onBack: () => void }) {
+export function Shop({
+  onBack,
+  initialSection,
+}: {
+  onBack: () => void;
+  initialSection?: "themes";
+}) {
   const isTabletLayout = useIsTabletLayout();
   const {
     goldCoins,
@@ -778,6 +784,7 @@ export function Shop({ onBack }: { onBack: () => void }) {
   const [purchaseReport, setPurchaseReport] = useState("");
   const [coinToast, setCoinToast] = useState<{ id: number; text: string } | null>(null);
   const coinToastTimeoutRef = useRef<number | null>(null);
+  const themesSectionRef = useRef<HTMLElement | null>(null);
   const proPack = getProductById(PRODUCT_IDS.proLabPack);
   const isNativeIos = Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios";
   const purchaseDebugEnabled = isPurchaseDebugUiEnabled();
@@ -789,6 +796,14 @@ export function Shop({ onBack }: { onBack: () => void }) {
     isNativeIos &&
     purchaseDebugEnabled &&
     Boolean(proPackMessage || message || purchaseSupportMessage || purchaseReport);
+
+  useEffect(() => {
+    if (initialSection !== "themes") return;
+    const frame = window.requestAnimationFrame(() => {
+      themesSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [initialSection]);
 
   useEffect(() => {
     if (!isNativeIos) return;
@@ -1001,32 +1016,6 @@ export function Shop({ onBack }: { onBack: () => void }) {
       );
     } finally {
       setPendingProductId(null);
-      if (purchaseDebugEnabled) refreshPurchaseDebugLogs();
-    }
-  }
-
-  async function handleThemeRestore() {
-    if (appStorePurchaseBusy) return;
-    setProPackBusy("restore");
-    setCosmeticMessage("Checking App Store purchases...");
-    try {
-      const restored = await restorePurchases();
-      if (restored.includes(PRODUCT_IDS.proLabPack)) grantProPack({ fromRestore: true });
-      const restoredThemes = restored.filter((productId) =>
-        (THEME_BUNDLE_PRODUCT_IDS as readonly ProductId[]).includes(productId),
-      );
-      restoredThemes.forEach(grantThemeProduct);
-      setCosmeticMessage(
-        restoredThemes.length
-          ? `${restoredThemes.length} cosmetic bundle${restoredThemes.length === 1 ? "" : "s"} restored.`
-          : "No cosmetic bundle purchases were found.",
-      );
-    } catch (error) {
-      setCosmeticMessage(
-        error instanceof Error ? error.message : "Purchases could not be restored.",
-      );
-    } finally {
-      setProPackBusy("");
       if (purchaseDebugEnabled) refreshPurchaseDebugLogs();
     }
   }
@@ -1495,6 +1484,8 @@ export function Shop({ onBack }: { onBack: () => void }) {
 
         {isNativeIos && (
           <section
+            ref={themesSectionRef}
+            id="shop-themes"
             style={{
               background: "var(--surface-elevated)",
               border: "1px solid var(--border)",
@@ -1528,20 +1519,6 @@ export function Shop({ onBack }: { onBack: () => void }) {
                   Boards + atom skins
                 </h2>
               </div>
-              {COSMETIC_THEME_PURCHASES_ENABLED && (
-                <button
-                  type="button"
-                  onClick={handleThemeRestore}
-                  disabled={appStorePurchaseBusy || purchaseDebugLocked}
-                  style={{
-                    ...secondaryShopButton,
-                    padding: "8px 11px",
-                    opacity: appStorePurchaseBusy || purchaseDebugLocked ? 0.55 : 1,
-                  }}
-                >
-                  {proPackBusy === "restore" ? "Checking..." : "Restore"}
-                </button>
-              )}
             </div>
             <p style={{ margin: "0 0 14px", color: "var(--muted-foreground)", fontSize: 13 }}>
               Support the developer by purchasing custom skins. Each one-time purchase unlocks a
@@ -1575,18 +1552,42 @@ export function Shop({ onBack }: { onBack: () => void }) {
                       background: "var(--surface)",
                     }}
                   >
-                    <div
+                    <button
+                      type="button"
+                      onClick={() => setPreviewProductId(productId)}
+                      aria-label={`Preview ${product.name}`}
                       style={{
+                        border: 0,
+                        padding: 0,
+                        width: "100%",
                         position: "relative",
                         minHeight: 124,
                         borderRadius: 12,
                         background: visual.board,
                         boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.14)",
                         overflow: "hidden",
+                        cursor: "pointer",
                       }}
                     >
                       <BundlePreview visual={visual} />
-                    </div>
+                      <span
+                        style={{
+                          position: "absolute",
+                          left: 8,
+                          bottom: 8,
+                          padding: "5px 8px",
+                          borderRadius: 999,
+                          background: "rgba(4,8,24,.78)",
+                          color: "white",
+                          fontSize: 10,
+                          fontWeight: 900,
+                          letterSpacing: 0.5,
+                          textTransform: "uppercase",
+                        }}
+                      >
+                        Preview
+                      </span>
+                    </button>
                     <div style={{ minWidth: 0, display: "grid", gap: 7 }}>
                       <div>
                         <strong style={{ display: "block", fontSize: 15 }}>{product.name}</strong>
@@ -1617,26 +1618,11 @@ export function Shop({ onBack }: { onBack: () => void }) {
                       <div
                         style={{
                           display: "grid",
-                          gridTemplateColumns: "minmax(0, 0.8fr) minmax(0, 1.2fr)",
+                          gridTemplateColumns: "1fr",
                           gap: 8,
                           minWidth: 0,
                         }}
                       >
-                        <button
-                          type="button"
-                          onClick={() => setPreviewProductId(productId)}
-                          style={{
-                            ...secondaryShopButton,
-                            minWidth: 0,
-                            width: "100%",
-                            padding: "8px 6px",
-                            whiteSpace: "normal",
-                            overflowWrap: "anywhere",
-                            lineHeight: 1.15,
-                          }}
-                        >
-                          Preview
-                        </button>
                         <button
                           type="button"
                           onClick={() => handleThemePurchase(productId)}

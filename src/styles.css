@@ -2269,62 +2269,19 @@
   filter: blur(0.4px);
 }
 
-.atom-moss-mushrooms {
+.atom-moss-texture {
   position: absolute;
   inset: 0;
   z-index: 1;
   pointer-events: none;
-  filter: drop-shadow(0 0 2px oklch(0.84 0.16 120 / 0.6));
-}
-
-.atom-moss-mushrooms span {
-  position: absolute;
-  width: 23%;
-  height: 28%;
-  opacity: 0.9;
-}
-
-.atom-moss-mushrooms span::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 46%;
-  border-radius: 54% 54% 42% 42%;
+  border-radius: inherit;
   background:
-    radial-gradient(circle at 35% 25%, oklch(1 0 0 / 0.82) 0 12%, transparent 14%),
-    linear-gradient(145deg, oklch(0.92 0.16 80), oklch(0.54 0.15 35) 58%, oklch(0.27 0.08 30));
-  box-shadow: inset 0 -2px 2px oklch(0.12 0.05 30 / 0.38);
-}
-
-.atom-moss-mushrooms span::after {
-  content: "";
-  position: absolute;
-  top: 36%;
-  left: 39%;
-  width: 24%;
-  height: 58%;
-  border-radius: 40% 40% 48% 48%;
-  background: linear-gradient(90deg, oklch(0.92 0.1 95), oklch(0.7 0.12 75), oklch(0.36 0.08 65));
-}
-
-.atom-moss-mushrooms span:nth-child(1) {
-  top: 13%;
-  left: 12%;
-  transform: rotate(-12deg);
-}
-
-.atom-moss-mushrooms span:nth-child(2) {
-  right: 10%;
-  bottom: 14%;
-  transform: scale(0.82) rotate(11deg);
-}
-
-.atom-moss-mushrooms span:nth-child(3) {
-  top: 53%;
-  left: 65%;
-  transform: scale(0.62) rotate(-5deg);
+    radial-gradient(circle at 16% 68%, oklch(0.98 0.12 110 / 0.38) 0 2%, transparent 3%),
+    radial-gradient(circle at 78% 28%, oklch(0.95 0.14 118 / 0.32) 0 2%, transparent 3%),
+    radial-gradient(circle at 62% 78%, oklch(0.1 0.06 145 / 0.24) 0 8%, transparent 9%),
+    linear-gradient(118deg, transparent 35%, oklch(0.95 0.16 118 / 0.2) 36% 38%, transparent 39% 62%, oklch(0.1 0.06 145 / 0.22) 63% 65%, transparent 66%);
+  mix-blend-mode: screen;
+  opacity: 0.72;
 }
 
 .atom-ball-label {

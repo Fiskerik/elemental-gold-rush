@@ -12,7 +12,9 @@ import type { ProductId } from "./products";
 import { setMusicVolume, setSfxVolume, startAmbientMusic, stopAmbientMusic } from "./audio";
 import { isNativePlatform, useIsTabletLayout } from "./responsive";
 
-export function Settings({ onBack }: { onBack: () => void; onOpenShop?: () => void }) {
+export type ShopSection = "themes";
+
+export function Settings({ onBack }: { onBack: () => void; onOpenShop?: (section?: ShopSection) => void }) {
   const isTabletLayout = useIsTabletLayout();
   const {
     soundEnabled,
@@ -174,7 +176,7 @@ export function BoardThemePicker({
   hasProPack: boolean;
   ownedThemeProducts: ProductId[];
   onChange: (theme: BoardTheme) => void;
-  onOpenShop?: () => void;
+  onOpenShop?: (section?: ShopSection) => void;
 }) {
   const anyLocked = BOARD_THEMES.some(
     (theme) => !isBoardThemeUnlocked(theme, { hasProPack, ownedThemeProducts }),
@@ -196,7 +198,7 @@ export function BoardThemePicker({
         {anyLocked && onOpenShop && (
           <button
             type="button"
-            onClick={onOpenShop}
+            onClick={() => onOpenShop("themes")}
             style={{
               background: "none",
               border: "none",
@@ -223,7 +225,7 @@ export function BoardThemePicker({
               key={theme}
               type="button"
               aria-disabled={locked}
-              onClick={() => (locked ? onOpenShop?.() : onChange(theme))}
+              onClick={() => (locked ? onOpenShop?.("themes") : onChange(theme))}
               style={{
                 minHeight: 72,
                 display: "grid",
@@ -296,7 +298,7 @@ export function AtomSkinPicker({
   hasProPack: boolean;
   ownedThemeProducts: ProductId[];
   onChange: (skin: AtomSkin) => void;
-  onOpenShop?: () => void;
+  onOpenShop?: (section?: ShopSection) => void;
 }) {
   return (
     <section
@@ -318,7 +320,7 @@ export function AtomSkinPicker({
           ) && (
             <button
               type="button"
-              onClick={onOpenShop}
+              onClick={() => onOpenShop("themes")}
               style={{
                 background: "none",
                 border: "none",
@@ -343,7 +345,7 @@ export function AtomSkinPicker({
               key={skin}
               type="button"
               aria-disabled={locked}
-              onClick={() => (locked ? onOpenShop?.() : onChange(skin))}
+              onClick={() => (locked ? onOpenShop?.("themes") : onChange(skin))}
               title={
                 locked && bundleTheme
                   ? `Included with the ${BOARD_THEME_LABELS[bundleTheme]} theme`

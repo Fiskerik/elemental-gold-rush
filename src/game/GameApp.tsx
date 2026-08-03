@@ -32,7 +32,7 @@ type Screen =
       secretCompoundId?: string;
     }
   | { name: "collection" }
-  | { name: "shop" }
+  | { name: "shop"; section?: "themes" }
   | { name: "lab" }
   | { name: "library" }
   | { name: "profile" }
@@ -203,7 +203,7 @@ export function GameApp() {
             onLevels={() => setScreen({ name: "levels" })}
             onCollection={() => setScreen({ name: "collection" })}
             onSettings={() => setScreen({ name: "settings" })}
-            onShop={() => setScreen({ name: "shop" })}
+            onShop={(section) => setScreen({ name: "shop", section })}
             onLab={() => setScreen({ name: "lab" })}
             onLibrary={() => setScreen({ name: "library" })}
             onProfile={() => setScreen({ name: "profile" })}
@@ -280,7 +280,12 @@ export function GameApp() {
     case "collection":
       return withGlobalModals(<Collection onBack={() => setScreen({ name: "menu" })} />);
     case "shop":
-      return withGlobalModals(<Shop onBack={() => setScreen({ name: "menu" })} />);
+      return withGlobalModals(
+        <Shop
+          initialSection={screen.section}
+          onBack={() => setScreen({ name: "menu" })}
+        />,
+      );
     case "lab":
       return withGlobalModals(
         <LabModes
@@ -303,7 +308,7 @@ export function GameApp() {
       return withGlobalModals(
         <Profile
           onBack={() => setScreen({ name: "menu" })}
-          onOpenShop={() => setScreen({ name: "shop" })}
+          onOpenShop={(section) => setScreen({ name: "shop", section })}
         />,
       );
     case "leaderboard":
@@ -312,7 +317,7 @@ export function GameApp() {
       return withGlobalModals(
         <Settings
           onBack={() => setScreen({ name: "menu" })}
-          onOpenShop={() => setScreen({ name: "shop" })}
+          onOpenShop={(section) => setScreen({ name: "shop", section })}
         />,
       );
   }

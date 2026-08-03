@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Capacitor } from "@capacitor/core";
 import { ELEMENTS } from "./elements";
 import { getLevelById, MAX_LEVEL } from "./levels";
 import { isAtomSkinUnlocked, useProgress, type CoinTransaction } from "./store";
@@ -8,6 +9,8 @@ import { COMPOUNDS } from "./compounds";
 import { BOSSES, type BossId } from "./bosses";
 import { ElementBall } from "./ElementBall";
 import { AtomSkinPicker, BoardThemePicker } from "./Settings";
+import { COSMETIC_THEME_PURCHASES_ENABLED, PRODUCT_IDS, THEME_BUNDLE_PRODUCT_IDS } from "./products";
+import { restorePurchases } from "./purchases";
 import {
   authenticateGameCenter,
   getCachedGameCenterPlayerName,
@@ -38,7 +41,7 @@ import {
 
 interface Props {
   onBack: () => void;
-  onOpenShop?: () => void;
+  onOpenShop?: (section?: "themes") => void;
 }
 
 export function Profile({ onBack, onOpenShop }: Props) {
@@ -81,6 +84,8 @@ export function Profile({ onBack, onOpenShop }: Props) {
     setBoardTheme,
     setAtomSkin,
     setAppLanguage,
+    grantProPack,
+    grantThemeProduct,
   } = useProgress();
   const tr = (text: string) => t(text, appLanguage);
   const intlLocale = toIntlLocale(appLanguage);
@@ -142,7 +147,10 @@ export function Profile({ onBack, onOpenShop }: Props) {
       day: "numeric",
       hour: "2-digit",
       minute: "2-digit",
-    });
+      });
+  const isNativeIos = Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios";
+  const [restoreBusy, setRestoreBusy] = useState(false);
+  const [restoreMessage, setRestoreMessage] = useState("");
   async function handleGameCenterSignIn() {
     if (gameCenterBusy) return;
     if (!isGameCenterAvailable()) {
@@ -186,6 +194,29 @@ export function Profile({ onBack, onOpenShop }: Props) {
       );
     } finally {
       setGameCenterBusy(false);
+    }
+  }
+
+  async function handleRestorePurchases() {
+    if (restoreBusy) return;
+    setRestoreBusy(true);
+    setRestoreMessage("Checking App Store purchases...");
+    try {
+      const restored = await restorePurchases();
+      if (restored.includes(PRODUCT_IDS.proLabPack)) grantProPack({ fromRestore: true });
+      const restoredThemes = restored.filter((productId) =>
+        THEME_BUNDLE_PRODUCT_IDS.includes(productId as (typeof THEME_BUNDLE_PRODUCT_IDS)[number]),
+      );
+      if (COSMETIC_THEME_PURCHASES_ENABLED) restoredThemes.forEach(grantThemeProduct);
+      setRestoreMessage(
+        restored.length
+          ? `${restored.length} purchase${restored.length === 1 ? "" : "s"} restored.`
+          : "No purchases were found.",
+      );
+    } catch (error) {
+      setRestoreMessage(error instanceof Error ? error.message : "Purchases could not be restored.");
+    } finally {
+      setRestoreBusy(false);
     }
   }
 
@@ -528,6 +559,25 @@ export function Profile({ onBack, onOpenShop }: Props) {
             onChange={setAtomSkin}
             onOpenShop={onOpenShop}
           />
+          {isNativeIos && (
+            <div style={restorePurchasesRow}>
+              <div>
+                <strong>Purchases</strong>
+                <div style={{ color: "var(--muted-foreground)", fontSize: 11 }}>
+                  Restore your App Store purchases on this device.
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleRestorePurchases}
+                disabled={restoreBusy}
+                style={{ ...themeChoiceButton, opacity: restoreBusy ? 0.6 : 1 }}
+              >
+                {restoreBusy ? "Checking..." : "Restore Purchases"}
+              </button>
+              {restoreMessage && <div style={restoreMessageStyle}>{restoreMessage}</div>}
+            </div>
+          )}
           <div style={preferenceRow}>
             <span style={preferenceLabel}>{tr("Theme")}</span>
             <div
@@ -1121,6 +1171,22 @@ const themeChoiceButton: React.CSSProperties = {
   fontSize: 12,
   fontWeight: 900,
   cursor: "pointer",
+};
+
+const restorePurchasesRow: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "minmax(0, 1fr) auto",
+  alignItems: "center",
+  gap: 10,
+  marginTop: 12,
+  padding: "12px 0 0",
+  borderTop: "1px solid var(--border)",
+};
+
+const restoreMessageStyle: React.CSSProperties = {
+  gridColumn: "1 / -1",
+  color: "var(--muted-foreground)",
+  fontSize: 11,
 };
 
 const languageSelect: React.CSSProperties = {
