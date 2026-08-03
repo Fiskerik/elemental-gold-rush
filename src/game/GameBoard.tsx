@@ -60,7 +60,7 @@ import { useIsTabletLayout, useWideBoardLayout } from "./responsive";
 import { ElementalBossBoard } from "./ElementalBossBoard";
 import { PeriodicGuardianBoard } from "./PeriodicGuardianBoard";
 import { NucleusCoreBoard } from "./NucleusCoreBoard";
-import { HowToPlay } from "./HowToPlay";
+import { HowToPlay, type HowToPlayMode } from "./HowToPlay";
 import {
   submitDailyBoardLeaderboardScore,
   submitDailyCompoundLeaderboardScore,
@@ -74,6 +74,7 @@ interface Props {
   mode?: GameModeId;
   resumeSavedRun?: boolean;
   secretCompoundId?: string;
+  initialHowToPlay?: HowToPlayMode;
   preview?: boolean;
   previewBoardTheme?: BoardTheme;
   previewAtomSkin?: AtomSkin;
@@ -766,6 +767,7 @@ function DailyCompoundGridBoard({
   onWin,
   onMap,
   onExit,
+  initialHowToPlay,
 }: Props & { secretCompoundId: string }) {
   const {
     soundEnabled,
@@ -805,7 +807,7 @@ function DailyCompoundGridBoard({
     tone: "right" | "wrong";
     text: string;
   }>(null);
-  const [howToPlayOpen, setHowToPlayOpen] = useState(false);
+  const [howToPlayOpen, setHowToPlayOpen] = useState(initialHowToPlay === "daily-compound");
   const [elapsedMs, setElapsedMs] = useState(0);
   const [result, setResult] = useState<null | {
     score: number;
@@ -1296,6 +1298,7 @@ function StandardGameBoard({
   mode = "campaign",
   resumeSavedRun = false,
   secretCompoundId,
+  initialHowToPlay,
   preview = false,
   previewBoardTheme,
   previewAtomSkin,
@@ -1504,6 +1507,10 @@ function StandardGameBoard({
   const [busy, setBusy] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [howToPlayOpen, setHowToPlayOpen] = useState(false);
+  useEffect(() => {
+    if (!initialHowToPlay || initialHowToPlay === "daily-compound" || playStylePromptOpen) return;
+    setHowToPlayOpen(true);
+  }, [initialHowToPlay, playStylePromptOpen]);
   const [gameOver, setGameOver] = useState(false);
   const [gameOverContinueOpen, setGameOverContinueOpen] = useState(false);
   const [gameOverContinueUsed, setGameOverContinueUsed] = useState(false);
@@ -7808,7 +7815,7 @@ function StandardGameBoard({
         )}
         {howToPlayOpen && !gameOver && !won && (
           <HowToPlay
-            mode={isMoleculeChallenge ? "compound" : "normal"}
+            mode={initialHowToPlay ?? (isMoleculeChallenge ? "compound" : "normal")}
             atomSkin={activeAtomSkin}
             onClose={() => setHowToPlayOpen(false)}
           />

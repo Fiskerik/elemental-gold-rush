@@ -18,8 +18,15 @@ import { Profile } from "@/game/Profile";
 import { Leaderboard } from "@/game/DailyCompoundLeaderboard";
 import { GameModeId } from "@/game/challenges";
 import { MOLECULE_CHALLENGE_BY_LEVEL, getCompoundChallengeKind, getLevelById } from "@/game/levels";
+import type { HowToPlayMode } from "@/game/HowToPlay";
 import { useProgress } from "@/game/store";
 import { useDomLocalization } from "@/game/useDomLocalization";
+
+const FIRST_ENTRY_TUTORIAL_TIP_IDS: Record<HowToPlayMode, string> = {
+  normal: "onboarding-normal-game",
+  compound: "onboarding-compound-level",
+  "daily-compound": "onboarding-daily-compound",
+};
 
 type Screen =
   | { name: "menu" }
@@ -30,6 +37,7 @@ type Screen =
       mode?: GameModeId;
       resumeSavedRun?: boolean;
       secretCompoundId?: string;
+      initialHowToPlay?: HowToPlayMode;
     }
   | { name: "collection" }
   | { name: "shop"; section?: "themes" }
@@ -148,6 +156,24 @@ export function GameApp() {
     setAppReviewMilestonePromptOpen(true);
   }
 
+  function startGameWithFirstTutorial(
+    tutorialMode: HowToPlayMode | undefined,
+    startGame: (initialHowToPlay?: HowToPlayMode) => void,
+  ) {
+    startGameWithAppReviewMilestone(() => {
+      if (tutorialMode) {
+        const tipId = FIRST_ENTRY_TUTORIAL_TIP_IDS[tutorialMode];
+        const progress = useProgress.getState();
+        if (!progress.seenTips.includes(tipId)) {
+          progress.markTipSeen(tipId);
+          startGame(tutorialMode);
+          return;
+        }
+      }
+      startGame();
+    });
+  }
+
   function startCampaign() {
     const saved = getSavedRunSummary();
     if (saved) {
@@ -160,14 +186,19 @@ export function GameApp() {
   function startDailyChallenge() {
     refreshDailyFeatures();
     const dailyChallenge = useProgress.getState().dailyChallenge;
-    startGameWithAppReviewMilestone(() =>
-      setScreen({ name: "game", levelId: dailyChallenge.levelId, mode: "daily-challenge" }),
+    startGameWithFirstTutorial("normal", (initialHowToPlay) =>
+      setScreen({
+        name: "game",
+        levelId: dailyChallenge.levelId,
+        mode: "daily-challenge",
+        initialHowToPlay,
+      }),
     );
   }
 
   function startSecretCompound() {
     refreshDailyFeatures();
-    startGameWithAppReviewMilestone(() => {
+    startGameWithFirstTutorial("daily-compound", (initialHowToPlay) => {
       const { secretCompound, revealSecretCompound } = useProgress.getState();
       revealSecretCompound();
       setScreen({
@@ -175,17 +206,20 @@ export function GameApp() {
         levelId: getLevelById(unlockedLevel)?.id ?? 1,
         mode: "campaign",
         secretCompoundId: secretCompound.compoundId,
+        initialHowToPlay,
       });
     });
   }
 
   function startCampaignLevel(levelId: number) {
-    startGameWithAppReviewMilestone(() => {
+    const tutorialMode = levelId === 1 ? "normal" : levelId === 5 ? "compound" : undefined;
+    startGameWithFirstTutorial(tutorialMode, (initialHowToPlay) => {
       const compoundId = MOLECULE_CHALLENGE_BY_LEVEL[levelId];
       setScreen({
         name: "game",
         levelId,
         mode: "campaign",
+        initialHowToPlay,
         secretCompoundId:
           compoundId && getCompoundChallengeKind(levelId) === "search-find"
             ? compoundId
@@ -254,6 +288,7 @@ export function GameApp() {
           mode={screen.mode}
           resumeSavedRun={screen.resumeSavedRun}
           secretCompoundId={screen.secretCompoundId}
+          initialHowToPlay={screen.initialHowToPlay}
           onExit={() => setScreen({ name: "menu" })}
           onMap={() => setScreen({ name: "levels" })}
           onWin={(nextId) => {
