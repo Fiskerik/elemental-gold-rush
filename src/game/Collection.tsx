@@ -466,7 +466,7 @@ export function Collection({ onBack }: { onBack: () => void }) {
               );
             })}
           </div>
-        </div>
+        </section>
       </div>
 
       {el && (
