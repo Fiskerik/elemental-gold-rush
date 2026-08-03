@@ -983,7 +983,7 @@ function DailyCompoundGridBoard({
       className={`daily-compound-shell atom-skin-${activeAtomSkin}-active`}
       style={dailyCompoundShell}
     >
-        <div style={dailyCompoundHeader}>
+      <div style={dailyCompoundHeader}>
         <div style={{ display: "grid", justifyItems: "start", gap: 5 }}>
           <button type="button" onClick={onExit} style={dailyCompoundExitBtn}>
             Exit

@@ -48,8 +48,8 @@ const SLIDES: Record<HowToPlayMode, Slide[]> = {
   ],
   compound: [
     {
-      title: "Build the elements",
-      body: "Shoot atoms onto the board until the elements needed for the level's compound are present.",
+      title: "Build the atoms",
+      body: "Shoot atoms onto the board until the atoms needed for the level's molecule are present.",
       visual: "add",
     },
     {
@@ -197,7 +197,7 @@ function TutorialVisual({ kind, atomSkin }: { kind: Slide["visual"]; atomSkin: A
           <MiniAtom atomicNumber={8} left="52%" top="42%" atomSkin={atomSkin} />
           <MiniAtom atomicNumber={1} left="70%" top="66%" atomSkin={atomSkin} />
           <MiniAtom atomicNumber={6} left="82%" top="22%" atomSkin={atomSkin} />
-          <div style={compoundNeedTagStyle}>3 elements present</div>
+          <div style={compoundNeedTagStyle}>3 atoms present</div>
         </MiniBoard>
       );
     case "select":
@@ -205,7 +205,8 @@ function TutorialVisual({ kind, atomSkin }: { kind: Slide["visual"]; atomSkin: A
         <MiniBoard atomSkin={atomSkin} footer="COMPOUND MODE · 2/3 selected">
           <MiniAtom atomicNumber={1} left="18%" top="27%" selected atomSkin={atomSkin} />
           <MiniAtom atomicNumber={8} left="52%" top="44%" selected atomSkin={atomSkin} />
-          <MiniAtom atomicNumber={6} left="72%" top="68%" atomSkin={atomSkin} />
+          <MiniAtom atomicNumber={1} left="72%" top="68%" selected atomSkin={atomSkin} />
+          <MiniAtom atomicNumber={6} left="82%" top="22%" atomSkin={atomSkin} />
           <div style={selectionRingStyle} />
         </MiniBoard>
       );
@@ -238,7 +239,7 @@ function TutorialVisual({ kind, atomSkin }: { kind: Slide["visual"]; atomSkin: A
     case "daily-select":
       return (
         <div style={dailyVisualStyle}>
-          <DailyTutorialGrid atomSkin={atomSkin} state="wrong" />
+          <DailyTutorialGrid atomSkin={atomSkin} state="selected" />
         </div>
       );
     case "daily-solve":
@@ -256,11 +257,28 @@ function TutorialVisual({ kind, atomSkin }: { kind: Slide["visual"]; atomSkin: A
   }
 }
 
-function MiniBoard({ children, atomSkin, footer }: { children: React.ReactNode; atomSkin: AtomSkin; footer?: string }) {
+function MiniBoard({
+  children,
+  atomSkin,
+  footer,
+  action,
+}: {
+  children: React.ReactNode;
+  atomSkin: AtomSkin;
+  footer?: string;
+  action?: string;
+}) {
   return (
     <div style={miniBoardStyle}>
       <div style={miniBoardGridStyle}>{children}</div>
-      {footer && <div style={miniBoardFooterStyle}>{footer}</div>}
+      {footer && (
+        <div style={miniBoardFooterStyle}>
+          {footer.includes("COMPOUND MODE") ? footer.replace("2/3", "3/3") : footer}
+        </div>
+      )}
+      {(action || footer?.includes("COMPOUND MODE")) && (
+        <div style={miniBoardActionStyle}>{action ?? "Form H₂O"}</div>
+      )}
     </div>
   );
 }
@@ -303,7 +321,7 @@ function MiniAtom({
   );
 }
 
-type DailyTutorialState = "base" | "wrong" | "correct";
+type DailyTutorialState = "base" | "selected" | "correct";
 
 const DAILY_TUTORIAL_ATOMS = [
   1, 5, 6, 2, 8, 5, 1, 6,
@@ -312,7 +330,6 @@ const DAILY_TUTORIAL_ATOMS = [
   6, 1, 5, 2, 8, 6, 1, 5,
 ] as const;
 const DAILY_TUTORIAL_TARGET = [9, 10, 11, 12];
-const DAILY_TUTORIAL_WRONG = [1, 2, 3];
 
 function DailyTutorialGrid({
   atomSkin,
@@ -321,7 +338,7 @@ function DailyTutorialGrid({
   atomSkin: AtomSkin;
   state: DailyTutorialState;
 }) {
-  const selected = state === "correct" ? DAILY_TUTORIAL_TARGET : state === "wrong" ? DAILY_TUTORIAL_WRONG : [];
+  const selected = state === "correct" || state === "selected" ? DAILY_TUTORIAL_TARGET : [];
   return (
     <div style={dailyTutorialBoardStyle}>
       <div style={dailyTutorialGridStyle}>
@@ -351,7 +368,7 @@ function DailyTutorialGrid({
           );
         })}
       </div>
-      {state === "wrong" && <div style={dailyTutorialHintButtonStyle}>HINT</div>}
+      {state === "selected" && <div style={dailyTutorialSelectedLabelStyle}>4/4 atoms selected</div>}
       {state === "correct" && <div style={dailyTutorialSolvedStyle}>ACETYLENE FOUND - C2H2</div>}
     </div>
   );
@@ -398,6 +415,7 @@ const primaryButtonStyle: CSSProperties = { ...secondaryButtonStyle, border: "no
 const miniBoardStyle: CSSProperties = { width: "100%", maxWidth: 330 };
 const miniBoardGridStyle: CSSProperties = { position: "relative", height: 150, overflow: "hidden", borderRadius: 14, border: "1px solid var(--game-panel-accent-border, var(--border))", background: "radial-gradient(circle at 50% 30%, color-mix(in oklch, var(--primary) 28%, transparent), transparent 55%), var(--surface)" };
 const miniBoardFooterStyle: CSSProperties = { marginTop: 7, padding: "7px 10px", borderRadius: 8, color: "var(--accent)", background: "var(--surface)", fontSize: 11, fontWeight: 850, textAlign: "center" };
+const miniBoardActionStyle: CSSProperties = { marginTop: 7, padding: "8px 10px", borderRadius: 9, background: "linear-gradient(135deg, var(--primary), var(--accent))", color: "#07101c", fontSize: 11, fontWeight: 900, textAlign: "center", boxShadow: "0 0 16px var(--accent-glow)" };
 const miniGoalBarStyle: CSSProperties = { position: "absolute", left: 9, right: 9, top: 9, display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", borderRadius: 8, background: "var(--surface-elevated)", border: "1px solid var(--game-panel-accent-border, var(--border))" };
 const miniGoalLabelsStyle: CSSProperties = { display: "flex", justifyContent: "space-between", gap: 6, color: "var(--muted-foreground)", fontSize: 8, fontWeight: 800 };
 const miniGoalTrackStyle: CSSProperties = { position: "relative", height: 7, marginTop: 4, borderRadius: 99, background: "var(--surface-high)" };
@@ -424,5 +442,5 @@ const dailyTutorialGridStyle: CSSProperties = { display: "grid", gridTemplateCol
 const dailyTutorialCellStyle: CSSProperties = { display: "grid", placeItems: "center", minWidth: 0, aspectRatio: "1", borderRadius: 6, border: "1px solid color-mix(in oklch, var(--border) 80%, transparent)", background: "color-mix(in oklch, var(--background) 72%, var(--surface))" };
 const dailyTutorialSelectedCellStyle: CSSProperties = { border: "2px solid var(--accent)", background: "color-mix(in oklch, var(--accent) 20%, var(--surface))", boxShadow: "0 0 12px var(--accent-glow)" };
 const dailyTutorialCorrectCellStyle: CSSProperties = { border: "2px solid var(--success, #51e6a4)", background: "color-mix(in oklch, var(--success, #51e6a4) 20%, var(--surface))", boxShadow: "0 0 12px color-mix(in oklch, var(--success, #51e6a4) 60%, transparent)" };
-const dailyTutorialHintButtonStyle: CSSProperties = { marginTop: 8, padding: "7px 10px", borderRadius: 8, border: "1px solid var(--accent)", background: "color-mix(in oklch, var(--accent) 20%, var(--surface-elevated))", color: "var(--accent)", textAlign: "center", fontSize: 10, fontWeight: 900, letterSpacing: 1.5, boxShadow: "0 0 14px var(--accent-glow)" };
+const dailyTutorialSelectedLabelStyle: CSSProperties = { marginTop: 8, padding: "7px 10px", borderRadius: 8, border: "1px solid var(--accent)", background: "color-mix(in oklch, var(--accent) 20%, var(--surface-elevated))", color: "var(--accent)", textAlign: "center", fontSize: 10, fontWeight: 900, letterSpacing: 1.1, boxShadow: "0 0 14px var(--accent-glow)" };
 const dailyTutorialSolvedStyle: CSSProperties = { marginTop: 8, padding: "7px 10px", borderRadius: 8, border: "1px solid var(--success, #51e6a4)", color: "var(--success, #51e6a4)", textAlign: "center", fontSize: 10, fontWeight: 900, letterSpacing: 1 };
