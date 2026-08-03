@@ -120,7 +120,9 @@ export function Collection({ onBack }: { onBack: () => void }) {
 
         <section style={collectionUnlockPanel}>
           <div>
-            <div style={{ fontSize: 12, fontWeight: 900 }}>{tr("Unlock collection entries")}</div>
+            <h2 style={{ fontSize: 12, fontWeight: 900, margin: 0 }}>
+              {tr("Unlock collection entries")}
+            </h2>
             <div style={{ fontSize: 11, color: "var(--muted-foreground)", marginTop: 2 }}>
               {tr("Spend gold to reveal locked collection facts immediately.")}
             </div>
@@ -243,16 +245,18 @@ export function Collection({ onBack }: { onBack: () => void }) {
         </div>
 
         <section style={{ marginTop: 18 }}>
-          <div
+          <h2
             style={{
               fontSize: 11,
               letterSpacing: 1.5,
               color: "var(--muted-foreground)",
               marginBottom: 8,
+              marginTop: 0,
+              fontWeight: 700,
             }}
           >
             COMPOUNDS
-          </div>
+          </h2>
           <div
             style={{
               display: "grid",
@@ -325,17 +329,19 @@ export function Collection({ onBack }: { onBack: () => void }) {
         </section>
 
         {/* Badges */}
-        <div style={{ marginTop: 20 }}>
-          <div
+        <section style={{ marginTop: 20 }}>
+          <h2
             style={{
               fontSize: 11,
               letterSpacing: 1.5,
               color: "var(--muted-foreground)",
               marginBottom: 8,
+              marginTop: 0,
+              fontWeight: 700,
             }}
           >
             BADGES
-          </div>
+          </h2>
           <div style={{ display: "grid", gap: 12 }}>
             {BADGE_GROUPS.map((group) => {
               const groupBadges = BADGES.filter((badge) => badge.group === group.id);
