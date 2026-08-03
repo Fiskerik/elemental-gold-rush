@@ -10,7 +10,16 @@ export const Route = createFileRoute("/game")({
         content:
           "Play Atomic Fusion Rush, a periodic table merge puzzle game about fusing atoms and discovering elements.",
       },
+      { property: "og:title", content: "Play Atomic Fusion Rush" },
+      {
+        property: "og:description",
+        content:
+          "Play Atomic Fusion Rush in your browser: fuse atoms, discover compounds, and climb the periodic table.",
+      },
+      { property: "og:type", content: "website" },
+      { property: "og:url", content: "https://atomic-fusion.lovable.app/game" },
     ],
+    links: [{ rel: "canonical", href: "https://atomic-fusion.lovable.app/game" }],
   }),
   component: GamePage,
 });

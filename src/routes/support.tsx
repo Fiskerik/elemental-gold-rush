@@ -16,6 +16,41 @@ export const Route = createFileRoute("/support")({
         content:
           "Support page for Atomic Fusion Rush with contact details and issue-reporting guidance.",
       },
+      { property: "og:title", content: "Support | Atomic Fusion Rush" },
+      {
+        property: "og:description",
+        content: "Contact details and issue-reporting guidance for Atomic Fusion Rush players.",
+      },
+      { property: "og:type", content: "website" },
+      { property: "og:url", content: "https://atomic-fusion.lovable.app/support" },
+    ],
+    links: [{ rel: "canonical", href: "https://atomic-fusion.lovable.app/support" }],
+    scripts: [
+      {
+        type: "application/ld+json",
+        children: JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "FAQPage",
+          mainEntity: [
+            {
+              "@type": "Question",
+              name: "How do I contact Atomic Fusion Rush support?",
+              acceptedAnswer: {
+                "@type": "Answer",
+                text: "Email eaconsulting.supp@gmail.com. Typical response time is 1-3 business days.",
+              },
+            },
+            {
+              "@type": "Question",
+              name: "What should I include when reporting an issue?",
+              acceptedAnswer: {
+                "@type": "Answer",
+                text: "Include your device model, iOS version, app version/build number, exact steps to reproduce the issue, and a screenshot or short video if possible.",
+              },
+            },
+          ],
+        }),
+      },
     ],
   }),
   component: SupportPage,
