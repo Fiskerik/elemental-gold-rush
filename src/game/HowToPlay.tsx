@@ -157,13 +157,15 @@ function TutorialVisual({ kind, atomSkin }: { kind: Slide["visual"]; atomSkin: A
   switch (kind) {
     case "target":
       return (
-        <MiniBoard atomSkin={atomSkin}>
-          <MiniAtom atomicNumber={1} left="16%" top="22%" atomSkin={atomSkin} />
-          <MiniAtom atomicNumber={6} left="55%" top="34%" atomSkin={atomSkin} />
-          <MiniAtom atomicNumber={8} left="31%" top="60%" atomSkin={atomSkin} />
+        <div style={targetVisualStyle}>
           <MiniGoalBar atomSkin={atomSkin} />
-          <div style={aimLineStyle} />
-        </MiniBoard>
+          <MiniBoard atomSkin={atomSkin}>
+            <MiniAtom atomicNumber={1} left="16%" top="22%" atomSkin={atomSkin} />
+            <MiniAtom atomicNumber={6} left="55%" top="34%" atomSkin={atomSkin} />
+            <MiniAtom atomicNumber={8} left="31%" top="60%" atomSkin={atomSkin} />
+            <div style={aimLineStyle} />
+          </MiniBoard>
+        </div>
       );
     case "merge":
       return (
@@ -207,7 +209,6 @@ function TutorialVisual({ kind, atomSkin }: { kind: Slide["visual"]; atomSkin: A
           <MiniAtom atomicNumber={8} left="52%" top="44%" selected atomSkin={atomSkin} />
           <MiniAtom atomicNumber={1} left="72%" top="68%" selected atomSkin={atomSkin} />
           <MiniAtom atomicNumber={6} left="82%" top="22%" atomSkin={atomSkin} />
-          <div style={selectionRingStyle} />
         </MiniBoard>
       );
     case "discover":
@@ -290,11 +291,13 @@ function MiniGoalBar({ atomSkin }: { atomSkin: AtomSkin }) {
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={miniGoalLabelsStyle}>
           <span>Highest reached</span>
-          <span>Target: Ne (#10)</span>
+          <span style={miniGoalTargetStyle}>
+            <span>Target:</span>
+            <ElementBall atomicNumber={10} size={21} glow atomSkin={atomSkin} />
+          </span>
         </div>
         <div style={miniGoalTrackStyle}>
           <div style={miniGoalFillStyle} />
-          <span style={miniGoalMarkerStyle}>Ne</span>
         </div>
       </div>
     </div>
@@ -414,13 +417,14 @@ const secondaryButtonStyle: CSSProperties = { border: "1px solid var(--border)",
 const primaryButtonStyle: CSSProperties = { ...secondaryButtonStyle, border: "none", background: "linear-gradient(135deg, var(--primary), var(--accent))", color: "#07101c" };
 const miniBoardStyle: CSSProperties = { width: "100%", maxWidth: 330 };
 const miniBoardGridStyle: CSSProperties = { position: "relative", height: 150, overflow: "hidden", borderRadius: 14, border: "1px solid var(--game-panel-accent-border, var(--border))", background: "radial-gradient(circle at 50% 30%, color-mix(in oklch, var(--primary) 28%, transparent), transparent 55%), var(--surface)" };
+const targetVisualStyle: CSSProperties = { display: "grid", gap: 8, width: "100%", maxWidth: 330 };
 const miniBoardFooterStyle: CSSProperties = { marginTop: 7, padding: "7px 10px", borderRadius: 8, color: "var(--accent)", background: "var(--surface)", fontSize: 11, fontWeight: 850, textAlign: "center" };
 const miniBoardActionStyle: CSSProperties = { marginTop: 7, padding: "8px 10px", borderRadius: 9, background: "linear-gradient(135deg, var(--primary), var(--accent))", color: "#07101c", fontSize: 11, fontWeight: 900, textAlign: "center", boxShadow: "0 0 16px var(--accent-glow)" };
-const miniGoalBarStyle: CSSProperties = { position: "absolute", left: 9, right: 9, top: 9, display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", borderRadius: 8, background: "var(--surface-elevated)", border: "1px solid var(--game-panel-accent-border, var(--border))" };
+const miniGoalBarStyle: CSSProperties = { display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", borderRadius: 8, background: "var(--surface-elevated)", border: "1px solid var(--game-panel-accent-border, var(--border))", boxSizing: "border-box" };
 const miniGoalLabelsStyle: CSSProperties = { display: "flex", justifyContent: "space-between", gap: 6, color: "var(--muted-foreground)", fontSize: 8, fontWeight: 800 };
+const miniGoalTargetStyle: CSSProperties = { display: "inline-flex", alignItems: "center", gap: 4, color: "var(--foreground)", whiteSpace: "nowrap" };
 const miniGoalTrackStyle: CSSProperties = { position: "relative", height: 7, marginTop: 4, borderRadius: 99, background: "var(--surface-high)" };
 const miniGoalFillStyle: CSSProperties = { width: "54%", height: "100%", borderRadius: 99, background: "linear-gradient(90deg, var(--primary), var(--accent))" };
-const miniGoalMarkerStyle: CSSProperties = { position: "absolute", right: -2, top: -5, padding: "1px 3px", borderRadius: 4, background: "var(--accent)", color: "#07101c", fontSize: 7, fontWeight: 900 };
 const aimLineStyle: CSSProperties = { position: "absolute", left: "50%", bottom: 6, width: 2, height: 60, borderLeft: "2px dashed var(--accent)", opacity: 0.7 };
 const mergeVisualStyle: CSSProperties = { display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%" };
 const operatorStyle: CSSProperties = { color: "var(--accent)", fontSize: 24, fontWeight: 900 };
@@ -428,7 +432,6 @@ const powerupsVisualStyle: CSSProperties = { display: "flex", alignItems: "cente
 const powerupItemStyle: CSSProperties = { display: "grid", justifyItems: "center", gap: 2, color: "var(--muted-foreground)", fontSize: 10, fontWeight: 850 };
 const compoundNeedTagStyle: CSSProperties = { position: "absolute", left: 10, top: 9, padding: "5px 7px", borderRadius: 7, color: "var(--success, var(--accent))", background: "var(--surface-elevated)", fontSize: 10, fontWeight: 900 };
 const selectedAtomStyle: CSSProperties = { borderRadius: "50%", boxShadow: "0 0 0 3px var(--accent), 0 0 22px var(--accent-glow)" };
-const selectionRingStyle: CSSProperties = { position: "absolute", left: "18%", top: "27%", width: 56, height: 56, border: "2px solid var(--accent)", borderRadius: "50%", transform: "translate(-50%, -50%)", opacity: 0.9 };
 const discoverVisualStyle: CSSProperties = { display: "flex", alignItems: "center", justifyContent: "center", gap: 10, width: "100%" };
 const moleculePanelStyle: CSSProperties = { display: "grid", justifyItems: "center", gap: 3, color: "var(--foreground)", fontSize: 12 };
 const discoverArrowStyle: CSSProperties = { color: "var(--accent)", fontSize: 24, fontWeight: 900 };

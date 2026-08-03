@@ -253,10 +253,11 @@ export function BoardThemePicker({
                   fontWeight: 900,
                 }}
               >
-                {label}
+                <span style={{ minWidth: 0, overflowWrap: "anywhere" }}>{label}</span>
                 {locked && badge && (
                   <span
                     style={{
+                      flex: "0 0 auto",
                       fontSize: 8,
                       letterSpacing: 0.6,
                       color: "var(--accent)",
@@ -378,10 +379,11 @@ export function AtomSkinPicker({
                   fontWeight: 900,
                 }}
               >
-                {ATOM_SKIN_LABELS[skin]}
+                <span style={{ minWidth: 0, overflowWrap: "anywhere" }}>{ATOM_SKIN_LABELS[skin]}</span>
                 {locked && (
                   <span
                     style={{
+                      flex: "0 0 auto",
                       fontSize: 8,
                       letterSpacing: 0.6,
                       color: "var(--accent)",
