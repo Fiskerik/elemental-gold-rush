@@ -4,7 +4,9 @@ import { KeyboardResize, KeyboardStyle } from "@capacitor/keyboard";
 const config: CapacitorConfig = {
   appId: "com.eaconsulting.atomicfusion",
   appName: "Atomic Fusion Rush",
-  webDir: "dist",
+  // The Capacitor build is emitted to dist/client by vite.capacitor.config.ts.
+  // Keeping this aligned ensures iOS bundles capacitor-entry.js rather than the web entrypoint.
+  webDir: "dist/client",
   server: {
     iosScheme: "https",
   },
