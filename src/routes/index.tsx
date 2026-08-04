@@ -26,6 +26,16 @@ export const Route = createFileRoute("/")({
       },
       { property: "og:type", content: "website" },
       { property: "og:url", content: "https://atomic-fusion.lovable.app/" },
+      {
+        property: "og:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/96b7dab8-6bea-45f2-9458-357106f22801/id-preview-5ae28a15--a7f1def7-b935-44fb-a197-7b4e163d699c.lovable.app-1778691171983.png",
+      },
+      {
+        name: "twitter:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/96b7dab8-6bea-45f2-9458-357106f22801/id-preview-5ae28a15--a7f1def7-b935-44fb-a197-7b4e163d699c.lovable.app-1778691171983.png",
+      },
     ],
     links: [{ rel: "canonical", href: "https://atomic-fusion.lovable.app/" }],
     scripts: [
