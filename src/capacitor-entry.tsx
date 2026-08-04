@@ -81,9 +81,11 @@ if (Capacitor.getPlatform() === "ios") {
   void StatusBar.setBackgroundColor({
     color: storedTheme === "light" ? "#f7f5ef" : "#0A0A1A",
   }).catch(() => {});
-  void initializePushNotifications();
+  // Keep optional push setup out of the first render. APNs/Firebase can reject
+  // while the native plugin is still being configured.
+  window.setTimeout(() => {
+    void initializePushNotifications().catch((error) => {
+      console.warn("[push] Startup registration failed", error);
+    });
+  }, 1500);
 }
-
-window.requestAnimationFrame(() => {
-  window.__bootReady?.();
-});

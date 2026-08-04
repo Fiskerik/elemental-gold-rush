@@ -94,21 +94,22 @@ export function initializePushNotifications(): Promise<void> {
   }
 
   initializationPromise = (async () => {
-    await FirebaseMessaging.addListener("notificationActionPerformed", ({ notification }) => {
-      const data = notification.data as Record<string, unknown> | undefined;
-      const route = typeof data?.route === "string" ? data.route : "";
-      if (!route) return;
-      try {
-        window.localStorage.setItem(PENDING_PUSH_ROUTE_STORAGE_KEY, route);
-      } catch {
-        // The app still opens; routing is best-effort.
-      }
-    });
-    const tokenListener = await FirebaseMessaging.addListener("tokenReceived", ({ token }) => {
-      rememberToken(token);
-    });
-
+    let tokenListener: { remove: () => Promise<void> } | null = null;
     try {
+      await FirebaseMessaging.addListener("notificationActionPerformed", ({ notification }) => {
+        const data = notification.data as Record<string, unknown> | undefined;
+        const route = typeof data?.route === "string" ? data.route : "";
+        if (!route) return;
+        try {
+          window.localStorage.setItem(PENDING_PUSH_ROUTE_STORAGE_KEY, route);
+        } catch {
+          // The app still opens; routing is best-effort.
+        }
+      });
+      tokenListener = await FirebaseMessaging.addListener("tokenReceived", ({ token }) => {
+        rememberToken(token);
+      });
+
       let permission = await FirebaseMessaging.checkPermissions();
 
       if (permission.receive === "prompt") {
@@ -127,7 +128,9 @@ export function initializePushNotifications(): Promise<void> {
     } catch (error) {
       console.warn("[push] Unable to register for Firebase notifications", error);
     } finally {
-      await tokenListener.remove();
+      await tokenListener?.remove().catch((error) => {
+        console.warn("[push] Could not remove token listener", error);
+      });
     }
   })();
 

@@ -98,11 +98,18 @@ export function GameApp() {
     }
 
     let active = true;
+    const safetyTimeoutId = window.setTimeout(() => {
+      if (active) {
+        console.warn("[app-update] Store version check timed out; continuing with the current build.");
+        setAppUpdateCheckComplete(true);
+      }
+    }, 6500);
     const refreshAppUpdate = async () => {
       const update = await checkForRequiredAppUpdate();
       if (!active) return;
       setRequiredAppUpdate(update);
       setAppUpdateCheckComplete(true);
+      window.clearTimeout(safetyTimeoutId);
     };
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") void refreshAppUpdate();
@@ -112,6 +119,7 @@ export function GameApp() {
     document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => {
       active = false;
+      window.clearTimeout(safetyTimeoutId);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [isNativeIos]);
