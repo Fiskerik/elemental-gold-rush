@@ -62,8 +62,10 @@ import { PeriodicGuardianBoard } from "./PeriodicGuardianBoard";
 import { NucleusCoreBoard } from "./NucleusCoreBoard";
 import { HowToPlay, type HowToPlayMode } from "./HowToPlay";
 import {
+  calculateDailyBoardScoreBreakdown,
   submitDailyBoardLeaderboardScore,
   submitDailyCompoundLeaderboardScore,
+  type DailyBoardScoreBreakdown,
 } from "./leaderboard";
 
 interface Props {
@@ -238,6 +240,7 @@ type StageClearStats = {
   shots: number;
   bestCombo: number;
   compound?: CompoundDefinition;
+  dailyBoardScoreBreakdown?: DailyBoardScoreBreakdown;
 };
 
 export function getSavedRunSummary(): {
@@ -2965,21 +2968,28 @@ function StandardGameBoard({
     if (stageClearTimeoutRef.current !== null) {
       window.clearTimeout(stageClearTimeoutRef.current);
     }
-    const finalStats =
+    const dailyBoardScoreInput =
       mode === "daily-challenge" && !stats.compound
         ? {
-            ...stats,
-            score: submitDailyBoardLeaderboardScore({
-              baseScore: stats.score,
-              shots: stats.shots,
-              elapsedMs: Date.now() - startTimeRef.current,
-              powerUpsUsed: runPowerUpsUsedRef.current,
-              bestCombo: stats.bestCombo,
-              mergeCount: runMergeCountRef.current,
-              comboScore: runComboScoreRef.current,
-            }),
+            baseScore: stats.score,
+            shots: stats.shots,
+            elapsedMs: Date.now() - startTimeRef.current,
+            powerUpsUsed: runPowerUpsUsedRef.current,
+            bestCombo: stats.bestCombo,
+            mergeCount: runMergeCountRef.current,
+            comboScore: runComboScoreRef.current,
           }
-        : stats;
+        : null;
+    const dailyBoardScoreBreakdown = dailyBoardScoreInput
+      ? calculateDailyBoardScoreBreakdown(dailyBoardScoreInput)
+      : undefined;
+    const finalStats = dailyBoardScoreInput
+      ? {
+          ...stats,
+          score: submitDailyBoardLeaderboardScore(dailyBoardScoreInput),
+          dailyBoardScoreBreakdown,
+        }
+      : stats;
     if (finalStats.score !== stats.score) {
       setScore(finalStats.score);
       addScore(Math.max(0, finalStats.score - stats.score));
@@ -7975,6 +7985,7 @@ function StandardGameBoard({
             clearTimeMs={elapsedMs}
             newDiscoveries={newlyDiscoveredThisRun}
             formedCompounds={formedCompoundsThisRun}
+            dailyBoardScoreBreakdown={winChoice?.dailyBoardScoreBreakdown}
             isPowerUpPass={isPowerUpStage}
             claimablePowerUps={
               isPowerUpStage || hasClaimedUnusedInventoryRef.current ? {} : collectUnusedPowerUps()
@@ -8014,6 +8025,7 @@ function StandardGameBoard({
             clearTimeMs={elapsedMs}
             newDiscoveries={newlyDiscoveredThisRun}
             formedCompounds={formedCompoundsThisRun}
+            dailyBoardScoreBreakdown={undefined}
             claimablePowerUps={
               isPowerUpStage || hasClaimedUnusedInventoryRef.current ? {} : collectUnusedPowerUps()
             }
@@ -9200,6 +9212,7 @@ function ResultModal({
   clearTimeMs,
   newDiscoveries = [],
   formedCompounds = [],
+  dailyBoardScoreBreakdown,
   claimablePowerUps = {},
   claimedPowerUp = null,
   coins = 0,
@@ -9221,6 +9234,7 @@ function ResultModal({
   clearTimeMs: number;
   newDiscoveries?: number[];
   formedCompounds?: string[];
+  dailyBoardScoreBreakdown?: DailyBoardScoreBreakdown;
   claimablePowerUps?: Partial<Record<InventoryPowerUpId, number>>;
   claimedPowerUp?: InventoryPowerUpId | null;
   coins?: number;
@@ -9396,6 +9410,54 @@ function ResultModal({
           />
           <ResultStat label="Shots" value={`${shots} / ${shotGoal}`} color="var(--foreground)" />
           <ResultStat label="Best Combo" value={`${bestCombo}`} color="var(--foreground)" />
+        </div>
+      )}
+      {dailyBoardScoreBreakdown && (
+        <div
+          style={{
+            display: "grid",
+            gap: 6,
+            marginBottom: 12,
+            padding: 10,
+            borderRadius: 12,
+            border: "1px solid color-mix(in oklch, var(--accent) 42%, var(--border))",
+            background: "color-mix(in oklch, var(--accent) 8%, var(--surface))",
+            textAlign: "left",
+          }}
+        >
+          <div style={{ fontSize: 10, letterSpacing: 1.4, fontWeight: 900, color: "var(--accent)" }}>
+            DAILY BOARD SCORE CALCULATION
+          </div>
+          <ScoreBreakdownRow label="Points earned" value={dailyBoardScoreBreakdown.baseScore} />
+          <ScoreBreakdownRow label="Combo bonus" value={dailyBoardScoreBreakdown.comboBonus} />
+          <ScoreBreakdownRow label="Time bonus" value={dailyBoardScoreBreakdown.timeBonus} />
+          <ScoreBreakdownRow
+            label={`${shots} shots — ${Math.round(dailyBoardScoreBreakdown.shotEfficiency * 100)}% efficiency`}
+            value={-dailyBoardScoreBreakdown.shotEfficiencyPenalty}
+            negative
+          />
+          <ScoreBreakdownRow label="Fast-clear bonus" value={dailyBoardScoreBreakdown.fastClearBonus} />
+          {dailyBoardScoreBreakdown.powerUpPenalty > 0 && (
+            <ScoreBreakdownRow
+              label="Power-up penalty"
+              value={-dailyBoardScoreBreakdown.powerUpPenalty}
+              negative
+            />
+          )}
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              gap: 12,
+              paddingTop: 5,
+              marginTop: 2,
+              borderTop: "1px solid var(--border)",
+              fontWeight: 950,
+            }}
+          >
+            <span>Final leaderboard score</span>
+            <span style={{ color: "var(--accent)" }}>{formatScore(dailyBoardScoreBreakdown.finalScore)}</span>
+          </div>
         </div>
       )}
       {newDiscoveries.length > 0 && !isPowerUpPass && (
@@ -9677,6 +9739,26 @@ function StarRequirementRow({
         </div>
         <div style={{ fontSize: 11, color: "var(--muted-foreground)", marginTop: 2 }}>{detail}</div>
       </div>
+    </div>
+  );
+}
+
+function ScoreBreakdownRow({
+  label,
+  value,
+  negative = false,
+}: {
+  label: string;
+  value: number;
+  negative?: boolean;
+}) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 11 }}>
+      <span style={{ color: "var(--muted-foreground)" }}>{label}</span>
+      <strong style={{ color: negative ? "var(--destructive)" : "var(--foreground)" }}>
+        {value >= 0 ? "+" : ""}
+        {formatScore(value)}
+      </strong>
     </div>
   );
 }

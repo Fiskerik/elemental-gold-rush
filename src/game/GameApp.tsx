@@ -16,10 +16,13 @@ import { LabModes } from "@/game/LabModes";
 import { GameLibrary } from "@/game/GameLibrary";
 import { Profile } from "@/game/Profile";
 import { Leaderboard } from "@/game/DailyCompoundLeaderboard";
+import { settleDailyLeaderboardRewards } from "@/game/leaderboard";
+import { getTodayQuestDate } from "@/game/quests";
 import { GameModeId } from "@/game/challenges";
 import { MOLECULE_CHALLENGE_BY_LEVEL, getCompoundChallengeKind, getLevelById } from "@/game/levels";
 import type { HowToPlayMode } from "@/game/HowToPlay";
 import { APP_STORE_URL, checkForRequiredAppUpdate, type RequiredAppUpdate } from "@/game/appUpdate";
+import { consumePendingPushRoute, recordPushActivity } from "@/game/pushNotifications";
 import { useProgress } from "@/game/store";
 import { useDomLocalization } from "@/game/useDomLocalization";
 
@@ -80,6 +83,15 @@ export function GameApp() {
   }, [isNativeIos]);
 
   useEffect(() => {
+    if (!isNativeIos) return;
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") recordPushActivity();
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [isNativeIos]);
+
+  useEffect(() => {
     if (!isNativeIos) {
       setAppUpdateCheckComplete(true);
       return;
@@ -133,6 +145,17 @@ export function GameApp() {
     const timeoutId = window.setTimeout(() => setShowLaunchScreen(false), 1100);
     return () => window.clearTimeout(timeoutId);
   }, [showLaunchScreen]);
+
+  useEffect(() => {
+    const now = new Date();
+    const settlement = new Date(now);
+    settlement.setHours(23, 59, 0, 0);
+    if (settlement.getTime() <= now.getTime()) settlement.setDate(settlement.getDate() + 1);
+    const timer = window.setTimeout(() => {
+      void settleDailyLeaderboardRewards(getTodayQuestDate());
+    }, Math.max(1000, settlement.getTime() - now.getTime()));
+    return () => window.clearTimeout(timer);
+  }, []);
 
   if (showLaunchScreen || !appUpdateCheckComplete) return <LaunchScreen />;
 
@@ -247,6 +270,12 @@ export function GameApp() {
       });
     });
   }
+
+  useEffect(() => {
+    const route = consumePendingPushRoute();
+    if (route === "daily-board") startDailyChallenge();
+    if (route === "daily-compound") startSecretCompound();
+  }, []);
 
   function startCampaignLevel(levelId: number) {
     const compoundId = MOLECULE_CHALLENGE_BY_LEVEL[levelId];

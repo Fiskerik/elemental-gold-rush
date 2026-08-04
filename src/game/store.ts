@@ -39,6 +39,10 @@ import {
   SHOP_SPEND_CENTS,
   type ProductId,
 } from "./products";
+import {
+  getDailyLeaderboardReward,
+  getDailyLeaderboardRewardKey,
+} from "./dailyLeaderboardRewards";
 
 export const INVENTORY_POWER_UPS = [
   "transmute",
@@ -412,6 +416,7 @@ interface ProgressState {
   dailyCompoundBestScore: number;
   dailyBoardLeaderboardAchievementCounts: DailyBoardLeaderboardAchievementCounts;
   dailyBoardLeaderboardAchievementRecords: string[];
+  dailyLeaderboardRewardClaims: Record<string, number>;
   markTipSeen: (id: string) => void;
   refreshDailyFeatures: () => void;
   completeDailyChallenge: (score: number) => boolean;
@@ -454,6 +459,11 @@ interface ProgressState {
     totalPlayerCount: number,
     date?: string,
   ) => void;
+  claimDailyLeaderboardReward: (
+    kind: "daily-board" | "daily-compound",
+    rank: number,
+    date?: string,
+  ) => { awarded: number; totalAwarded: number };
   grantProPack: (options?: { fromRestore?: boolean }) => void;
   toggleProPack: () => void;
   recordGameAttemptForAd: () => void;
@@ -546,6 +556,7 @@ export const useProgress = create<ProgressState>()(
       dailyCompoundBestScore: 0,
       dailyBoardLeaderboardAchievementCounts: emptyDailyBoardLeaderboardAchievementCounts(),
       dailyBoardLeaderboardAchievementRecords: [],
+      dailyLeaderboardRewardClaims: {},
       markTipSeen: (id) =>
         set((s) => (s.seenTips.includes(id) ? s : { seenTips: [...s.seenTips, id] })),
       refreshDailyFeatures: () =>
@@ -1094,6 +1105,39 @@ export const useProgress = create<ProgressState>()(
             ].slice(-MAX_LEADERBOARD_ACHIEVEMENT_RECORDS),
           };
         }),
+      claimDailyLeaderboardReward: (kind, rank, date = getTodayQuestDate()) => {
+        let result = { awarded: 0, totalAwarded: 0 };
+        set((s) => {
+          const entitlement = getDailyLeaderboardReward(rank);
+          if (entitlement <= 0) return s;
+
+          const key = getDailyLeaderboardRewardKey(kind, date);
+          const alreadyAwarded = Math.max(
+            0,
+            Math.floor(s.dailyLeaderboardRewardClaims[key] ?? 0),
+          );
+          const awarded = Math.max(0, entitlement - alreadyAwarded);
+          const totalAwarded = Math.max(alreadyAwarded, entitlement);
+          result = { awarded, totalAwarded };
+          if (awarded <= 0) return s;
+
+          const balanceAfter = s.goldCoins + awarded;
+          return {
+            goldCoins: balanceAfter,
+            dailyLeaderboardRewardClaims: {
+              ...s.dailyLeaderboardRewardClaims,
+              [key]: totalAwarded,
+            },
+            coinTransactions: appendCoinTransaction(
+              s.coinTransactions,
+              awarded,
+              balanceAfter,
+              `${kind === "daily-board" ? "Daily Board" : "Daily Compound"} #${Math.floor(rank)} prize`,
+            ),
+          };
+        });
+        return result;
+      },
       grantProPack: (options) =>
         set((s) => {
           // Restoring a non-consumable entitlement must never mint coins. The
@@ -1294,6 +1338,7 @@ export const useProgress = create<ProgressState>()(
           dailyCompoundBestScore: 0,
           dailyBoardLeaderboardAchievementCounts: s.dailyBoardLeaderboardAchievementCounts,
           dailyBoardLeaderboardAchievementRecords: s.dailyBoardLeaderboardAchievementRecords,
+          dailyLeaderboardRewardClaims: s.dailyLeaderboardRewardClaims,
         })),
     }),
     {
@@ -1419,6 +1464,8 @@ export const useProgress = create<ProgressState>()(
           )
             .map(String)
             .slice(-MAX_LEADERBOARD_ACHIEVEMENT_RECORDS),
+          dailyLeaderboardRewardClaims:
+            persistedState?.dailyLeaderboardRewardClaims ?? current.dailyLeaderboardRewardClaims,
         } as ProgressState;
       },
     },

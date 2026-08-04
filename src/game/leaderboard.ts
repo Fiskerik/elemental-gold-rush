@@ -25,6 +25,17 @@ export interface DailyBoardScoreInput {
   comboScore: number;
 }
 
+export interface DailyBoardScoreBreakdown {
+  baseScore: number;
+  comboBonus: number;
+  timeBonus: number;
+  shotEfficiency: number;
+  shotEfficiencyPenalty: number;
+  fastClearBonus: number;
+  powerUpPenalty: number;
+  finalScore: number;
+}
+
 export interface LeaderboardEntry {
   id: string;
   rank: number;
@@ -185,6 +196,12 @@ function clamp01(value: number): number {
 }
 
 export function calculateDailyBoardLeaderboardScore(input: DailyBoardScoreInput): number {
+  return calculateDailyBoardScoreBreakdown(input).finalScore;
+}
+
+export function calculateDailyBoardScoreBreakdown(
+  input: DailyBoardScoreInput,
+): DailyBoardScoreBreakdown {
   const baseScore = Math.max(0, Math.floor(input.baseScore));
   const shots = Math.max(1, Math.floor(input.shots));
   const elapsedMs = Math.max(0, Math.floor(input.elapsedMs));
@@ -212,10 +229,24 @@ export function calculateDailyBoardLeaderboardScore(input: DailyBoardScoreInput)
   const shotEfficiency =
     1 - shotProgress * (1 - DAILY_BOARD_MIN_SHOT_EFFICIENCY);
   const efficiencyAdjustedScore = Math.round((baseScore + comboBonus) * shotEfficiency);
+  const shotEfficiencyPenalty = Math.max(
+    0,
+    baseScore + comboBonus - efficiencyAdjustedScore,
+  );
   const fastClearBonus = Math.round(9000 * shotEfficiency);
   const powerUpPenalty = Math.min(2500, powerUpsUsed * 350);
 
-  return Math.max(1, efficiencyAdjustedScore + timeBonus + fastClearBonus - powerUpPenalty);
+  const finalScore = Math.max(1, efficiencyAdjustedScore + timeBonus + fastClearBonus - powerUpPenalty);
+  return {
+    baseScore,
+    comboBonus,
+    timeBonus,
+    shotEfficiency,
+    shotEfficiencyPenalty,
+    fastClearBonus,
+    powerUpPenalty,
+    finalScore,
+  };
 }
 
 function recordDailyLeaderboardRun(kind: LeaderboardKind, score: number, shots: number): boolean {
@@ -461,5 +492,23 @@ export async function loadDailyLeaderboard(
       ...fallbackBoard,
       status: gameCenterDiagnosticStatus(kind, "Game Center unavailable - showing device scores"),
     };
+  }
+}
+
+/**
+ * Settles both daily competition prizes using the leaderboard ranks visible
+ * at the daily reset cutoff. The wallet claim is idempotent, so this can be
+ * called by the app timer and later by a server-backed settlement flow.
+ */
+export async function settleDailyLeaderboardRewards(date = getTodayQuestDate()): Promise<void> {
+  for (const kind of ["daily-board", "daily-compound"] as const) {
+    try {
+      const board = await loadDailyLeaderboard(kind, "global");
+      if (board.player.rank > 0 && board.player.rank <= 3) {
+        useProgress.getState().claimDailyLeaderboardReward(kind, board.player.rank, date);
+      }
+    } catch (error) {
+      console.warn(`Daily ${kind} prize settlement failed`, error);
+    }
   }
 }
