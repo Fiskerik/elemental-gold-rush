@@ -731,28 +731,43 @@ function getShotStarGoal(level: (typeof LEVELS)[0]): number {
 
 export function GameBoard(props: Props) {
   const level = getLevelById(props.levelId);
-  if (props.secretCompoundId) {
-    return <DailyCompoundGridBoard {...props} secretCompoundId={props.secretCompoundId} />;
-  }
-  if (
+  const heading = props.secretCompoundId
+    ? "Daily Compound Challenge"
+    : level?.specialStage
+      ? `Boss Stage ${props.levelId} - Atomic Fusion Rush`
+      : `Level ${props.levelId} - Atomic Fusion Rush`;
+  const board = renderBoard();
+  return (
+    <>
+      <h1 className="sr-only">{heading}</h1>
+      {board}
+    </>
+  );
+
+  function renderBoard() {
+    if (props.secretCompoundId) {
+      return <DailyCompoundGridBoard {...props} secretCompoundId={props.secretCompoundId} />;
+    }
+    if (
     !props.secretCompoundId &&
     (props.mode === "elemental-boss" || level?.specialStage === "elemental-boss")
-  ) {
-    return <ElementalBossBoard {...props} mode="elemental-boss" />;
-  }
-  if (
+    ) {
+      return <ElementalBossBoard {...props} mode="elemental-boss" />;
+    }
+    if (
     !props.secretCompoundId &&
     (props.mode === "periodic-guardian" || level?.specialStage === "periodic-guardian")
-  ) {
-    return <PeriodicGuardianBoard {...props} mode="periodic-guardian" />;
-  }
-  if (
+    ) {
+      return <PeriodicGuardianBoard {...props} mode="periodic-guardian" />;
+    }
+    if (
     !props.secretCompoundId &&
     (props.mode === "nucleus-core" || level?.specialStage === "nucleus-core")
-  ) {
-    return <NucleusCoreBoard {...props} mode="nucleus-core" />;
+    ) {
+      return <NucleusCoreBoard {...props} mode="nucleus-core" />;
+    }
+    return <StandardGameBoard {...props} />;
   }
-  return <StandardGameBoard {...props} />;
 }
 
 type DailyCompoundCell = {
