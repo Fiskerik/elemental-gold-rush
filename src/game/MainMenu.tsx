@@ -300,9 +300,9 @@ export function MainMenu({
             <SettingsIcon size={18} aria-hidden="true" />
           </button>
           <div style={{ textAlign: "center", minWidth: 0 }}>
-            <div className="gold-text" style={brandTitle}>
+            <h1 className="gold-text" style={brandTitle}>
               Atomic Fusion Rush
-            </div>
+            </h1>
             <div style={brandSubline}>{`Level ${unlockedLevel} of ${MAX_LEVEL}`}</div>
             {hasProPack && <div style={proActiveChip}>PRO LAB ACTIVE</div>}
           </div>
