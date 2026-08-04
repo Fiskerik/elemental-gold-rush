@@ -39,10 +39,7 @@ import {
   SHOP_SPEND_CENTS,
   type ProductId,
 } from "./products";
-import {
-  getDailyLeaderboardReward,
-  getDailyLeaderboardRewardKey,
-} from "./dailyLeaderboardRewards";
+import { getDailyLeaderboardReward, getDailyLeaderboardRewardKey } from "./dailyLeaderboardRewards";
 
 export const INVENTORY_POWER_UPS = [
   "transmute",
@@ -1112,10 +1109,7 @@ export const useProgress = create<ProgressState>()(
           if (entitlement <= 0) return s;
 
           const key = getDailyLeaderboardRewardKey(kind, date);
-          const alreadyAwarded = Math.max(
-            0,
-            Math.floor(s.dailyLeaderboardRewardClaims[key] ?? 0),
-          );
+          const alreadyAwarded = Math.max(0, Math.floor(s.dailyLeaderboardRewardClaims[key] ?? 0));
           const awarded = Math.max(0, entitlement - alreadyAwarded);
           const totalAwarded = Math.max(alreadyAwarded, entitlement);
           result = { awarded, totalAwarded };
@@ -1343,18 +1337,37 @@ export const useProgress = create<ProgressState>()(
     }),
     {
       name: "elemental-gold-rush",
+      onRehydrateStorage: () => (_state, error) => {
+        if (!error) return;
+        console.warn(
+          "[store] Saved progress could not be restored; clearing the invalid local save.",
+          error,
+        );
+        try {
+          window.localStorage.removeItem("elemental-gold-rush");
+        } catch {
+          // The in-memory default state remains usable if storage is unavailable.
+        }
+      },
       merge: (persisted, current) => {
         const persistedState = persisted as Partial<ProgressState> | undefined;
-        const discoveredElements = persistedState?.discoveredElements ?? current.discoveredElements;
+        const discoveredElements = Array.isArray(persistedState?.discoveredElements)
+          ? persistedState.discoveredElements
+              .map(Number)
+              .filter((atomicNumber) => Number.isFinite(atomicNumber) && atomicNumber > 0)
+          : current.discoveredElements;
         const viewedElementDiscoveries = Array.isArray(persistedState?.viewedElementDiscoveries)
           ? persistedState.viewedElementDiscoveries
           : discoveredElements;
-        const discoveredCompounds =
-          persistedState?.discoveredCompounds ?? current.discoveredCompounds;
-        const viewedCompoundDiscoveries = Array.isArray(
-          persistedState?.viewedCompoundDiscoveries,
-        )
-          ? persistedState.viewedCompoundDiscoveries
+        const discoveredCompounds = Array.isArray(persistedState?.discoveredCompounds)
+          ? persistedState.discoveredCompounds.filter(
+              (compoundId): compoundId is string => typeof compoundId === "string",
+            )
+          : current.discoveredCompounds;
+        const viewedCompoundDiscoveries = Array.isArray(persistedState?.viewedCompoundDiscoveries)
+          ? persistedState.viewedCompoundDiscoveries.filter(
+              (compoundId): compoundId is string => typeof compoundId === "string",
+            )
           : discoveredCompounds;
         const compoundCounts = {
           ...Object.fromEntries(discoveredCompounds.map((id) => [id, 1])),
@@ -1480,9 +1493,7 @@ export function getSerializableProgressSnapshot(): SerializableProgressSnapshot 
 }
 
 /** Applies a cloud snapshot without replacing the live Zustand action functions. */
-export function applySerializableProgressSnapshot(
-  snapshot: SerializableProgressSnapshot,
-): boolean {
+export function applySerializableProgressSnapshot(snapshot: SerializableProgressSnapshot): boolean {
   if (
     !snapshot ||
     typeof snapshot !== "object" ||
