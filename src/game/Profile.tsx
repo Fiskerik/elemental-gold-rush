@@ -4,7 +4,13 @@ import { ELEMENTS } from "./elements";
 import { getLevelById, MAX_LEVEL } from "./levels";
 import { isAtomSkinUnlocked, useProgress, type CoinTransaction } from "./store";
 import { useIsTabletLayout } from "./responsive";
-import { SUPPORTED_LANGUAGES, t, toIntlLocale, type AppLanguage } from "./localization";
+import {
+  getLanguageFlag,
+  SUPPORTED_LANGUAGES,
+  t,
+  toIntlLocale,
+  type AppLanguage,
+} from "./localization";
 import { COMPOUNDS } from "./compounds";
 import { BOSSES, type BossId } from "./bosses";
 import { ElementBall } from "./ElementBall";
@@ -43,6 +49,12 @@ interface Props {
   onBack: () => void;
   onOpenShop?: (section?: "themes") => void;
 }
+
+const SETTINGS_LANGUAGES = [...SUPPORTED_LANGUAGES].sort((left, right) => {
+  if (left.code === "en") return -1;
+  if (right.code === "en") return 1;
+  return left.name.localeCompare(right.name, "en", { sensitivity: "base" });
+});
 
 export function Profile({ onBack, onOpenShop }: Props) {
   const isTabletLayout = useIsTabletLayout();
@@ -617,9 +629,9 @@ export function Profile({ onBack, onOpenShop }: Props) {
               aria-label={tr("Language")}
               data-no-localize="true"
             >
-              {SUPPORTED_LANGUAGES.map((language) => (
+              {SETTINGS_LANGUAGES.map((language) => (
                 <option key={language.code} value={language.code}>
-                  {language.nativeName} - {language.name}
+                  {getLanguageFlag(language.code)} {language.name} — {language.nativeName}
                 </option>
               ))}
             </select>

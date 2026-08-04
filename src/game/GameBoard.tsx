@@ -7300,7 +7300,7 @@ function StandardGameBoard({
                 zIndex: 12,
                 transform: `translate3d(${projectile.x - projShotSize / 2}px, ${projectile.y - projShotSize / 2}px, 0)`,
                 willChange: "transform",
-                backfaceVisibility: "hidden",
+                background: "transparent",
               }}
             >
               {showCatalystShotRadius && (

@@ -28,9 +28,60 @@ export const SUPPORTED_LANGUAGES = [
   { code: "tr", appStoreLocale: "tr", name: "Turkish", nativeName: "Türkçe" },
   { code: "it", appStoreLocale: "it", name: "Italian", nativeName: "Italiano" },
   { code: "vi", appStoreLocale: "vi", name: "Vietnamese", nativeName: "Tiếng Việt" },
+  {
+    code: "zh-Hant",
+    appStoreLocale: "zh-Hant",
+    name: "Chinese Traditional",
+    nativeName: "繁體中文",
+  },
+  { code: "cs", appStoreLocale: "cs", name: "Czech", nativeName: "Čeština" },
+  { code: "nl", appStoreLocale: "nl-NL", name: "Dutch", nativeName: "Nederlands" },
+  { code: "fi", appStoreLocale: "fi", name: "Finnish", nativeName: "Suomi" },
+  { code: "ms", appStoreLocale: "ms", name: "Malay", nativeName: "Bahasa Melayu" },
+  { code: "no", appStoreLocale: "no", name: "Norwegian", nativeName: "Norsk" },
+  { code: "pl", appStoreLocale: "pl", name: "Polish", nativeName: "Polski" },
+  { code: "sv", appStoreLocale: "sv", name: "Swedish", nativeName: "Svenska" },
+  { code: "th", appStoreLocale: "th", name: "Thai", nativeName: "ไทย" },
+  { code: "uk", appStoreLocale: "uk", name: "Ukrainian", nativeName: "Українська" },
+  { code: "da", appStoreLocale: "da", name: "Danish", nativeName: "Dansk" },
+  { code: "ta", appStoreLocale: "ta", name: "Tamil", nativeName: "தமிழ்" },
 ] as const;
 
 export type AppLanguage = (typeof SUPPORTED_LANGUAGES)[number]["code"];
+
+const LANGUAGE_FLAGS: Record<AppLanguage, string> = {
+  en: "🇺🇸",
+  "zh-Hans": "🇨🇳",
+  es: "🇪🇸",
+  hi: "🇮🇳",
+  ar: "🇸🇦",
+  "pt-BR": "🇧🇷",
+  fr: "🇫🇷",
+  de: "🇩🇪",
+  ja: "🇯🇵",
+  ko: "🇰🇷",
+  ru: "🇷🇺",
+  id: "🇮🇩",
+  tr: "🇹🇷",
+  it: "🇮🇹",
+  vi: "🇻🇳",
+  "zh-Hant": "🇹🇼",
+  cs: "🇨🇿",
+  nl: "🇳🇱",
+  fi: "🇫🇮",
+  ms: "🇲🇾",
+  no: "🇳🇴",
+  pl: "🇵🇱",
+  sv: "🇸🇪",
+  th: "🇹🇭",
+  uk: "🇺🇦",
+  da: "🇩🇰",
+  ta: "🇮🇳",
+};
+
+export function getLanguageFlag(language: AppLanguage): string {
+  return LANGUAGE_FLAGS[language] ?? "🌐";
+}
 
 type TranslationMap = Record<string, string>;
 
@@ -78,13 +129,14 @@ function translateTrimmed(text: string, language: AppLanguage): string | undefin
   if (source !== text && dictionary[source]) return dictionary[source];
   const lowerSource = source.toLowerCase();
   if (source !== lowerSource && dictionary[lowerSource]) {
-    return source === source.toUpperCase() ? dictionary[lowerSource].toUpperCase() : dictionary[lowerSource];
+    return source === source.toUpperCase()
+      ? dictionary[lowerSource].toUpperCase()
+      : dictionary[lowerSource];
   }
 
   const moleculeHint = /^Molecule hint: look for (.+) as one connected group\.$/.exec(source);
   if (moleculeHint) {
-    const template =
-      dictionary["Molecule hint: look for {formula} as one connected group."];
+    const template = dictionary["Molecule hint: look for {formula} as one connected group."];
     return template?.replace("{formula}", moleculeHint[1]);
   }
 
@@ -131,8 +183,7 @@ function translateTrimmed(text: string, language: AppLanguage): string | undefin
 
   const levelRequirement = /^Level (\d+) \/ (.+)$/.exec(source);
   if (levelRequirement) {
-    const requirement =
-      translateTrimmed(levelRequirement[2], language) ?? levelRequirement[2];
+    const requirement = translateTrimmed(levelRequirement[2], language) ?? levelRequirement[2];
     return `${dictionary.Level ?? "Level"} ${levelRequirement[1]} / ${requirement}`;
   }
 
@@ -277,9 +328,7 @@ function translateTrimmed(text: string, language: AppLanguage): string | undefin
   }
 
   const discoverEveryPeriod =
-    /^Discover every Period (\d+) element(?:, including (lanthanides|actinides))?\.$/.exec(
-      source,
-    );
+    /^Discover every Period (\d+) element(?:, including (lanthanides|actinides))?\.$/.exec(source);
   if (discoverEveryPeriod) {
     const template = dictionary["Discover every Period {n} element"];
     const base = template
@@ -402,7 +451,9 @@ function translateTrimmed(text: string, language: AppLanguage): string | undefin
   const alreadyDiscoveredCount = /^Already discovered - found (\d+) times?$/.exec(source);
   if (alreadyDiscoveredCount) {
     return `${dictionary["Already discovered"] ?? "Already discovered"} - ${dictionary.found ?? "found"} ${alreadyDiscoveredCount[1]} ${
-      alreadyDiscoveredCount[1] === "1" ? (dictionary.time ?? "time") : (dictionary.times ?? "times")
+      alreadyDiscoveredCount[1] === "1"
+        ? (dictionary.time ?? "time")
+        : (dictionary.times ?? "times")
     }`;
   }
 
@@ -426,12 +477,14 @@ function translateTrimmed(text: string, language: AppLanguage): string | undefin
 
   const elementFamilyTrivia = /^(.+) belongs to the (.+) family in period (\d+)\.$/.exec(source);
   if (elementFamilyTrivia) {
-    const elementName = translateTrimmed(elementFamilyTrivia[1], language) ?? elementFamilyTrivia[1];
+    const elementName =
+      translateTrimmed(elementFamilyTrivia[1], language) ?? elementFamilyTrivia[1];
     const family = translateTrimmed(elementFamilyTrivia[2], language) ?? elementFamilyTrivia[2];
     return `${elementName} ${dictionary["belongs to the"] ?? "belongs to the"} ${family} ${dictionary["family in period"] ?? "family in period"} ${elementFamilyTrivia[3]}.`;
   }
 
-  const sampleSpecimen = /^A collection sample would typically be shown as a (.+) material specimen\.$/.exec(source);
+  const sampleSpecimen =
+    /^A collection sample would typically be shown as a (.+) material specimen\.$/.exec(source);
   if (sampleSpecimen) {
     const material = translateTrimmed(sampleSpecimen[1], language) ?? sampleSpecimen[1];
     return `${dictionary["A collection sample would typically be shown as a"] ?? "A collection sample would typically be shown as a"} ${material} ${dictionary["material specimen."] ?? "material specimen."}`;
@@ -771,14 +824,36 @@ const TRANSLATIONS: Partial<Record<AppLanguage, TranslationMap>> = {
   },
 };
 
-for (const language of ["fr", "de", "ja", "ko", "ru", "id", "tr", "it", "vi"] as const) {
+for (const language of [
+  "fr",
+  "de",
+  "ja",
+  "ko",
+  "ru",
+  "id",
+  "tr",
+  "it",
+  "vi",
+  "zh-Hant",
+  "cs",
+  "nl",
+  "fi",
+  "ms",
+  "no",
+  "pl",
+  "sv",
+  "th",
+  "uk",
+  "da",
+  "ta",
+] as const) {
   TRANSLATIONS[language] = makeCompactTranslation(language);
 }
 
 function makeCompactTranslation(
   language: Exclude<AppLanguage, "en" | "zh-Hans" | "es" | "hi" | "ar" | "pt-BR">,
 ): TranslationMap {
-  const compact: Record<typeof language, TranslationMap> = {
+  const compact: Partial<Record<AppLanguage, TranslationMap>> = {
     fr: {
       Menu: "Menu",
       Back: "Retour",
@@ -1112,8 +1187,452 @@ function makeCompactTranslation(
       Support: "Hỗ trợ",
       Contact: "Liên hệ",
     },
+    "zh-Hant": {
+      Menu: "選單",
+      Back: "返回",
+      "Back to game": "返回遊戲",
+      Shop: "商店",
+      Play: "開始",
+      Map: "地圖",
+      Collection: "收藏",
+      Settings: "設定",
+      Profile: "個人檔案",
+      Lab: "實驗室",
+      Library: "圖鑑",
+      Level: "關卡",
+      of: "共",
+      "Free Lab": "免費實驗室",
+      "Fusion Rush Chemist": "Fusion Rush 化學家",
+      "Gold Coins": "金幣",
+      "Daily Streak": "每日連續",
+      "Best Combo": "最佳連擊",
+      Elements: "元素",
+      Stars: "星級",
+      Display: "顯示",
+      Theme: "主題",
+      Dark: "深色",
+      Light: "淺色",
+      Language: "語言",
+      "Daily Lab": "每日實驗室",
+      Records: "紀錄",
+      Available: "可用",
+      Restore: "恢復",
+      "Unlock Pack": "解鎖套組",
+      "Manage Purchases": "管理購買",
+      "Buy gold coins": "購買金幣",
+      Secret: "秘密",
+      Support: "支援",
+      Contact: "聯絡",
+    },
+    cs: {
+      Menu: "Nabídka",
+      Back: "Zpět",
+      "Back to game": "Zpět do hry",
+      Shop: "Obchod",
+      Play: "Hrát",
+      Map: "Mapa",
+      Collection: "Sbírka",
+      Settings: "Nastavení",
+      Profile: "Profil",
+      Lab: "Laboratoř",
+      Library: "Knihovna",
+      Level: "Úroveň",
+      of: "z",
+      "Free Lab": "Laboratoř zdarma",
+      "Fusion Rush Chemist": "Chemik Fusion Rush",
+      "Gold Coins": "Zlaté mince",
+      "Daily Streak": "Denní série",
+      "Best Combo": "Nejlepší kombo",
+      Elements: "Prvky",
+      Stars: "Hvězdy",
+      Display: "Zobrazení",
+      Theme: "Motiv",
+      Dark: "Tmavý",
+      Light: "Světlý",
+      Language: "Jazyk",
+      "Daily Lab": "Denní laboratoř",
+      Records: "Rekordy",
+      Available: "Dostupné",
+      Restore: "Obnovit",
+      "Unlock Pack": "Odemknout balíček",
+      "Manage Purchases": "Spravovat nákupy",
+      "Buy gold coins": "Koupit zlaté mince",
+      Secret: "Tajné",
+      Support: "Podpora",
+      Contact: "Kontakt",
+    },
+    nl: {
+      Menu: "Menu",
+      Back: "Terug",
+      "Back to game": "Terug naar het spel",
+      Shop: "Winkel",
+      Play: "Spelen",
+      Map: "Kaart",
+      Collection: "Collectie",
+      Settings: "Instellingen",
+      Profile: "Profiel",
+      Lab: "Lab",
+      Library: "Bibliotheek",
+      Level: "Level",
+      of: "van",
+      "Free Lab": "Gratis lab",
+      "Fusion Rush Chemist": "Fusion Rush-chemicus",
+      "Gold Coins": "Gouden munten",
+      "Daily Streak": "Dagelijkse reeks",
+      "Best Combo": "Beste combo",
+      Elements: "Elementen",
+      Stars: "Sterren",
+      Display: "Weergave",
+      Theme: "Thema",
+      Dark: "Donker",
+      Light: "Licht",
+      Language: "Taal",
+      "Daily Lab": "Dagelijks lab",
+      Records: "Records",
+      Available: "Beschikbaar",
+      Restore: "Herstellen",
+      "Unlock Pack": "Pakket ontgrendelen",
+      "Manage Purchases": "Aankopen beheren",
+      "Buy gold coins": "Gouden munten kopen",
+      Secret: "Geheim",
+      Support: "Ondersteuning",
+      Contact: "Contact",
+    },
+    fi: {
+      Menu: "Valikko",
+      Back: "Takaisin",
+      "Back to game": "Takaisin peliin",
+      Shop: "Kauppa",
+      Play: "Pelaa",
+      Map: "Kartta",
+      Collection: "Kokoelma",
+      Settings: "Asetukset",
+      Profile: "Profiili",
+      Lab: "Laboratorio",
+      Library: "Kirjasto",
+      Level: "Taso",
+      of: "/",
+      "Free Lab": "Ilmainen laboratorio",
+      "Fusion Rush Chemist": "Fusion Rush -kemisti",
+      "Gold Coins": "Kultakolikot",
+      "Daily Streak": "Päivittäinen putki",
+      "Best Combo": "Paras combo",
+      Elements: "Alkuaineet",
+      Stars: "Tähdet",
+      Display: "Näyttö",
+      Theme: "Teema",
+      Dark: "Tumma",
+      Light: "Vaalea",
+      Language: "Kieli",
+      "Daily Lab": "Päivälaboratorio",
+      Records: "Ennätykset",
+      Available: "Saatavilla",
+      Restore: "Palauta",
+      "Unlock Pack": "Avaa paketti",
+      "Manage Purchases": "Hallitse ostoja",
+      "Buy gold coins": "Osta kultakolikoita",
+      Secret: "Salainen",
+      Support: "Tuki",
+      Contact: "Yhteystiedot",
+    },
+    ms: {
+      Menu: "Menu",
+      Back: "Kembali",
+      "Back to game": "Kembali ke permainan",
+      Shop: "Kedai",
+      Play: "Main",
+      Map: "Peta",
+      Collection: "Koleksi",
+      Settings: "Tetapan",
+      Profile: "Profil",
+      Lab: "Makmal",
+      Library: "Perpustakaan",
+      Level: "Tahap",
+      of: "daripada",
+      "Free Lab": "Makmal percuma",
+      "Fusion Rush Chemist": "Ahli kimia Fusion Rush",
+      "Gold Coins": "Syiling emas",
+      "Daily Streak": "Rentetan harian",
+      "Best Combo": "Kombo terbaik",
+      Elements: "Unsur",
+      Stars: "Bintang",
+      Display: "Paparan",
+      Theme: "Tema",
+      Dark: "Gelap",
+      Light: "Cerah",
+      Language: "Bahasa",
+      "Daily Lab": "Makmal harian",
+      Records: "Rekod",
+      Available: "Tersedia",
+      Restore: "Pulihkan",
+      "Unlock Pack": "Buka pakej",
+      "Manage Purchases": "Urus pembelian",
+      "Buy gold coins": "Beli syiling emas",
+      Secret: "Rahsia",
+      Support: "Sokongan",
+      Contact: "Hubungi",
+    },
+    no: {
+      Menu: "Meny",
+      Back: "Tilbake",
+      "Back to game": "Tilbake til spillet",
+      Shop: "Butikk",
+      Play: "Spill",
+      Map: "Kart",
+      Collection: "Samling",
+      Settings: "Innstillinger",
+      Profile: "Profil",
+      Lab: "Laboratorium",
+      Library: "Bibliotek",
+      Level: "Nivå",
+      of: "av",
+      "Free Lab": "Gratis laboratorium",
+      "Fusion Rush Chemist": "Fusion Rush-kjemiker",
+      "Gold Coins": "Gullmynter",
+      "Daily Streak": "Daglig serie",
+      "Best Combo": "Beste kombinasjon",
+      Elements: "Grunnstoffer",
+      Stars: "Stjerner",
+      Display: "Visning",
+      Theme: "Tema",
+      Dark: "Mørk",
+      Light: "Lys",
+      Language: "Språk",
+      "Daily Lab": "Daglig laboratorium",
+      Records: "Rekorder",
+      Available: "Tilgjengelig",
+      Restore: "Gjenopprett",
+      "Unlock Pack": "Lås opp pakke",
+      "Manage Purchases": "Administrer kjøp",
+      "Buy gold coins": "Kjøp gullmynter",
+      Secret: "Hemmelig",
+      Support: "Kundestøtte",
+      Contact: "Kontakt",
+    },
+    pl: {
+      Menu: "Menu",
+      Back: "Wstecz",
+      "Back to game": "Wróć do gry",
+      Shop: "Sklep",
+      Play: "Graj",
+      Map: "Mapa",
+      Collection: "Kolekcja",
+      Settings: "Ustawienia",
+      Profile: "Profil",
+      Lab: "Laboratorium",
+      Library: "Biblioteka",
+      Level: "Poziom",
+      of: "z",
+      "Free Lab": "Darmowe laboratorium",
+      "Fusion Rush Chemist": "Chemik Fusion Rush",
+      "Gold Coins": "Złote monety",
+      "Daily Streak": "Codzienna seria",
+      "Best Combo": "Najlepsze combo",
+      Elements: "Pierwiastki",
+      Stars: "Gwiazdki",
+      Display: "Wyświetlanie",
+      Theme: "Motyw",
+      Dark: "Ciemny",
+      Light: "Jasny",
+      Language: "Język",
+      "Daily Lab": "Codzienne laboratorium",
+      Records: "Rekordy",
+      Available: "Dostępne",
+      Restore: "Przywróć",
+      "Unlock Pack": "Odblokuj pakiet",
+      "Manage Purchases": "Zarządzaj zakupami",
+      "Buy gold coins": "Kup złote monety",
+      Secret: "Sekret",
+      Support: "Pomoc",
+      Contact: "Kontakt",
+    },
+    sv: {
+      Menu: "Meny",
+      Back: "Tillbaka",
+      "Back to game": "Tillbaka till spelet",
+      Shop: "Butik",
+      Play: "Spela",
+      Map: "Karta",
+      Collection: "Samling",
+      Settings: "Inställningar",
+      Profile: "Profil",
+      Lab: "Laboratorium",
+      Library: "Bibliotek",
+      Level: "Nivå",
+      of: "av",
+      "Free Lab": "Gratis labb",
+      "Fusion Rush Chemist": "Fusion Rush-kemist",
+      "Gold Coins": "Guldmynt",
+      "Daily Streak": "Daglig svit",
+      "Best Combo": "Bästa kombination",
+      Elements: "Grundämnen",
+      Stars: "Stjärnor",
+      Display: "Visning",
+      Theme: "Tema",
+      Dark: "Mörk",
+      Light: "Ljus",
+      Language: "Språk",
+      "Daily Lab": "Dagligt labb",
+      Records: "Rekord",
+      Available: "Tillgänglig",
+      Restore: "Återställ",
+      "Unlock Pack": "Lås upp paket",
+      "Manage Purchases": "Hantera köp",
+      "Buy gold coins": "Köp guldmynt",
+      Secret: "Hemlig",
+      Support: "Support",
+      Contact: "Kontakt",
+    },
+    th: {
+      Menu: "เมนู",
+      Back: "ย้อนกลับ",
+      "Back to game": "กลับไปที่เกม",
+      Shop: "ร้านค้า",
+      Play: "เล่น",
+      Map: "แผนที่",
+      Collection: "คอลเลกชัน",
+      Settings: "การตั้งค่า",
+      Profile: "โปรไฟล์",
+      Lab: "ห้องทดลอง",
+      Library: "คลังเกม",
+      Level: "ด่าน",
+      of: "จาก",
+      "Free Lab": "ห้องทดลองฟรี",
+      "Fusion Rush Chemist": "นักเคมี Fusion Rush",
+      "Gold Coins": "เหรียญทอง",
+      "Daily Streak": "ต่อเนื่องรายวัน",
+      "Best Combo": "คอมโบที่ดีที่สุด",
+      Elements: "ธาตุ",
+      Stars: "ดาว",
+      Display: "การแสดงผล",
+      Theme: "ธีม",
+      Dark: "มืด",
+      Light: "สว่าง",
+      Language: "ภาษา",
+      "Daily Lab": "ห้องทดลองรายวัน",
+      Records: "สถิติ",
+      Available: "พร้อมใช้",
+      Restore: "กู้คืน",
+      "Unlock Pack": "ปลดล็อกแพ็ก",
+      "Manage Purchases": "จัดการการซื้อ",
+      "Buy gold coins": "ซื้อเหรียญทอง",
+      Secret: "ลับ",
+      Support: "ช่วยเหลือ",
+      Contact: "ติดต่อ",
+    },
+    uk: {
+      Menu: "Меню",
+      Back: "Назад",
+      "Back to game": "Повернутися до гри",
+      Shop: "Магазин",
+      Play: "Грати",
+      Map: "Мапа",
+      Collection: "Колекція",
+      Settings: "Налаштування",
+      Profile: "Профіль",
+      Lab: "Лабораторія",
+      Library: "Бібліотека",
+      Level: "Рівень",
+      of: "із",
+      "Free Lab": "Безкоштовна лабораторія",
+      "Fusion Rush Chemist": "Хімік Fusion Rush",
+      "Gold Coins": "Золоті монети",
+      "Daily Streak": "Щоденна серія",
+      "Best Combo": "Найкраще комбо",
+      Elements: "Елементи",
+      Stars: "Зірки",
+      Display: "Відображення",
+      Theme: "Тема",
+      Dark: "Темна",
+      Light: "Світла",
+      Language: "Мова",
+      "Daily Lab": "Щоденна лабораторія",
+      Records: "Рекорди",
+      Available: "Доступно",
+      Restore: "Відновити",
+      "Unlock Pack": "Розблокувати пакет",
+      "Manage Purchases": "Керувати покупками",
+      "Buy gold coins": "Купити золоті монети",
+      Secret: "Таємниця",
+      Support: "Підтримка",
+      Contact: "Контакти",
+    },
+    da: {
+      Menu: "Menu",
+      Back: "Tilbage",
+      "Back to game": "Tilbage til spillet",
+      Shop: "Butik",
+      Play: "Spil",
+      Map: "Kort",
+      Collection: "Samling",
+      Settings: "Indstillinger",
+      Profile: "Profil",
+      Lab: "Laboratorium",
+      Library: "Bibliotek",
+      Level: "Niveau",
+      of: "af",
+      "Free Lab": "Gratis laboratorium",
+      "Fusion Rush Chemist": "Fusion Rush-kemiker",
+      "Gold Coins": "Guldmønter",
+      "Daily Streak": "Daglig serie",
+      "Best Combo": "Bedste combo",
+      Elements: "Grundstoffer",
+      Stars: "Stjerner",
+      Display: "Visning",
+      Theme: "Tema",
+      Dark: "Mørk",
+      Light: "Lys",
+      Language: "Sprog",
+      "Daily Lab": "Dagligt laboratorium",
+      Records: "Rekorder",
+      Available: "Tilgængelig",
+      Restore: "Gendan",
+      "Unlock Pack": "Lås pakke op",
+      "Manage Purchases": "Administrer køb",
+      "Buy gold coins": "Køb guldmønter",
+      Secret: "Hemmelig",
+      Support: "Support",
+      Contact: "Kontakt",
+    },
+    ta: {
+      Menu: "மெனு",
+      Back: "பின்செல்",
+      "Back to game": "விளையாட்டுக்குத் திரும்பு",
+      Shop: "கடை",
+      Play: "விளையாடு",
+      Map: "வரைபடம்",
+      Collection: "சேகரிப்பு",
+      Settings: "அமைப்புகள்",
+      Profile: "சுயவிவரம்",
+      Lab: "ஆய்வகம்",
+      Library: "நூலகம்",
+      Level: "நிலை",
+      of: "இல்",
+      "Free Lab": "இலவச ஆய்வகம்",
+      "Fusion Rush Chemist": "Fusion Rush வேதியியலாளர்",
+      "Gold Coins": "தங்க நாணயங்கள்",
+      "Daily Streak": "தினசரி தொடர்",
+      "Best Combo": "சிறந்த காம்போ",
+      Elements: "தனிமங்கள்",
+      Stars: "நட்சத்திரங்கள்",
+      Display: "காட்சி",
+      Theme: "தீம்",
+      Dark: "இருள்",
+      Light: "ஒளி",
+      Language: "மொழி",
+      "Daily Lab": "தினசரி ஆய்வகம்",
+      Records: "சாதனைகள்",
+      Available: "கிடைக்கும்",
+      Restore: "மீட்டமை",
+      "Unlock Pack": "தொகுப்பைத் திற",
+      "Manage Purchases": "வாங்குதல்களை நிர்வகி",
+      "Buy gold coins": "தங்க நாணயங்களை வாங்கு",
+      Secret: "ரகசியம்",
+      Support: "ஆதரவு",
+      Contact: "தொடர்பு",
+    },
   };
-  return compact[language];
+  return compact[language] ?? {};
 }
 
 const ITALIAN_TRANSLATION_EXTENSIONS: TranslationMap = {
@@ -1165,8 +1684,7 @@ const ITALIAN_TRANSLATION_EXTENSIONS: TranslationMap = {
   "Collect three stars across today's runs.": "Raccogli tre stelle nelle partite di oggi.",
   "Land a shot that causes four cascading merges.":
     "Esegui un tiro che causa quattro fusioni a cascata.",
-  "Create reactions by merging matching atoms.":
-    "Crea reazioni fondendo atomi uguali.",
+  "Create reactions by merging matching atoms.": "Crea reazioni fondendo atomi uguali.",
   "Spend saved score on any shop power-up.":
     "Spendi il punteggio accumulato per un potenziamento del negozio.",
 
@@ -1252,8 +1770,7 @@ const ITALIAN_TRANSLATION_EXTENSIONS: TranslationMap = {
     "Gli atomi instabili perdono 1 segmento di anello dopo ogni tiro",
   "Merging stabilizes the isotope into the new atom for double points":
     "La fusione stabilizza l'isotopo nel nuovo atomo per punti doppi",
-  "At 0 segments, it decays down by 1 element tier":
-    "A 0 segmenti decade di 1 grado elementale",
+  "At 0 segments, it decays down by 1 element tier": "A 0 segmenti decade di 1 grado elementale",
   "Gravity Surge": "Impulso gravitazionale",
   "Every 5 shots, all atoms shift slightly downward toward danger.":
     "Ogni 5 tiri, tutti gli atomi scivolano leggermente verso il pericolo.",
@@ -1271,7 +1788,8 @@ const ITALIAN_TRANSLATION_EXTENSIONS: TranslationMap = {
   "Use E-gun, Gravity, Emission, or Grab to unlock reactions":
     "Usa E-Gun, Gravità, Emissione o Presa per sbloccare le reazioni",
   "Fusion Rush Timer": "Timer Fusion Rush",
-  "Reach the target before the lab clock expires.": "Raggiungi l'obiettivo prima che scada il tempo.",
+  "Reach the target before the lab clock expires.":
+    "Raggiungi l'obiettivo prima che scada il tempo.",
   "180-second countdown": "Conto alla rovescia di 180 secondi",
   "Game over when time runs out": "Game over allo scadere del tempo",
   "Isotope Decay": "Decadimento isotopico",
@@ -1298,7 +1816,8 @@ const ITALIAN_TRANSLATION_EXTENSIONS: TranslationMap = {
     "Sconfiggi questo boss in Campagna per archiviare le sue note di campo.",
   "The first lab guardian is a stitched-together watcher grown from low-period atoms. It opens only a few eyes at once, forcing clean recognition instead of brute force.":
     "Il primo guardiano del laboratorio è una sentinella assemblata da atomi dei primi periodi. Apre solo pochi occhi alla volta, imponendo riconoscimento pulito invece della forza bruta.",
-  "Match the open eye element to deal damage": "Abbina l'elemento dell'occhio aperto per infliggere danni",
+  "Match the open eye element to deal damage":
+    "Abbina l'elemento dell'occhio aperto per infliggere danni",
   "Shimmer shots hit harder": "I tiri scintillanti colpiscono più forte",
   "Charge the center eye to earn Blank atoms": "Carica l'occhio centrale per ottenere atomi Vuoti",
   "The archive built this sentinel to test whether you understand families, not just symbols. Its core cycles through metals, halogens, and noble gases like a living table.":
@@ -1310,7 +1829,8 @@ const ITALIAN_TRANSLATION_EXTENSIONS: TranslationMap = {
   "A singularity-bound core that hides its eye behind orbiting atoms. It does not guard a table; it bends the arena until straight-line thinking falls apart.":
     "Un nucleo legato a una singolarità che nasconde l'occhio dietro atomi orbitanti. Non protegge una tavola: piega l'arena finché il pensiero lineare crolla.",
   "The black hole bends live shots": "Il buco nero devia i tiri in volo",
-  "Removed orbit atoms no longer fire back": "Gli atomi orbitanti rimossi non rispondono più al fuoco",
+  "Removed orbit atoms no longer fire back":
+    "Gli atomi orbitanti rimossi non rispondono più al fuoco",
   "Clear the orbit, then hit the exposed eye three times":
     "Libera l'orbita, poi colpisci l'occhio esposto tre volte",
   "Obtained:": "Ottenuto:",
@@ -1375,8 +1895,7 @@ const ITALIAN_TRANSLATION_EXTENSIONS: TranslationMap = {
   "Checking...": "Controllo...",
   "Opening...": "Apertura...",
   "Preparing purchase with App Store...": "Preparazione dell'acquisto con App Store...",
-  "App Store did not respond in time. Try again.":
-    "L'App Store non ha risposto in tempo. Riprova.",
+  "App Store did not respond in time. Try again.": "L'App Store non ha risposto in tempo. Riprova.",
   "Pro Lab Pack unlocked.": "Pacchetto Lab Pro sbloccato.",
   "Pro Lab Pack is not available right now.": "Il Pacchetto Lab Pro non è disponibile al momento.",
   "App Store purchase could not be started.": "Impossibile avviare l'acquisto su App Store.",
@@ -1416,7 +1935,7 @@ const ITALIAN_TRANSLATION_EXTENSIONS: TranslationMap = {
   "added to your inventory.": "aggiunto all'inventario.",
   "is introduced at level": "viene introdotto al livello",
 
-  "COMPOUNDS": "COMPOSTI",
+  COMPOUNDS: "COMPOSTI",
   Unknown: "Sconosciuto",
   "Unknown Compound": "Composto sconosciuto",
   "Found x": "Trovato x",
@@ -1425,7 +1944,7 @@ const ITALIAN_TRANSLATION_EXTENSIONS: TranslationMap = {
   times: "volte",
   "elements discovered": "elementi scoperti",
   "/ 118 elements discovered": "/ 118 elementi scoperti",
-  "BADGES": "DISTINTIVI",
+  BADGES: "DISTINTIVI",
   Unlocked: "Sbloccato",
   "Element Milestones": "Traguardi degli elementi",
   "Single landmark discoveries.": "Scoperte importanti singole.",
@@ -1694,9 +2213,9 @@ const ITALIAN_SCIENCE_TRANSLATIONS: TranslationMap = {
     "Un gas dall'odore pungente usato per produrre fertilizzanti.",
   "A nitrogen center surrounded by four hydrogens.":
     "Un centro di azoto circondato da quattro idrogeni.",
-  "A simple fuel gas found in natural gas.": "Un semplice gas combustibile presente nel gas naturale.",
-  "A familiar white crystal sprinkled on food.":
-    "Un familiare cristallo bianco sparso sul cibo.",
+  "A simple fuel gas found in natural gas.":
+    "Un semplice gas combustibile presente nel gas naturale.",
+  "A familiar white crystal sprinkled on food.": "Un familiare cristallo bianco sparso sul cibo.",
   "A bubbling household disinfectant that releases oxygen.":
     "Un disinfettante domestico frizzante che libera ossigeno.",
   "A reactive form of oxygen that helps shield Earth high above.":
@@ -1707,8 +2226,7 @@ const ITALIAN_SCIENCE_TRANSLATIONS: TranslationMap = {
     "Una molecola piccola ma pericolosa storicamente associata alle mandorle amare.",
   "A gas famous for whipped cream chargers and laughing gas.":
     "Un gas famoso per le bombolette di panna montata e come gas esilarante.",
-  "A hot-reacting powder known as quicklime.":
-    "Una polvere a reazione calda nota come calce viva.",
+  "A hot-reacting powder known as quicklime.": "Una polvere a reazione calda nota come calce viva.",
   "The hard mineral chemistry behind quartz and sand.":
     "La chimica minerale dura dietro quarzo e sabbia.",
   "The tangy molecule that gives vinegar its bite.":
@@ -1718,8 +2236,7 @@ const ITALIAN_SCIENCE_TRANSLATIONS: TranslationMap = {
   "A choking volcanic gas linked to smoky pollution.":
     "Un gas vulcanico soffocante collegato all'inquinamento fumoso.",
   "A tiny signaling gas used by the body.": "Un minuscolo gas di segnalazione usato dal corpo.",
-  "A reddish-brown gas seen in polluted air.":
-    "Un gas rosso-bruno visibile nell'aria inquinata.",
+  "A reddish-brown gas seen in polluted air.": "Un gas rosso-bruno visibile nell'aria inquinata.",
   "A white mineral made when magnesium burns brightly.":
     "Un minerale bianco che si forma quando il magnesio brucia intensamente.",
   "The red-brown chemistry of rust and earthy pigments.":
@@ -1756,4 +2273,3 @@ for (const [language, translations] of Object.entries(GLOBAL_TRANSLATION_EXTENSI
 >) {
   Object.assign(TRANSLATIONS[language] ?? (TRANSLATIONS[language] = {}), translations);
 }
-

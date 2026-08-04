@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { Clapperboard } from "lucide-react";
+import { toast } from "sonner";
 import { ElementBall } from "./ElementBall";
 import { GameBoard } from "./GameBoard";
 import { nextBallId, placeAndMerge, type Ball, type Board, type Geo } from "./logic";
@@ -1006,7 +1007,11 @@ export function Shop({
       if (result.purchased) {
         grantThemeProduct(productId);
         recordShopSpend(productId);
-        setCosmeticMessage(`${getProductById(productId)?.name ?? "Cosmetic bundle"} unlocked.`);
+        const productName = getProductById(productId)?.name ?? "Cosmetic bundle";
+        setCosmeticMessage(`${productName} unlocked. Equip it from Profile.`);
+        toast.success("Theme unlocked", {
+          description: `${productName} is now available to equip in Profile → Display.`,
+        });
         return;
       }
       setCosmeticMessage(result.reason ?? "This cosmetic bundle is not available right now.");

@@ -755,7 +755,9 @@
 }
 
 .game-projectile {
-  contain: layout;
+  /* Keep the moving atom transparent on iOS. `contain: layout` can make the
+     transformed wrapper render as a black rectangular compositing layer,
+     even though the atom itself is circular. */
   overflow: visible;
   transform-origin: 0 0;
 }
