@@ -364,6 +364,8 @@ interface ProgressState {
   coinTransactions: CoinTransaction[];
   discoveredElements: number[]; // atomic numbers seen
   discoveredCompounds: string[];
+  viewedElementDiscoveries: number[];
+  viewedCompoundDiscoveries: string[];
   compoundCounts: Record<string, number>;
   soundEnabled: boolean;
   musicEnabled: boolean;
@@ -421,6 +423,8 @@ interface ProgressState {
   setUnlockedLevel: (id: number) => void;
   recordDiscovery: (atomicNumbers: number[]) => void;
   recordCompoundDiscovery: (compoundId: string) => void;
+  markElementDiscoveryViewed: (atomicNumber: number) => void;
+  markCompoundDiscoveryViewed: (compoundId: string) => void;
   unlockLockedElementsForCoins: (atomicNumber: number, coinCost: number) => boolean;
   unlockLockedCompoundsForCoins: (compoundId: string, coinCost: number) => boolean;
   addScore: (n: number) => void;
@@ -494,6 +498,8 @@ export const useProgress = create<ProgressState>()(
       coinTransactions: [],
       discoveredElements: [1],
       discoveredCompounds: [],
+      viewedElementDiscoveries: [1],
+      viewedCompoundDiscoveries: [],
       compoundCounts: {},
       soundEnabled: true,
       musicEnabled: true,
@@ -711,6 +717,18 @@ export const useProgress = create<ProgressState>()(
             [compoundId]: (s.compoundCounts[compoundId] ?? 0) + 1,
           },
         })),
+      markElementDiscoveryViewed: (atomicNumber) =>
+        set((s) =>
+          s.viewedElementDiscoveries.includes(atomicNumber)
+            ? s
+            : { viewedElementDiscoveries: [...s.viewedElementDiscoveries, atomicNumber] },
+        ),
+      markCompoundDiscoveryViewed: (compoundId) =>
+        set((s) =>
+          s.viewedCompoundDiscoveries.includes(compoundId)
+            ? s
+            : { viewedCompoundDiscoveries: [...s.viewedCompoundDiscoveries, compoundId] },
+        ),
       unlockLockedElementsForCoins: (atomicNumber, coinCost) => {
         let unlocked = false;
         set((s) => {
@@ -1229,6 +1247,8 @@ export const useProgress = create<ProgressState>()(
           coinTransactions: s.coinTransactions,
           discoveredElements: [1],
           discoveredCompounds: [],
+          viewedElementDiscoveries: [1],
+          viewedCompoundDiscoveries: [],
           compoundCounts: {},
           soundEnabled: true,
           musicEnabled: true,
@@ -1281,8 +1301,18 @@ export const useProgress = create<ProgressState>()(
       merge: (persisted, current) => {
         const persistedState = persisted as Partial<ProgressState> | undefined;
         const discoveredElements = persistedState?.discoveredElements ?? current.discoveredElements;
+        const viewedElementDiscoveries = Array.isArray(persistedState?.viewedElementDiscoveries)
+          ? persistedState.viewedElementDiscoveries
+          : discoveredElements;
+        const discoveredCompounds =
+          persistedState?.discoveredCompounds ?? current.discoveredCompounds;
+        const viewedCompoundDiscoveries = Array.isArray(
+          persistedState?.viewedCompoundDiscoveries,
+        )
+          ? persistedState.viewedCompoundDiscoveries
+          : discoveredCompounds;
         const compoundCounts = {
-          ...Object.fromEntries((persistedState?.discoveredCompounds ?? []).map((id) => [id, 1])),
+          ...Object.fromEntries(discoveredCompounds.map((id) => [id, 1])),
           ...(persistedState?.compoundCounts ?? {}),
         };
         const levelStats = normalizeLevelStatsRecord(persistedState?.levelStats);
@@ -1339,7 +1369,10 @@ export const useProgress = create<ProgressState>()(
             discoveredElements,
             Math.max(0, Math.floor(persistedState?.shopSpendCents ?? current.shopSpendCents)),
           ),
-          discoveredCompounds: persistedState?.discoveredCompounds ?? current.discoveredCompounds,
+          discoveredElements,
+          discoveredCompounds,
+          viewedElementDiscoveries,
+          viewedCompoundDiscoveries,
           compoundCounts,
           levelStars: persistedState?.levelStars ?? current.levelStars,
           challengeBestScores: persistedState?.challengeBestScores ?? current.challengeBestScores,

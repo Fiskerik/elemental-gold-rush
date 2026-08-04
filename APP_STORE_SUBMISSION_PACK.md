@@ -1,4 +1,4 @@
-# App Store Submission Pack (iOS 1.1.0, build 131)
+# App Store Submission Pack (iOS 1.1.2, build 170)
 
 ## Metadata limits to follow
 
@@ -12,23 +12,54 @@
 
 ### Promotional Text (170 max)
 
-Merge atoms, unlock 118 elements, and build your lab in a strategic puzzle adventure. Daily quests, streak rewards, and optional power-ups await.
+Discover new elements and compounds with shimmering Library cues, plus a tighter web layout that feels closer to the mobile Atomic Fusion Rush experience.
 
 ### Description
 
-Atomic Fusion Rush is a science-inspired merge puzzle where you fuse atoms, discover compounds, and progress across 100 campaign levels.
+Atomic Fusion Rush is a science-inspired merge puzzle where you fuse atoms in 2048-style, discover compounds as you go, and discover the periodic table.
+
+HOW IT WORKS
+
+• Merge matching atoms to create higher elements
+• Complete campaign levels with unique goals
+• Discover compounds and composed molecules to expand your collection and get awarded bonus points
+• Use power-ups to recover from tough board states. Power-ups unlock as you progress and can be upgraded
+• Earn coins from gameplay and optional rewarded ads
+
+GAME MODES
+
+• Campaign progression across 100 levels
+• Special levels to unlock powerups, bosses and compound forming
+• Daily quests and streak rewards - with Leaderboards that reset every day
+• Collection tracking for elements and compounds
+• Profile milestones and achievement goals
+
+OPTIONAL PURCHASES
+
+• Coin packs for faster progression
+• One-time Pro upgrade to remove forced interstitial ads and daily bonus coins
+• Purchases are managed through Apple’s in-app purchase system
+
+Built for short sessions and long-term progression, Atomic Fusion Rush blends strategy, planning, and satisfying chain reactions. Become the alchemist you always wanted to be by completing the Periodic Table and find all the Secret Molecules.
 
 - Merge atoms to discover higher elements
 - Complete daily quests and maintain streaks
 - Build coin reserves through gameplay and optional rewarded ads
-- Use power-ups to recover difficult runs
+- Compound campaign levels always start with one compound charge ready, and Daily Compound does not prompt for power-ups
+- Use power-ups to recover difficult normal-game runs
 - Optional one-time Pro upgrade removes forced interstitial ads
 
 Designed for short sessions and long-term progression, Atomic Fusion Rush blends strategy, planning, and satisfying chain reactions.
 
 ### Keywords (100-byte target)
 
-merge,puzzle,chemistry,elements,periodic table,science,strategy,casual,logic,brain game
+puzzle,chemistry,element,merge,atom,science,strategy,brain,logic,compound,periodic,table,alchemy,lab
+
+### App Store localization coverage
+
+Metadata and 1.1.2 release notes are prepared for these 27 App Store locales:
+
+`ar`, `zh-Hans`, `zh-Hant`, `cs`, `da`, `nl-NL`, `en-US`, `fi`, `fr-FR`, `de-DE`, `hi`, `id`, `it`, `ja`, `ko`, `ms`, `no`, `pl`, `pt-BR`, `ru`, `es-ES`, `sv`, `ta`, `th`, `tr`, `uk`, `vi`.
 
 ### App Review Notes
 
@@ -52,7 +83,7 @@ Privacy policy: https://atomic-fusion.lovable.app/privacy
 
 ## Left-sidebar checklist before submit
 
-- iOS App Version 1.1.0 (build 131)
+- iOS App Version 1.1.2 (build 170)
   - Attach build
   - Upload required screenshot sets
   - Fill promo text, description, keywords, support URL, copyright

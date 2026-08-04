@@ -19,13 +19,15 @@ import { Leaderboard } from "@/game/DailyCompoundLeaderboard";
 import { GameModeId } from "@/game/challenges";
 import { MOLECULE_CHALLENGE_BY_LEVEL, getCompoundChallengeKind, getLevelById } from "@/game/levels";
 import type { HowToPlayMode } from "@/game/HowToPlay";
+import { APP_STORE_URL, checkForRequiredAppUpdate, type RequiredAppUpdate } from "@/game/appUpdate";
 import { useProgress } from "@/game/store";
 import { useDomLocalization } from "@/game/useDomLocalization";
 
 const FIRST_ENTRY_TUTORIAL_TIP_IDS: Record<HowToPlayMode, string> = {
   normal: "onboarding-normal-game",
-  compound: "onboarding-compound-level",
-  "daily-compound": "onboarding-daily-compound",
+  "daily-board": "onboarding-daily-board-1.1.2",
+  compound: "onboarding-compound-level-1.1.2",
+  "daily-compound": "onboarding-daily-compound-1.1.2",
 };
 
 type Screen =
@@ -62,6 +64,8 @@ export function GameApp() {
   const [screen, setScreen] = useState<Screen>({ name: "menu" });
   const [gameRunNonce, setGameRunNonce] = useState(0);
   const [showLaunchScreen, setShowLaunchScreen] = useState(true);
+  const [appUpdateCheckComplete, setAppUpdateCheckComplete] = useState(false);
+  const [requiredAppUpdate, setRequiredAppUpdate] = useState<RequiredAppUpdate | null>(null);
   const [resumePrompt, setResumePrompt] = useState<ReturnType<typeof getSavedRunSummary>>(null);
   const [appReviewMilestonePromptOpen, setAppReviewMilestonePromptOpen] = useState(false);
   const [appReviewRequested, setAppReviewRequested] = useState(false);
@@ -73,6 +77,31 @@ export function GameApp() {
   useEffect(() => {
     if (!isNativeIos) return;
     return startCloudProgressSync();
+  }, [isNativeIos]);
+
+  useEffect(() => {
+    if (!isNativeIos) {
+      setAppUpdateCheckComplete(true);
+      return;
+    }
+
+    let active = true;
+    const refreshAppUpdate = async () => {
+      const update = await checkForRequiredAppUpdate();
+      if (!active) return;
+      setRequiredAppUpdate(update);
+      setAppUpdateCheckComplete(true);
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") void refreshAppUpdate();
+    };
+
+    void refreshAppUpdate();
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      active = false;
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, [isNativeIos]);
 
   useEffect(() => {
@@ -105,7 +134,7 @@ export function GameApp() {
     return () => window.clearTimeout(timeoutId);
   }, [showLaunchScreen]);
 
-  if (showLaunchScreen) return <LaunchScreen />;
+  if (showLaunchScreen || !appUpdateCheckComplete) return <LaunchScreen />;
 
   const shouldShowAppReviewMilestone =
     completedGameCount >= 4 && !appReviewMilestonePromptSeen && !appReviewMilestoneRewardClaimed;
@@ -133,6 +162,14 @@ export function GameApp() {
       <>
         {content}
         {appReviewMilestonePrompt}
+        {requiredAppUpdate && (
+          <RequiredAppUpdatePrompt
+            update={requiredAppUpdate}
+            onUpdate={() => {
+              window.location.href = requiredAppUpdate.storeUrl || APP_STORE_URL;
+            }}
+          />
+        )}
       </>
     );
   }
@@ -186,7 +223,7 @@ export function GameApp() {
   function startDailyChallenge() {
     refreshDailyFeatures();
     const dailyChallenge = useProgress.getState().dailyChallenge;
-    startGameWithFirstTutorial("normal", (initialHowToPlay) =>
+    startGameWithFirstTutorial("daily-board", (initialHowToPlay) =>
       setScreen({
         name: "game",
         levelId: dailyChallenge.levelId,
@@ -212,9 +249,9 @@ export function GameApp() {
   }
 
   function startCampaignLevel(levelId: number) {
-    const tutorialMode = levelId === 1 ? "normal" : levelId === 5 ? "compound" : undefined;
+    const compoundId = MOLECULE_CHALLENGE_BY_LEVEL[levelId];
+    const tutorialMode = levelId === 1 ? "normal" : compoundId ? "compound" : undefined;
     startGameWithFirstTutorial(tutorialMode, (initialHowToPlay) => {
-      const compoundId = MOLECULE_CHALLENGE_BY_LEVEL[levelId];
       setScreen({
         name: "game",
         levelId,
@@ -546,6 +583,59 @@ function AppReviewMilestonePrompt({
             Not now
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function RequiredAppUpdatePrompt({
+  update,
+  onUpdate,
+}: {
+  update: RequiredAppUpdate;
+  onUpdate: () => void;
+}) {
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="App update required"
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 2400,
+        display: "grid",
+        placeItems: "center",
+        padding: 20,
+        background: "rgba(0,0,0,0.78)",
+        backdropFilter: "blur(7px)",
+      }}
+    >
+      <div
+        style={{
+          width: "100%",
+          maxWidth: 360,
+          padding: 22,
+          borderRadius: 18,
+          border: "1px solid var(--accent)",
+          background: "var(--surface-elevated)",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.6), 0 0 28px var(--accent-glow)",
+          textAlign: "center",
+        }}
+      >
+        <div style={{ fontSize: 11, letterSpacing: 3, color: "var(--accent)", fontWeight: 900 }}>
+          UPDATE REQUIRED
+        </div>
+        <h2 style={{ margin: "7px 0 8px", fontSize: 23 }}>New version available</h2>
+        <p style={{ margin: "0 0 8px", color: "var(--foreground)", fontSize: 14, fontWeight: 750 }}>
+          Update the app to continue playing.
+        </p>
+        <p style={{ margin: "0 0 18px", color: "var(--muted-foreground)", fontSize: 12 }}>
+          Version {update.storeVersion} is available in the App Store.
+        </p>
+        <button type="button" onClick={onUpdate} style={{ ...promptPrimaryBtn, width: "100%" }}>
+          Update in App Store
+        </button>
       </div>
     </div>
   );

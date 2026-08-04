@@ -15,6 +15,7 @@ def capacitor_pods
   # Unity Ads and ironSource Ads demand inside AdMob.
   pod 'CapacitorCommunityAdmob', :path => '../../node_modules/@capacitor-community/admob'
   pod 'CapacitorFirebaseAnalytics', :path => '../../node_modules/@capacitor-firebase/analytics'
+  pod 'CapacitorFirebaseMessaging', :path => '../../node_modules/@capacitor-firebase/messaging'
   pod 'CapacitorHaptics', :path => '../../node_modules/@capacitor/haptics'
   pod 'CapacitorKeyboard', :path => '../../node_modules/@capacitor/keyboard'
   pod 'CapacitorSplashScreen', :path => '../../node_modules/@capacitor/splash-screen'

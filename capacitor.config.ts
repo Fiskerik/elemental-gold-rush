@@ -27,6 +27,9 @@ const config: CapacitorConfig = {
       style: "DARK",
       backgroundColor: "#0A0A1A",
     },
+    FirebaseMessaging: {
+      presentationOptions: ["alert", "badge", "sound"],
+    },
   },
 };
 

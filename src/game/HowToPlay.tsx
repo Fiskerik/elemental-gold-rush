@@ -5,7 +5,7 @@ import { COMPOUNDS } from "./compounds";
 import { PowerUpBadge } from "./PowerUpLibrary";
 import type { AtomSkin } from "./store";
 
-export type HowToPlayMode = "normal" | "compound" | "daily-compound";
+export type HowToPlayMode = "normal" | "daily-board" | "compound" | "daily-compound";
 
 interface HowToPlayProps {
   mode: HowToPlayMode;
@@ -44,6 +44,23 @@ const SLIDES: Record<HowToPlayMode, Slide[]> = {
       title: "Use power-ups later",
       body: "As you progress, power-ups can pull, move, or transform atoms to clear difficult stages faster.",
       visual: "powerups",
+    },
+  ],
+  "daily-board": [
+    {
+      title: "Match today's target",
+      body: "The Daily Board gives you a seeded board and a target atom. Reach the target before the danger line rises.",
+      visual: "target",
+    },
+    {
+      title: "Aim for efficient merges",
+      body: "Every shot counts toward your daily score. Use the queue and matching atoms to build the target with as few shots as possible.",
+      visual: "merge",
+    },
+    {
+      title: "Come back tomorrow",
+      body: "The board, score, and leaderboard reset each day. Finish a run to claim the daily reward and record your best attempt.",
+      visual: "daily-grid",
     },
   ],
   compound: [
@@ -86,7 +103,14 @@ export function HowToPlay({ mode, atomSkin = "classic", onClose }: HowToPlayProp
   const [slideIndex, setSlideIndex] = useState(0);
   const slides = SLIDES[mode];
   const slide = slides[slideIndex];
-  const modeLabel = mode === "normal" ? "Normal game" : mode === "compound" ? "Compound levels" : "Daily Compound";
+  const modeLabel =
+    mode === "normal"
+      ? "Normal game"
+      : mode === "daily-board"
+        ? "Daily Board"
+        : mode === "compound"
+          ? "Compound levels"
+          : "Daily Compound";
 
   useEffect(() => {
     setSlideIndex(0);

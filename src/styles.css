@@ -632,6 +632,25 @@
   color: var(--foreground);
 }
 
+/* Verdant uses dark green text on its light board. Fixed messages and toasts
+   use dark glass surfaces, so give those surfaces their own readable default. */
+.game-board-shell.board-theme-verdantCrystal .game-board-message-surface {
+  --foreground: oklch(0.96 0.02 155);
+  --muted-foreground: oklch(0.78 0.035 155);
+  color: var(--foreground);
+}
+
+.board-theme-verdant-active .toaster {
+  --background: oklch(0.11 0.035 280);
+  --foreground: oklch(0.96 0.02 155);
+  --muted-foreground: oklch(0.78 0.035 155);
+  --border: oklch(0.4 0.12 250 / 0.62);
+}
+
+.board-theme-verdant-active .toaster .toast {
+  color: var(--foreground) !important;
+}
+
 .game-board-shell.board-theme-biohazard {
   --game-shell-bg:
     radial-gradient(circle at 50% 16%, oklch(0.62 0.2 140 / 0.18), transparent 30%),
@@ -1594,6 +1613,79 @@
     transform: scale(1.08);
     opacity: 1;
   }
+}
+@keyframes collection-discovery-border {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+@keyframes collection-discovery-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 rgba(88, 255, 159, 0), 0 8px 18px rgba(0, 0, 0, 0.18);
+  }
+  50% {
+    box-shadow: 0 0 18px rgba(88, 255, 159, 0.42), 0 8px 18px rgba(0, 0, 0, 0.18);
+  }
+}
+.collection-discovery-new {
+  position: relative;
+  isolation: isolate;
+  animation: collection-discovery-glow 2.2s ease-in-out infinite;
+}
+.collection-discovery-new::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  z-index: 1;
+  border-radius: inherit;
+  padding: 2px;
+  background: conic-gradient(
+    from 0deg,
+    rgba(88, 255, 159, 0.2),
+    rgba(255, 255, 255, 0.95),
+    rgba(88, 255, 159, 1),
+    rgba(0, 215, 255, 0.85),
+    rgba(88, 255, 159, 0.2)
+  );
+  animation: collection-discovery-border 2.2s linear infinite;
+  pointer-events: none;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+.collection-discovery-new::after {
+  content: "";
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  z-index: 3;
+  width: 7px;
+  height: 7px;
+  border: 1px solid rgba(220, 255, 232, 0.95);
+  border-radius: 50%;
+  background: #58ff9f;
+  box-shadow: 0 0 0 2px rgba(7, 29, 22, 0.72), 0 0 10px rgba(88, 255, 159, 0.95);
+  animation: collection-discovery-dot 1.3s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes collection-discovery-dot {
+  0%,
+  100% {
+    transform: scale(0.82);
+    opacity: 0.72;
+  }
+  50% {
+    transform: scale(1.18);
+    opacity: 1;
+  }
+}
+.collection-discovery-new > * {
+  position: relative;
+  z-index: 2;
 }
 @keyframes wiggle {
   0%,

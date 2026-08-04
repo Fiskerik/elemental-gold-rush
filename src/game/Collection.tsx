@@ -29,6 +29,8 @@ export function Collection({ onBack }: { onBack: () => void }) {
   const {
     discoveredElements,
     discoveredCompounds,
+    viewedElementDiscoveries,
+    viewedCompoundDiscoveries,
     compoundCounts,
     earnedBadges,
     shopSpendCents,
@@ -36,6 +38,8 @@ export function Collection({ onBack }: { onBack: () => void }) {
     goldCoins,
     unlockLockedElementsForCoins,
     unlockLockedCompoundsForCoins,
+    markElementDiscoveryViewed,
+    markCompoundDiscoveryViewed,
   } = useProgress();
   const tr = (text: string) => t(text, appLanguage);
   const [selected, setSelected] = useState<number | null>(null);
@@ -45,6 +49,8 @@ export function Collection({ onBack }: { onBack: () => void }) {
   const [expandedBadgeGroups, setExpandedBadgeGroups] = useState<Record<string, boolean>>({});
   const found = new Set(discoveredElements);
   const foundCompounds = new Set(discoveredCompounds);
+  const viewedElements = new Set(viewedElementDiscoveries);
+  const viewedCompounds = new Set(viewedCompoundDiscoveries);
   const earned = new Set(earnedBadges);
   const el = selected ? ELEMENTS[selected - 1] : null;
   const elementDetails = el ? getElementCollectionDetails(el) : null;
@@ -79,6 +85,16 @@ export function Collection({ onBack }: { onBack: () => void }) {
 
   function toggleBadgeGroup(groupId: string) {
     setExpandedBadgeGroups((current) => ({ ...current, [groupId]: !current[groupId] }));
+  }
+
+  function openElement(atomicNumber: number) {
+    setSelected(atomicNumber);
+    if (found.has(atomicNumber)) markElementDiscoveryViewed(atomicNumber);
+  }
+
+  function openCompound(compound: CompoundDefinition) {
+    setSelectedCompound(compound);
+    if (foundCompounds.has(compound.id)) markCompoundDiscoveryViewed(compound.id);
   }
 
   return (
@@ -165,6 +181,7 @@ export function Collection({ onBack }: { onBack: () => void }) {
           >
             {ELEMENTS.map((e) => {
               const isFound = found.has(e.atomicNumber);
+              const isNewDiscovery = isFound && !viewedElements.has(e.atomicNumber);
               // Place lanthanides (57–71) and actinides (89–103) in their own rows below.
               let row: number;
               let col: number;
@@ -181,7 +198,9 @@ export function Collection({ onBack }: { onBack: () => void }) {
               return (
                 <button
                   key={e.atomicNumber}
-                  onClick={() => setSelected(e.atomicNumber)}
+                  onClick={() => openElement(e.atomicNumber)}
+                  className={isNewDiscovery ? "collection-discovery-new" : undefined}
+                  aria-label={isNewDiscovery ? `${e.name}, newly discovered` : e.name}
                   style={{
                     gridColumn: col,
                     gridRow: row,
@@ -262,12 +281,15 @@ export function Collection({ onBack }: { onBack: () => void }) {
           >
             {visibleCompounds.map((compound) => {
               const unlocked = foundCompounds.has(compound.id);
+              const isNewDiscovery = unlocked && !viewedCompounds.has(compound.id);
               const foundCount = compoundCounts[compound.id] ?? (unlocked ? 1 : 0);
               return (
                 <button
                   key={compound.id}
                   type="button"
-                  onClick={() => setSelectedCompound(compound)}
+                  onClick={() => openCompound(compound)}
+                  className={isNewDiscovery ? "collection-discovery-new" : undefined}
+                  aria-label={isNewDiscovery ? `${compound.name}, newly discovered` : compound.name}
                   style={{
                     display: "flex",
                     gap: 9,

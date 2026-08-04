@@ -95,6 +95,8 @@ function mergeSnapshots(
   const unionKeys = [
     "discoveredElements",
     "discoveredCompounds",
+    "viewedElementDiscoveries",
+    "viewedCompoundDiscoveries",
     "earnedBadges",
     "ownedThemeProducts",
     "seenTips",

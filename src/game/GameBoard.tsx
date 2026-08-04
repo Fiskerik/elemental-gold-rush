@@ -1363,6 +1363,16 @@ function StandardGameBoard({
   const activeAtomSkin = previewAtomSkin ?? (isAtomSkinUnlocked(atomSkin, { hasProPack, ownedThemeProducts })
     ? atomSkin
     : "classic");
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.toggle("board-theme-verdant-active", activeBoardTheme === "verdantCrystal");
+
+    return () => {
+      root.classList.remove("board-theme-verdant-active");
+    };
+  }, [activeBoardTheme]);
+
   const isNativeIos = Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios";
   const resultPowerUpSaveCost = isNativeIos ? MOBILE_RESULT_POWER_UP_SAVE_COST : 0;
   const progressionPowerUpLevel = Math.max(level.id, unlockedLevel);
@@ -1998,12 +2008,12 @@ function StandardGameBoard({
     return mode === "daily-challenge" ? uniqueAtoms.filter((atom) => atom === target) : uniqueAtoms;
   }
 
-  function registerDiscoveries(atoms: number[]) {
+  function registerDiscoveries(atoms: number[]): number[] {
     const collectibleAtoms = getCollectibleDiscoveries(atoms);
-    if (collectibleAtoms.length === 0) return;
+    if (collectibleAtoms.length === 0) return [];
     const knownAtoms = new Set([...discoveredElements, ...pendingDiscoveryAtomsRef.current]);
     const newAtoms = collectibleAtoms.filter((atom) => !knownAtoms.has(atom));
-    if (newAtoms.length === 0) return;
+    if (newAtoms.length === 0) return [];
     pendingDiscoveryAtomsRef.current = [...pendingDiscoveryAtomsRef.current, ...newAtoms].sort(
       (a, b) => a - b,
     );
@@ -2014,6 +2024,7 @@ function StandardGameBoard({
       });
       return merged.sort((a, b) => a - b);
     });
+    return newAtoms;
   }
 
   function isCompoundDiscoveredOrPending(compoundId: string) {
@@ -4191,11 +4202,11 @@ function StandardGameBoard({
     setTimeout(() => setWiggleIds(new Set()), 380);
     setNoMergeStreak(0);
     const discoveries = Array.from(upgradedAtoms).filter((n) => !discoveredElements.includes(n));
-    const firstDiscovery = [...discoveries].sort((a, b) => b - a)[0];
     if (upgradedAtoms.size > 0) {
+      const registeredDiscoveries = discoveries.length > 0 ? registerDiscoveries(discoveries) : [];
+      const firstDiscovery = [...registeredDiscoveries].sort((a, b) => b - a)[0];
       if (discoveries.length > 0) {
-        registerDiscoveries(discoveries);
-        if (firstDiscovery > 1 && !discoveries.includes(target)) {
+        if (firstDiscovery > 1 && !registeredDiscoveries.includes(target)) {
           feedback({ type: "milestone", atomicNumber: firstDiscovery });
         }
       }
@@ -4875,8 +4886,9 @@ function StandardGameBoard({
     const newAtoms = new Set<number>([atomOverride]);
     result.merges.forEach((m) => newAtoms.add(m.resultAtomicNumber));
     const undiscovered = Array.from(newAtoms).filter((n) => !discoveredElements.includes(n));
-    const firstDiscovery = undiscovered.sort((a, b) => b - a)[0];
-    if (!preview && undiscovered.length > 0) registerDiscoveries(undiscovered);
+    const registeredDiscoveries =
+      !preview && undiscovered.length > 0 ? registerDiscoveries(undiscovered) : [];
+    const firstDiscovery = [...registeredDiscoveries].sort((a, b) => b - a)[0];
 
     let mergeStoneBonus = 0;
     const mergeStoneDamage = damageStones(
@@ -5100,7 +5112,7 @@ function StandardGameBoard({
               shots: nextShots,
               bestCombo: nextBestCombo,
             },
-            undiscovered.includes(target) ? target : undefined,
+            registeredDiscoveries.includes(target) ? target : undefined,
           );
           return;
         }
@@ -5722,8 +5734,9 @@ function StandardGameBoard({
     });
     result.merges.forEach((m) => newAtoms.add(m.resultAtomicNumber));
     const undiscovered = Array.from(newAtoms).filter((n) => !discoveredElements.includes(n));
-    const firstDiscovery = undiscovered.sort((a, b) => b - a)[0];
-    if (undiscovered.length > 0) registerDiscoveries(undiscovered);
+    const registeredDiscoveries =
+      undiscovered.length > 0 ? registerDiscoveries(undiscovered) : [];
+    const firstDiscovery = [...registeredDiscoveries].sort((a, b) => b - a)[0];
 
     setBalls(result.balls.map((b) => (b.stoneHp != null ? b : { ...b, r: radiusFor(b.atom) })));
     setHighlightId(result.finalBallId);
@@ -5822,7 +5835,7 @@ function StandardGameBoard({
               shots,
               bestCombo: Math.max(runBestCombo, result.merges.length),
             },
-            undiscovered.includes(target) ? target : undefined,
+            registeredDiscoveries.includes(target) ? target : undefined,
           );
           return;
         }
@@ -5918,8 +5931,9 @@ function StandardGameBoard({
     const newAtoms = new Set<number>([grabbed.atom]);
     result.merges.forEach((m) => newAtoms.add(m.resultAtomicNumber));
     const undiscovered = Array.from(newAtoms).filter((n) => !discoveredElements.includes(n));
-    const firstDiscovery = undiscovered.sort((a, b) => b - a)[0];
-    if (undiscovered.length > 0) registerDiscoveries(undiscovered);
+    const registeredDiscoveries =
+      undiscovered.length > 0 ? registerDiscoveries(undiscovered) : [];
+    const firstDiscovery = [...registeredDiscoveries].sort((a, b) => b - a)[0];
 
     let mergeStoneBonus = 0;
     const mergeStoneDamage = damageStones(
@@ -6047,7 +6061,7 @@ function StandardGameBoard({
           shots,
           bestCombo: nextBestCombo,
         },
-        undiscovered.includes(target) ? target : undefined,
+        registeredDiscoveries.includes(target) ? target : undefined,
       );
     } else if (firstDiscovery && firstDiscovery > 1) {
       feedback({ type: "milestone", atomicNumber: firstDiscovery });
@@ -8121,6 +8135,7 @@ function FeatureTip({
       }}
     >
       <div
+        className="game-board-message-surface"
         style={{
           maxWidth: isTabletLayout ? 460 : 360,
           width: "100%",

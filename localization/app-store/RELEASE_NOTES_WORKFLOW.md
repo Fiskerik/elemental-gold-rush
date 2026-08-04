@@ -10,11 +10,11 @@ This is the standing workflow for Atomic Fusion Rush releases after 1.1.0.
    - important bug fixes, including leaderboard and purchase fixes;
    - App Store, coupon, promotional-code, or monetization support;
    - localization, accessibility, performance, and major UI improvements.
-3. Write both fields in all 15 supported locales:
+3. Write both fields in all 27 supported locales:
    - Promotional Text: maximum 170 characters per locale;
    - What's New: maximum 4,000 characters per locale.
-4. Keep the locale sections in alphabetical order by display name:
-   Arabic, Chinese Simplified, English, French, German, Hindi, Indonesian, Italian, Japanese, Korean, Portuguese (Brazil), Russian, Spanish, Turkish, Vietnamese.
+4. Keep the locale sections in the configured display-name order:
+   Arabic, Chinese Simplified, Chinese Traditional, Czech, Danish, Dutch, English, Finnish, French, German, Hindi, Indonesian, Italian, Japanese, Korean, Malay, Norwegian, Polish, Portuguese (Brazil), Russian, Spanish, Swedish, Tamil, Thai, Turkish, Ukrainian, Vietnamese.
 5. Do not put quotation marks around copy in the release-notes file. Each field must be ready to paste directly into App Store Connect.
 6. Review every translation for meaning, product names, character limits, and text overflow before publishing.
 
@@ -24,7 +24,12 @@ This is the standing workflow for Atomic Fusion Rush releases after 1.1.0.
 | --- | --- |
 | Arabic | `ar` |
 | Chinese Simplified | `zh-Hans` |
+| Chinese Traditional | `zh-Hant` |
+| Czech | `cs` |
+| Danish | `da` |
+| Dutch | `nl-NL` |
 | English | `en-US` |
+| Finnish | `fi` |
 | French | `fr-FR` |
 | German | `de-DE` |
 | Hindi | `hi` |
@@ -32,10 +37,17 @@ This is the standing workflow for Atomic Fusion Rush releases after 1.1.0.
 | Italian | `it` |
 | Japanese | `ja` |
 | Korean | `ko` |
+| Malay | `ms` |
+| Norwegian | `no` |
+| Polish | `pl` |
 | Portuguese (Brazil) | `pt-BR` |
 | Russian | `ru` |
 | Spanish | `es-ES` |
+| Swedish | `sv` |
+| Tamil | `ta` |
+| Thai | `th` |
 | Turkish | `tr` |
+| Ukrainian | `uk` |
 | Vietnamese | `vi` |
 
 ## File template

@@ -1,6 +1,7 @@
 import { Capacitor } from "@capacitor/core";
 import { Keyboard, KeyboardResize, KeyboardStyle } from "@capacitor/keyboard";
 import { StatusBar, Style } from "@capacitor/status-bar";
+import { initializePushNotifications } from "./game/pushNotifications";
 import { createRoot } from "react-dom/client";
 import { RouterProvider } from "@tanstack/react-router";
 import { getRouter } from "./router";
@@ -80,6 +81,7 @@ if (Capacitor.getPlatform() === "ios") {
   void StatusBar.setBackgroundColor({
     color: storedTheme === "light" ? "#f7f5ef" : "#0A0A1A",
   }).catch(() => {});
+  void initializePushNotifications();
 }
 
 window.requestAnimationFrame(() => {
