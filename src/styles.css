@@ -611,9 +611,11 @@
 
 /* In-game dialogs remain dark glass panels on the light Verdant board, so
    their controls keep the same high-contrast text as the other themes. */
-.game-board-shell.board-theme-verdantCrystal .game-modal-surface {
-  --foreground: oklch(0.96 0.02 155);
-  --muted-foreground: oklch(0.78 0.035 155);
+.game-board-shell.board-theme-verdantCrystal .game-modal-surface,
+.game-board-shell.board-theme-verdantCrystal .stage-clear-card,
+.game-board-shell.board-theme-verdantCrystal .game-board-message-surface {
+  --foreground: oklch(0.98 0.003 247);
+  --muted-foreground: oklch(0.82 0.02 250);
   --surface: oklch(0.11 0.035 280);
   --surface-high: oklch(0.16 0.045 280);
   --surface-elevated: oklch(0.13 0.04 280);
@@ -622,8 +624,8 @@
 }
 
 .game-board-shell.board-theme-verdantCrystal .compound-mode-panel {
-  --foreground: oklch(0.96 0.02 155);
-  --muted-foreground: oklch(0.78 0.035 155);
+  --foreground: oklch(0.98 0.003 247);
+  --muted-foreground: oklch(0.82 0.02 250);
   --surface: oklch(0.11 0.035 280);
   --surface-high: oklch(0.16 0.045 280);
   --surface-elevated: oklch(0.13 0.04 280);
@@ -632,13 +634,8 @@
   color: var(--foreground);
 }
 
-/* Verdant uses dark green text on its light board. Fixed messages and toasts
-   use dark glass surfaces, so give those surfaces their own readable default. */
-.game-board-shell.board-theme-verdantCrystal .game-board-message-surface {
-  --foreground: oklch(0.96 0.02 155);
-  --muted-foreground: oklch(0.78 0.035 155);
-  color: var(--foreground);
-}
+/* Fixed messages and toasts use dark glass surfaces over Verdant's light board.
+   Keep their text on the neutral dark-theme default instead of Verdant green. */
 
 .board-theme-verdant-active .toaster {
   --background: oklch(0.11 0.035 280);
@@ -1616,10 +1613,24 @@
 }
 @keyframes collection-discovery-border {
   0% {
-    transform: rotate(0deg);
+    opacity: 0.35;
+    transform: scale(1);
+  }
+  28% {
+    opacity: 1;
+    transform: scale(1.035);
+  }
+  52% {
+    opacity: 0.3;
+    transform: scale(1.075);
+  }
+  76% {
+    opacity: 0.9;
+    transform: scale(1.018);
   }
   100% {
-    transform: rotate(360deg);
+    opacity: 0.35;
+    transform: scale(1);
   }
 }
 @keyframes collection-discovery-glow {
@@ -1651,7 +1662,7 @@
     rgba(0, 215, 255, 0.85),
     rgba(88, 255, 159, 0.2)
   );
-  animation: collection-discovery-border 2.2s linear infinite;
+  animation: collection-discovery-border 1.8s ease-in-out infinite;
   pointer-events: none;
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;

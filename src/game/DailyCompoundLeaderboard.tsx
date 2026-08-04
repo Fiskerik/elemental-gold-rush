@@ -1,4 +1,5 @@
 import { useEffect, useState, type CSSProperties } from "react";
+import { Coins } from "lucide-react";
 import {
   countryFlag,
   getDailyLeaderboard,
@@ -138,16 +139,20 @@ export function Leaderboard({ onBack }: { onBack: () => void }) {
           <div>
             <div style={summaryLabel}>Today’s top-three prizes</div>
             <div style={prizeLine}>
-              <span>1st <strong>+{DAILY_LEADERBOARD_REWARDS[1]}</strong></span>
-              <span>2nd <strong>+{DAILY_LEADERBOARD_REWARDS[2]}</strong></span>
-              <span>3rd <strong>+{DAILY_LEADERBOARD_REWARDS[3]}</strong></span>
-              <span style={coinLabel}>gold coins</span>
+              <PrizeReward place="1st" amount={DAILY_LEADERBOARD_REWARDS[1]} />
+              <PrizeReward place="2nd" amount={DAILY_LEADERBOARD_REWARDS[2]} />
+              <PrizeReward place="3rd" amount={DAILY_LEADERBOARD_REWARDS[3]} />
             </div>
           </div>
           <div style={prizeStatus}>
-            {currentPrize > 0
-              ? `You are currently entitled to +${currentPrize} coins${awardedPrize >= currentPrize ? " (awarded)" : ""}.`
-              : "Finish a run to enter today’s leaderboard."}
+            {currentPrize > 0 ? (
+              <>
+                You are currently entitled to <CoinReward amount={currentPrize} />
+                {awardedPrize >= currentPrize ? " (awarded)" : ""}.
+              </>
+            ) : (
+              "Finish a run to enter today’s leaderboard."
+            )}
           </div>
         </section>
 
@@ -219,7 +224,10 @@ function LeaderboardRow({ entry, kind }: { entry: LeaderboardEntry; kind: Leader
       <strong style={rankCell}>
         <span>{entry.rank}</span>
         {getDailyLeaderboardReward(entry.rank) > 0 && (
-          <span style={rowPrize}>+{getDailyLeaderboardReward(entry.rank)}</span>
+          <span style={rowPrize}>
+            <Coins size={11} strokeWidth={3} aria-hidden="true" />
+            <span>+{getDailyLeaderboardReward(entry.rank)}</span>
+          </span>
         )}
       </strong>
       <span style={playerCell}>
@@ -243,6 +251,24 @@ function LeaderboardRow({ entry, kind }: { entry: LeaderboardEntry; kind: Leader
       </strong>
       {kind === "daily-board" && <span style={shotsCell}>{entry.shots}</span>}
     </div>
+  );
+}
+
+function PrizeReward({ place, amount }: { place: string; amount: number }) {
+  return (
+    <span style={prizeReward}>
+      <span>{place}</span>
+      <CoinReward amount={amount} />
+    </span>
+  );
+}
+
+function CoinReward({ amount }: { amount: number }) {
+  return (
+    <span style={coinReward}>
+      <Coins size={14} strokeWidth={2.8} aria-hidden="true" />
+      <strong>+{amount}</strong>
+    </span>
   );
 }
 
@@ -396,9 +422,18 @@ const prizeLine: CSSProperties = {
   fontWeight: 850,
 };
 
-const coinLabel: CSSProperties = {
-  color: "var(--muted-foreground)",
-  fontWeight: 700,
+const prizeReward: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 5,
+};
+
+const coinReward: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 3,
+  color: "var(--accent)",
+  whiteSpace: "nowrap",
 };
 
 const prizeStatus: CSSProperties = {
@@ -488,6 +523,9 @@ const rankCell: CSSProperties = {
 };
 
 const rowPrize: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 2,
   color: "var(--success, var(--accent))",
   fontSize: 9,
   fontWeight: 900,
