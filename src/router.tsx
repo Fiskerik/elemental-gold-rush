@@ -28,6 +28,20 @@ function RouterErrorPanel({ error }: { error: unknown }) {
           Please reload the app. The technical details below are included so this startup issue can
           be diagnosed from the TestFlight build.
         </p>
+        <p
+          style={{
+            margin: "16px 0 8px",
+            padding: "10px 12px",
+            borderRadius: 8,
+            background: "#20263D",
+            color: "#FFFFFF",
+            fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+            fontSize: 13,
+            overflowWrap: "anywhere",
+          }}
+        >
+          {message || "Unknown startup error"}
+        </p>
         <pre
           style={{
             maxHeight: 260,

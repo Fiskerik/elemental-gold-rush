@@ -100,7 +100,9 @@ export function GameApp() {
     let active = true;
     const safetyTimeoutId = window.setTimeout(() => {
       if (active) {
-        console.warn("[app-update] Store version check timed out; continuing with the current build.");
+        console.warn(
+          "[app-update] Store version check timed out; continuing with the current build.",
+        );
         setAppUpdateCheckComplete(true);
       }
     }, 6500);
@@ -159,10 +161,19 @@ export function GameApp() {
     const settlement = new Date(now);
     settlement.setHours(23, 59, 0, 0);
     if (settlement.getTime() <= now.getTime()) settlement.setDate(settlement.getDate() + 1);
-    const timer = window.setTimeout(() => {
-      void settleDailyLeaderboardRewards(getTodayQuestDate());
-    }, Math.max(1000, settlement.getTime() - now.getTime()));
+    const timer = window.setTimeout(
+      () => {
+        void settleDailyLeaderboardRewards(getTodayQuestDate());
+      },
+      Math.max(1000, settlement.getTime() - now.getTime()),
+    );
     return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    const route = consumePendingPushRoute();
+    if (route === "daily-board") startDailyChallenge();
+    if (route === "daily-compound") startSecretCompound();
   }, []);
 
   if (showLaunchScreen || !appUpdateCheckComplete) return <LaunchScreen />;
@@ -279,12 +290,6 @@ export function GameApp() {
     });
   }
 
-  useEffect(() => {
-    const route = consumePendingPushRoute();
-    if (route === "daily-board") startDailyChallenge();
-    if (route === "daily-compound") startSecretCompound();
-  }, []);
-
   function startCampaignLevel(levelId: number) {
     const compoundId = MOLECULE_CHALLENGE_BY_LEVEL[levelId];
     const tutorialMode = levelId === 1 ? "normal" : compoundId ? "compound" : undefined;
@@ -390,10 +395,7 @@ export function GameApp() {
       return withGlobalModals(<Collection onBack={() => setScreen({ name: "menu" })} />);
     case "shop":
       return withGlobalModals(
-        <Shop
-          initialSection={screen.section}
-          onBack={() => setScreen({ name: "menu" })}
-        />,
+        <Shop initialSection={screen.section} onBack={() => setScreen({ name: "menu" })} />,
       );
     case "lab":
       return withGlobalModals(
