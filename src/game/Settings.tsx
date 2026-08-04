@@ -11,6 +11,7 @@ import {
 import type { ProductId } from "./products";
 import { setMusicVolume, setSfxVolume, startAmbientMusic, stopAmbientMusic } from "./audio";
 import { useIsTabletLayout } from "./responsive";
+import { t } from "./localization";
 
 export type ShopSection = "themes";
 
@@ -23,6 +24,7 @@ export function Settings({ onBack }: { onBack: () => void; onOpenShop?: (section
     soundVolume,
     musicVolume,
     appTheme,
+    appLanguage,
     shootingStyle,
     toggleSound,
     toggleMusic,
@@ -33,6 +35,7 @@ export function Settings({ onBack }: { onBack: () => void; onOpenShop?: (section
     setShootingStyle,
     reset,
   } = useProgress();
+  const tr = (text: string) => t(text, appLanguage);
   const handleMusicToggle = () => {
     if (!musicEnabled) startAmbientMusic();
     else stopAmbientMusic();
@@ -71,42 +74,42 @@ export function Settings({ onBack }: { onBack: () => void; onOpenShop?: (section
           >
             ← Back
           </button>
-          <h1 style={{ fontSize: 22, margin: 0, fontWeight: 800 }}>Settings</h1>
+          <h1 style={{ fontSize: 22, margin: 0, fontWeight: 800 }}>{tr("Settings")}</h1>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <Row label="Music" value={musicEnabled} onToggle={handleMusicToggle} />
+          <Row label={tr("Music")} value={musicEnabled} onToggle={handleMusicToggle} />
           {musicEnabled && (
             <VolumeRow
-              label="Music volume"
+              label={tr("Music volume")}
               value={musicVolume}
               onChange={handleMusicVolumeChange}
             />
           )}
-          <Row label="Sound effects" value={soundEnabled} onToggle={toggleSound} />
+          <Row label={tr("Sound effects")} value={soundEnabled} onToggle={toggleSound} />
           {soundEnabled && (
             <VolumeRow
-              label="Sound volume"
+              label={tr("Sound volume")}
               value={soundVolume}
               onChange={handleSoundVolumeChange}
             />
           )}
-          <Row label="Haptics" value={hapticsEnabled} onToggle={toggleHaptics} />
+          <Row label={tr("Haptics")} value={hapticsEnabled} onToggle={toggleHaptics} />
           <Row
-            label={`Theme: ${appTheme === "dark" ? "Dark" : "Light"}`}
+            label={`${tr("Theme")}: ${tr(appTheme === "dark" ? "Dark" : "Light")}`}
             value={appTheme === "light"}
             onToggle={toggleAppTheme}
           />
           <Row
-            label={`Play style: ${shootingStyle === "hold" ? "Hold" : "Press"}`}
+            label={`${tr("Play style")}: ${tr(shootingStyle === "hold" ? "Hold" : "Press")}`}
             value={shootingStyle === "press"}
             onToggle={() => setShootingStyle(shootingStyle === "hold" ? "press" : "hold")}
           />
           <button
             onClick={() => {
-              if (!confirm("Reset all progress? This cannot be undone.")) return;
+              if (!confirm(tr("Reset all progress? This cannot be undone."))) return;
               if (
                 !confirm(
-                  "Only your unspent gold coins will be saved. Levels, discoveries, upgrades, inventory, and records will be reset.",
+                  tr("Only your unspent gold coins will be saved. Levels, discoveries, upgrades, inventory, and records will be reset."),
                 )
               )
                 return;
@@ -123,7 +126,7 @@ export function Settings({ onBack }: { onBack: () => void; onOpenShop?: (section
               fontWeight: 700,
             }}
           >
-            Reset Progress
+            {tr("Reset Progress")}
           </button>
         </div>
       </div>
@@ -168,6 +171,8 @@ export function BoardThemePicker({
   onChange: (theme: BoardTheme) => void;
   onOpenShop?: (section?: ShopSection) => void;
 }) {
+  const appLanguage = useProgress((state) => state.appLanguage);
+  const tr = (text: string) => t(text, appLanguage);
   const anyLocked = BOARD_THEMES.some(
     (theme) => !isBoardThemeUnlocked(theme, { hasProPack, ownedThemeProducts }),
   );
@@ -181,10 +186,10 @@ export function BoardThemePicker({
         border: "1px solid var(--border)",
         borderRadius: 12,
       }}
-      aria-label="Board theme"
+      aria-label={tr("Board theme")}
     >
       <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
-        <strong>Board theme</strong>
+        <strong>{tr("Board theme")}</strong>
         {anyLocked && onOpenShop && (
           <button
             type="button"
@@ -199,7 +204,7 @@ export function BoardThemePicker({
               cursor: "pointer",
             }}
           >
-            Buy in Shop →
+            {tr("Buy in Shop")} →
           </button>
         )}
       </div>
@@ -207,9 +212,9 @@ export function BoardThemePicker({
         {BOARD_THEMES.map((theme) => {
           const locked = !isBoardThemeUnlocked(theme, { hasProPack, ownedThemeProducts });
           const active = value === theme;
-          const label = BOARD_THEME_LABELS[theme];
+          const label = tr(BOARD_THEME_LABELS[theme]);
           const unlockKind = BOARD_THEME_UNLOCK_KIND[theme];
-          const badge = unlockKind === "pro" ? "Pro" : unlockKind === "buy" ? "Buy" : null;
+          const badge = unlockKind === "pro" ? tr("Pro") : unlockKind === "buy" ? tr("Buy") : null;
           return (
             <button
               key={theme}
@@ -291,6 +296,8 @@ export function AtomSkinPicker({
   onChange: (skin: AtomSkin) => void;
   onOpenShop?: (section?: ShopSection) => void;
 }) {
+  const appLanguage = useProgress((state) => state.appLanguage);
+  const tr = (text: string) => t(text, appLanguage);
   return (
     <section
       style={{
@@ -301,10 +308,10 @@ export function AtomSkinPicker({
         border: "1px solid var(--border)",
         borderRadius: 12,
       }}
-      aria-label="Atom skin"
+      aria-label={tr("Atom skin")}
     >
       <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
-        <strong>Atom skin</strong>
+        <strong>{tr("Atom skin")}</strong>
         {onOpenShop &&
           ATOM_SKINS.some(
             (skin) => !isAtomSkinUnlocked(skin, { hasProPack, ownedThemeProducts }),
@@ -322,7 +329,7 @@ export function AtomSkinPicker({
                 cursor: "pointer",
               }}
             >
-              Buy in Shop →
+              {tr("Buy in Shop")} →
             </button>
           )}
       </div>
@@ -339,7 +346,7 @@ export function AtomSkinPicker({
               onClick={() => (locked ? onOpenShop?.("themes") : onChange(skin))}
               title={
                 locked && bundleTheme
-                  ? `Included with the ${BOARD_THEME_LABELS[bundleTheme]} theme`
+                  ? `${tr("Included with the")} ${tr(BOARD_THEME_LABELS[bundleTheme])} ${tr("theme")}`
                   : undefined
               }
               style={{
@@ -369,7 +376,7 @@ export function AtomSkinPicker({
                   fontWeight: 900,
                 }}
               >
-                <span style={{ minWidth: 0, overflowWrap: "anywhere" }}>{ATOM_SKIN_LABELS[skin]}</span>
+                <span style={{ minWidth: 0, overflowWrap: "anywhere" }}>{tr(ATOM_SKIN_LABELS[skin])}</span>
                 {locked && (
                   <span
                     style={{
@@ -380,7 +387,7 @@ export function AtomSkinPicker({
                       textTransform: "uppercase",
                     }}
                   >
-                    Buy
+                    {tr("Buy")}
                   </span>
                 )}
               </span>

@@ -3,7 +3,8 @@ import { ElementBall } from "./ElementBall";
 import { MoleculeVisual } from "./MoleculeVisual";
 import { COMPOUNDS } from "./compounds";
 import { PowerUpBadge } from "./PowerUpLibrary";
-import type { AtomSkin } from "./store";
+import { useProgress, type AtomSkin } from "./store";
+import { t } from "./localization";
 
 export type HowToPlayMode = "normal" | "daily-board" | "compound" | "daily-compound";
 
@@ -101,16 +102,18 @@ const SLIDES: Record<HowToPlayMode, Slide[]> = {
 
 export function HowToPlay({ mode, atomSkin = "classic", onClose }: HowToPlayProps) {
   const [slideIndex, setSlideIndex] = useState(0);
+  const appLanguage = useProgress((state) => state.appLanguage);
+  const tr = (text: string) => t(text, appLanguage);
   const slides = SLIDES[mode];
   const slide = slides[slideIndex];
   const modeLabel =
     mode === "normal"
-      ? "Normal game"
+        ? tr("Normal game")
       : mode === "daily-board"
-        ? "Daily Board"
+        ? tr("Daily Board")
         : mode === "compound"
-          ? "Compound levels"
-          : "Daily Compound";
+          ? tr("Compound levels")
+          : tr("Daily Compound");
 
   useEffect(() => {
     setSlideIndex(0);
@@ -120,34 +123,34 @@ export function HowToPlay({ mode, atomSkin = "classic", onClose }: HowToPlayProp
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={`${modeLabel} how to play`}
+      aria-label={`${modeLabel} ${tr("how to play")}`}
       onClick={onClose}
       style={overlayStyle}
     >
       <div className="game-modal-surface" onClick={(event) => event.stopPropagation()} style={cardStyle}>
-        <div style={eyebrowStyle}>HOW TO PLAY</div>
+        <div style={eyebrowStyle}>{tr("HOW TO PLAY")}</div>
         <div style={headingRowStyle}>
           <div>
             <h2 style={headingStyle}>{modeLabel}</h2>
-            <div style={stepStyle}>Step {slideIndex + 1} of {slides.length}</div>
+            <div style={stepStyle}>{tr("Step")} {slideIndex + 1} {tr("of")} {slides.length}</div>
           </div>
-          <button type="button" onClick={onClose} style={closeButtonStyle} aria-label="Close how to play">
-            Close
+          <button type="button" onClick={onClose} style={closeButtonStyle} aria-label={tr("Close how to play")}>
+            {tr("Close")}
           </button>
         </div>
 
         <div style={visualFrameStyle} aria-hidden="true">
-          <TutorialVisual kind={slide.visual} atomSkin={atomSkin} />
+          <TutorialVisual kind={slide.visual} atomSkin={atomSkin} translate={tr} />
         </div>
-        <h3 style={slideTitleStyle}>{slide.title}</h3>
-        <p style={slideBodyStyle}>{slide.body}</p>
+        <h3 style={slideTitleStyle}>{tr(slide.title)}</h3>
+        <p style={slideBodyStyle}>{tr(slide.body)}</p>
 
-        <div style={dotsStyle} aria-label={`Slide ${slideIndex + 1} of ${slides.length}`}>
+        <div style={dotsStyle} aria-label={`${tr("Slide")} ${slideIndex + 1} ${tr("of")} ${slides.length}`}>
           {slides.map((item, index) => (
             <button
               key={item.title}
               type="button"
-              aria-label={`Go to step ${index + 1}`}
+              aria-label={`${tr("Go to step")} ${index + 1}`}
               onClick={() => setSlideIndex(index)}
               style={{ ...dotStyle, ...(index === slideIndex ? activeDotStyle : {}) }}
             />
@@ -160,15 +163,15 @@ export function HowToPlay({ mode, atomSkin = "classic", onClose }: HowToPlayProp
             disabled={slideIndex === 0}
             style={{ ...secondaryButtonStyle, opacity: slideIndex === 0 ? 0.45 : 1 }}
           >
-            Back
+            {tr("Back")}
           </button>
           {slideIndex < slides.length - 1 ? (
             <button type="button" onClick={() => setSlideIndex((index) => index + 1)} style={primaryButtonStyle}>
-              Next
+              {tr("Next")}
             </button>
           ) : (
             <button type="button" onClick={onClose} style={primaryButtonStyle}>
-              Got it
+              {tr("Got it")}
             </button>
           )}
         </div>
@@ -177,13 +180,13 @@ export function HowToPlay({ mode, atomSkin = "classic", onClose }: HowToPlayProp
   );
 }
 
-function TutorialVisual({ kind, atomSkin }: { kind: Slide["visual"]; atomSkin: AtomSkin }) {
+function TutorialVisual({ kind, atomSkin, translate }: { kind: Slide["visual"]; atomSkin: AtomSkin; translate: (text: string) => string }) {
   switch (kind) {
     case "target":
       return (
         <div style={targetVisualStyle}>
-          <MiniGoalBar atomSkin={atomSkin} />
-          <MiniBoard atomSkin={atomSkin}>
+          <MiniGoalBar atomSkin={atomSkin} translate={translate} />
+          <MiniBoard atomSkin={atomSkin} translate={translate}>
             <MiniAtom atomicNumber={1} left="16%" top="22%" atomSkin={atomSkin} />
             <MiniAtom atomicNumber={6} left="55%" top="34%" atomSkin={atomSkin} />
             <MiniAtom atomicNumber={8} left="31%" top="60%" atomSkin={atomSkin} />
@@ -218,7 +221,7 @@ function TutorialVisual({ kind, atomSkin }: { kind: Slide["visual"]; atomSkin: A
       );
     case "add":
       return (
-        <MiniBoard atomSkin={atomSkin} footer="Required: H₂O">
+          <MiniBoard atomSkin={atomSkin} footer="Required: H₂O" translate={translate}>
           <MiniAtom atomicNumber={1} left="18%" top="25%" atomSkin={atomSkin} />
           <MiniAtom atomicNumber={8} left="52%" top="42%" atomSkin={atomSkin} />
           <MiniAtom atomicNumber={1} left="70%" top="66%" atomSkin={atomSkin} />
@@ -228,7 +231,7 @@ function TutorialVisual({ kind, atomSkin }: { kind: Slide["visual"]; atomSkin: A
       );
     case "select":
       return (
-        <MiniBoard atomSkin={atomSkin} footer="COMPOUND MODE · 2/3 selected">
+        <MiniBoard atomSkin={atomSkin} footer="COMPOUND MODE · 2/3 selected" translate={translate}>
           <MiniAtom atomicNumber={1} left="18%" top="27%" selected atomSkin={atomSkin} />
           <MiniAtom atomicNumber={8} left="52%" top="44%" selected atomSkin={atomSkin} />
           <MiniAtom atomicNumber={1} left="72%" top="68%" selected atomSkin={atomSkin} />
@@ -245,8 +248,8 @@ function TutorialVisual({ kind, atomSkin }: { kind: Slide["visual"]; atomSkin: A
           <div style={discoverArrowStyle}>→</div>
           <div style={rewardPanelStyle}>
             <div style={checkmarkStyle}>✓</div>
-            <strong>Discovery</strong>
-            <span>+ bonus points</span>
+            <strong>{translate("Discovery")}</strong>
+            <span>{translate("+ bonus points")}</span>
           </div>
         </div>
       );
@@ -254,23 +257,23 @@ function TutorialVisual({ kind, atomSkin }: { kind: Slide["visual"]; atomSkin: A
       return (
         <div style={dailyVisualStyle}>
           <div style={dailyTopBarStyle}>
-            <span>DAILY COMPOUND</span>
-            <strong>0/4 atoms</strong>
+            <span>{translate("DAILY COMPOUND")}</span>
+            <strong>{translate("0/4 atoms")}</strong>
           </div>
-          <div style={clueStyle}>Hint: a gas used in bright welding torches</div>
-          <DailyTutorialGrid atomSkin={atomSkin} state="base" />
+          <div style={clueStyle}>{translate("Hint: a gas used in bright welding torches")}</div>
+          <DailyTutorialGrid atomSkin={atomSkin} state="base" translate={translate} />
         </div>
       );
     case "daily-select":
       return (
         <div style={dailyVisualStyle}>
-          <DailyTutorialGrid atomSkin={atomSkin} state="selected" />
+          <DailyTutorialGrid atomSkin={atomSkin} state="selected" translate={translate} />
         </div>
       );
     case "daily-solve":
       return (
         <div style={dailyVisualStyle}>
-          <DailyTutorialGrid atomSkin={atomSkin} state="correct" />
+          <DailyTutorialGrid atomSkin={atomSkin} state="correct" translate={translate} />
         </div>
       );
     default:
@@ -287,36 +290,42 @@ function MiniBoard({
   atomSkin,
   footer,
   action,
+  translate,
 }: {
   children: React.ReactNode;
   atomSkin: AtomSkin;
   footer?: string;
   action?: string;
+  translate?: (text: string) => string;
 }) {
   return (
     <div style={miniBoardStyle}>
       <div style={miniBoardGridStyle}>{children}</div>
       {footer && (
         <div style={miniBoardFooterStyle}>
-          {footer.includes("COMPOUND MODE") ? footer.replace("2/3", "3/3") : footer}
+          {translate
+            ? translate(footer.includes("COMPOUND MODE") ? footer.replace("2/3", "3/3") : footer)
+            : footer.includes("COMPOUND MODE")
+              ? footer.replace("2/3", "3/3")
+              : footer}
         </div>
       )}
       {(action || footer?.includes("COMPOUND MODE")) && (
-        <div style={miniBoardActionStyle}>{action ?? "Form H₂O"}</div>
+        <div style={miniBoardActionStyle}>{translate ? translate(action ?? "Form H₂O") : action ?? "Form H₂O"}</div>
       )}
     </div>
   );
 }
 
-function MiniGoalBar({ atomSkin }: { atomSkin: AtomSkin }) {
+function MiniGoalBar({ atomSkin, translate }: { atomSkin: AtomSkin; translate?: (text: string) => string }) {
   return (
     <div style={miniGoalBarStyle}>
       <ElementBall atomicNumber={6} size={28} atomSkin={atomSkin} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={miniGoalLabelsStyle}>
-          <span>Highest reached</span>
+          <span>{translate ? translate("Highest reached") : "Highest reached"}</span>
           <span style={miniGoalTargetStyle}>
-            <span>Target:</span>
+            <span>{translate ? translate("Target:") : "Target:"}</span>
             <ElementBall atomicNumber={10} size={21} glow atomSkin={atomSkin} />
           </span>
         </div>
@@ -361,9 +370,11 @@ const DAILY_TUTORIAL_TARGET = [9, 10, 11, 12];
 function DailyTutorialGrid({
   atomSkin,
   state,
+  translate,
 }: {
   atomSkin: AtomSkin;
   state: DailyTutorialState;
+  translate?: (text: string) => string;
 }) {
   const selected = state === "correct" || state === "selected" ? DAILY_TUTORIAL_TARGET : [];
   return (
@@ -395,8 +406,8 @@ function DailyTutorialGrid({
           );
         })}
       </div>
-      {state === "selected" && <div style={dailyTutorialSelectedLabelStyle}>4/4 atoms selected</div>}
-      {state === "correct" && <div style={dailyTutorialSolvedStyle}>ACETYLENE FOUND - C2H2</div>}
+      {state === "selected" && <div style={dailyTutorialSelectedLabelStyle}>{translate ? translate("4/4 atoms selected") : "4/4 atoms selected"}</div>}
+      {state === "correct" && <div style={dailyTutorialSolvedStyle}>{translate ? translate("ACETYLENE FOUND - C2H2") : "ACETYLENE FOUND - C2H2"}</div>}
     </div>
   );
 }

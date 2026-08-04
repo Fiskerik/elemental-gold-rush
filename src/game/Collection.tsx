@@ -123,15 +123,15 @@ export function Collection({ onBack }: { onBack: () => void }) {
               cursor: "pointer",
             }}
           >
-            ← Back
+            ← {tr("Back")}
           </button>
           <div style={{ flex: 1 }}>
-            <h1 style={{ fontSize: 22, margin: 0, fontWeight: 800 }}>Collection</h1>
+            <h1 style={{ fontSize: 22, margin: 0, fontWeight: 800 }}>{tr("Collection")}</h1>
             <div style={{ fontSize: 12, color: "var(--muted-foreground)" }}>
-              {`${discoveredElements.length} / 118 elements discovered`}
+              {`${discoveredElements.length} / 118 ${tr("elements discovered")}`}
             </div>
           </div>
-          <div style={collectionWalletPill}>{goldCoins} gold</div>
+          <div style={collectionWalletPill}>{goldCoins} {tr("gold")}</div>
         </div>
 
         <section style={collectionUnlockPanel}>
@@ -270,7 +270,7 @@ export function Collection({ onBack }: { onBack: () => void }) {
               marginBottom: 8,
             }}
           >
-            COMPOUNDS
+            {tr("COMPOUNDS")}
           </div>
           <div
             style={{
@@ -309,7 +309,7 @@ export function Collection({ onBack }: { onBack: () => void }) {
                   <MoleculeVisual compound={compound} locked={!unlocked} size={44} />
                   <span style={{ minWidth: 0 }}>
                     <span style={{ display: "block", fontSize: 12, fontWeight: 900 }}>
-                      {unlocked ? compound.name : "Unknown"}
+                      {unlocked ? tr(compound.name) : tr("Unknown")}
                     </span>
                     <span
                       style={{ display: "block", fontSize: 11, color: "var(--muted-foreground)" }}
@@ -325,7 +325,7 @@ export function Collection({ onBack }: { onBack: () => void }) {
                           marginTop: 2,
                         }}
                       >
-                        {`Found x${foundCount}`}
+                        {`${tr("Found")} x${foundCount}`}
                       </span>
                     )}
                   </span>
@@ -356,7 +356,7 @@ export function Collection({ onBack }: { onBack: () => void }) {
               marginBottom: 8,
             }}
           >
-            BADGES
+            {tr("BADGES")}
           </div>
           <div style={{ display: "grid", gap: 12 }}>
             {BADGE_GROUPS.map((group) => {
@@ -385,9 +385,9 @@ export function Collection({ onBack }: { onBack: () => void }) {
                     }}
                   >
                     <div>
-                      <div style={{ fontSize: 13, fontWeight: 900 }}>{group.title}</div>
+                      <div style={{ fontSize: 13, fontWeight: 900 }}>{tr(group.title)}</div>
                       <div style={{ fontSize: 10, color: "var(--muted-foreground)" }}>
-                        {group.description}
+                        {tr(group.description)}
                       </div>
                     </div>
                     <div style={{ fontSize: 11, color: "var(--accent)", fontWeight: 800 }}>
@@ -441,7 +441,7 @@ export function Collection({ onBack }: { onBack: () => void }) {
                             )}
                           </div>
                           <div>
-                            <div style={{ fontSize: 12, fontWeight: 800 }}>{badge.name}</div>
+                          <div style={{ fontSize: 12, fontWeight: 800 }}>{tr(badge.name)}</div>
                             <div
                               style={{
                                 fontSize: 10,
@@ -449,7 +449,7 @@ export function Collection({ onBack }: { onBack: () => void }) {
                                 lineHeight: 1.35,
                               }}
                             >
-                              {badge.description}
+                              {tr(badge.description)}
                             </div>
                             <div
                               style={{
@@ -459,7 +459,7 @@ export function Collection({ onBack }: { onBack: () => void }) {
                               }}
                             >
                               {unlocked
-                                ? "Unlocked"
+                                ? tr("Unlocked")
                                 : shopProgress}
                             </div>
                           </div>
@@ -521,7 +521,7 @@ export function Collection({ onBack }: { onBack: () => void }) {
               aria-label={tr("Close")}
               style={collectionModalCloseBtn}
             >
-              X
+              {tr("Close")}
             </button>
             <div style={{ display: "flex", justifyContent: "center", marginBottom: 14 }}>
               <ElementBall
@@ -541,7 +541,7 @@ export function Collection({ onBack }: { onBack: () => void }) {
               {tr(el.category.toUpperCase().replace("-", " "))}
             </div>
             <div style={{ fontSize: 26, fontWeight: 800, textAlign: "center", marginTop: 4 }}>
-              {el.name}
+              {tr(el.name)}
             </div>
             <div
               style={{
@@ -677,7 +677,7 @@ export function Collection({ onBack }: { onBack: () => void }) {
               aria-label={tr("Close")}
               style={collectionModalCloseBtn}
             >
-              X
+              {tr("Close")}
             </button>
             <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
               <MoleculeVisual
@@ -687,7 +687,7 @@ export function Collection({ onBack }: { onBack: () => void }) {
               />
             </div>
             <div style={{ fontSize: 24, fontWeight: 900, textAlign: "center" }}>
-              {selectedCompoundUnlocked ? selectedCompound.name : tr("Unknown Compound")}
+              {selectedCompoundUnlocked ? tr(selectedCompound.name) : tr("Unknown Compound")}
             </div>
             <div
               style={{
@@ -709,11 +709,9 @@ export function Collection({ onBack }: { onBack: () => void }) {
                   marginBottom: 10,
                 }}
               >
-                {tr(
-                  `Found ${compoundCounts[selectedCompound.id] ?? 1} time${
-                    (compoundCounts[selectedCompound.id] ?? 1) === 1 ? "" : "s"
-                  }`,
-                )}
+                  {`${tr("Found")} ${compoundCounts[selectedCompound.id] ?? 1} ${tr(
+                    (compoundCounts[selectedCompound.id] ?? 1) === 1 ? "time" : "times",
+                  )}`}
               </div>
             )}
             {selectedCompoundUnlocked && selectedCompoundDetails ? (

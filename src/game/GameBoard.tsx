@@ -57,6 +57,7 @@ import { DAILY_FEATURE_REWARD_COINS, hashDailySeed } from "./dailyFeatures";
 import { getTodayQuestDate } from "./quests";
 import { showInterstitialIfReady, showRewardedForCoin } from "./ads";
 import { useIsTabletLayout, useWideBoardLayout } from "./responsive";
+import { t } from "./localization";
 import { ElementalBossBoard } from "./ElementalBossBoard";
 import { PeriodicGuardianBoard } from "./PeriodicGuardianBoard";
 import { NucleusCoreBoard } from "./NucleusCoreBoard";
@@ -789,7 +790,9 @@ function DailyCompoundGridBoard({
     hasProPack,
     atomSkin,
     ownedThemeProducts,
+    appLanguage,
   } = useProgress();
+  const tr = (text: string) => t(text, appLanguage);
   const activeAtomSkin = isAtomSkinUnlocked(atomSkin, { hasProPack, ownedThemeProducts })
     ? atomSkin
     : "classic";
@@ -878,7 +881,7 @@ function DailyCompoundGridBoard({
     if (!canRevealHint) {
       const unlockAt = hintsUsed === 0 ? 2 : 4;
       showCompoundCheck("wrong", `Hint unlocks after ${unlockAt} wrong guesses`);
-      setMessage(`Make ${unlockAt - wrongGuesses} more wrong guess${unlockAt - wrongGuesses === 1 ? "" : "es"} to unlock a hint.`);
+      setMessage(`${tr("Make")} ${unlockAt - wrongGuesses} ${tr(unlockAt - wrongGuesses === 1 ? "more wrong guess" : "more wrong guesses")} ${tr("to unlock a hint.")}`);
       if (hapticsEnabled) vibrate(12);
       return;
     }
@@ -888,8 +891,8 @@ function DailyCompoundGridBoard({
     setSelectedIds((current) => new Set([...current, nextHint.id]));
     setMessage(
       hintsUsed === 0
-        ? "A correct atom was marked. Your final score will be reduced."
-        : "A second correct atom was marked. Your final score will be reduced.",
+        ? tr("A correct atom was marked. Your final score will be reduced.")
+        : tr("A second correct atom was marked. Your final score will be reduced."),
     );
     if (hapticsEnabled) vibrate([15, 25, 15]);
   }
@@ -919,8 +922,8 @@ function DailyCompoundGridBoard({
       setSelectedIds(new Set(hintedIds));
       setMessage(
         nextWrong === 2 || nextWrong === 4
-          ? "Not the compound. A reveal hint is now available."
-          : "Not the compound. Adjust your marked atoms.",
+          ? tr("Not the compound. A reveal hint is now available.")
+          : tr("Not the compound. Adjust your marked atoms."),
       );
       showCompoundCheck("wrong", "Wrong");
       if (hapticsEnabled) vibrate(24);
@@ -932,8 +935,8 @@ function DailyCompoundGridBoard({
       setSelectedIds(new Set(hintedIds));
       setMessage(
         nextWrong === 2 || nextWrong === 4
-          ? "Those atoms match the formula, but not the hidden compound. A reveal hint is now available."
-          : "Those atoms match the formula, but they are not linked in the compound pattern.",
+          ? tr("Those atoms match the formula, but not the hidden compound. A reveal hint is now available.")
+          : tr("Those atoms match the formula, but they are not linked in the compound pattern."),
       );
       showCompoundCheck("wrong", "Wrong");
       if (hapticsEnabled) vibrate(24);
@@ -961,8 +964,8 @@ function DailyCompoundGridBoard({
     setRevealedIds(new Set(formedIds));
     setSelectedIds(new Set(formedIds));
     setResult({ score, awarded, wasNew, count });
-    setMessage("Compound formed.");
-    showCompoundCheck("right", "Right");
+    setMessage(tr("Compound formed."));
+    showCompoundCheck("right", tr("Right"));
     if (soundEnabled) playShootSound();
     if (hapticsEnabled) vibrate([20, 40, 20]);
   }
@@ -971,12 +974,12 @@ function DailyCompoundGridBoard({
     return (
       <div className="daily-compound-shell" style={dailyCompoundShell}>
         <div style={dailyCompoundMissingCard}>
-          <h2 style={{ margin: "0 0 8px" }}>Daily compound unavailable</h2>
+          <h2 style={{ margin: "0 0 8px" }}>{tr("Daily compound unavailable")}</h2>
           <p style={{ color: "var(--muted-foreground)", margin: "0 0 14px" }}>
-            The selected compound could not be found.
+            {tr("The selected compound could not be found.")}
           </p>
           <button type="button" onClick={onExit} style={modalBtn}>
-            Back to Menu
+            {tr("Back to Menu")}
           </button>
         </div>
       </div>
@@ -991,30 +994,30 @@ function DailyCompoundGridBoard({
       <div style={dailyCompoundHeader}>
         <div style={{ display: "grid", justifyItems: "start", gap: 5 }}>
           <button type="button" onClick={onExit} style={dailyCompoundExitBtn}>
-            Exit
+            {tr("Exit")}
           </button>
           <button
             type="button"
             onClick={() => setHowToPlayOpen(true)}
-            title="How to play"
-            aria-label="How to play Daily Compound"
+            title={tr("How to play")}
+            aria-label={tr("How to play Daily Compound")}
             style={dailyCompoundInfoBtn}
           >
             <Info size={16} aria-hidden="true" />
           </button>
         </div>
         <div style={{ minWidth: 0 }}>
-          <div style={dailyCompoundKicker}>DAILY COMPOUND</div>
+          <div style={dailyCompoundKicker}>{tr("DAILY COMPOUND")}</div>
           <div style={dailyCompoundTitle}>
-            <span style={{ color: "var(--accent)", fontWeight: 900 }}>Hint: </span>
+            <span style={{ color: "var(--accent)", fontWeight: 900 }}>{tr("Hint:")} </span>
             {getDailyCompoundClue(compound)}
           </div>
           <div style={dailyCompoundMeta}>
             <span style={dailyCompoundMetaBox}>
-              {selectedCells.length}/{secretAtoms.length} atoms
+              {selectedCells.length}/{secretAtoms.length} {tr("atoms")}
             </span>
-            <span style={dailyCompoundMetaBox}>{wrongGuesses} wrong</span>
-            <span style={dailyCompoundMetaBox}>{hintsUsed} hints</span>
+            <span style={dailyCompoundMetaBox}>{wrongGuesses} {tr("wrong")}</span>
+            <span style={dailyCompoundMetaBox}>{hintsUsed} {tr("hints")}</span>
             <span style={dailyCompoundMetaBox}>{elapsedSec}s</span>
           </div>
         </div>
@@ -1044,7 +1047,7 @@ function DailyCompoundGridBoard({
                 key={cell.id}
                 type="button"
                 onClick={() => toggleCell(cell)}
-                aria-label={`${selected ? "Unmark" : "Mark"} ${ELEMENTS[cell.atom - 1]?.name ?? "atom"}`}
+                aria-label={`${tr(selected ? "Unmark" : "Mark")} ${ELEMENTS[cell.atom - 1]?.name ?? tr("atom")}`}
                 style={{
                   minWidth: 0,
                   minHeight: 0,
@@ -1105,7 +1108,7 @@ function DailyCompoundGridBoard({
                 cursor: result ? "not-allowed" : "pointer",
               }}
             >
-              Reveal atom hint
+              {tr("Reveal atom hint")}
             </button>
           )}
           <button
@@ -1118,7 +1121,7 @@ function DailyCompoundGridBoard({
               cursor: selectedCells.length > 0 && !result ? "pointer" : "not-allowed",
             }}
           >
-            Form Compound
+            {tr("Form Compound")}
           </button>
         </div>
       </div>
@@ -1126,7 +1129,7 @@ function DailyCompoundGridBoard({
       {result && (
         <Modal>
           <div style={{ textAlign: "center" }}>
-            <div style={dailyCompoundKicker}>COMPOUND FORMED</div>
+            <div style={dailyCompoundKicker}>{tr("COMPOUND FORMED")}</div>
             <MoleculeVisual compound={compound} size={104} />
             <h2 style={{ margin: "10px 0 4px", fontSize: 24 }}>{compound.name}</h2>
             <div style={{ fontSize: 18, fontWeight: 900, color: "var(--accent)", marginBottom: 8 }}>
@@ -1138,14 +1141,14 @@ function DailyCompoundGridBoard({
             <div
               style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}
             >
-              <ResultStat label="Score" value={formatScore(result.score)} color="var(--accent)" />
-              <ResultStat label="Wrong" value={`${wrongGuesses}`} color="var(--foreground)" />
-              <ResultStat label="Hints" value={`${hintsUsed}`} color="var(--foreground)" />
-              <ResultStat label="Time" value={`${elapsedSec}s`} color="var(--foreground)" />
+              <ResultStat label={tr("Score")} value={formatScore(result.score)} color="var(--accent)" />
+              <ResultStat label={tr("Wrong")} value={`${wrongGuesses}`} color="var(--foreground)" />
+              <ResultStat label={tr("Hints")} value={`${hintsUsed}`} color="var(--foreground)" />
+              <ResultStat label={tr("Time")} value={`${elapsedSec}s`} color="var(--foreground)" />
             </div>
             <div style={{ color: "var(--success, var(--accent))", fontSize: 12, fontWeight: 900 }}>
-              {result.wasNew ? "Added to collection" : `Collection count ${result.count}`}
-              {result.awarded ? ` - Daily reward +${DAILY_FEATURE_REWARD_COINS} coins` : ""}
+              {result.wasNew ? tr("Added to collection") : `${tr("Collection count")} ${result.count}`}
+              {result.awarded ? ` - ${tr("Daily reward")} +${DAILY_FEATURE_REWARD_COINS} ${tr("coins")}` : ""}
             </div>
             <button
               type="button"
@@ -1159,7 +1162,7 @@ function DailyCompoundGridBoard({
               }}
               style={{ ...modalBtn, width: "100%" }}
             >
-              {isCampaignSearchFind ? "Map" : "Back to Menu"}
+              {isCampaignSearchFind ? tr("Map") : tr("Back to Menu")}
             </button>
           </div>
         </Modal>
@@ -1359,7 +1362,9 @@ function StandardGameBoard({
     ownedThemeProducts,
     clearedStagesSinceAd,
     markInterstitialShown,
+    appLanguage,
   } = useProgress();
+  const tr = (text: string) => t(text, appLanguage);
   const activeBoardTheme = previewBoardTheme ?? (isBoardThemeUnlocked(boardTheme, { hasProPack, ownedThemeProducts })
     ? boardTheme
     : "reactor");
@@ -6410,7 +6415,7 @@ function StandardGameBoard({
             </div>
           </div>
           <div style={{ ...iconBtn, cursor: "default", minWidth: 74, textAlign: "right" }}>
-            <div style={{ fontSize: 10, color: "var(--muted-foreground)" }}>SCORE</div>
+            <div style={{ fontSize: 10, color: "var(--muted-foreground)" }}>{tr("SCORE")}</div>
             <div
               style={{
                 fontSize: 14,
@@ -6472,9 +6477,9 @@ function StandardGameBoard({
                   color: "var(--muted-foreground)",
                 }}
               >
-                <span>Highest reached</span>
+                <span>{tr("Highest reached")}</span>
                 <span>
-                  Target: {targetEl?.symbol} (#{target})
+                  {tr("Target:")} {targetEl?.symbol} (#{target})
                 </span>
               </div>
               <div
@@ -6661,7 +6666,7 @@ function StandardGameBoard({
                   color: "var(--muted-foreground)",
                 }}
               >
-                <span>Grab combo</span>
+                <span>{tr("Grab combo")}</span>
                 <span>
                   {grabProgress}/{GRAB_THRESHOLD}
                   {grabs > 0 ? `  •  ×${grabs} ready` : ""}
@@ -7126,7 +7131,7 @@ function StandardGameBoard({
             <div
               className="stage-clear-fx"
               aria-live="polite"
-              aria-label={stageClearFx.compound ? "Target compound formed" : "Target atom formed"}
+              aria-label={stageClearFx.compound ? tr("Target compound formed") : tr("Target atom formed")}
             >
               <div className="stage-clear-wash" />
               <div className="stage-clear-ring stage-clear-ring-a" />
@@ -7145,7 +7150,7 @@ function StandardGameBoard({
               </div>
               <div className="stage-clear-card">
                 <div className="stage-clear-eyebrow">
-                  {stageClearFx.compound ? "TARGET COMPOUND FORMED" : "TARGET ATOM FORMED"}
+                  {stageClearFx.compound ? tr("TARGET COMPOUND FORMED") : tr("TARGET ATOM FORMED")}
                 </div>
                 <div className="stage-clear-atom">
                   {stageClearFx.compound ? (
@@ -7156,10 +7161,10 @@ function StandardGameBoard({
                 </div>
                 <div className="stage-clear-title">
                   {stageClearFx.compound
-                    ? `${stageClearFx.compound.name} formed!`
-                    : `${targetEl?.name ?? "Target"} discovered!`}
+                    ? `${stageClearFx.compound.name} ${tr("formed!")}`
+                    : `${targetEl?.name ?? tr("Target")} ${tr("discovered!")}`}
                 </div>
-                <div className="stage-clear-subtitle">Clearing the stage…</div>
+                <div className="stage-clear-subtitle">{tr("Clearing the stage…")}</div>
                 <div className="stage-clear-stars">
                   {Array.from({ length: 3 }, (_, i) => (i < stageClearFx.stars ? "★" : "☆")).join(
                     "",
@@ -7186,7 +7191,7 @@ function StandardGameBoard({
                 pointerEvents: "none",
               }}
             >
-              Drag any atom to a new spot
+              {tr("Drag any atom to a new spot")}
             </div>
           )}
 
@@ -7884,9 +7889,9 @@ function StandardGameBoard({
                   fontWeight: 800,
                 }}
               >
-                PAUSED
+                {tr("PAUSED")}
               </div>
-              <h2 style={{ margin: "6px 0 4px", fontSize: 24 }}>Game paused</h2>
+              <h2 style={{ margin: "6px 0 4px", fontSize: 24 }}>{tr("Game paused")}</h2>
               <p
                 style={{
                   margin: "0 0 16px",
@@ -7895,7 +7900,7 @@ function StandardGameBoard({
                   lineHeight: 1.45,
                 }}
               >
-                All power-up timers are frozen until you resume.
+                {tr("All power-up timers are frozen until you resume.")}
               </p>
               <div style={{ display: "grid", gap: 8 }}>
                 <button
@@ -7926,7 +7931,7 @@ function StandardGameBoard({
                     cursor: "pointer",
                   }}
                 >
-                  Exit to menu
+                  {tr("Exit to menu")}
                 </button>
               </div>
             </div>
@@ -8209,12 +8214,14 @@ function PlayStyleModal({
   selected: "hold" | "press";
   onSelect: (style: "hold" | "press") => void;
 }) {
+  const { appLanguage } = useProgress();
+  const tr = (text: string) => t(text, appLanguage);
   return (
     <Modal zIndex={1200}>
       <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--accent)", marginBottom: 8 }}>
-        PLAY STYLE
+        {tr("PLAY STYLE")}
       </div>
-      <h2 style={{ margin: "0 0 8px", fontSize: 24, fontWeight: 900 }}>Choose how you shoot</h2>
+      <h2 style={{ margin: "0 0 8px", fontSize: 24, fontWeight: 900 }}>{tr("Choose how you shoot")}</h2>
       <p
         style={{
           margin: "0 0 14px",
@@ -8223,13 +8230,13 @@ function PlayStyleModal({
           lineHeight: 1.45,
         }}
       >
-        You can change this anytime in in-game settings or the main settings screen.
+        {tr("You can change this anytime in in-game settings or the main settings screen.")}
       </p>
       <div style={{ display: "grid", gap: 8 }}>
         {(
           [
-            ["hold", "Hold", "Aim by holding the board, then release to shoot."],
-            ["press", "Toggle", "Aim on the board first, then press the queued atom to shoot."],
+            ["hold", tr("Hold"), tr("Aim by holding the board, then release to shoot.")],
+            ["press", tr("Toggle"), tr("Aim on the board first, then press the queued atom to shoot.")],
           ] as const
         ).map(([style, title, body]) => (
           <button
@@ -8276,13 +8283,15 @@ function ConfirmRunExitModal({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
+  const { appLanguage } = useProgress();
+  const tr = (text: string) => t(text, appLanguage);
   return (
     <Modal zIndex={1300}>
       <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--destructive)", marginBottom: 8 }}>
-        {action === "restart" ? "RESTART LEVEL" : "LEAVE GAME"}
+        {action === "restart" ? tr("RESTART LEVEL") : tr("LEAVE GAME")}
       </div>
       <h2 style={{ margin: "0 0 8px", fontSize: 24, fontWeight: 900 }}>
-        Progress and loaded power-ups will be lost.
+        {tr("Progress and loaded power-ups will be lost.")}
       </h2>
       <p
         style={{
@@ -8293,8 +8302,8 @@ function ConfirmRunExitModal({
         }}
       >
         {action === "restart"
-          ? "Restarting returns you to the pre-game inventory screen for this level."
-          : "Leaving discards this run and returns you to the map."}
+          ? tr("Restarting returns you to the pre-game inventory screen for this level.")
+          : tr("Leaving discards this run and returns you to the map.")}
       </p>
       <div style={{ display: "flex", gap: 8 }}>
         <button
@@ -8302,10 +8311,10 @@ function ConfirmRunExitModal({
           onClick={onCancel}
           style={{ ...modalBtn, background: "var(--surface-high)", color: "var(--foreground)" }}
         >
-          Cancel
+          {tr("Cancel")}
         </button>
         <button type="button" onClick={onConfirm} style={modalBtn}>
-          {action === "restart" ? "Restart" : "Leave game"}
+          {action === "restart" ? tr("Restart") : tr("Leave game")}
         </button>
       </div>
     </Modal>
@@ -8325,6 +8334,8 @@ function InventoryStartModal({
   onStart: () => void;
   onBack: () => void;
 }) {
+  const { appLanguage } = useProgress();
+  const tr = (text: string) => t(text, appLanguage);
   const selectedCount = countPowerUps(selected);
   const selectedSlots = selectedPowerUpSlots(selected);
   const availablePowerUps = (Object.keys(POWER_UP_INVENTORY_META) as InventoryPowerUpId[]).filter(
@@ -8334,11 +8345,11 @@ function InventoryStartModal({
   return (
     <Modal>
       <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--accent)", marginBottom: 8 }}>
-        POWER-UP INVENTORY
+        {tr("POWER-UP INVENTORY")}
       </div>
-      <h2 style={{ margin: "0 0 8px", fontSize: 24, fontWeight: 900 }}>Pick up to 3 boosts</h2>
+      <h2 style={{ margin: "0 0 8px", fontSize: 24, fontWeight: 900 }}>{tr("Pick up to 3 boosts")}</h2>
       <p style={{ margin: "0 0 14px", color: "var(--muted-foreground)", fontSize: 13 }}>
-        Fill up to 3 starting slots from your saved power-ups. Tap a filled slot to remove it.
+        {tr("Fill up to 3 starting slots from your saved power-ups. Tap a filled slot to remove it.")}
       </p>
       <div
         style={{
@@ -8380,7 +8391,7 @@ function InventoryStartModal({
                   <span style={{ fontSize: 10 }}>{meta?.name}</span>
                 </>
               ) : (
-                <span style={{ fontSize: 11 }}>Empty</span>
+                <span style={{ fontSize: 11 }}>{tr("Empty")}</span>
               )}
             </button>
           );
@@ -8503,10 +8514,10 @@ function InventoryStartModal({
           ← Back
         </button>
         <span style={{ flex: "1 1 70px", textAlign: "center" }}>
-          Selected {selectedCount}/{INVENTORY_PICK_LIMIT}
+          {tr("Selected")} {selectedCount}/{INVENTORY_PICK_LIMIT}
         </span>
         <button onClick={onStart} style={{ ...modalBtn, marginTop: 0, flex: "1 1 150px" }}>
-          {selectedCount > 0 ? "Start with boosts" : "Start without boosts"}
+          {selectedCount > 0 ? tr("Start with boosts") : tr("Start without boosts")}
         </button>
       </div>
     </Modal>
@@ -8514,12 +8525,14 @@ function InventoryStartModal({
 }
 
 function DiscoveryModal({ atomicNumber, onClose }: { atomicNumber: number; onClose: () => void }) {
+  const { appLanguage } = useProgress();
+  const tr = (text: string) => t(text, appLanguage);
   const el = ELEMENTS[atomicNumber - 1];
   if (!el) return null;
   return (
     <Modal zIndex={200}>
       <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--accent)", marginBottom: 8 }}>
-        NEW DISCOVERY
+        {tr("NEW DISCOVERY")}
       </div>
       <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
         <ElementBall atomicNumber={atomicNumber} size={96} glow />
@@ -8532,7 +8545,7 @@ function DiscoveryModal({ atomicNumber, onClose }: { atomicNumber: number; onClo
         {el.fact}
       </p>
       <button onClick={onClose} style={modalBtn}>
-        Continue
+        {tr("Continue")}
       </button>
     </Modal>
   );
@@ -8577,6 +8590,8 @@ function CompoundSelectionPanel({
   hideNonObjectiveMatches?: boolean;
   onCancel: () => void;
 }) {
+  const { appLanguage } = useProgress();
+  const tr = (text: string) => t(text, appLanguage);
   const entries = Object.entries(counts).sort(([a], [b]) => a.localeCompare(b));
   const objectiveMismatch = objective != null && match != null && match.id !== objective.id;
   const canForm = match != null && !objectiveMismatch;
@@ -8607,7 +8622,7 @@ function CompoundSelectionPanel({
           <div
             style={{ fontSize: 10, letterSpacing: 1.5, color: "var(--accent)", fontWeight: 900 }}
           >
-            COMPOUND MODE
+            {tr("COMPOUND MODE")}
           </div>
           <div style={{ fontSize: 12, color: "var(--muted-foreground)" }}>
             {selectedCount}/{COMPOUND_MAX_SELECTION} atoms · max {COMPOUND_MAX_ELEMENT_TYPES}{" "}
@@ -8615,13 +8630,13 @@ function CompoundSelectionPanel({
           </div>
         </div>
         <button type="button" onClick={onCancel} style={miniPanelBtn}>
-          Cancel
+          {tr("Cancel")}
         </button>
       </div>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
         {entries.length === 0 ? (
           <span style={{ fontSize: 12, color: "var(--muted-foreground)" }}>
-            Tap atoms to select
+            {tr("Tap atoms to select")}
           </span>
         ) : (
           entries.map(([symbol, count]) => (
@@ -8645,7 +8660,7 @@ function CompoundSelectionPanel({
                 cursor: canAffordHint ? "pointer" : "not-allowed",
               }}
             >
-              Hint {hintCost} coins
+              {tr("Hint")} {hintCost} {tr("coins")}
             </button>
           )}
           {newHint && (
@@ -8662,7 +8677,7 @@ function CompoundSelectionPanel({
                 cursor: canAffordSuperHint ? "pointer" : "not-allowed",
               }}
             >
-              Super Hint {superHintCost} coins
+              {tr("Super Hint")} {superHintCost} {tr("coins")}
             </button>
           )}
         </div>
@@ -8691,16 +8706,16 @@ function CompoundSelectionPanel({
               }}
             >
               {hideMatchDetails
-                ? "SECRET COMPOUND PREVIEW"
+                ? tr("SECRET COMPOUND PREVIEW")
                 : visibleMatchIsNew
-                  ? "NEW COMPOUND PREVIEW"
-                  : "COMPOUND PREVIEW"}
+                  ? tr("NEW COMPOUND PREVIEW")
+                  : tr("COMPOUND PREVIEW")}
             </div>
             <div style={{ fontSize: 14, fontWeight: 900 }}>
-              {hideMatchDetails ? "Secret compound" : visibleMatch.name}
+              {hideMatchDetails ? tr("Secret compound") : visibleMatch.name}
             </div>
             <div style={{ fontSize: 12, color: "var(--muted-foreground)" }}>
-              {hideMatchDetails ? "Reveals after 50 shots" : visibleMatch.formula}
+              {hideMatchDetails ? tr("Reveals after 50 shots") : visibleMatch.formula}
             </div>
           </div>
         </div>
@@ -8723,17 +8738,17 @@ function CompoundSelectionPanel({
       >
         {objectiveMismatch
           ? hideObjectiveFormula
-            ? "Need secret compound"
-            : `Need ${objective?.formula ?? "target"}`
+            ? tr("Need secret compound")
+            : `${tr("Need")} ${objective?.formula ?? tr("target")}`
           : match
             ? hideMatchDetails
-              ? "Form Secret Compound"
-              : `Form ${match.name}`
+              ? tr("Form Secret Compound")
+              : `${tr("Form")} ${match.name}`
             : objective
               ? hideObjectiveFormula
-                ? "Form Secret Compound"
-                : `Form ${objective.formula}`
-              : "Form Compound"}
+                ? tr("Form Secret Compound")
+                : `${tr("Form")} ${objective.formula}`
+              : tr("Form Compound")}
       </button>
       {visibleMatch && (
         <div
@@ -8747,7 +8762,7 @@ function CompoundSelectionPanel({
             color: "var(--accent)",
           }}
         >
-          <span>{visibleMatchIsNew ? "NEW compound" : "Already discovered"}</span>
+          <span>{visibleMatchIsNew ? tr("NEW compound") : tr("Already discovered")}</span>
           <span>+{formatScore(matchScore)}</span>
         </div>
       )}
@@ -8811,10 +8826,12 @@ function CompoundDiscoveryModal({
   bonusScore: number;
   onClose: () => void;
 }) {
+  const { appLanguage } = useProgress();
+  const tr = (text: string) => t(text, appLanguage);
   return (
     <Modal zIndex={210}>
       <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--accent)", marginBottom: 8 }}>
-        {isNew ? "NEW COMPOUND" : "COMPOUND FOUND AGAIN"}
+        {isNew ? tr("NEW COMPOUND") : tr("COMPOUND FOUND AGAIN")}
       </div>
       <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
         <MoleculeVisual compound={compound} size={118} />
@@ -8824,7 +8841,7 @@ function CompoundDiscoveryModal({
         {compound.formula}
       </div>
       <div style={{ fontSize: 12, color: "var(--muted-foreground)", marginBottom: 8 }}>
-        {isNew ? "Added to your collection" : `Already discovered - found ${count} times`}
+        {isNew ? tr("Added to your collection") : `${tr("Already discovered - found")} ${count} ${tr(count === 1 ? "time" : "times")}`}
       </div>
       <div style={{ fontSize: 20, fontWeight: 900, color: "var(--primary)", marginBottom: 10 }}>
         +{formatScore(bonusScore)}
@@ -8833,7 +8850,7 @@ function CompoundDiscoveryModal({
         {compound.fact}
       </p>
       <button onClick={onClose} style={modalBtn}>
-        Continue
+        {tr("Continue")}
       </button>
     </Modal>
   );
@@ -8860,14 +8877,16 @@ function ShotHistoryModal({
   }[];
   onClose: () => void;
 }) {
+  const { appLanguage } = useProgress();
+  const tr = (text: string) => t(text, appLanguage);
   return (
     <Modal>
       <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--accent)", marginBottom: 8 }}>
-        SHOT LOG
+        {tr("SHOT LOG")}
       </div>
-      <h2 style={{ margin: "0 0 12px", fontSize: 22, fontWeight: 900 }}>This run, step by step</h2>
+      <h2 style={{ margin: "0 0 12px", fontSize: 22, fontWeight: 900 }}>{tr("This run, step by step")}</h2>
       {entries.length === 0 ? (
-        <p style={{ color: "var(--muted-foreground)", fontSize: 13 }}>No shots logged yet.</p>
+        <p style={{ color: "var(--muted-foreground)", fontSize: 13 }}>{tr("No shots logged yet.")}</p>
       ) : (
         <div
           style={{
@@ -9026,6 +9045,8 @@ function GameOverContinueModal({
   onAdContinue: () => void;
   onResults: () => void;
 }) {
+  const { appLanguage } = useProgress();
+  const tr = (text: string) => t(text, appLanguage);
   const canPay = coins >= 5 && !busy;
   return (
     <Modal>
@@ -9038,9 +9059,9 @@ function GameOverContinueModal({
           marginBottom: 8,
         }}
       >
-        GAME OVER
+        {tr("GAME OVER")}
       </div>
-      <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 6 }}>Continue this run?</div>
+      <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 6 }}>{tr("Continue this run?")}</div>
       <p
         style={{
           fontSize: 13,
@@ -9049,13 +9070,13 @@ function GameOverContinueModal({
           margin: "0 0 14px",
         }}
       >
-        Continue once to lower the danger bar by half and reset the stone streak.
+        {tr("Continue once to lower the danger bar by half and reset the stone streak.")}
       </p>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
-        <ResultStat label="Score" value={formatScore(score)} color="var(--accent)" />
-        <ResultStat label="Shots" value={`${shots}`} color="var(--foreground)" />
-        <ResultStat label="Coins" value={<CoinValue amount={coins} />} color="var(--accent)" />
-        <ResultStat label="Continue" value={<CoinValue amount={5} />} color="var(--foreground)" />
+        <ResultStat label={tr("Score")} value={formatScore(score)} color="var(--accent)" />
+        <ResultStat label={tr("Shots")} value={`${shots}`} color="var(--foreground)" />
+        <ResultStat label={tr("Coins")} value={<CoinValue amount={coins} />} color="var(--accent)" />
+        <ResultStat label={tr("Continue")} value={<CoinValue amount={5} />} color="var(--foreground)" />
       </div>
       {message && (
         <div
@@ -9096,7 +9117,7 @@ function GameOverContinueModal({
               cursor: busy ? "wait" : "pointer",
             }}
           >
-            {busy ? "Loading ad..." : "Watch ad to continue"}
+            {busy ? tr("Loading ad...") : tr("Watch ad to continue")}
           </button>
         )}
         <button
@@ -9111,7 +9132,7 @@ function GameOverContinueModal({
             opacity: busy ? 0.65 : 1,
           }}
         >
-          Results
+          {tr("Results")}
         </button>
       </div>
     </Modal>
@@ -9139,6 +9160,8 @@ function ContinueChoiceModal({
   onClaim: () => void;
   onContinue: () => void;
 }) {
+  const { appLanguage } = useProgress();
+  const tr = (text: string) => t(text, appLanguage);
   return (
     <Modal>
       <div
@@ -9150,14 +9173,14 @@ function ContinueChoiceModal({
           marginBottom: 8,
         }}
       >
-        {isContinuing ? "FINISH LEVEL?" : "TARGET REACHED"}
+        {isContinuing ? tr("FINISH LEVEL?") : tr("TARGET REACHED")}
       </div>
       <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 6 }}>
         {isContinuing
-          ? "Ready to claim?"
+          ? tr("Ready to claim?")
           : compound
             ? `${compound.name} formed!`
-            : `${ELEMENTS[level.targetElement - 1]?.name ?? "?"} discovered!`}
+            : `${ELEMENTS[level.targetElement - 1]?.name ?? "?"} ${tr("discovered!")}`}
       </div>
       <p
         style={{
@@ -9167,7 +9190,7 @@ function ContinueChoiceModal({
           margin: "0 0 14px",
         }}
       >
-        The level is clear. Finish the stage, or restart this level and try a cleaner run.
+        {tr("The level is clear. Finish the stage, or restart this level and try a cleaner run.")}
       </p>
       {stars > 0 && (
         <div
@@ -9183,18 +9206,18 @@ function ContinueChoiceModal({
         </div>
       )}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 4 }}>
-        <ResultStat label="Score" value={formatScore(score)} color="var(--accent)" />
-        <ResultStat label="Shots" value={`${shots}`} color="var(--foreground)" />
+        <ResultStat label={tr("Score")} value={formatScore(score)} color="var(--accent)" />
+        <ResultStat label={tr("Shots")} value={`${shots}`} color="var(--foreground)" />
       </div>
       <div style={{ display: "flex", gap: 8 }}>
         <button
           onClick={onContinue}
           style={{ ...modalBtn, background: "var(--surface-high)", color: "var(--foreground)" }}
         >
-          Restart
+          {tr("Restart")}
         </button>
         <button onClick={onClaim} style={modalBtn}>
-          Finish Level
+          {tr("Finish Level")}
         </button>
       </div>
     </Modal>
@@ -9246,6 +9269,8 @@ function ResultModal({
   onNext: () => void;
   nextLabel?: string;
 }) {
+  const { appLanguage } = useProgress();
+  const tr = (text: string) => t(text, appLanguage);
   const [selectedSavePowerUp, setSelectedSavePowerUp] = useState<InventoryPowerUpId | null>(null);
   const [selectedCompound, setSelectedCompound] = useState<CompoundDefinition | null>(null);
   const formedCompoundDefinitions = formedCompounds
@@ -9284,9 +9309,9 @@ function ResultModal({
       <div
         style={{ fontSize: 12, letterSpacing: 3, color: accent, fontWeight: 800, marginBottom: 8 }}
       >
-        {title}
+        {tr(title)}
       </div>
-      <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 12 }}>{level.name}</div>
+      <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 12 }}>{tr(level.name)}</div>
       {isPowerUpPass && (
         <div
           style={{
@@ -9315,7 +9340,7 @@ function ResultModal({
             ✓
           </div>
           <div style={{ fontSize: 24, fontWeight: 900, color: "var(--success, var(--accent))" }}>
-            Pass
+            {tr("Pass")}
           </div>
         </div>
       )}
@@ -9425,21 +9450,21 @@ function ResultModal({
             textAlign: "left",
           }}
         >
-          <div style={{ fontSize: 10, letterSpacing: 1.4, fontWeight: 900, color: "var(--accent)" }}>
-            DAILY BOARD SCORE CALCULATION
+            <div style={{ fontSize: 10, letterSpacing: 1.4, fontWeight: 900, color: "var(--accent)" }}>
+            {tr("DAILY BOARD SCORE CALCULATION")}
           </div>
-          <ScoreBreakdownRow label="Points earned" value={dailyBoardScoreBreakdown.baseScore} />
-          <ScoreBreakdownRow label="Combo bonus" value={dailyBoardScoreBreakdown.comboBonus} />
-          <ScoreBreakdownRow label="Time bonus" value={dailyBoardScoreBreakdown.timeBonus} />
+          <ScoreBreakdownRow label={tr("Points earned")} value={dailyBoardScoreBreakdown.baseScore} />
+          <ScoreBreakdownRow label={tr("Combo bonus")} value={dailyBoardScoreBreakdown.comboBonus} />
+          <ScoreBreakdownRow label={tr("Time bonus")} value={dailyBoardScoreBreakdown.timeBonus} />
           <ScoreBreakdownRow
             label={`${shots} shots — ${Math.round(dailyBoardScoreBreakdown.shotEfficiency * 100)}% efficiency`}
             value={-dailyBoardScoreBreakdown.shotEfficiencyPenalty}
             negative
           />
-          <ScoreBreakdownRow label="Fast-clear bonus" value={dailyBoardScoreBreakdown.fastClearBonus} />
+          <ScoreBreakdownRow label={tr("Fast-clear bonus")} value={dailyBoardScoreBreakdown.fastClearBonus} />
           {dailyBoardScoreBreakdown.powerUpPenalty > 0 && (
             <ScoreBreakdownRow
-              label="Power-up penalty"
+              label={tr("Power-up penalty")}
               value={-dailyBoardScoreBreakdown.powerUpPenalty}
               negative
             />
@@ -9455,7 +9480,7 @@ function ResultModal({
               fontWeight: 950,
             }}
           >
-            <span>Final leaderboard score</span>
+            <span>{tr("Final leaderboard score")}</span>
             <span style={{ color: "var(--accent)" }}>{formatScore(dailyBoardScoreBreakdown.finalScore)}</span>
           </div>
         </div>
@@ -9515,7 +9540,7 @@ function ResultModal({
               textAlign: "center",
             }}
           >
-            COMPOUNDS FORMED
+            {tr("COMPOUNDS FORMED")}
           </div>
           <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
             {formedCompoundDefinitions.map((compound, index) => (
@@ -9572,7 +9597,7 @@ function ResultModal({
               textAlign: "center",
             }}
           >
-            KEEP ONE POWER-UP
+            {tr("KEEP ONE POWER-UP")}
           </div>
           {!claimedPowerUp && (
             <div
@@ -9586,10 +9611,10 @@ function ResultModal({
             >
               {savePowerUpCost > 0 ? (
                 <>
-                  Save one unused power-up for <CoinValue amount={savePowerUpCost} />.
+                  {tr("Save one unused power-up for")} <CoinValue amount={savePowerUpCost} />.
                 </>
               ) : (
-                "Collect one unused power-up for free on web."
+                tr("Collect one unused power-up for free on web.")
               )}
             </div>
           )}
@@ -9602,7 +9627,7 @@ function ResultModal({
                 fontWeight: 900,
               }}
             >
-              Saved {POWER_UP_INVENTORY_META[claimedPowerUp].name} to inventory
+              {tr("Saved")} {tr(POWER_UP_INVENTORY_META[claimedPowerUp].name)} {tr("to inventory")}
             </div>
           ) : (
             <>
@@ -9662,14 +9687,14 @@ function ResultModal({
               >
                 {savePowerUpCost > 0 ? (
                   <span style={coinContinueLabel}>
-                    <span>Save selected</span>
+                    <span>{tr("Save selected")}</span>
                     <span style={coinContinueCost}>
                       <Coins size={15} aria-hidden="true" />
                       <span>{savePowerUpCost}</span>
                     </span>
                   </span>
                 ) : (
-                  "Collect selected"
+                  tr("Collect selected")
                 )}
               </button>
               {savePowerUpCost > 0 && !canAffordPowerUpSave && (
@@ -9683,7 +9708,7 @@ function ResultModal({
                     fontWeight: 900,
                   }}
                 >
-                  Need {savePowerUpCost} gold coins.
+                  {tr("Need")} {savePowerUpCost} {tr("gold coins")}.
                 </div>
               )}
             </>
@@ -9695,10 +9720,10 @@ function ResultModal({
           onClick={onMain}
           style={{ ...modalBtn, background: "var(--surface-high)", color: "var(--foreground)" }}
         >
-          Menu
+          {tr("Menu")}
         </button>
         <button onClick={onNext} style={modalBtn}>
-          {nextLabel ?? "Next"}
+          {nextLabel ? tr(nextLabel) : tr("Next")}
         </button>
       </div>
     </Modal>
@@ -9773,9 +9798,10 @@ function CoinValue({ amount }: { amount: number }) {
 }
 
 function CoinContinueLabel() {
+  const { appLanguage } = useProgress();
   return (
     <span style={coinContinueLabel}>
-      <span>Continue run</span>
+      <span>{t("Continue run", appLanguage)}</span>
       <span style={coinContinueCost}>
         <Coins size={15} aria-hidden="true" />
         <span>5</span>
@@ -9831,25 +9857,27 @@ function InGameSettingsModal({
   onRestart: () => void;
   onLeave: () => void;
 }) {
+  const { appLanguage } = useProgress();
+  const tr = (text: string) => t(text, appLanguage);
   return (
     <Modal zIndex={1000}>
       <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--accent)", fontWeight: 900 }}>
-        SETTINGS
+        {tr("SETTINGS")}
       </div>
-      <h2 style={{ margin: "6px 0 12px", fontSize: 24, fontWeight: 900 }}>Game settings</h2>
+      <h2 style={{ margin: "6px 0 12px", fontSize: 24, fontWeight: 900 }}>{tr("Game settings")}</h2>
       <div style={{ display: "grid", gap: 10 }}>
         <label style={settingsCheckRow}>
           <input type="checkbox" checked={musicEnabled} onChange={onToggleMusic} />
           <span style={settingsLabelText}>
-            <strong>Music</strong>
-            <small style={settingsLabelSubtext}>Ambient background track</small>
+            <strong>{tr("Music")}</strong>
+            <small style={settingsLabelSubtext}>{tr("Ambient background track")}</small>
           </span>
         </label>
         <label style={settingsCheckRow}>
           <input type="checkbox" checked={soundEnabled} onChange={onToggleSound} />
           <span style={settingsLabelText}>
-            <strong>Sound</strong>
-            <small style={settingsLabelSubtext}>Shot, merge, and win effects</small>
+            <strong>{tr("Sound")}</strong>
+            <small style={settingsLabelSubtext}>{tr("Shot, merge, and win effects")}</small>
           </span>
         </label>
         <label style={settingsCheckRow}>
@@ -9859,18 +9887,18 @@ function InGameSettingsModal({
             onChange={onToggleShootingStyle}
           />
           <span style={settingsLabelText}>
-            <strong>Shooting: {shootingStyle === "hold" ? "Hold" : "Toggle"}</strong>
+            <strong>{tr("Shooting:")} {shootingStyle === "hold" ? tr("Hold") : tr("Toggle")}</strong>
             <small style={settingsLabelSubtext}>
               {shootingStyle === "hold"
-                ? "Aim and release to shoot"
-                : "Aim on the board, then press the queued atom"}
+                ? tr("Aim and release to shoot")
+                : tr("Aim on the board, then press the queued atom")}
             </small>
           </span>
         </label>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10, marginTop: 16 }}>
         <button type="button" onClick={onClose} style={{ ...modalBtn, marginTop: 0 }}>
-          Resume
+          {tr("Resume")}
         </button>
         <button
           type="button"
@@ -9882,7 +9910,7 @@ function InGameSettingsModal({
             color: "var(--foreground)",
           }}
         >
-          Restart
+          {tr("Restart")}
         </button>
         <button
           type="button"
@@ -9894,7 +9922,7 @@ function InGameSettingsModal({
             color: "var(--foreground)",
           }}
         >
-          Leave game
+          {tr("Leave game")}
         </button>
       </div>
     </Modal>

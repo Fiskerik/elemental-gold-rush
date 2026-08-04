@@ -7,7 +7,7 @@
     "zh-Hans",
     "es-ES",
     "hi",
-    "ar",
+    "ar-SA",
     "pt-BR",
     "fr-FR",
     "de-DE",
@@ -28,7 +28,7 @@
     "pl",
     "sv",
     "th",
-    "ta",
+    "ta-IN",
     "uk"
   ],
   "locales": {
@@ -71,7 +71,7 @@
       "subtitle": "元素合成益智游戏",
       "promotionalText": "合成原子、解锁元素，在节奏明快的化学益智游戏中冲向黄金。",
       "description": "Atomic Fusion Rush 将元素周期表变成轻快爽感的合成益智游戏。瞄准发射，把原子合成为更重的元素，通关战役关卡，收集化学知识，并在困难局面中使用实验室工具。一路合成到黄金，完成每日任务，不断刷新最佳表现。",
-      "keywords": "化学,原子,合成,益智,元素周期表,黄金,科学",
+      "keywords": "化学,原子,合成,益智,元素周期表,黄金,科学,策略,逻辑,化合物,炼金术,实验室,分子,每日挑战,排行榜,连锁反应,脑力游戏,拼图,闯关,收藏,元素收集,化学游戏,脑力挑战,化学拼图",
       "reviewNotes": "主要购买路径：主菜单 -> 商店 -> 解锁礼包。金币包也显示在商店中。",
       "inAppPurchases": {
         "pro_lab_pack_lifetime": {
@@ -103,7 +103,7 @@
       "subtitle": "Puzzle de fusión química",
       "promotionalText": "Fusiona átomos, desbloquea elementos y persigue el oro en un puzzle químico rápido.",
       "description": "Atomic Fusion Rush convierte la tabla periódica en un puzzle de fusión ágil y satisfactorio. Apunta, lanza y combina átomos para crear elementos más pesados, supera fases de campaña, descubre datos de química y usa herramientas de laboratorio cuando el tablero se complica. Avanza hacia el oro, completa misiones diarias y mejora tus mejores partidas.",
-      "keywords": "química,átomos,fusión,puzzle,elementos,oro,ciencia",
+      "keywords": "química,átomos,fusión,puzzle,elementos,oro,ciencia,estrategia,lógica,compuestos,alquimia,lab,desafío",
       "reviewNotes": "Ruta principal de compra: Menú principal -> Tienda -> Desbloquear pack. Los packs de monedas también aparecen en Tienda.",
       "inAppPurchases": {
         "pro_lab_pack_lifetime": {
@@ -135,7 +135,7 @@
       "subtitle": "तत्व मर्ज पहेली",
       "promotionalText": "परमाणु मिलाएँ, तत्व खोलें, और तेज रसायन पहेली में सोने तक पहुँचें।",
       "description": "Atomic Fusion Rush आवर्त सारणी को तेज और मजेदार मर्ज पहेली में बदल देता है। निशाना लगाएँ, परमाणुओं को भारी तत्वों में मिलाएँ, अभियान स्तर पार करें, रसायन तथ्य खोजें, और कठिन बोर्ड पर लैब टूल्स का उपयोग करें। सोने तक प्रगति करें, दैनिक क्वेस्ट पूरे करें, और अपनी सर्वश्रेष्ठ रन बेहतर बनाते रहें।",
-      "keywords": "रसायन,परमाणु,मर्ज,तत्व,सोना",
+      "keywords": "रसायन,परमाणु,मर्ज,तत्व,सोना,विज्ञान,पहेली,रणनीति,तर्क,यौगिक,आवर्त सारणी,प्रयोगशाला,अणु,दैनिक चुनौती",
       "reviewNotes": "मुख्य खरीद मार्ग: मुख्य मेनू -> दुकान -> पैक अनलॉक करें। कॉइन पैक भी दुकान में दिखते हैं।",
       "inAppPurchases": {
         "pro_lab_pack_lifetime": {
@@ -160,14 +160,14 @@
         }
       }
     },
-    "ar": {
+    "ar-SA": {
       "languageCode": "ar",
       "displayName": "العربية",
       "appName": "Atomic Fusion Rush",
       "subtitle": "لغز دمج العناصر",
       "promotionalText": "ادمج الذرات وافتح العناصر واسعَ إلى الذهب في لغز كيميائي سريع.",
       "description": "يحوّل Atomic Fusion Rush الجدول الدوري إلى لعبة ألغاز دمج سريعة وممتعة. صوّب الطلقات، وادمج الذرات لتكوين عناصر أثقل، وتجاوز مراحل الحملة، واجمع حقائق كيميائية، واستخدم أدوات المختبر عندما يصبح اللوح صعباً. تقدّم نحو الذهب، وأنجز المهام اليومية، وحسّن أفضل جولاتك.",
-      "keywords": "كيمياء,ذرات,دمج,ألغاز,عناصر,ذهب,علوم",
+      "keywords": "كيمياء,ذرات,دمج,ألغاز,عناصر,ذهب,علوم,استراتيجية,منطق,مركبات,جدول دوري,مختبر,جزيئات,تحدي يومي,لعبة",
       "reviewNotes": "مسار الشراء الرئيسي: القائمة الرئيسية -> المتجر -> فتح الحزمة. تظهر حزم العملات أيضاً في المتجر.",
       "inAppPurchases": {
         "pro_lab_pack_lifetime": {
@@ -199,7 +199,7 @@
       "subtitle": "Puzzle químico de fusão",
       "promotionalText": "Funda átomos, desbloqueie elementos e busque ouro em um puzzle químico rápido.",
       "description": "Atomic Fusion Rush transforma a tabela periódica em um puzzle de fusão rápido e recompensador. Mire, lance e funda átomos em elementos mais pesados, vença fases da campanha, descubra fatos de química e use ferramentas de laboratório quando o tabuleiro apertar. Progrida até o ouro, complete missões diárias e melhore suas melhores partidas.",
-      "keywords": "química,átomos,fusão,puzzle,elementos,ouro,ciência",
+      "keywords": "química,átomos,fusão,puzzle,elementos,ouro,ciência,estratégia,lógica,compostos,alquimia,laboratório",
       "reviewNotes": "Caminho principal de compra: Menu principal -> Loja -> Desbloquear pacote. Os pacotes de moedas também aparecem na Loja.",
       "inAppPurchases": {
         "pro_lab_pack_lifetime": {
@@ -231,7 +231,7 @@
       "subtitle": "Puzzle fusion chimique",
       "promotionalText": "Fusionnez des atomes, débloquez des éléments et visez l’or dans un puzzle chimique rapide.",
       "description": "Atomic Fusion Rush transforme le tableau périodique en puzzle de fusion rapide et satisfaisant. Visez, lancez et fusionnez des atomes en éléments plus lourds, terminez les niveaux de campagne, découvrez des faits de chimie et utilisez des outils de laboratoire quand le plateau se complique. Progressez vers l’or, réussissez les quêtes quotidiennes et améliorez vos meilleures parties.",
-      "keywords": "chimie,atomes,fusion,puzzle,éléments,or,science",
+      "keywords": "chimie,atomes,fusion,puzzle,éléments,or,science,stratégie,logique,composés,alchimie,laboratoire",
       "reviewNotes": "Chemin d’achat principal : Menu principal -> Boutique -> Débloquer le pack. Les packs de pièces sont aussi dans Boutique.",
       "inAppPurchases": {
         "pro_lab_pack_lifetime": {
@@ -263,7 +263,7 @@
       "subtitle": "Chemie-Merge-Puzzle",
       "promotionalText": "Verschmelze Atome, schalte Elemente frei und jage Gold in einem schnellen Chemie-Puzzle.",
       "description": "Atomic Fusion Rush macht das Periodensystem zu einem schnellen, befriedigenden Merge-Puzzle. Ziele, schieße und verschmelze Atome zu schwereren Elementen, meistere Kampagnenstufen, sammle Chemiefakten und nutze Laborwerkzeuge, wenn das Feld knifflig wird. Arbeite dich bis zu Gold vor, erfülle tägliche Quests und verbessere deine besten Läufe.",
-      "keywords": "chemie,atome,merge,puzzle,elemente,gold,wissenschaft",
+      "keywords": "chemie,atome,merge,puzzle,elemente,gold,wissenschaft,strategie,logik,verbindungen,periodensystem",
       "reviewNotes": "Hauptkaufpfad: Hauptmenü -> Shop -> Paket freischalten. Münzpakete erscheinen ebenfalls im Shop.",
       "inAppPurchases": {
         "pro_lab_pack_lifetime": {
@@ -295,7 +295,7 @@
       "subtitle": "元素合成パズル",
       "promotionalText": "原子を合成し、元素を解放し、テンポの良い化学パズルで金を目指そう。",
       "description": "Atomic Fusion Rush は周期表をテンポの良い合成パズルに変えます。狙って撃ち、原子をより重い元素へ合成し、キャンペーンステージをクリアし、化学の豆知識を集め、難しい盤面ではラボツールを使いましょう。金を目指して進み、デイリークエストを達成し、ベストランを更新してください。",
-      "keywords": "化学,原子,合成,パズル,元素,金,科学",
+      "keywords": "化学,原子,合成,パズル,元素,金,科学,戦略,論理,化合物,周期表,錬金術,研究室,分子,毎日チャレンジ,ランキング,元素収集,化学ゲーム,脳トレ,連鎖反応,元素パズル,原子ゲーム",
       "reviewNotes": "主な購入経路：メインメニュー -> ショップ -> パックを解除。コインパックもショップに表示されます。",
       "inAppPurchases": {
         "pro_lab_pack_lifetime": {
@@ -327,7 +327,7 @@
       "subtitle": "원소 합성 퍼즐",
       "promotionalText": "원자를 합성하고 원소를 해제하며 빠른 화학 퍼즐에서 금을 향해 나아가세요.",
       "description": "Atomic Fusion Rush는 주기율표를 빠르고 만족스러운 합성 퍼즐로 바꿉니다. 조준해 발사하고 원자를 더 무거운 원소로 합성하며, 캠페인 스테이지를 클리어하고 화학 정보를 수집하세요. 어려운 보드에서는 실험실 도구를 활용하고, 금을 향해 진행하며 일일 퀘스트와 최고 기록에 도전하세요.",
-      "keywords": "화학,원자,합성,퍼즐,원소,금,과학",
+      "keywords": "화학,원자,합성,퍼즐,원소,금,과학,전략,논리,화합물,주기율표,연금술,실험실,분자,일일도전,순위표,원소수집,화학게임,두뇌퍼즐,연쇄반응,원소퍼즐,원자게임,매일게임",
       "reviewNotes": "주요 구매 경로: 메인 메뉴 -> 상점 -> 팩 잠금 해제. 코인 팩도 상점에 표시됩니다.",
       "inAppPurchases": {
         "pro_lab_pack_lifetime": {
@@ -359,7 +359,7 @@
       "subtitle": "Пазл слияния атомов",
       "promotionalText": "Сливайте атомы, открывайте элементы и идите к золоту в быстрой химической головоломке.",
       "description": "Atomic Fusion Rush превращает периодическую таблицу в быструю и приятную головоломку со слиянием. Прицеливайтесь, запускайте атомы и объединяйте их в более тяжелые элементы, проходите этапы кампании, собирайте факты о химии и используйте лабораторные инструменты на сложных досках. Двигайтесь к золоту, выполняйте ежедневные задания и улучшайте лучшие забеги.",
-      "keywords": "химия,атомы,слияние,пазл,элементы,золото,наука",
+      "keywords": "химия,атомы,слияние,пазл,элементы,золото,наука,стратегия,логика,соединения,таблица,алхимия,формулы",
       "reviewNotes": "Основной путь покупки: Главное меню -> Магазин -> Разблокировать пакет. Наборы монет также отображаются в Магазине.",
       "inAppPurchases": {
         "pro_lab_pack_lifetime": {
@@ -391,7 +391,7 @@
       "subtitle": "Puzzle gabung unsur",
       "promotionalText": "Gabungkan atom, buka unsur, dan kejar emas dalam puzzle kimia cepat.",
       "description": "Atomic Fusion Rush mengubah tabel periodik menjadi puzzle penggabungan yang cepat dan memuaskan. Bidik, tembak, dan gabungkan atom menjadi unsur yang lebih berat, selesaikan tahap kampanye, temukan fakta kimia, dan gunakan alat lab saat papan menjadi sulit. Maju menuju emas, selesaikan misi harian, dan tingkatkan rekor permainanmu.",
-      "keywords": "kimia,atom,gabung,puzzle,unsur,emas,sains",
+      "keywords": "kimia,atom,gabung,puzzle,unsur,emas,sains,strategi,logika,senyawa,alkimia,laboratorium,molekul",
       "reviewNotes": "Jalur pembelian utama: Menu Utama -> Toko -> Buka paket. Paket koin juga tampil di Toko.",
       "inAppPurchases": {
         "pro_lab_pack_lifetime": {
@@ -423,7 +423,7 @@
       "subtitle": "Element birleştirme bulmacası",
       "promotionalText": "Atomları birleştir, elementleri aç ve hızlı kimya bulmacasında altına ulaş.",
       "description": "Atomic Fusion Rush periyodik tabloyu hızlı ve tatmin edici bir birleştirme bulmacasına dönüştürür. Nişan al, atomları daha ağır elementlere dönüştür, sefer aşamalarını geç, kimya bilgileri topla ve zor tahtalarda laboratuvar araçlarını kullan. Altına doğru ilerle, günlük görevleri tamamla ve en iyi koşularını geliştir.",
-      "keywords": "kimya,atom,birleştir,bulmaca,element,altın,bilim",
+      "keywords": "kimya,atom,birleştir,bulmaca,element,altın,bilim,strateji,mantık,bileşik,periyodik,simya,laboratuvar",
       "reviewNotes": "Ana satın alma yolu: Ana Menü -> Mağaza -> Paketi aç. Coin paketleri de Mağaza içinde görünür.",
       "inAppPurchases": {
         "pro_lab_pack_lifetime": {
@@ -455,7 +455,7 @@
       "subtitle": "Puzzle chimico merge",
       "promotionalText": "Fondi atomi, sblocca elementi e punta all’oro in un rapido puzzle di chimica.",
       "description": "Atomic Fusion Rush trasforma la tavola periodica in un puzzle di fusione rapido e appagante. Mira, lancia e fondi atomi in elementi più pesanti, supera livelli campagna, scopri curiosità di chimica e usa strumenti da laboratorio quando il tabellone diventa difficile. Avanza verso l’oro, completa missioni giornaliere e migliora le tue run migliori.",
-      "keywords": "chimica,atomi,fusione,puzzle,elementi,oro,scienza",
+      "keywords": "chimica,atomi,fusione,puzzle,elementi,oro,scienza,strategia,logica,composti,periodica,alchimia",
       "reviewNotes": "Percorso principale di acquisto: Menu principale -> Negozio -> Sblocca pacchetto. I pacchetti monete sono nel Negozio.",
       "inAppPurchases": {
         "pro_lab_pack_lifetime": {
@@ -487,7 +487,7 @@
       "subtitle": "Ghép nguyên tố giải đố",
       "promotionalText": "Ghép nguyên tử, mở khóa nguyên tố và chinh phục vàng trong game giải đố hóa học nhanh.",
       "description": "Atomic Fusion Rush biến bảng tuần hoàn thành một game giải đố ghép nhanh và thỏa mãn. Ngắm bắn, ghép nguyên tử thành nguyên tố nặng hơn, vượt các màn chiến dịch, khám phá kiến thức hóa học và dùng công cụ phòng thí nghiệm khi bàn chơi trở nên khó. Tiến tới vàng, hoàn thành nhiệm vụ hằng ngày và cải thiện lượt chơi tốt nhất.",
-      "keywords": "hóa học,nguyên tử,ghép,giải đố,nguyên tố,vàng,khoa học",
+      "keywords": "hóa học,nguyên tử,ghép,giải đố,nguyên tố,vàng,khoa học,chiến lược,logic,hợp chất,bảng tuần hoàn",
       "reviewNotes": "Đường dẫn mua chính: Menu chính -> Cửa hàng -> Mở khóa gói. Các gói xu cũng hiển thị trong Cửa hàng.",
       "inAppPurchases": {
         "pro_lab_pack_lifetime": {
@@ -519,7 +519,7 @@
       "subtitle": "週期表合併益智遊戲",
       "promotionalText": "融合原子、解鎖元素，在 Atomic Fusion Rush 中體驗更順暢的化學合併益智遊戲。",
       "description": "Atomic Fusion Rush 是一款以科學為靈感的合併益智遊戲。你可以像 2048 一樣融合原子，在遊戲過程中發現化合物並探索週期表。\\n\\n遊戲方式\\n• 合併相同原子，創造更高階的元素\\n• 完成擁有獨特目標的戰役關卡\\n• 發現化合物與組成分子，擴充收藏並獲得額外分數\\n• 使用強化道具應對棘手的棋盤；強化道具會隨進度解鎖並可升級\\n• 透過遊戲與選擇性獎勵廣告賺取金幣\\n\\n遊戲模式\\n• 100 個戰役關卡的進度挑戰\\n• 解鎖強化道具、首領與化合物形成的特殊關卡\\n• 每日任務與連續獎勵，排行榜每天重置\\n• 追蹤元素與化合物收藏\\n• 個人檔案里程碑與成就目標\\n\\n選擇性購買\\n• 用於加速進度的金幣套組\\n• 一次性 Pro 升級，可移除強制插頁廣告並增加每日獎勵金幣\\n• 購買由 Apple 的 App 內購買系統管理\\n\\nAtomic Fusion Rush 適合短時間遊玩，也有長期進度目標，結合策略、規劃與令人滿足的連鎖反應。完成週期表，找出所有秘密分子，成為你一直想成為的煉金術士。",
-      "keywords": "益智,化學,元素,合併,原子,科學,策略,邏輯,化合物,週期表,鍊金術,實驗室",
+      "keywords": "益智,化學,元素,合併,原子,科學,策略,邏輯,化合物,週期表,鍊金術,實驗室,分子,每日挑戰,排行榜,連鎖反應,元素收藏,化學遊戲,腦力挑戰,元素表,合成遊戲",
       "reviewNotes": "主要購買路徑：主選單 -> 商店 -> 解鎖套組。金幣套組也會顯示在商店中。",
       "inAppPurchases": {
         "pro_lab_pack_lifetime": {
@@ -551,7 +551,7 @@
       "subtitle": "Chemická slučovací logická hra",
       "promotionalText": "Slučujte atomy, odemykejte prvky a vydejte se za zlatem v rychlé chemické logické hře Atomic Fusion Rush.",
       "description": "Atomic Fusion Rush je logická hra inspirovaná vědou, ve které slučujete atomy ve stylu hry 2048, objevujete sloučeniny a postupně odhalujete periodickou tabulku.\\n\\nJAK HRÁT\\n• Slučujte stejné atomy a vytvářejte vyšší prvky\\n• Plňte kampaňové úrovně s jedinečnými cíli\\n• Objevujte sloučeniny a složené molekuly, rozšiřujte sbírku a získávejte bonusové body\\n• Používejte posilovače v obtížných stavech hrací plochy; odemykají se postupně a lze je vylepšovat\\n• Získávejte mince hraním a prostřednictvím volitelných odměněných reklam\\n\\nHERNÍ REŽIMY\\n• Kampaň napříč 100 úrovněmi\\n• Speciální úrovně pro odemykání posilovačů, bossů a tvorbu sloučenin\\n• Denní úkoly a odměny za sérii s žebříčky resetovanými každý den\\n• Sledování sbírky prvků a sloučenin\\n• Milníky profilu a cíle úspěchů\\n\\nVOLITELNÉ NÁKUPY\\n• Balíčky mincí pro rychlejší postup\\n• Jednorázový upgrade Pro pro odstranění vynucených celoobrazovkových reklam a denních bonusových mincí\\n• Platby spravuje systém nákupů v aplikaci společnosti Apple\\n\\nAtomic Fusion Rush je navržena pro krátké hraní i dlouhodobý postup. Kombinuje strategii, plánování a uspokojivé řetězové reakce. Dokončete periodickou tabulku a najděte všechny tajné molekuly.",
-      "keywords": "puzzle,chemie,prvky,atomy,slučování,věda,logika,sloučeniny,tabulka,alchymie,lab",
+      "keywords": "puzzle,chemie,prvky,atomy,slučování,věda,logika,sloučeniny,tabulka,alchymie,lab,strategie,molekuly",
       "reviewNotes": "Hlavní cesta nákupu: Hlavní nabídka -> Obchod -> Odemknout balíček. Balíčky mincí jsou také v Obchodu.",
       "inAppPurchases": {
         "pro_lab_pack_lifetime": {
@@ -583,7 +583,7 @@
       "subtitle": "Chemische mergepuzzel",
       "promotionalText": "Voeg atomen samen, ontgrendel elementen en jaag op goud in de snelle chemische mergepuzzel Atomic Fusion Rush.",
       "description": "Atomic Fusion Rush is een wetenschappelijk geïnspireerde mergepuzzel waarin je atomen samenvoegt in 2048-stijl, verbindingen ontdekt en het periodiek systeem verkent.\\n\\nZO WERKT HET\\n• Voeg gelijke atomen samen om hogere elementen te maken\\n• Voltooi campagnelevels met unieke doelen\\n• Ontdek verbindingen en samengestelde moleculen, breid je collectie uit en verdien bonuspunten\\n• Gebruik power-ups bij lastige bordsituaties; power-ups ontgrendel je tijdens je voortgang en je kunt ze upgraden\\n• Verdien munten door te spelen en via optionele beloonde advertenties\\n\\nSPEL­MODI\\n• Campagnevoortgang over 100 levels\\n• Speciale levels om power-ups, eindbazen en verbindingen maken te ontgrendelen\\n• Dagelijkse opdrachten en reeksbeloningen met klassementen die elke dag resetten\\n• Collectieoverzicht voor elementen en verbindingen\\n• Profielmijlpalen en prestatiedoelen\\n\\nOPTIONELE AANKOPEN\\n• Muntenpakketten voor snellere voortgang\\n• Eenmalige Pro-upgrade om verplichte interstitial advertenties te verwijderen en dagelijkse bonusmunten te krijgen\\n• Aankopen worden beheerd via het in-app-aankoopsysteem van Apple\\n\\nAtomic Fusion Rush is gemaakt voor korte sessies en langdurige voortgang. Combineer strategie, planning en bevredigende kettingreacties. Voltooi het periodiek systeem en vind alle geheime moleculen.",
-      "keywords": "puzzel,chemie,elementen,atomen,merge,strategie,logica,verbindingen,periodiek,alchemie,lab",
+      "keywords": "puzzel,chemie,elementen,atomen,merge,strategie,logica,verbindingen,periodiek,alchemie,lab,moleculen",
       "reviewNotes": "Belangrijkste aankooppad: Hoofdmenu -> Winkel -> Pakket ontgrendelen. Muntenpakketten staan ook in de Winkel.",
       "inAppPurchases": {
         "pro_lab_pack_lifetime": {
@@ -615,7 +615,7 @@
       "subtitle": "Kemiallinen yhdistelypulma",
       "promotionalText": "Yhdistä atomeja, avaa alkuaineita ja tavoittele kultaa Atomic Fusion Rushin nopeassa kemian pulmapelissä.",
       "description": "Atomic Fusion Rush on tieteestä inspiroitu yhdistelypulma, jossa yhdistät atomeja 2048-tyyliin, löydät yhdisteitä ja tutkit jaksollista järjestelmää.\\n\\nNÄIN PELAAT\\n• Yhdistä samanlaisia atomeja luodaksesi korkeamman tason alkuaineita\\n• Suorita kampanjatasoja, joilla on omat tavoitteensa\\n• Löydä yhdisteitä ja molekyylejä, laajenna kokoelmaasi ja ansaitse bonuspisteitä\\n• Käytä tehosteita vaikeissa pelilaudoissa; ne avautuvat etenemisen myötä ja niitä voi päivittää\\n• Ansaitse kolikoita pelaamalla ja valinnaisilla palkintomainoksilla\\n\\nPELITILAT\\n• Kampanja, jossa on 100 tasoa\\n• Erikoistasot tehosteiden, pomojen ja yhdisteiden muodostamisen avaamiseen\\n• Päivittäiset tehtävät ja putkipalkinnot; tulostaulukot nollautuvat joka päivä\\n• Alkuaineiden ja yhdisteiden kokoelman seuranta\\n• Profiilin virstanpylväät ja saavutustavoitteet\\n\\nVALINNAISET OSTOT\\n• Kolikkopaketit nopeampaan etenemiseen\\n• Kertaluonteinen Pro-päivitys poistaa pakotetut koko näytön mainokset ja antaa päivittäisiä bonuskolikoita\\n• Apple hallinnoi ostoksia App Storen appinsisäisellä ostojärjestelmällä\\n\\nAtomic Fusion Rush on suunniteltu lyhyisiin pelisessioihin ja pitkäaikaiseen etenemiseen. Se yhdistää strategian, suunnittelun ja tyydyttävät ketjureaktiot. Täydennä jaksollinen järjestelmä ja löydä kaikki salaiset molekyylit.",
-      "keywords": "pulma,kemia,alkuaineet,atomit,yhdistäminen,tiede,logiikka,yhdisteet,alkemia,labra",
+      "keywords": "pulma,kemia,alkuaineet,atomit,yhdistäminen,tiede,logiikka,yhdisteet,alkemia,labra,strategia",
       "reviewNotes": "Pääasiallinen ostoreitti: Päävalikko -> Kauppa -> Avaa paketti. Kolikkopaketit näkyvät myös kaupassa.",
       "inAppPurchases": {
         "pro_lab_pack_lifetime": {
@@ -647,7 +647,7 @@
       "subtitle": "Teka-teki gabungan kimia",
       "promotionalText": "Gabungkan atom, buka unsur dan buru emas dalam teka-teki gabungan kimia pantas Atomic Fusion Rush.",
       "description": "Atomic Fusion Rush ialah teka-teki gabungan berinspirasikan sains. Gabungkan atom dalam gaya 2048, temui sebatian dan terokai jadual berkala sepanjang permainan.\\n\\nCARA BERMAIN\\n• Gabungkan atom yang sepadan untuk mencipta unsur lebih tinggi\\n• Lengkapkan tahap kempen dengan matlamat unik\\n• Temui sebatian dan molekul terbina, kembangkan koleksi dan dapatkan mata bonus\\n• Gunakan kuasa tambahan untuk memulihkan keadaan papan yang sukar; kuasa tambahan dibuka dan boleh dinaik taraf mengikut kemajuan\\n• Dapatkan syiling melalui permainan dan iklan ganjaran pilihan\\n\\nMOD PERMAINAN\\n• Kemajuan kempen merentasi 100 tahap\\n• Tahap khas untuk membuka kuasa tambahan, bos dan pembentukan sebatian\\n• Misi harian dan ganjaran berturut-turut dengan papan pendahulu yang ditetapkan semula setiap hari\\n• Penjejakan koleksi unsur dan sebatian\\n• Pencapaian profil dan matlamat pencapaian\\n\\nPEMBELIAN PILIHAN\\n• Pakej syiling untuk kemajuan lebih pantas\\n• Naik taraf Pro sekali bayar untuk membuang iklan sela wajib dan menerima syiling bonus harian\\n• Pembelian diurus melalui sistem pembelian dalam app Apple\\n\\nAtomic Fusion Rush dibina untuk sesi singkat dan kemajuan jangka panjang. Gabungkan strategi, perancangan dan tindak balas berantai yang memuaskan. Lengkapkan jadual berkala dan temui semua molekul rahsia.",
-      "keywords": "teka-teki,kimia,unsur,atom,gabungan,sains,logik,sebatian,berkala,alkimia,makmal",
+      "keywords": "teka-teki,kimia,unsur,atom,gabungan,sains,logik,sebatian,berkala,alkimia,makmal,strategi,molekul",
       "reviewNotes": "Laluan pembelian utama: Menu Utama -> Kedai -> Buka Kunci Pakej. Pakej syiling juga dipaparkan di Kedai.",
       "inAppPurchases": {
         "pro_lab_pack_lifetime": {
@@ -679,7 +679,7 @@
       "subtitle": "Kjemisk sammenslåingsspill",
       "promotionalText": "Slå sammen atomer, lås opp grunnstoffer og jag etter gull i Atomic Fusion Rush, et raskt kjemisk puslespill.",
       "description": "Atomic Fusion Rush er et vitenskapsinspirert sammenslåingsspill der du slår sammen atomer i 2048-stil, oppdager forbindelser og utforsker periodesystemet.\\n\\nSLIK FUNGERER DET\\n• Slå sammen like atomer for å lage tyngre grunnstoffer\\n• Fullfør kampanjenivåer med unike mål\\n• Oppdag forbindelser og sammensatte molekyler, utvid samlingen og få bonuspoeng\\n• Bruk hjelpemidler når brettet blir vanskelig; de låses opp underveis og kan oppgraderes\\n• Tjen mynter gjennom spill og valgfrie belønnede annonser\\n\\nSPILLMODUSER\\n• Kampanjeprogresjon gjennom 100 nivåer\\n• Spesialnivåer for å låse opp hjelpemidler, bosser og dannelse av forbindelser\\n• Daglige oppdrag og seriebosser med ledertavler som nullstilles hver dag\\n• Følg samlingen av grunnstoffer og forbindelser\\n• Profilmilepæler og prestasjonsmål\\n\\nVALGFRIE KJØP\\n• Myntpakker for raskere fremgang\\n• Én gangs Pro-oppgradering som fjerner obligatoriske mellomannonser og gir daglige bonusmynter\\n• Kjøp håndteres av Apples system for kjøp i app\\n\\nAtomic Fusion Rush er laget for korte økter og langsiktig fremgang. Kombiner strategi, planlegging og tilfredsstillende kjedereaksjoner. Fullfør periodesystemet og finn alle hemmelige molekyler.",
-      "keywords": "puslespill,kjemi,grunnstoffer,atomer,sammenslåing,vitenskap,logikk,forbindelser,alkymi,lab",
+      "keywords": "puslespill,kjemi,grunnstoffer,atomer,sammenslåing,vitenskap,logikk,forbindelser,alkymi,lab,strategi",
       "reviewNotes": "Hovedsti for kjøp: Hovedmeny -> Butikk -> Lås opp pakke. Myntpakker vises også i Butikk.",
       "inAppPurchases": {
         "pro_lab_pack_lifetime": {
@@ -711,7 +711,7 @@
       "subtitle": "Chemiczna łamigłówka łączenia",
       "promotionalText": "Łącz atomy, odblokowuj pierwiastki i ruszaj po złoto w szybkiej chemicznej łamigłówce Atomic Fusion Rush.",
       "description": "Atomic Fusion Rush to inspirowana nauką łamigłówka łączenia, w której łączysz atomy w stylu 2048, odkrywasz związki i poznajesz układ okresowy.\\n\\nJAK TO DZIAŁA\\n• Łącz pasujące atomy, aby tworzyć wyższe pierwiastki\\n• Ukończ poziomy kampanii z wyjątkowymi celami\\n• Odkrywaj związki i złożone cząsteczki, powiększaj kolekcję i zdobywaj punkty bonusowe\\n• Używaj ulepszeń, aby wyjść z trudnych sytuacji na planszy; ulepszenia odblokowują się w miarę postępów i można je rozwijać\\n• Zdobywaj monety podczas gry i dzięki opcjonalnym reklamom z nagrodą\\n\\nTRYBY GRY\\n• Kampania obejmująca 100 poziomów\\n• Specjalne poziomy odblokowujące ulepszenia, bossów i tworzenie związków\\n• Codzienne zadania i nagrody za serie z tabelami wyników resetowanymi każdego dnia\\n• Śledzenie kolekcji pierwiastków i związków\\n• Kamienie milowe profilu i cele osiągnięć\\n\\nZAKUPY OPCJONALNE\\n• Pakiety monet przyspieszające postęp\\n• Jednorazowe ulepszenie Pro usuwające wymuszone reklamy pełnoekranowe i dodające codzienne monety bonusowe\\n• Zakupami zarządza system zakupów w aplikacji firmy Apple\\n\\nAtomic Fusion Rush powstało z myślą o krótkich sesjach i długoterminowym postępie. Łączy strategię, planowanie i satysfakcjonujące reakcje łańcuchowe. Uzupełnij układ okresowy i znajdź wszystkie sekretne cząsteczki.",
-      "keywords": "puzzle,chemia,pierwiastki,atomy,łączenie,nauka,logika,związki,okresowy,alchemia,lab",
+      "keywords": "puzzle,chemia,pierwiastki,atomy,łączenie,nauka,logika,związki,okresowy,alchemia,lab,strategia",
       "reviewNotes": "Główna ścieżka zakupu: Menu główne -> Sklep -> Odblokuj pakiet. Pakiety monet są również w Sklepie.",
       "inAppPurchases": {
         "pro_lab_pack_lifetime": {
@@ -743,7 +743,7 @@
       "subtitle": "Kemiskt sammanslagningspussel",
       "promotionalText": "Slå ihop atomer, lås upp grundämnen och jaga guld i det snabba kemiska pusselspelet Atomic Fusion Rush.",
       "description": "Atomic Fusion Rush är ett vetenskapsinspirerat sammanslagningspussel där du slår ihop atomer i 2048-stil, upptäcker föreningar och utforskar det periodiska systemet.\\n\\nSÅ FUNGERAR DET\\n• Slå ihop matchande atomer för att skapa högre grundämnen\\n• Klara kampanjbanor med unika mål\\n• Upptäck föreningar och sammansatta molekyler, utöka samlingen och få bonuspoäng\\n• Använd hjälpmedel när brädet blir svårt; de låses upp under spelets gång och kan uppgraderas\\n• Tjäna mynt genom spel och valfria belönade annonser\\n\\nSPEL­LÄGEN\\n• Kampanj med 100 banor\\n• Specialbanor för att låsa upp hjälpmedel, bossar och föreningsbildning\\n• Dagliga uppdrag och svitbelöningar med topplistor som återställs varje dag\\n• Följ samlingen av grundämnen och föreningar\\n• Profilmilstolpar och prestationsmål\\n\\nVALFRIA KÖP\\n• Myntpaket för snabbare framsteg\\n• En engångs Pro-uppgradering som tar bort tvingade mellansidesannonser och ger dagliga bonusmynt\\n• Köp hanteras via Apples system för köp i appar\\n\\nAtomic Fusion Rush är byggt för korta sessioner och långsiktiga framsteg. Kombinera strategi, planering och tillfredsställande kedjereaktioner. Slutför det periodiska systemet och hitta alla hemliga molekyler.",
-      "keywords": "pussel,kemi,grundämnen,atomer,slå ihop,vetenskap,logik,föreningar,alkemi,labb",
+      "keywords": "pussel,kemi,grundämnen,atomer,slå ihop,vetenskap,logik,föreningar,alkemi,labb,strategi,molekyler",
       "reviewNotes": "Huvudväg för köp: Huvudmeny -> Butik -> Lås upp paket. Myntpaket visas också i Butik.",
       "inAppPurchases": {
         "pro_lab_pack_lifetime": {
@@ -775,7 +775,7 @@
       "subtitle": "เกมปริศนาผสานธาตุ",
       "promotionalText": "ผสานอะตอม ปลดล็อกธาตุ และไล่ล่าทองคำในเกมปริศนาเคมีที่รวดเร็วของ Atomic Fusion Rush",
       "description": "Atomic Fusion Rush คือเกมปริศนาผสานที่ได้แรงบันดาลใจจากวิทยาศาสตร์ คุณจะผสานอะตอมแบบ 2048 ค้นพบสารประกอบ และสำรวจตารางธาตุไปพร้อมกับการเล่น\\n\\nวิธีเล่น\\n• ผสานอะตอมที่เหมือนกันเพื่อสร้างธาตุระดับสูงขึ้น\\n• ผ่านด่านแคมเปญที่มีเป้าหมายเฉพาะตัว\\n• ค้นพบสารประกอบและโมเลกุลที่ประกอบขึ้น ขยายคลังสะสม และรับคะแนนโบนัส\\n• ใช้พาวเวอร์อัปเมื่อกระดานยากขึ้น โดยจะปลดล็อกและอัปเกรดได้ตามความก้าวหน้า\\n• รับเหรียญจากการเล่นและโฆษณาที่มีรางวัลซึ่งเลือกดูได้\\n\\nโหมดเกม\\n• ความก้าวหน้าในแคมเปญ 100 ด่าน\\n• ด่านพิเศษสำหรับปลดล็อกพาวเวอร์อัป บอส และการสร้างสารประกอบ\\n• ภารกิจประจำวันและรางวัลต่อเนื่อง พร้อมกระดานผู้นำที่รีเซ็ตทุกวัน\\n• ติดตามคลังสะสมธาตุและสารประกอบ\\n• เป้าหมายความสำเร็จและหมุดหมายในโปรไฟล์\\n\\nการซื้อเพิ่มเติม\\n• แพ็กเหรียญเพื่อความก้าวหน้าที่เร็วขึ้น\\n• อัปเกรด Pro แบบซื้อครั้งเดียว เพื่อลบโฆษณาคั่นที่บังคับและรับเหรียญโบนัสรายวัน\\n• การซื้อจัดการผ่านระบบการซื้อภายในแอปของ Apple\\n\\nAtomic Fusion Rush สร้างมาเพื่อการเล่นช่วงสั้น ๆ และความก้าวหน้าในระยะยาว ผสานกลยุทธ์ การวางแผน และปฏิกิริยาลูกโซ่ที่น่าพอใจ ทำตารางธาตุให้ครบและค้นหาโมเลกุลลับทั้งหมดให้พบ",
-      "keywords": "ปริศนา,เคมี,ธาตุ,อะตอม,ผสาน,แล็บ",
+      "keywords": "ปริศนา,เคมี,ธาตุ,อะตอม,ผสาน,แล็บ,วิทยาศาสตร์,กลยุทธ์,ตรรกะ,สารประกอบ,ตารางธาตุ,โมเลกุล,เกมเคมี",
       "reviewNotes": "เส้นทางการซื้อหลัก: เมนูหลัก -> ร้านค้า -> ปลดล็อกแพ็ก เหรียญยังแสดงอยู่ในร้านค้า",
       "inAppPurchases": {
         "pro_lab_pack_lifetime": {
@@ -807,7 +807,7 @@
       "subtitle": "Хімічна головоломка зі злиттям",
       "promotionalText": "Об’єднуйте атоми, відкривайте елементи та шукайте золото у швидкій хімічній головоломці Atomic Fusion Rush.",
       "description": "Atomic Fusion Rush — науково натхненна головоломка зі злиттям, у якій ви об’єднуєте атоми у стилі 2048, відкриваєте сполуки та досліджуєте періодичну таблицю.\\n\\nЯК ЦЕ ПРАЦЮЄ\\n• Об’єднуйте однакові атоми, щоб створювати елементи вищого рівня\\n• Проходьте рівні кампанії з унікальними цілями\\n• Відкривайте сполуки й складені молекули, розширюйте колекцію та отримуйте бонусні очки\\n• Використовуйте підсилювачі у складних ситуаціях на полі; вони відкриваються під час проходження та покращуються\\n• Заробляйте монети за гру й за бажанням переглядайте рекламу з нагородою\\n\\nРЕЖИМИ ГРИ\\n• Кампанія зі 100 рівнями\\n• Спеціальні рівні для відкриття підсилювачів, босів і створення сполук\\n• Щоденні завдання та нагороди за серії, таблиці лідерів скидаються щодня\\n• Колекція елементів і сполук\\n• Віхи профілю та цілі досягнень\\n\\nДОДАТКОВІ ПОКУПКИ\\n• Пакети монет для швидшого прогресу\\n• Одноразове покращення Pro прибирає примусову міжсторінкову рекламу та додає щоденні бонусні монети\\n• Покупки обробляються системою внутрішніх покупок Apple\\n\\nAtomic Fusion Rush створена для коротких сесій і довготривалого прогресу. Вона поєднує стратегію, планування та приємні ланцюгові реакції. Завершіть періодичну таблицю й знайдіть усі секретні молекули.",
-      "keywords": "пазл,хімія,елементи,атоми,злиття,наука,логіка,сполуки",
+      "keywords": "пазл,хімія,елементи,атоми,злиття,наука,логіка,сполуки,таблиця,алхімія,лабораторія,молекули,формули",
       "reviewNotes": "Основний шлях покупки: Головне меню -> Магазин -> Розблокувати пакет. Пакети монет також показані в Магазині.",
       "inAppPurchases": {
         "pro_lab_pack_lifetime": {
@@ -839,7 +839,7 @@
       "subtitle": "Kemisk fusionspuslespil",
       "promotionalText": "Flet atomer, lås grundstoffer op, og opdag forbindelser i det hurtige kemipuslespil Atomic Fusion Rush.",
       "description": "Atomic Fusion Rush er et videnskabsinspireret fusionspuslespil, hvor du fusionerer atomer i 2048-stil, opdager forbindelser undervejs og udforsker det periodiske system.\\n\\nSÅDAN FUNGERER DET\\n• Flet matchende atomer for at skabe grundstoffer på højere niveauer\\n• Gennemfør kampagneniveauer med unikke mål\\n• Opdag forbindelser og sammensatte molekyler, udvid din samling, og få bonuspoint\\n• Brug power-ups til at komme videre fra svære brættilstande; power-ups låses op undervejs og kan opgraderes\\n• Tjen mønter gennem spil og valgfrie belønnede annoncer\\n\\nSPILTILSTANDE\\n• Kampagne med 100 niveauer\\n• Særlige niveauer, der låser op for power-ups, bosser og forbindelsesdannelse\\n• Daglige opgaver og streak-belønninger med ranglister, der nulstilles hver dag\\n• Følg din samling af grundstoffer og forbindelser\\n• Milepæle på profilen og præstationsmål\\n\\nVALGFRIE KØB\\n• Møntpakker til hurtigere fremgang\\n• Engangsopgradering til Pro, der fjerner tvungne mellemliggende annoncer og giver daglige bonusmønter\\n• Køb håndteres via Apples system til køb i apps\\n\\nAtomic Fusion Rush er skabt til korte spilsessioner og langsigtet fremgang. Spillet kombinerer strategi, planlægning og tilfredsstillende kædereaktioner. Fuldfør det periodiske system, og find alle de hemmelige molekyler.",
-      "keywords": "puslespil,kemi,grundstoffer,atomer,sammenføjning,videnskab,logik,forbindelser,alkymi,lab",
+      "keywords": "puslespil,kemi,grundstoffer,atomer,sammenføjning,videnskab,logik,forbindelser,alkymi,lab,strategi",
       "reviewNotes": "Primær købssti: Hovedmenu -> Butik -> Lås pakke op. Møntpakker vises også i Butik.",
       "inAppPurchases": {
         "pro_lab_pack_lifetime": {
@@ -864,14 +864,14 @@
         }
       }
     },
-    "ta": {
+    "ta-IN": {
       "languageCode": "ta",
       "displayName": "தமிழ்",
       "appName": "Atomic Fusion Rush",
       "subtitle": "வேதியியல் இணைப்பு புதிர்",
       "promotionalText": "அணுக்களை இணைத்து, தனிமங்களைத் திறந்து, Atomic Fusion Rush வேதியியல் புதிரில் சேர்மங்களைக் கண்டறியுங்கள்.",
       "description": "Atomic Fusion Rush என்பது அறிவியலால் ஈர்க்கப்பட்ட இணைப்பு புதிர் விளையாட்டு. 2048 பாணியில் அணுக்களை இணைத்து, வழியிலேயே சேர்மங்களைக் கண்டறிந்து, தனிம அட்டவணையை ஆராயுங்கள்.\\n\\nஇது எப்படி செயல்படுகிறது\\n• ஒரே மாதிரியான அணுக்களை இணைத்து உயர்ந்த தனிமங்களை உருவாக்குங்கள்\\n• தனித்துவமான இலக்குகளுடன் கூடிய பிரச்சார நிலைகளை முடிக்குங்கள்\\n• சேர்மங்கள் மற்றும் கூட்டு மூலக்கூறுகளைக் கண்டறிந்து, உங்கள் சேகரிப்பை விரிவுபடுத்தி, கூடுதல் புள்ளிகளைப் பெறுங்கள்\\n• கடினமான பலகை நிலைகளிலிருந்து மீள பவர்-அப்களைப் பயன்படுத்துங்கள்; முன்னேற்றத்துடன் அவை திறக்கப்பட்டு மேம்படுத்தப்படலாம்\\n• விளையாட்டின் மூலமும் விருப்பமான வெகுமதி விளம்பரங்களின் மூலமும் நாணயங்களைப் பெறுங்கள்\\n\\nவிளையாட்டு முறைகள்\\n• 100 நிலைகளைக் கொண்ட பிரச்சார முன்னேற்றம்\\n• பவர்-அப்கள், முதலாளிகள் மற்றும் சேர்ம உருவாக்கத்தைத் திறக்கும் சிறப்பு நிலைகள்\\n• தினசரி பணிகள் மற்றும் தொடர்ச்சியான வெகுமதிகள்; தரவரிசைப் பட்டியல்கள் தினமும் மீட்டமைக்கப்படும்\\n• தனிமங்கள் மற்றும் சேர்மங்களின் சேகரிப்பு கண்காணிப்பு\\n• சுயவிவர மைல்கற்கள் மற்றும் சாதனை இலக்குகள்\\n\\nவிருப்பமான வாங்குதல்கள்\\n• வேகமான முன்னேற்றத்திற்கான நாணயப் பொதிகள்\\n• கட்டாய இடைநிலை விளம்பரங்களை அகற்றி, தினசரி போனஸ் நாணயங்களை வழங்கும் ஒருமுறை Pro மேம்படுத்தல்\\n• வாங்குதல்கள் Apple இன் பயன்பாட்டுக்குள் வாங்கும் அமைப்பால் நிர்வகிக்கப்படுகின்றன\\n\\nAtomic Fusion Rush குறுகிய விளையாட்டு அமர்வுகளுக்கும் நீண்டகால முன்னேற்றத்திற்கும் உருவாக்கப்பட்டது. உத்தி, திட்டமிடல் மற்றும் திருப்திகரமான தொடர் இணைப்புகளை இது ஒருங்கிணைக்கிறது. தனிம அட்டவணையை நிறைவு செய்து, அனைத்து ரகசிய மூலக்கூறுகளையும் கண்டறியுங்கள்.",
-      "keywords": "புதிர்,வேதியியல்,தனிமம்,அணு,சேர்மம்",
+      "keywords": "புதிர்,வேதியியல்,தனிமம்,அணு,சேர்மம்,அறிவியல்,உத்தி,தர்க்கம்,ஆய்வகம்,மூலக்கூறுகள்,தினசரி சவால்",
       "reviewNotes": "முக்கிய வாங்கும் பாதை: முதன்மை மெனு -> கடை -> தொகுப்பைத் திறக்கவும். நாணயத் தொகுப்புகளும் கடையில் காணப்படும்.",
       "inAppPurchases": {
         "pro_lab_pack_lifetime": {

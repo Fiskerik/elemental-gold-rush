@@ -2,7 +2,7 @@
 
 Compared with <previous version>
 
-## Arabic (العربية) — ar
+## Arabic (العربية) — ar-SA
 
 Promotional Text:
 <maximum 170 characters>

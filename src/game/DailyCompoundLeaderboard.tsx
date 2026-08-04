@@ -18,6 +18,7 @@ import {
   getDailyLeaderboardRewardKey,
 } from "./dailyLeaderboardRewards";
 import { getTodayQuestDate } from "./quests";
+import { t } from "./localization";
 
 export function Leaderboard({ onBack }: { onBack: () => void }) {
   const isTabletLayout = useIsTabletLayout();
@@ -31,8 +32,10 @@ export function Leaderboard({ onBack }: { onBack: () => void }) {
     (s) => s.recordDailyBoardLeaderboardPlacement,
   );
   const dailyLeaderboardRewardClaims = useProgress((s) => s.dailyLeaderboardRewardClaims);
+  const appLanguage = useProgress((s) => s.appLanguage);
+  const tr = (text: string) => t(text, appLanguage);
   const playerRank = board.player.rank > 0 ? `#${board.player.rank}` : "-";
-  const leaderboardLabel = kind === "daily-board" ? "Daily Board" : "Daily Compound";
+  const leaderboardLabel = tr(kind === "daily-board" ? "Daily Board" : "Daily Compound");
 
   useEffect(() => {
     let cancelled = false;
@@ -70,16 +73,16 @@ export function Leaderboard({ onBack }: { onBack: () => void }) {
   async function handleOpenGameCenter() {
     if (gameCenterBusy) return;
     if (!isGameCenterAvailable()) {
-      setGameCenterMessage("Game Center is available on iOS devices.");
+      setGameCenterMessage(tr("Game Center is available on iOS devices."));
       return;
     }
     setGameCenterBusy(true);
     setGameCenterMessage(null);
     try {
       const shown = await showGameCenterLeaderboards(kind, scope);
-      if (!shown) setGameCenterMessage("Game Center did not open.");
+      if (!shown) setGameCenterMessage(tr("Game Center did not open."));
     } catch (error) {
-      setGameCenterMessage(error instanceof Error ? error.message : "Could not open Game Center.");
+      setGameCenterMessage(error instanceof Error ? tr(error.message) : tr("Could not open Game Center."));
     } finally {
       setGameCenterBusy(false);
     }
@@ -93,22 +96,22 @@ export function Leaderboard({ onBack }: { onBack: () => void }) {
       <div style={{ position: "relative", zIndex: 1, maxWidth: 620, margin: "0 auto" }}>
         <header style={headerRow}>
           <button type="button" onClick={onBack} style={backButton}>
-            Back
+            {tr("Back")}
           </button>
           <div style={{ minWidth: 0 }}>
             <div style={kicker}>{leaderboardLabel.toUpperCase()}</div>
-            <h1 style={title}>Leaderboard</h1>
+            <h1 style={title}>{tr("Leaderboard")}</h1>
           </div>
           <PodiumMark />
         </header>
 
         <section style={summaryPanel}>
           <div>
-            <div style={summaryLabel}>Your Rank</div>
+            <div style={summaryLabel}>{tr("Your Rank")}</div>
             <strong style={summaryValue}>{playerRank}</strong>
           </div>
           <div style={{ textAlign: "center" }}>
-            <div style={summaryLabel}>{kind === "daily-compound" ? "Time" : "Score"}</div>
+            <div style={summaryLabel}>{tr(kind === "daily-compound" ? "Time" : "Score")}</div>
             <strong style={summaryValue}>
               {kind === "daily-compound"
                 ? formatSeconds(board.player.score)
@@ -116,42 +119,42 @@ export function Leaderboard({ onBack }: { onBack: () => void }) {
             </strong>
           </div>
           <div style={{ textAlign: "right" }}>
-            <div style={summaryLabel}>Country</div>
+            <div style={summaryLabel}>{tr("Country")}</div>
             <strong style={summaryValue}>
               {countryFlag(board.countryCode)} {board.countryCode}
             </strong>
           </div>
         </section>
 
-        <div style={kindTabRow} role="tablist" aria-label="Leaderboard type">
+        <div style={kindTabRow} role="tablist" aria-label={tr("Leaderboard type")}>
           <SegmentButton active={kind === "daily-board"} onClick={() => setKind("daily-board")}>
-            Daily Board
+            {tr("Daily Board")}
           </SegmentButton>
           <SegmentButton
             active={kind === "daily-compound"}
             onClick={() => setKind("daily-compound")}
           >
-            Daily Compound
+            {tr("Daily Compound")}
           </SegmentButton>
         </div>
 
-        <section style={prizePanel} aria-label="Daily leaderboard prizes">
+        <section style={prizePanel} aria-label={tr("Daily leaderboard prizes")}>
           <div>
             <div style={summaryLabel}>Today’s top-three prizes</div>
             <div style={prizeLine}>
-              <PrizeReward place="1st" amount={DAILY_LEADERBOARD_REWARDS[1]} />
-              <PrizeReward place="2nd" amount={DAILY_LEADERBOARD_REWARDS[2]} />
-              <PrizeReward place="3rd" amount={DAILY_LEADERBOARD_REWARDS[3]} />
+              <PrizeReward place={tr("1st")} amount={DAILY_LEADERBOARD_REWARDS[1]} />
+              <PrizeReward place={tr("2nd")} amount={DAILY_LEADERBOARD_REWARDS[2]} />
+              <PrizeReward place={tr("3rd")} amount={DAILY_LEADERBOARD_REWARDS[3]} />
             </div>
           </div>
           <div style={prizeStatus}>
             {currentPrize > 0 ? (
               <>
-                You are currently entitled to <CoinReward amount={currentPrize} />
-                {awardedPrize >= currentPrize ? " (awarded)" : ""}.
+                {tr("You are currently entitled to")} <CoinReward amount={currentPrize} />
+                {awardedPrize >= currentPrize ? ` (${tr("awarded")})` : ""}.
               </>
             ) : (
-              "Finish a run to enter today’s leaderboard."
+              tr("Finish a run to enter today’s leaderboard.")
             )}
           </div>
         </section>
@@ -167,7 +170,7 @@ export function Leaderboard({ onBack }: { onBack: () => void }) {
               cursor: gameCenterBusy ? "not-allowed" : "pointer",
             }}
           >
-            {gameCenterBusy ? "Opening Game Center..." : "Open Game Center"}
+            {gameCenterBusy ? tr("Opening Game Center...") : tr("Open Game Center")}
           </button>
         )}
 
@@ -175,20 +178,20 @@ export function Leaderboard({ onBack }: { onBack: () => void }) {
           <div style={statusLine} role="status" aria-live="polite">
             {loading
               ? isGameCenterAvailable()
-                ? "Loading Game Center..."
-                : "Loading scores..."
+                ? tr("Loading Game Center...")
+                : tr("Loading scores...")
               : (gameCenterMessage ?? board.status)}
           </div>
         )}
 
-        <section style={tablePanel} aria-label={`${leaderboardLabel} ${scope} leaderboard`}>
+        <section style={tablePanel} aria-label={`${leaderboardLabel} ${tr(scope)} ${tr("leaderboard")}`}>
           <div style={{ ...tableHeader, gridTemplateColumns: leaderboardGridColumns(kind) }}>
-            <span>Rank</span>
-            <span>Player</span>
+            <span>{tr("Rank")}</span>
+            <span>{tr("Player")}</span>
             <span style={{ textAlign: "right" }}>
-              {kind === "daily-compound" ? "Time" : "Score"}
+              {tr(kind === "daily-compound" ? "Time" : "Score")}
             </span>
-            {kind === "daily-board" && <span style={{ textAlign: "right" }}>Shots</span>}
+            {kind === "daily-board" && <span style={{ textAlign: "right" }}>{tr("Shots")}</span>}
           </div>
           <div style={{ display: "grid", gap: 7 }}>
             {board.entries.length > 0 ? (
@@ -197,7 +200,7 @@ export function Leaderboard({ onBack }: { onBack: () => void }) {
               ))
             ) : (
               <div style={emptyRows}>
-                {isGameCenterAvailable() ? "No Game Center scores yet." : "No scores yet."}
+                {isGameCenterAvailable() ? tr("No Game Center scores yet.") : tr("No scores yet.")}
               </div>
             )}
           </div>

@@ -213,7 +213,7 @@ export function Profile({ onBack, onOpenShop }: Props) {
   async function handleRestorePurchases() {
     if (restoreBusy) return;
     setRestoreBusy(true);
-    setRestoreMessage("Checking App Store purchases...");
+    setRestoreMessage(tr("Checking App Store purchases..."));
     try {
       const restored = await restorePurchases();
       if (restored.includes(PRODUCT_IDS.proLabPack)) grantProPack({ fromRestore: true });
@@ -223,11 +223,11 @@ export function Profile({ onBack, onOpenShop }: Props) {
       if (COSMETIC_THEME_PURCHASES_ENABLED) restoredThemes.forEach(grantThemeProduct);
       setRestoreMessage(
         restored.length
-          ? `${restored.length} purchase${restored.length === 1 ? "" : "s"} restored.`
-          : "No purchases were found.",
+          ? `${restored.length} ${tr(restored.length === 1 ? "purchase restored." : "purchases restored.")}`
+          : tr("No purchases were found."),
       );
     } catch (error) {
-      setRestoreMessage(error instanceof Error ? error.message : "Purchases could not be restored.");
+      setRestoreMessage(error instanceof Error ? tr(error.message) : tr("Purchases could not be restored."));
     } finally {
       setRestoreBusy(false);
     }
@@ -251,7 +251,7 @@ export function Profile({ onBack, onOpenShop }: Props) {
         }}
       >
         <button onClick={onBack} style={backBtn}>
-          ← Menu
+          ← {tr("Menu")}
         </button>
 
         <header style={heroCard}>
@@ -265,7 +265,7 @@ export function Profile({ onBack, onOpenShop }: Props) {
             <div
               style={{ fontSize: 12, letterSpacing: 3, color: "var(--accent)", fontWeight: 900 }}
             >
-              PLAYER PROFILE
+              {tr("PLAYER PROFILE")}
             </div>
             {gameCenterName && (
               <h1
@@ -288,7 +288,7 @@ export function Profile({ onBack, onOpenShop }: Props) {
             <p style={{ margin: 0, color: "var(--muted-foreground)", fontSize: 13 }}>
               {`${tr(hasProPack ? "Pro Lab active" : "Free Lab")} • ${tr("Level")} ${unlockedLevel} / ${MAX_LEVEL}`}
             </p>
-            {hasProPack && <div style={proBadge}>PRO LAB PACK ACTIVE</div>}
+            {hasProPack && <div style={proBadge}>{tr("PRO LAB PACK ACTIVE")}</div>}
           </div>
           <div style={heroIconStack} aria-hidden="true">
             <Crown size={20} />
@@ -575,9 +575,9 @@ export function Profile({ onBack, onOpenShop }: Props) {
           {isNativeIos && (
             <div style={restorePurchasesRow}>
               <div>
-                <strong>Purchases</strong>
+                <strong>{tr("Purchases")}</strong>
                 <div style={{ color: "var(--muted-foreground)", fontSize: 11 }}>
-                  Restore your App Store purchases on this device.
+                  {tr("Restore your App Store purchases on this device.")}
                 </div>
               </div>
               <button
@@ -586,7 +586,7 @@ export function Profile({ onBack, onOpenShop }: Props) {
                 disabled={restoreBusy}
                 style={{ ...themeChoiceButton, opacity: restoreBusy ? 0.6 : 1 }}
               >
-                {restoreBusy ? "Checking..." : "Restore Purchases"}
+                {restoreBusy ? tr("Checking...") : tr("Restore Purchases")}
               </button>
               {restoreMessage && <div style={restoreMessageStyle}>{restoreMessage}</div>}
             </div>
@@ -639,10 +639,11 @@ export function Profile({ onBack, onOpenShop }: Props) {
         </section>
 
         {transactionsOpen && (
-          <CoinTransactionsModal
-            transactions={coinTransactions}
-            formatDateTime={formatDateTime}
-            onClose={() => setTransactionsOpen(false)}
+            <CoinTransactionsModal
+              transactions={coinTransactions}
+              formatDateTime={formatDateTime}
+              language={appLanguage}
+              onClose={() => setTransactionsOpen(false)}
           />
         )}
       </div>
@@ -759,6 +760,8 @@ function CoinProfileStat({
   sub: string;
   onTransactions: () => void;
 }) {
+  const appLanguage = useProgress((state) => state.appLanguage);
+  const tr = (text: string) => t(text, appLanguage);
   const tone = "oklch(0.86 0.18 88)";
   return (
     <div style={statCard}>
@@ -781,7 +784,7 @@ function CoinProfileStat({
           fontWeight: 800,
         }}
       >
-        GOLD COINS
+        {tr("GOLD COINS")}
       </div>
       <div
         style={{
@@ -797,7 +800,7 @@ function CoinProfileStat({
       </div>
       <div style={{ fontSize: 11, color: "var(--muted-foreground)" }}>{sub}</div>
       <button type="button" onClick={onTransactions} style={transactionButton}>
-        Transactions
+        {tr("Transactions")}
       </button>
     </div>
   );
@@ -806,33 +809,36 @@ function CoinProfileStat({
 function CoinTransactionsModal({
   transactions,
   formatDateTime,
+  language,
   onClose,
 }: {
   transactions: CoinTransaction[];
   formatDateTime: (value: string) => string;
+  language: AppLanguage;
   onClose: () => void;
 }) {
+  const tr = (text: string) => t(text, language);
   const rows = [...transactions].reverse();
   return (
     <div
       style={transactionOverlay}
       role="dialog"
       aria-modal="true"
-      aria-label="Gold coin transactions"
+      aria-label={tr("Gold coin transactions")}
     >
       <div style={transactionModal}>
         <div style={transactionHeader}>
           <div>
-            <div style={sectionHeading}>GOLD COINS</div>
-            <h2 style={{ margin: 0, fontSize: 22 }}>Transactions</h2>
+            <div style={sectionHeading}>{tr("GOLD COINS")}</div>
+            <h2 style={{ margin: 0, fontSize: 22 }}>{tr("Transactions")}</h2>
           </div>
           <button type="button" onClick={onClose} style={transactionCloseButton}>
-            Close
+            {tr("Close")}
           </button>
         </div>
         <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
           {rows.length === 0 ? (
-            <div style={emptyTransactions}>No coin transactions recorded yet.</div>
+            <div style={emptyTransactions}>{tr("No coin transactions recorded yet.")}</div>
           ) : (
             rows.map((transaction) => (
               <div key={transaction.id} style={transactionRow}>

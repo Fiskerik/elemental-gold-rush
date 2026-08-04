@@ -2,7 +2,7 @@
   "bundleId": "com.eaconsulting.atomicfusion",
   "platform": "IOS",
   "releaseNotesLocaleOrder": [
-    "ar",
+    "ar-SA",
     "zh-Hans",
     "zh-Hant",
     "cs",
@@ -24,7 +24,7 @@
     "ru",
     "es-ES",
     "sv",
-    "ta",
+    "ta-IN",
     "th",
     "tr",
     "uk",

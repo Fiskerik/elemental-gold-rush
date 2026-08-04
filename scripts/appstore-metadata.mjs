@@ -7,6 +7,8 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const API_ROOT = "https://api.appstoreconnect.apple.com/v1";
 const PROMOTIONAL_TEXT_LIMIT = 170;
 const WHATS_NEW_LIMIT = 4000;
+const DESCRIPTION_LIMIT = 4000;
+const KEYWORDS_LIMIT = 100;
 
 const CONFIG_PATH = path.join(ROOT, "localization", "app-store", "appstore.config.json");
 const config = JSON.parse(readFileSync(CONFIG_PATH, "utf8"));
@@ -142,6 +144,9 @@ function validateNotes(notes, metadata) {
   }
 
   for (const [locale, entry] of notes.locales) {
+    const localeMetadata = metadataForLocale(metadata, locale);
+    const description = normalizeMetadataText(localeMetadata?.description);
+    const keywords = normalizeMetadataText(localeMetadata?.keywords);
     const promotionalLength = characterCount(entry.promotionalText);
     const whatsNewLength = characterCount(entry.whatsNew);
     if (!entry.promotionalText || entry.promotionalText.startsWith("<")) {
@@ -156,6 +161,16 @@ function validateNotes(notes, metadata) {
     if (whatsNewLength > WHATS_NEW_LIMIT) {
       errors.push(`${locale}: What's New is ${whatsNewLength}/${WHATS_NEW_LIMIT} characters.`);
     }
+    if (!description || description.startsWith("<")) {
+      errors.push(`${locale}: Description is empty or still a placeholder.`);
+    } else if (characterCount(description) > DESCRIPTION_LIMIT) {
+      errors.push(`${locale}: Description is ${characterCount(description)}/${DESCRIPTION_LIMIT} characters.`);
+    }
+    if (!keywords || keywords.startsWith("<")) {
+      errors.push(`${locale}: Keywords are empty or still a placeholder.`);
+    } else if (characterCount(keywords) > KEYWORDS_LIMIT) {
+      errors.push(`${locale}: Keywords are ${characterCount(keywords)}/${KEYWORDS_LIMIT} characters.`);
+    }
   }
 
   return { ok: errors.length === 0, errors };
@@ -165,10 +180,21 @@ function printValidation(notes, filePath) {
   console.log(`Valid release notes: ${path.relative(ROOT, filePath)}`);
   console.log(`Locales: ${notes.locales.size}`);
   for (const entry of notes.locales.values()) {
+    const metadata = metadataForLocale(sourceMetadata, entry.locale);
+    const description = normalizeMetadataText(metadata?.description);
+    const keywords = normalizeMetadataText(metadata?.keywords);
     console.log(
-      `  ${entry.locale}: Promotional Text ${characterCount(entry.promotionalText)}/${PROMOTIONAL_TEXT_LIMIT}, What's New ${characterCount(entry.whatsNew)}/${WHATS_NEW_LIMIT}`,
+      `  ${entry.locale}: Description ${characterCount(description)}/${DESCRIPTION_LIMIT}, Keywords ${characterCount(keywords)}/${KEYWORDS_LIMIT}, Promotional Text ${characterCount(entry.promotionalText)}/${PROMOTIONAL_TEXT_LIMIT}, What's New ${characterCount(entry.whatsNew)}/${WHATS_NEW_LIMIT}`,
     );
   }
+}
+
+function metadataForLocale(metadata, locale) {
+  return metadata.locales?.[locale] ?? null;
+}
+
+function normalizeMetadataText(value) {
+  return String(value ?? "").replace(/\\n/g, "\n").replace(/\r\n?/g, "\n");
 }
 
 async function uploadMetadata(notes, version) {
@@ -184,7 +210,7 @@ async function uploadMetadata(notes, version) {
     versionLocalizations.data.map((item) => [item.attributes.locale, item]),
   );
 
-  const appInfo = await resolveAppInfo(token, appId);
+  const appInfo = await resolveAppInfo(token, appId, versionResource);
   const appInfoLocalizations = await apiRequest(
     token,
     `/appInfos/${appInfo.id}/appInfoLocalizations?limit=200`,
@@ -223,6 +249,7 @@ async function uploadMetadata(notes, version) {
 
     const existing = existingVersionLocalizations.get(locale);
     if (!existing) {
+      const appLocale = sourceMetadata.locales[locale];
       await apiRequest(token, "/appStoreVersionLocalizations", {
         method: "POST",
         body: {
@@ -230,6 +257,8 @@ async function uploadMetadata(notes, version) {
             type: "appStoreVersionLocalizations",
             attributes: {
               locale,
+              description: normalizeMetadataText(appLocale.description),
+              keywords: normalizeMetadataText(appLocale.keywords),
               promotionalText: entry.promotionalText,
               whatsNew: entry.whatsNew,
             },
@@ -244,6 +273,15 @@ async function uploadMetadata(notes, version) {
     }
 
     const attributes = {};
+    const appLocale = sourceMetadata.locales[locale];
+    const description = normalizeMetadataText(appLocale.description);
+    const keywords = normalizeMetadataText(appLocale.keywords);
+    if (existing.attributes.description !== description) {
+      attributes.description = description;
+    }
+    if (existing.attributes.keywords !== keywords) {
+      attributes.keywords = keywords;
+    }
     if (existing.attributes.promotionalText !== entry.promotionalText) {
       attributes.promotionalText = entry.promotionalText;
     }
@@ -323,11 +361,36 @@ async function resolveVersion(token, appId, version) {
   return matches[0];
 }
 
-async function resolveAppInfo(token, appId) {
+async function resolveAppInfo(token, appId, versionResource) {
+  if (process.env.ASC_APP_INFO_ID) {
+    return { id: process.env.ASC_APP_INFO_ID };
+  }
+
   const response = await apiRequest(token, `/apps/${appId}/appInfos?limit=200`);
   const matches = response.data.filter((item) => item.attributes?.appStoreState);
-  if (matches.length !== 1) fail(`Expected exactly one active App Info record; found ${matches.length}.`);
-  return matches[0];
+  if (matches.length === 1) return matches[0];
+
+  // Apple keeps one App Info record for the live version and another for the
+  // version currently being prepared. For a new release, prefer the non-live
+  // record; for a live-version update, prefer the Ready for Sale record.
+  const versionState = versionResource.attributes?.appStoreState;
+  const preferred =
+    versionState === "READY_FOR_SALE"
+      ? matches.filter((item) => item.attributes.appStoreState === "READY_FOR_SALE")
+      : matches.filter((item) => item.attributes.appStoreState !== "READY_FOR_SALE");
+  if (preferred.length === 1) return preferred[0];
+
+  const exactState = matches.filter(
+    (item) => item.attributes.appStoreState === versionState,
+  );
+  if (exactState.length === 1) return exactState[0];
+
+  const states = matches
+    .map((item) => `${item.id}:${item.attributes.appStoreState}`)
+    .join(", ");
+  fail(
+    `Could not uniquely select the App Info record for iOS ${versionResource.attributes?.versionString ?? "the requested version"}. Found ${matches.length}: ${states}. Set ASC_APP_INFO_ID to override.`,
+  );
 }
 
 async function apiRequest(token, endpoint, { method = "GET", body } = {}) {

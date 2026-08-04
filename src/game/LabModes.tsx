@@ -117,7 +117,7 @@ export function LabModes({ onBack, onStart }: Props) {
     <div className="app-shell" style={{ padding: isTabletLayout ? 28 : 20, paddingTop: isTabletLayout ? 36 : 32, minHeight: "100dvh" }}>
       <div style={{ position: "relative", zIndex: 1, maxWidth: isTabletLayout ? 920 : 560, margin: "0 auto" }}>
         <button onClick={onBack} style={backBtn}>
-          ← Menu
+          ← {tr("Menu")}
         </button>
         <header style={{ textAlign: "center", margin: "18px 0 20px" }}>
           <div style={{ fontSize: 12, letterSpacing: 3, color: "var(--accent)", fontWeight: 800 }}>

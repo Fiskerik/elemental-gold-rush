@@ -218,7 +218,7 @@ export function MainMenu({
   function handleDailyRewardClaim() {
     if (!dailyComplete || claimedDailyReward) return;
     claimDailyReward();
-    showDailyRewardToast(`+${dailyRewardAmount} gold coins claimed`);
+    showDailyRewardToast(`+${dailyRewardAmount} ${tr("gold coins claimed")}`);
   }
 
   function handleSecretCompoundPress() {
@@ -228,20 +228,20 @@ export function MainMenu({
   async function handleRewardedCoin() {
     if (rewardedAdBusy) return;
     setRewardedAdBusy(true);
-    showRewardedAdMessage("Loading ad...", false);
+    showRewardedAdMessage(tr("Loading ad..."), false);
     try {
       const result = await showRewardedForCoin(hasProPack);
       if (result.rewarded) {
         grantGoldCoins(1, "Rewarded ad");
         reportQuestProgress({ adsWatched: 1 });
         showRewardedAdMessage("");
-        showDailyRewardToast("+1 gold coin");
+        showDailyRewardToast(`+1 ${tr("gold coin")}`);
         return;
       }
-      showRewardedAdMessage(result.reason ?? "Loading failed - please try again in a moment");
+      showRewardedAdMessage(result.reason ? tr(result.reason) : tr("Loading failed - please try again in a moment"));
     } catch (error) {
       showRewardedAdMessage(
-        error instanceof Error ? error.message : "Loading failed - please try again in a moment",
+        error instanceof Error ? tr(error.message) : tr("Loading failed - please try again in a moment"),
       );
     } finally {
       setRewardedAdBusy(false);
@@ -266,7 +266,7 @@ export function MainMenu({
     setRatePromptOpen(false);
     const opened = await openAppStoreReview();
     if (!opened) {
-      toast("Could not open the App Store rating page.");
+      toast(tr("Could not open the App Store rating page."));
     }
   }
 
@@ -295,16 +295,16 @@ export function MainMenu({
               onSettings();
             }}
             style={iconButton}
-            aria-label="Open settings"
+            aria-label={tr("Open settings")}
           >
             <SettingsIcon size={18} aria-hidden="true" />
           </button>
           <div style={{ textAlign: "center", minWidth: 0 }}>
             <div className="gold-text" style={brandTitle}>
-              Atomic Fusion Rush
+              {tr("Atomic Fusion Rush")}
             </div>
             <div style={brandSubline}>{`Level ${unlockedLevel} of ${MAX_LEVEL}`}</div>
-            {hasProPack && <div style={proActiveChip}>PRO LAB ACTIVE</div>}
+            {hasProPack && <div style={proActiveChip}>{tr("PRO LAB ACTIVE")}</div>}
           </div>
           <button
             onClick={() => {
@@ -312,7 +312,7 @@ export function MainMenu({
               onProfile();
             }}
             style={profileCoinButton}
-            aria-label="Open profile"
+            aria-label={tr("Open profile")}
           >
             <GoldCoinIcon size={13} />
             <span>{goldCoins}</span>
@@ -323,9 +323,9 @@ export function MainMenu({
         <section style={{ ...playPanel, padding: isTabletLayout ? 22 : playPanel.padding }}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
             <div>
-              <div style={eyebrow}>NEXT RUN</div>
+              <div style={eyebrow}>{tr("NEXT RUN")}</div>
               <div style={{ fontSize: 22, fontWeight: 900, lineHeight: 1.1 }}>
-                Level {unlockedLevel}
+                {tr("Level")} {unlockedLevel}
               </div>
               <div style={{ fontSize: 13, color: "var(--muted-foreground)", marginTop: 4 }}>
                 {nextRunGoal.text}
@@ -336,7 +336,7 @@ export function MainMenu({
                 <button
                   onClick={handleRateApp}
                   style={{ ...chooseLevelBtn, paddingInline: 9, color: "var(--accent)" }}
-                  aria-label="Rate app"
+                  aria-label={tr("Rate app")}
                 >
                   <Star size={18} fill="currentColor" aria-hidden="true" />
                 </button>
@@ -347,7 +347,7 @@ export function MainMenu({
                   onLeaderboard();
                 }}
                 style={{ ...chooseLevelBtn, paddingInline: 9 }}
-                aria-label="Open leaderboard"
+                aria-label={tr("Open leaderboard")}
               >
                 <PodiumMark size={20} />
               </button>
@@ -359,7 +359,7 @@ export function MainMenu({
                 style={chooseLevelBtn}
               >
                 <Layers size={16} aria-hidden="true" />
-                Map
+                {tr("Map")}
               </button>
             </div>
           </div>
@@ -420,7 +420,7 @@ export function MainMenu({
           >
             <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
               <Play size={20} fill="currentColor" aria-hidden="true" />
-              Continue
+              {tr("Continue")}
             </span>
             {nextRunGoal.kind === "compound" ? (
               <MoleculeVisual compound={nextRunGoal.compound} size={54} />
@@ -444,7 +444,7 @@ export function MainMenu({
             >
               <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
                 <Clapperboard size={17} aria-hidden="true" />
-                {rewardedAdBusy ? "Loading ad..." : "Free coins"}
+                {rewardedAdBusy ? tr("Loading ad...") : tr("Free coins")}
               </span>
               <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
                 <GoldCoinIcon size={14} />
@@ -461,9 +461,9 @@ export function MainMenu({
             <div style={{ ...progressFill, width: `${campaignProgress}%` }} />
           </div>
           <div style={compactStatRow}>
-            <span>{`Highest ${highestEl?.symbol ?? "H"} #${highestElement}`}</span>
-            <span>{`${formatScore(totalScore)} score`}</span>
-            <span>{`${campaignProgress}% campaign`}</span>
+            <span>{`${tr("Highest")} ${highestEl?.symbol ?? "H"} #${highestElement}`}</span>
+            <span>{`${formatScore(totalScore)} ${tr("score")}`}</span>
+            <span>{`${campaignProgress}% ${tr("campaign")}`}</span>
           </div>
         </section>
 
@@ -472,12 +472,12 @@ export function MainMenu({
             type="button"
             onClick={() => onShop("themes")}
             style={newThemesBanner}
-            aria-label="Open new themes in the shop"
+            aria-label={tr("Open new themes in the shop")}
           >
             <span style={{ minWidth: 0 }}>
-              <span style={newThemesEyebrow}>NEW IN SHOP</span>
-              <strong style={newThemesTitle}>Fresh themes are available</strong>
-              <span style={newThemesLink}>View themes →</span>
+              <span style={newThemesEyebrow}>{tr("NEW IN SHOP")}</span>
+              <strong style={newThemesTitle}>{tr("Fresh themes are available")}</strong>
+              <span style={newThemesLink}>{tr("View themes")} →</span>
             </span>
             <span style={newThemesThumbnails} aria-hidden="true">
               {NEW_THEME_ITEMS.map((item) => (
@@ -496,7 +496,7 @@ export function MainMenu({
         >
           <NavPill
             icon={Atom}
-            label="Collection"
+            label={tr("Collection")}
             tone="collection"
             onClick={() => {
               trackMenuAction("collection");
@@ -505,7 +505,7 @@ export function MainMenu({
           />
           <NavPill
             icon={FlaskConical}
-            label="Lab"
+            label={tr("Lab")}
             tone="lab"
             onClick={() => {
               trackMenuAction("lab");
@@ -514,7 +514,7 @@ export function MainMenu({
           />
           <NavPill
             icon={Library}
-            label="Library"
+            label={tr("Library")}
             tone="library"
             onClick={() => {
               trackMenuAction("library");
@@ -523,7 +523,7 @@ export function MainMenu({
           />
           <NavPill
             icon={ShoppingBag}
-            label="Shop"
+            label={tr("Shop")}
             tone="shop"
             onClick={() => {
               trackMenuAction("shop");
@@ -535,7 +535,7 @@ export function MainMenu({
         <section style={weeklyBonusCard}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
             <div>
-              <div style={sectionLabel}>PLAY A GAME A DAY</div>
+              <div style={sectionLabel}>{tr("PLAY A GAME A DAY")}</div>
               <div style={{ fontSize: 12, color: "var(--muted-foreground)", marginTop: 2 }}>
                 {`Streak ${weeklyBonus.currentStreak} - ${weeklyBonus.cycleProgress}/7 toward +5`}
               </div>
@@ -543,7 +543,7 @@ export function MainMenu({
             <div style={weeklyBonusPill}>
               {weeklyBonus.todayClaimed
                 ? `Today +${weeklyBonus.coinsEarnedToday}`
-                : "Play today +1"}
+                : tr("Play today +1")}
             </div>
           </div>
           <div
@@ -593,18 +593,18 @@ export function MainMenu({
                 </strong>
                 <small>
                   {day.claimed
-                    ? "Claimed"
+                    ? tr("Claimed")
                     : day.isToday
                       ? weeklyBonus.todayClaimed
-                        ? "Today"
-                        : "Claim"
-                      : "Next"}
+                        ? tr("Today")
+                        : tr("Claim")
+                      : tr("Next")}
                 </small>
               </button>
             ))}
           </div>
           <div style={{ fontSize: 10, color: "var(--muted-foreground)", lineHeight: 1.35 }}>
-            {`1 coin each day you play. ${weeklyBonus.nextRewardText}.`}
+            {`${tr("1 coin each day you play.")} ${tr(weeklyBonus.nextRewardText)}.`}
           </div>
         </section>
 
@@ -624,7 +624,7 @@ export function MainMenu({
             }}
           >
             <div>
-              <div style={sectionLabel}>DAILY LAB</div>
+              <div style={sectionLabel}>{tr("DAILY LAB")}</div>
               <div style={{ fontSize: 12, color: "var(--muted-foreground)" }}>
                 {`Streak ${dailyStreak} - ${completedDailyQuests}/${dailyQuests.length} quests`}
               </div>
@@ -644,7 +644,7 @@ export function MainMenu({
                   letterSpacing: 0.6,
                 }}
               >
-                {`Time until reset: ${resetCountdown}`}
+                {`${tr("Time until reset:")} ${resetCountdown}`}
               </div>
             </div>
             <div style={{ display: "grid", justifyItems: "end", gap: 8 }}>
@@ -664,12 +664,12 @@ export function MainMenu({
                   cursor: dailyComplete && !claimedDailyReward ? "pointer" : "not-allowed",
                 }}
               >
-                {claimedDailyReward ? "Claimed" : "Claim"}
+                {claimedDailyReward ? tr("Claimed") : tr("Claim")}
               </button>
               <div style={weeklyBonusPill}>
                 {weeklyBonus.todayClaimed
                   ? `Today +${weeklyBonus.coinsEarnedToday}`
-                  : "Play today +1"}
+                  : tr("Play today +1")}
               </div>
             </div>
           </div>
@@ -740,19 +740,19 @@ export function MainMenu({
                 <Star size={34} fill="currentColor" aria-hidden="true" />
               </div>
               <h2 id="rate-app-title" style={rateTitle}>
-                Enjoying Atomic Fusion Rush?
+                {tr("Enjoying Atomic Fusion Rush?")}
               </h2>
-              <p style={rateCopy}>A quick App Store rating helps the game grow.</p>
+              <p style={rateCopy}>{tr("A quick App Store rating helps the game grow.")}</p>
               <div style={rateActions}>
                 <button
                   type="button"
                   onClick={() => setRatePromptOpen(false)}
                   style={rateSecondaryBtn}
                 >
-                  Later
+                  {tr("Later")}
                 </button>
                 <button type="button" onClick={handleRateConfirm} style={ratePrimaryBtn}>
-                  Rate App
+                  {tr("Rate App")}
                 </button>
               </div>
             </section>

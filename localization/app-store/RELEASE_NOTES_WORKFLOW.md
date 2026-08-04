@@ -22,7 +22,7 @@ This is the standing workflow for Atomic Fusion Rush releases after 1.1.0.
 
 | Display name | App Store locale |
 | --- | --- |
-| Arabic | `ar` |
+| Arabic | `ar-SA` |
 | Chinese Simplified | `zh-Hans` |
 | Chinese Traditional | `zh-Hant` |
 | Czech | `cs` |
@@ -44,7 +44,7 @@ This is the standing workflow for Atomic Fusion Rush releases after 1.1.0.
 | Russian | `ru` |
 | Spanish | `es-ES` |
 | Swedish | `sv` |
-| Tamil | `ta` |
+| Tamil | `ta-IN` |
 | Thai | `th` |
 | Turkish | `tr` |
 | Ukrainian | `uk` |
@@ -59,7 +59,7 @@ Copy this structure for the next version. Replace every placeholder and remove a
 
 Compared with <previous version>
 
-## Arabic (العربية) — ar
+## Arabic (العربية) — ar-SA
 
 Promotional Text:
 <maximum 170 characters>

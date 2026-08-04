@@ -2,7 +2,7 @@
 
 This package contains App Store Connect metadata for 27 high-reach locales:
 
-`en-US`, `zh-Hans`, `es-ES`, `hi`, `ar`, `pt-BR`, `fr-FR`, `de-DE`, `ja`, `ko`, `ru`, `id`, `tr`, `it`, `vi`, `zh-Hant`, `cs`, `da`, `nl-NL`, `fi`, `ms`, `no`, `pl`, `sv`, `th`, `ta`, and `uk`.
+`en-US`, `zh-Hans`, `es-ES`, `hi`, `ar-SA`, `pt-BR`, `fr-FR`, `de-DE`, `ja`, `ko`, `ru`, `id`, `tr`, `it`, `vi`, `zh-Hant`, `cs`, `da`, `nl-NL`, `fi`, `ms`, `no`, `pl`, `sv`, `th`, `ta-IN`, and `uk`.
 
 Use `packages.json` as the source for each App Store localization:
 
@@ -35,7 +35,7 @@ npm run appstore:upload -- --version 1.1.2 --dry-run
 npm run appstore:upload -- --version 1.1.2
 ```
 
-The uploader updates existing App Store version localizations and creates missing version and app-information localizations from `packages.json`. It uses App Store Connect API credentials supplied through environment variables:
+The uploader updates each locale's Description, Keywords, Promotional Text, and What's New fields, and creates missing version and app-information localizations from `packages.json`. It uses App Store Connect API credentials supplied through environment variables:
 
 ```text
 ASC_ISSUER_ID

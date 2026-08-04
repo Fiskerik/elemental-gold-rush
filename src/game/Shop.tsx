@@ -28,6 +28,7 @@ import {
 } from "./purchases";
 import { initAds, showRewardedForCoin } from "./ads";
 import { useIsTabletLayout } from "./responsive";
+import { t } from "./localization";
 import { clearLogs, copyDebugReport, getDebugReport, getLogs, logDebug } from "../lib/debugLogger";
 
 const SHOP_POWER_UPS: Array<{
@@ -770,7 +771,9 @@ export function Shop({
     ownedThemeProducts,
     grantThemeProduct,
     recordShopSpend,
+    appLanguage,
   } = useProgress();
+  const tr = (text: string) => t(text, appLanguage);
   const [message, setMessage] = useState("");
   const [pendingProductId, setPendingProductId] = useState<ProductId | "rewarded" | null>(null);
   const [previewProductId, setPreviewProductId] = useState<ProductId | null>(null);
@@ -821,7 +824,7 @@ export function Shop({
       // after restore. It is not a new purchase, so never grant starter coins
       // from this listener.
       grantProPack({ fromRestore: true });
-      setProPackMessage("Pro Lab Pack unlocked from offer code.");
+      setProPackMessage(tr("Pro Lab Pack unlocked from offer code."));
     });
     return () => {
       active = false;
@@ -862,14 +865,14 @@ export function Shop({
     unlockLevel: number,
   ) {
     if (unlockedLevel < unlockLevel) {
-      setMessage(`${name} is introduced at level ${unlockLevel}.`);
+      setMessage(`${tr(name)} ${tr("is introduced at level")} ${unlockLevel}.`);
       return;
     }
     const purchased = purchaseInventoryPowerUp(powerUp, coinCost);
     setMessage(
       purchased
-        ? `${name} added to your inventory.`
-        : `You need ${coinCost} gold coin${coinCost === 1 ? "" : "s"} to buy ${name}.`,
+        ? `${tr(name)} ${tr("added to your inventory.")}`
+        : `${tr("You need")} ${coinCost} ${tr(coinCost === 1 ? "gold coin" : "gold coins")} ${tr("to buy")} ${tr(name)}.`,
     );
   }
 
@@ -877,7 +880,7 @@ export function Shop({
     if (appStorePurchaseBusy) return;
     logDebug("Unlock Pack button tapped.", { productId: PRODUCT_IDS.proLabPack });
     setProPackBusy("purchase");
-    setProPackMessage("Preparing purchase with App Store...");
+    setProPackMessage(tr("Preparing purchase with App Store..."));
     try {
       const result = await withTimeout(
         () =>
@@ -890,10 +893,10 @@ export function Shop({
       if (result.purchased) {
         grantProPack();
         recordShopSpend(PRODUCT_IDS.proLabPack);
-        setProPackMessage("Pro Lab Pack unlocked.");
+        setProPackMessage(tr("Pro Lab Pack unlocked."));
         return;
       }
-      setProPackMessage(result.reason ?? "Pro Lab Pack is not available right now.");
+      setProPackMessage(result.reason ? tr(result.reason) : tr("Pro Lab Pack is not available right now."));
     } catch (error) {
       setProPackMessage(
         error instanceof Error ? error.message : "App Store purchase could not be started.",
@@ -908,15 +911,15 @@ export function Shop({
   async function handleProPackRestore() {
     if (appStorePurchaseBusy) return;
     setProPackBusy("restore");
-    setProPackMessage("Checking App Store purchases...");
+    setProPackMessage(tr("Checking App Store purchases..."));
     try {
       const restored = await restorePurchases();
       if (restored.includes(PRODUCT_IDS.proLabPack)) {
         grantProPack({ fromRestore: true });
-        setProPackMessage("Pro Lab Pack restored.");
+        setProPackMessage(tr("Pro Lab Pack restored."));
         return;
       }
-      setProPackMessage("No Pro Lab Pack purchase was found.");
+      setProPackMessage(tr("No Pro Lab Pack purchase was found."));
     } catch (error) {
       setProPackMessage(
         error instanceof Error ? error.message : "Purchases could not be restored.",
@@ -930,7 +933,7 @@ export function Shop({
   async function handleOfferCodeRedeem() {
     if (appStorePurchaseBusy) return;
     setProPackBusy("redeem");
-    setProPackMessage("Opening App Store code redemption...");
+    setProPackMessage(tr("Opening App Store code redemption..."));
     try {
       const result = await withTimeout(
         () => redeemOfferCode((statusMessage) => setProPackMessage(statusMessage)),
@@ -939,7 +942,7 @@ export function Shop({
       );
       if (result.purchased) {
         grantProPack();
-        setProPackMessage("Pro Lab Pack unlocked from offer code.");
+        setProPackMessage(tr("Pro Lab Pack unlocked from offer code."));
         return;
       }
       setProPackMessage(
@@ -960,7 +963,7 @@ export function Shop({
     if (appStorePurchaseBusy) return;
     logDebug("Coin pack button tapped.", { productId });
     setPendingProductId(productId);
-    setMessage("Preparing purchase with App Store...");
+    setMessage(tr("Preparing purchase with App Store..."));
     try {
       const result = await withTimeout(
         () => purchaseGoldCoinPack(productId, (statusMessage) => setMessage(statusMessage)),
@@ -975,10 +978,10 @@ export function Shop({
         );
         return;
       }
-      setMessage(result.reason ?? "App Store coin purchase is not available right now.");
+      setMessage(result.reason ? tr(result.reason) : tr("App Store coin purchase is not available right now."));
     } catch (error) {
       setMessage(
-        error instanceof Error ? error.message : "App Store coin purchase could not be started.",
+        error instanceof Error ? tr(error.message) : tr("App Store coin purchase could not be started."),
       );
     } finally {
       logDebug("Coin purchase UI flow ended.", { productId });
@@ -989,12 +992,12 @@ export function Shop({
 
   async function handleThemePurchase(productId: ProductId) {
     if (!COSMETIC_THEME_PURCHASES_ENABLED) {
-      setCosmeticMessage("All cosmetic themes are free during testing.");
+      setCosmeticMessage(tr("All cosmetic themes are free during testing."));
       return;
     }
     if (appStorePurchaseBusy || ownedThemeProducts.includes(productId)) return;
     setPendingProductId(productId);
-    setCosmeticMessage("Preparing cosmetic purchase with App Store...");
+    setCosmeticMessage(tr("Preparing cosmetic purchase with App Store..."));
     try {
       const result = await withTimeout(
         () =>
@@ -1008,16 +1011,16 @@ export function Shop({
         grantThemeProduct(productId);
         recordShopSpend(productId);
         const productName = getProductById(productId)?.name ?? "Cosmetic bundle";
-        setCosmeticMessage(`${productName} unlocked. Equip it from Profile.`);
+        setCosmeticMessage(`${tr(productName)} ${tr("unlocked. Equip it from Profile.")}`);
         toast.success("Theme unlocked", {
-          description: `${productName} is now available to equip in Profile → Display.`,
+          description: `${tr(productName)} ${tr("is now available to equip in Profile → Display.")}`,
         });
         return;
       }
-      setCosmeticMessage(result.reason ?? "This cosmetic bundle is not available right now.");
+      setCosmeticMessage(result.reason ? tr(result.reason) : tr("This cosmetic bundle is not available right now."));
     } catch (error) {
       setCosmeticMessage(
-        error instanceof Error ? error.message : "App Store purchase could not be started.",
+        error instanceof Error ? tr(error.message) : tr("App Store purchase could not be started."),
       );
     } finally {
       setPendingProductId(null);
@@ -1027,21 +1030,21 @@ export function Shop({
 
   async function handleRewardedCoin() {
     setPendingProductId("rewarded");
-    setMessage("Loading rewarded ad...");
+    setMessage(tr("Loading rewarded ad..."));
     try {
       const result = await showRewardedForCoin(hasProPack);
       if (result.rewarded) {
         grantGoldCoins(1, "Rewarded ad");
         reportQuestProgress({ adsWatched: 1 });
-        setMessage("Reward complete: +1 gold coin.");
-        showCoinToast("+1 gold coin");
+        setMessage(tr("Reward complete: +1 gold coin."));
+        showCoinToast(`+1 ${tr("gold coin")}`);
         return;
       }
       setMessage(
-        result.reason ?? "Rewarded ad not completed or not available yet. Try again shortly.",
+        result.reason ? tr(result.reason) : tr("Rewarded ad not completed or not available yet. Try again shortly."),
       );
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Rewarded ad could not be started.");
+      setMessage(error instanceof Error ? tr(error.message) : tr("Rewarded ad could not be started."));
     } finally {
       setPendingProductId(null);
     }
@@ -1049,7 +1052,7 @@ export function Shop({
 
   async function handlePurchaseDebug() {
     setPurchaseDebugBusy(true);
-    setMessage("Checking purchase diagnostics...");
+    setMessage(tr("Checking purchase diagnostics..."));
     logDebug("Manual purchase diagnostics started.");
     try {
       const snapshot = await debugNativePurchases((statusMessage) => setMessage(statusMessage));
@@ -1068,7 +1071,7 @@ export function Shop({
         .join("\n");
       console.log("RevenueCat diagnostics", snapshot);
       window.alert(details);
-      setMessage(snapshot.reason ?? "Purchase diagnostics complete.");
+      setMessage(snapshot.reason ? tr(snapshot.reason) : tr("Purchase diagnostics complete."));
       refreshPurchaseDebugLogs(true);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -1085,7 +1088,7 @@ export function Shop({
     clearLogs();
     setPurchaseDebugLogs([]);
     setPurchaseReport("");
-    setMessage("Purchase debug logs cleared.");
+    setMessage(tr("Purchase debug logs cleared."));
   }
 
   async function handlePurchaseSupportCheck() {
@@ -1140,10 +1143,10 @@ export function Shop({
       >
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <button onClick={onBack} style={smallButton}>
-            ← Back
+          ← {tr("Back")}
           </button>
           <div>
-            <h1 style={{ fontSize: 22, margin: 0, fontWeight: 800 }}>Shop</h1>
+            <h1 style={{ fontSize: 22, margin: 0, fontWeight: 800 }}>{tr("Shop")}</h1>
           </div>
         </div>
         {message && (
@@ -1163,7 +1166,7 @@ export function Shop({
                   opacity: purchaseDebugBusy ? 0.7 : 1,
                 }}
               >
-                {purchaseDebugBusy ? "Checking..." : "Debug RevenueCat"}
+                {purchaseDebugBusy ? tr("Checking...") : tr("Debug RevenueCat")}
               </button>
               <button
                 type="button"
@@ -1172,10 +1175,10 @@ export function Shop({
                 }}
                 style={secondaryShopButton}
               >
-                Show Logs
+                {tr("Show Logs")}
               </button>
               <button type="button" onClick={handleClearPurchaseLogs} style={secondaryShopButton}>
-                Clear Logs
+                {tr("Clear Logs")}
               </button>
             </div>
             {purchaseDebugOpen && (
@@ -1187,7 +1190,7 @@ export function Shop({
                     </div>
                   ))
                 ) : (
-                  <div style={debugLogLine}>No purchase logs yet.</div>
+                  <div style={debugLogLine}>{tr("No purchase logs yet.")}</div>
                 )}
               </div>
             )}
@@ -1197,7 +1200,7 @@ export function Shop({
         {showPurchaseSupport && (
           <section style={purchaseSupportPanel}>
             <div>
-              <div style={purchaseSupportTitle}>Purchase Support</div>
+              <div style={purchaseSupportTitle}>{tr("Purchase Support")}</div>
               <p style={purchaseSupportCopy}>
                 If the App Store sheet does not appear, run a check and copy diagnostics from this
                 TestFlight build.
@@ -1216,21 +1219,21 @@ export function Shop({
                       : 1,
                 }}
               >
-                {purchaseSupportBusy ? "Checking..." : "Run Check"}
+                {purchaseSupportBusy ? tr("Checking...") : tr("Run Check")}
               </button>
               <button
                 type="button"
                 onClick={handleCopyPurchaseDiagnostics}
                 style={secondaryShopButton}
               >
-                Copy Diagnostics
+                {tr("Copy Diagnostics")}
               </button>
               <button
                 type="button"
                 onClick={handleTogglePurchaseReport}
                 style={secondaryShopButton}
               >
-                {purchaseReport ? "Hide Report" : "Show Report"}
+                {purchaseReport ? tr("Hide Report") : tr("Show Report")}
               </button>
             </div>
             {purchaseSupportMessage && (
@@ -1277,15 +1280,15 @@ export function Shop({
                     marginBottom: 6,
                   }}
                 >
-                  {hasProPack ? "PRO LAB PACK" : "ONE-TIME UPGRADE"}
+                  {tr(hasProPack ? "PRO LAB PACK" : "ONE-TIME UPGRADE")}
                 </div>
                 <h2 style={{ margin: 0, fontSize: hasProPack ? 16 : 28, fontWeight: 900 }}>
-                  {proPack.name}
+                  {tr(proPack.name)}
                 </h2>
               </div>
               <WalletPill
-                label="Status"
-                value={hasProPack ? "Active" : "Available"}
+                label={tr("Status")}
+                value={tr(hasProPack ? "Active" : "Available")}
                 accent={hasProPack}
               />
             </div>
@@ -1299,14 +1302,14 @@ export function Shop({
                     lineHeight: 1.45,
                   }}
                 >
-                  A one-time premium upgrade for long-term progression.
+                  {tr("A one-time premium upgrade for long-term progression.")}
                 </p>
                 <div style={{ display: "grid", gap: 7, marginBottom: 14 }}>
-                  <Benefit text="Remove forced interstitial ads." />
-                  <Benefit text="Unlock the Pro Lab profile badge." />
-                  <Benefit text="Daily quest claims pay 10 gold coins instead of 3." />
-                  <Benefit text="Daily challenges award 5 gold coins each instead of 3." />
-                  <Benefit text="Level 1 upgrade to all power-ups (10 coin refund each for already upgraded)." />
+                  <Benefit text={tr("Remove forced interstitial ads.")} />
+                  <Benefit text={tr("Unlock the Pro Lab profile badge.")} />
+                  <Benefit text={tr("Daily quest claims pay 10 gold coins instead of 3.")} />
+                  <Benefit text={tr("Daily challenges award 5 gold coins each instead of 3.")} />
+                  <Benefit text={tr("Level 1 upgrade to all power-ups (10 coin refund each for already upgraded).")} />
                 </div>
               </>
             )}
@@ -1319,7 +1322,7 @@ export function Shop({
                   fontSize: 12,
                 }}
               >
-                Pro Lab Pack Active
+                {tr("Pro Lab Pack Active")}
               </div>
             ) : (
               <div style={{ display: "grid", gap: 10 }}>
@@ -1335,7 +1338,7 @@ export function Shop({
                         : 1,
                   }}
                 >
-                  {proPackBusy === "redeem" ? "Opening..." : "Redeem Code"}
+                  {proPackBusy === "redeem" ? tr("Opening...") : tr("Redeem Code")}
                 </button>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                   <button
@@ -1350,7 +1353,7 @@ export function Shop({
                           : 1,
                     }}
                   >
-                    {proPackBusy === "restore" ? "Checking..." : "Restore"}
+                    {proPackBusy === "restore" ? tr("Checking...") : tr("Restore")}
                   </button>
                   <button
                     type="button"
@@ -1364,7 +1367,7 @@ export function Shop({
                           : 1,
                     }}
                   >
-                    {proPackBusy === "purchase" ? "Opening..." : "Unlock Pack"}
+                    {proPackBusy === "purchase" ? tr("Opening...") : tr("Unlock Pack")}
                   </button>
                 </div>
               </div>
@@ -1406,20 +1409,19 @@ export function Shop({
                     marginBottom: 6,
                   }}
                 >
-                  APP STORE COINS
+                  {tr("APP STORE COINS")}
                 </div>
-                <h2 style={{ margin: 0, fontSize: 22, fontWeight: 900 }}>Buy gold coins</h2>
+                <h2 style={{ margin: 0, fontSize: 22, fontWeight: 900 }}>{tr("Buy gold coins")}</h2>
               </div>
               <WalletPill
-                label="Coins"
+                label={tr("Coins")}
                 value={`${goldCoins}`}
                 icon={<GoldCoinIcon size={18} />}
                 accent
               />
             </div>
             <p style={{ margin: "0 0 14px", color: "var(--muted-foreground)", fontSize: 13 }}>
-              Buy extra gold coins for power-ups and experiments. Purchases are processed securely
-              by the App Store.
+              {tr("Buy extra gold coins for power-ups and experiments. Purchases are processed securely by the App Store.")}
             </p>
             <button
               type="button"
@@ -1443,7 +1445,7 @@ export function Shop({
                 }}
               >
                 <Clapperboard size={18} aria-hidden="true" />
-                {pendingProductId === "rewarded" ? "Loading ad..." : "Free coins"}
+                {pendingProductId === "rewarded" ? tr("Loading ad...") : tr("Free coins")}
               </span>
             </button>
             <div
@@ -1477,7 +1479,7 @@ export function Shop({
                   >
                     <GoldCoinIcon size={28} />
                     <strong style={coinPackAmount}>{product.coins}x</strong>
-                    <span>{pendingProductId === productId ? "Opening..." : "App Store"}</span>
+                    <span>{pendingProductId === productId ? tr("Opening...") : tr("App Store")}</span>
                   </button>
                 );
               })}
@@ -1518,16 +1520,15 @@ export function Shop({
                     marginBottom: 6,
                   }}
                 >
-                  Themes and skins
+                  {tr("Themes and skins")}
                 </div>
                 <h2 style={{ margin: 0, fontSize: 22, fontWeight: 900 }}>
-                  Boards + atom skins
+                  {tr("Boards + atom skins")}
                 </h2>
               </div>
             </div>
             <p style={{ margin: "0 0 14px", color: "var(--muted-foreground)", fontSize: 13 }}>
-              Support the developer by purchasing custom skins. Each one-time purchase unlocks a
-              board and its matching atom finish; element colors and gameplay remain unchanged.
+              {tr("Support the developer by purchasing custom skins. Each one-time purchase unlocks a board and its matching atom finish; element colors and gameplay remain unchanged.")}
             </p>
             <div
               style={{
@@ -1560,7 +1561,7 @@ export function Shop({
                     <button
                       type="button"
                       onClick={() => setPreviewProductId(productId)}
-                      aria-label={`Preview ${product.name}`}
+                      aria-label={`${tr("Preview")} ${tr(product.name)}`}
                       style={{
                         border: 0,
                         padding: 0,
@@ -1590,14 +1591,14 @@ export function Shop({
                           textTransform: "uppercase",
                         }}
                       >
-                        Preview
+                        {tr("Preview")}
                       </span>
                     </button>
                     <div style={{ minWidth: 0, display: "grid", gap: 7 }}>
                       <div>
-                        <strong style={{ display: "block", fontSize: 15 }}>{product.name}</strong>
+                        <strong style={{ display: "block", fontSize: 15 }}>{tr(product.name)}</strong>
                         <span style={{ color: "var(--accent)", fontSize: 11, fontWeight: 800 }}>
-                          {visual.skin}
+                          {tr(visual.skin)}
                         </span>
                         <small
                           style={{
@@ -1607,7 +1608,7 @@ export function Shop({
                             fontSize: 10,
                           }}
                         >
-                          8-atom bundle preview
+                          {tr("8-atom bundle preview")}
                         </small>
                       </div>
                       <p
@@ -1618,7 +1619,7 @@ export function Shop({
                           lineHeight: 1.35,
                         }}
                       >
-                        {product.description}
+                        {tr(product.description)}
                       </p>
                       <div
                         style={{
@@ -1646,11 +1647,11 @@ export function Shop({
                         >
                           {owned
                             ? COSMETIC_THEME_PURCHASES_ENABLED
-                              ? "Owned"
-                              : "Free for testing"
+                              ? tr("Owned")
+                              : tr("Free for testing")
                             : pending
-                              ? "Opening..."
-                              : "Buy"}
+                              ? tr("Opening...")
+                              : tr("Buy")}
                         </button>
                       </div>
                     </div>
@@ -1694,13 +1695,13 @@ export function Shop({
                   marginBottom: 6,
                 }}
               >
-                INVENTORY POWER-UPS
+                  {tr("INVENTORY POWER-UPS")}
               </div>
-              <h2 style={{ margin: 0, fontSize: 22, fontWeight: 900 }}>Stock your next run</h2>
+              <h2 style={{ margin: 0, fontSize: 22, fontWeight: 900 }}>{tr("Stock your next run")}</h2>
             </div>
             <div style={walletWrap}>
               <WalletPill
-                label="Coins"
+                label={tr("Coins")}
                 value={`${goldCoins}`}
                 icon={<GoldCoinIcon size={18} />}
                 accent
@@ -1708,8 +1709,7 @@ export function Shop({
             </div>
           </div>
           <p style={{ margin: "0 0 14px", color: "var(--muted-foreground)", fontSize: 13 }}>
-            Buy extra inventory copies with gold coins. Before each level, you can choose up to 3
-            inventory power-ups to start with.
+            {tr("Buy extra inventory copies with gold coins. Before each level, you can choose up to 3 inventory power-ups to start with.")}
           </p>
           <div
             style={{
@@ -1746,18 +1746,18 @@ export function Shop({
                   </span>
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 900 }}>
-                      {isUnlocked ? powerUp.name : "Secret"}
+                      {isUnlocked ? tr(powerUp.name) : tr("Secret")}
                     </div>
                     <div
                       style={{ fontSize: 11, color: "var(--muted-foreground)", lineHeight: 1.35 }}
                     >
                       {isUnlocked
-                        ? powerUp.description
-                        : `Unlocked at level ${powerUp.unlockLevel}.`}
+                        ? tr(powerUp.description)
+                        : `${tr("Unlocked at level")} ${powerUp.unlockLevel}.`}
                     </div>
                     {!isUnlocked && (
                       <div style={{ fontSize: 11, color: "var(--accent)", marginTop: 3 }}>
-                        Secret unlock at level {powerUp.unlockLevel}
+                        {tr("Secret unlock at level")} {powerUp.unlockLevel}
                       </div>
                     )}
                   </div>

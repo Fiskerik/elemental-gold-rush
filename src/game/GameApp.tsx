@@ -25,6 +25,7 @@ import { APP_STORE_URL, checkForRequiredAppUpdate, type RequiredAppUpdate } from
 import { consumePendingPushRoute, recordPushActivity } from "@/game/pushNotifications";
 import { useProgress } from "@/game/store";
 import { useDomLocalization } from "@/game/useDomLocalization";
+import { t, type AppLanguage } from "@/game/localization";
 
 const FIRST_ENTRY_TUTORIAL_TIP_IDS: Record<HowToPlayMode, string> = {
   normal: "onboarding-normal-game",
@@ -183,6 +184,7 @@ export function GameApp() {
 
   const appReviewMilestonePrompt = appReviewMilestonePromptOpen ? (
     <AppReviewMilestonePrompt
+      language={appLanguage}
       showRating={isNativeIos}
       reviewRequested={appReviewRequested}
       onRate={() => {
@@ -206,6 +208,7 @@ export function GameApp() {
         {appReviewMilestonePrompt}
         {requiredAppUpdate && (
           <RequiredAppUpdatePrompt
+            language={appLanguage}
             update={requiredAppUpdate}
             onUpdate={() => {
               window.location.href = requiredAppUpdate.storeUrl || APP_STORE_URL;
@@ -326,6 +329,7 @@ export function GameApp() {
           />
           {resumePrompt && (
             <ResumeRunPrompt
+              language={appLanguage}
               saved={resumePrompt}
               onContinue={() => {
                 const savedRun = resumePrompt;
@@ -497,20 +501,23 @@ function LaunchScreen() {
 
 function ResumeRunPrompt({
   saved,
+  language,
   onContinue,
   onStartOver,
   onCancel,
 }: {
   saved: NonNullable<ReturnType<typeof getSavedRunSummary>>;
+  language: AppLanguage;
   onContinue: () => void;
   onStartOver: () => void;
   onCancel: () => void;
 }) {
+  const tr = (text: string) => t(text, language);
   return (
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="Resume saved run"
+      aria-label={tr("Resume saved run")}
       style={{
         position: "fixed",
         inset: 0,
@@ -535,21 +542,21 @@ function ResumeRunPrompt({
         }}
       >
         <div style={{ fontSize: 11, letterSpacing: 3, color: "var(--accent)", fontWeight: 800 }}>
-          SAVED RUN
+          {tr("SAVED RUN")}
         </div>
-        <h2 style={{ margin: "6px 0 4px", fontSize: 23 }}>Continue previous run?</h2>
+        <h2 style={{ margin: "6px 0 4px", fontSize: 23 }}>{tr("Continue previous run?")}</h2>
         <p style={{ margin: "0 0 16px", color: "var(--muted-foreground)", fontSize: 13 }}>
           Level {saved.levelId} · {saved.shots} shots · {saved.score.toLocaleString()} score
         </p>
         <div style={{ display: "grid", gap: 8 }}>
           <button type="button" onClick={onContinue} style={promptPrimaryBtn}>
-            Continue Run
+            {tr("Continue Run")}
           </button>
           <button type="button" onClick={onStartOver} style={promptSecondaryBtn}>
-            Start Over
+            {tr("Start Over")}
           </button>
           <button type="button" onClick={onCancel} style={promptGhostBtn}>
-            Cancel
+            {tr("Cancel")}
           </button>
         </div>
       </div>
@@ -558,23 +565,26 @@ function ResumeRunPrompt({
 }
 
 function AppReviewMilestonePrompt({
+  language,
   showRating,
   reviewRequested,
   onRate,
   onClaim,
   onSkip,
 }: {
+  language: AppLanguage;
   showRating: boolean;
   reviewRequested: boolean;
   onRate: () => void;
   onClaim: () => void;
   onSkip: () => void;
 }) {
+  const tr = (text: string) => t(text, language);
   return (
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="Game 5 bonus"
+      aria-label={tr("Game 5 bonus")}
       style={{
         position: "fixed",
         inset: 0,
@@ -599,27 +609,27 @@ function AppReviewMilestonePrompt({
         }}
       >
         <div style={{ fontSize: 11, letterSpacing: 3, color: "var(--accent)", fontWeight: 800 }}>
-          MILESTONE BONUS
+          {tr("MILESTONE BONUS")}
         </div>
         <h2 style={{ margin: "6px 0 8px", fontSize: 23 }}>
-          <CoinAmount amount={5} suffix="coins unlocked" />
+          <CoinAmount amount={5} suffix={tr("coins unlocked")} />
         </h2>
         <p style={{ margin: "0 0 16px", color: "var(--muted-foreground)", fontSize: 13 }}>
           {showRating
-            ? "Your milestone bonus is in your wallet. If Atomic Fusion Rush is hitting the spot, a quick App Store rating helps a lot."
-            : "Your milestone bonus is in your wallet. Keep building cleaner chains and pushing the next element."}
+            ? tr("Your milestone bonus is in your wallet. If Atomic Fusion Rush is hitting the spot, a quick App Store rating helps a lot.")
+            : tr("Your milestone bonus is in your wallet. Keep building cleaner chains and pushing the next element.")}
         </p>
         <div style={{ display: "grid", gap: 8 }}>
           {showRating && (
             <button type="button" onClick={onRate} style={promptSecondaryBtn}>
-              {reviewRequested ? "App Store opened" : "Rate App"}
+              {reviewRequested ? tr("App Store opened") : tr("Rate App")}
             </button>
           )}
           <button type="button" onClick={onClaim} style={promptPrimaryBtn}>
-            Continue
+            {tr("Continue")}
           </button>
           <button type="button" onClick={onSkip} style={promptGhostBtn}>
-            Not now
+            {tr("Not now")}
           </button>
         </div>
       </div>
@@ -629,16 +639,19 @@ function AppReviewMilestonePrompt({
 
 function RequiredAppUpdatePrompt({
   update,
+  language,
   onUpdate,
 }: {
   update: RequiredAppUpdate;
+  language: AppLanguage;
   onUpdate: () => void;
 }) {
+  const tr = (text: string) => t(text, language);
   return (
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="App update required"
+      aria-label={tr("App update required")}
       style={{
         position: "fixed",
         inset: 0,
@@ -663,17 +676,17 @@ function RequiredAppUpdatePrompt({
         }}
       >
         <div style={{ fontSize: 11, letterSpacing: 3, color: "var(--accent)", fontWeight: 900 }}>
-          UPDATE REQUIRED
+          {tr("UPDATE REQUIRED")}
         </div>
-        <h2 style={{ margin: "7px 0 8px", fontSize: 23 }}>New version available</h2>
+        <h2 style={{ margin: "7px 0 8px", fontSize: 23 }}>{tr("New version available")}</h2>
         <p style={{ margin: "0 0 8px", color: "var(--foreground)", fontSize: 14, fontWeight: 750 }}>
-          Update the app to continue playing.
+          {tr("Update the app to continue playing.")}
         </p>
         <p style={{ margin: "0 0 18px", color: "var(--muted-foreground)", fontSize: 12 }}>
-          Version {update.storeVersion} is available in the App Store.
+          {tr("Version")} {update.storeVersion} {tr("is available in the App Store.")}
         </p>
         <button type="button" onClick={onUpdate} style={{ ...promptPrimaryBtn, width: "100%" }}>
-          Update in App Store
+          {tr("Update in App Store")}
         </button>
       </div>
     </div>
