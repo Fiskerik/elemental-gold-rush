@@ -791,6 +791,7 @@ const topBar: CSSProperties = {
 };
 
 const brandTitle: CSSProperties = {
+  margin: 0,
   fontSize: "clamp(13px, 4.2vw, 22px)",
   fontWeight: 1000,
   lineHeight: 1,

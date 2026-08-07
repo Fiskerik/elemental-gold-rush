@@ -24,6 +24,35 @@ export const Route = createFileRoute("/")({
         content:
           "Merge hydrogen into helium, unlock power-ups, form compounds, and master the periodic table.",
       },
+      { property: "og:type", content: "website" },
+      { property: "og:url", content: "https://atomic-fusion.lovable.app/" },
+      {
+        property: "og:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/96b7dab8-6bea-45f2-9458-357106f22801/id-preview-5ae28a15--a7f1def7-b935-44fb-a197-7b4e163d699c.lovable.app-1778691171983.png",
+      },
+      {
+        name: "twitter:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/96b7dab8-6bea-45f2-9458-357106f22801/id-preview-5ae28a15--a7f1def7-b935-44fb-a197-7b4e163d699c.lovable.app-1778691171983.png",
+      },
+    ],
+    links: [{ rel: "canonical", href: "https://atomic-fusion.lovable.app/" }],
+    scripts: [
+      {
+        type: "application/ld+json",
+        children: JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "VideoGame",
+          name: "Atomic Fusion Rush",
+          url: "https://atomic-fusion.lovable.app/",
+          applicationCategory: "GameApplication",
+          operatingSystem: "iOS, Web",
+          genre: "Puzzle",
+          description:
+            "Fuse atoms, climb the periodic table, discover compounds, and chase Gold in Atomic Fusion Rush.",
+        }),
+      },
     ],
   }),
   component: Index,

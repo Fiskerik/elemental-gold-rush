@@ -11,7 +11,16 @@ export const Route = createFileRoute("/terms")({
         content:
           "Terms of service for Atomic Fusion Rush, covering acceptable use, purchases, liability, and account responsibilities.",
       },
+      { property: "og:title", content: "Terms of Service | Atomic Fusion Rush" },
+      {
+        property: "og:description",
+        content:
+          "Acceptable use, purchases, liability, and account responsibilities for Atomic Fusion Rush.",
+      },
+      { property: "og:type", content: "website" },
+      { property: "og:url", content: "https://atomic-fusion.lovable.app/terms" },
     ],
+    links: [{ rel: "canonical", href: "https://atomic-fusion.lovable.app/terms" }],
   }),
   component: TermsPage,
 });
