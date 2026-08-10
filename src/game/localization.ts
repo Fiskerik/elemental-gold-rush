@@ -1,5 +1,6 @@
 import { GLOBAL_TRANSLATION_EXTENSIONS } from "./localizationPacks";
 import { GENERATED_UI_TRANSLATIONS } from "./generatedUiTranslations";
+import { REFERRAL_TRANSLATIONS } from "./referralTranslations";
 
 export const DEFAULT_LANGUAGE = "en";
 
@@ -2597,6 +2598,12 @@ for (const [language, translations] of Object.entries(GLOBAL_TRANSLATION_EXTENSI
 }
 
 for (const [language, translations] of Object.entries(GENERATED_UI_TRANSLATIONS) as Array<
+  [AppLanguage, TranslationMap]
+>) {
+  Object.assign(TRANSLATIONS[language] ?? (TRANSLATIONS[language] = {}), translations);
+}
+
+for (const [language, translations] of Object.entries(REFERRAL_TRANSLATIONS) as Array<
   [AppLanguage, TranslationMap]
 >) {
   Object.assign(TRANSLATIONS[language] ?? (TRANSLATIONS[language] = {}), translations);

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { ELEMENTS } from "./elements";
 import { getLevelById, MAX_LEVEL } from "./levels";
@@ -17,6 +17,7 @@ import { ElementBall } from "./ElementBall";
 import { AtomSkinPicker, BoardThemePicker } from "./Settings";
 import { COSMETIC_THEME_PURCHASES_ENABLED, PRODUCT_IDS, THEME_BUNDLE_PRODUCT_IDS } from "./products";
 import { restorePurchases } from "./purchases";
+import { syncCloudProgressNow } from "./cloudSync";
 import {
   authenticateGameCenter,
   getCurrentGameCenterPlayer,
@@ -71,7 +72,7 @@ export function Profile({ onBack, onOpenShop }: Props) {
   const [gameCenterStatus, setGameCenterStatus] = useState<string | null>(null);
   const [gameCenterName, setGameCenterName] = useState(() => getCachedGameCenterPlayerName());
   const [referralCode, setReferralCode] = useState(() => getStoredReferralCode());
-  const [referralInput, setReferralInput] = useState("");
+  const referralInputRef = useRef<HTMLInputElement>(null);
   const [referralBusy, setReferralBusy] = useState(false);
   const [referralStatus, setReferralStatus] = useState<string | null>(null);
   const {
@@ -188,6 +189,7 @@ export function Profile({ onBack, onOpenShop }: Props) {
       const player = await authenticateGameCenter();
       const authenticatedName = player.displayName?.trim() || player.alias?.trim() || "";
       setGameCenterName(authenticatedName || getCachedGameCenterPlayerName());
+      if (player.authenticated) void syncCloudProgressNow();
       setGameCenterStatus(
         player.authenticated
           ? `${tr("Signed in as")} ${player.displayName || player.alias || tr("Player")}`
@@ -242,7 +244,9 @@ export function Profile({ onBack, onOpenShop }: Props) {
           : tr("Sharing cancelled. Your referral code is ready above."),
       );
     } catch (error) {
-      setReferralStatus(error instanceof Error ? error.message : tr("Referral sharing failed."));
+      setReferralStatus(
+        error instanceof Error ? tr(error.message) : tr("Referral sharing failed."),
+      );
     } finally {
       setReferralBusy(false);
     }
@@ -250,12 +254,13 @@ export function Profile({ onBack, onOpenShop }: Props) {
 
   async function handleRedeemReferral() {
     if (referralBusy || !isReferralAvailable()) return;
+    const referralInput = referralInputRef.current?.value ?? "";
     setReferralBusy(true);
     try {
       const playerId = await getReferralPlayerId();
       const redeemed = await redeemReferralCode(referralInput, playerId);
       setReferralStatus(redeemed ? tr("Code accepted. Complete your first game to receive 20 gold.") : tr("Referral code was not accepted."));
-      if (redeemed) setReferralInput("");
+      if (redeemed && referralInputRef.current) referralInputRef.current.value = "";
     } finally {
       setReferralBusy(false);
     }
@@ -403,13 +408,29 @@ export function Profile({ onBack, onOpenShop }: Props) {
                 {tr(referralBusy ? "Working..." : "Share referral code")}
               </button>
             </div>
-            {referralCode && <small>{`${tr("Your code")}: ${referralCode}`}</small>}
-            <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-              <input value={referralInput} onChange={(event) => setReferralInput(event.target.value)} placeholder="AFR-XXXXXXX" />
-              <button type="button" onClick={handleRedeemReferral} disabled={referralBusy || !referralInput.trim()} style={gameCenterButton}>
+            {referralCode && <small style={referralCodeText}>{`${tr("Your code")}: ${referralCode}`}</small>}
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                void handleRedeemReferral();
+              }}
+              style={{ ...referralRedeemRow, marginTop: referralCode ? 0 : 14 }}
+            >
+              <input
+                ref={referralInputRef}
+                type="text"
+                placeholder="AFR-XXXXXXX"
+                autoCapitalize="characters"
+                autoCorrect="off"
+                spellCheck={false}
+                enterKeyHint="done"
+                maxLength={11}
+                style={referralInputField}
+              />
+              <button type="submit" disabled={referralBusy} style={gameCenterButton}>
                 {tr("Redeem")}
               </button>
-            </div>
+            </form>
             {referralStatus && <small style={referralStatusText}>{referralStatus}</small>}
           </section>
         )}
@@ -1076,8 +1097,26 @@ const gameCenterActions: React.CSSProperties = {
 
 const referralStatusText: React.CSSProperties = {
   display: "block",
-  marginTop: 12,
+  marginTop: 14,
   lineHeight: 1.5,
+};
+
+const referralCodeText: React.CSSProperties = {
+  display: "block",
+  marginTop: 12,
+  marginBottom: 14,
+  lineHeight: 1.4,
+};
+
+const referralRedeemRow: React.CSSProperties = {
+  display: "flex",
+  alignItems: "stretch",
+  gap: 10,
+};
+
+const referralInputField: React.CSSProperties = {
+  flex: "1 1 0",
+  minWidth: 0,
 };
 
 const gameCenterButton: React.CSSProperties = {

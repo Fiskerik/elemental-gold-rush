@@ -273,7 +273,9 @@ export async function submitDailyGameCenterScore(
   const normalizedScore = Math.max(0, Math.floor(score));
   if (normalizedScore <= 0) return false;
   const normalizedShots = Math.max(0, Math.floor(shots));
-  await authenticateGameCenter();
+  // Background score submission must not open Apple's sign-in UI.
+  const currentPlayer = await getCurrentGameCenterPlayer();
+  if (!currentPlayer.authenticated) return false;
   const leaderboardIds = getSubmitLeaderboardIds(kind);
   if (!leaderboardIds.length) return false;
   const results = await Promise.allSettled(

@@ -2,7 +2,9 @@
 
 Compared with <previous version>
 
-## Arabic (العربية) — ar-SA
+Copy the following section once for each locale, in the order configured in `../appstore.config.json`:
+
+## <display name> — <locale code>
 
 Promotional Text:
 <maximum 170 characters>
@@ -10,114 +12,6 @@ Promotional Text:
 What's New:
 <maximum 4,000 characters>
 
-## Chinese Simplified (简体中文) — zh-Hans
+Required locale order:
 
-Promotional Text:
-<maximum 170 characters>
-
-What's New:
-<maximum 4,000 characters>
-
-## English — en-US
-
-Promotional Text:
-<maximum 170 characters>
-
-What's New:
-<maximum 4,000 characters>
-
-## French (Français) — fr-FR
-
-Promotional Text:
-<maximum 170 characters>
-
-What's New:
-<maximum 4,000 characters>
-
-## German (Deutsch) — de-DE
-
-Promotional Text:
-<maximum 170 characters>
-
-What's New:
-<maximum 4,000 characters>
-
-## Hindi (हिन्दी) — hi
-
-Promotional Text:
-<maximum 170 characters>
-
-What's New:
-<maximum 4,000 characters>
-
-## Indonesian (Bahasa Indonesia) — id
-
-Promotional Text:
-<maximum 170 characters>
-
-What's New:
-<maximum 4,000 characters>
-
-## Italian (Italiano) — it
-
-Promotional Text:
-<maximum 170 characters>
-
-What's New:
-<maximum 4,000 characters>
-
-## Japanese (日本語) — ja
-
-Promotional Text:
-<maximum 170 characters>
-
-What's New:
-<maximum 4,000 characters>
-
-## Korean (한국어) — ko
-
-Promotional Text:
-<maximum 170 characters>
-
-What's New:
-<maximum 4,000 characters>
-
-## Portuguese (Brazil) (Português do Brasil) — pt-BR
-
-Promotional Text:
-<maximum 170 characters>
-
-What's New:
-<maximum 4,000 characters>
-
-## Russian (Русский) — ru
-
-Promotional Text:
-<maximum 170 characters>
-
-What's New:
-<maximum 4,000 characters>
-
-## Spanish (Español) — es-ES
-
-Promotional Text:
-<maximum 170 characters>
-
-What's New:
-<maximum 4,000 characters>
-
-## Turkish (Türkçe) — tr
-
-Promotional Text:
-<maximum 170 characters>
-
-What's New:
-<maximum 4,000 characters>
-
-## Vietnamese (Tiếng Việt) — vi
-
-Promotional Text:
-<maximum 170 characters>
-
-What's New:
-<maximum 4,000 characters>
+`en-GB`, `en-AU`, `ar-SA`, `zh-Hans`, `zh-Hant`, `cs`, `da`, `nl-NL`, `en-US`, `fi`, `fr-FR`, `de-DE`, `hi`, `id`, `it`, `ja`, `ko`, `ms`, `no`, `pl`, `pt-BR`, `ru`, `es-ES`, `sv`, `ta-IN`, `th`, `tr`, `uk`, `vi`.

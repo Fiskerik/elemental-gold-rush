@@ -1,6 +1,6 @@
 import { Capacitor } from "@capacitor/core";
 import {
-  authenticateGameCenter,
+  getCurrentGameCenterPlayer,
   loadGameCloudSave,
   saveGameCloudSave,
 } from "./gameCenter";
@@ -176,7 +176,9 @@ export async function syncCloudProgressNow(): Promise<CloudSyncResult> {
 
   syncInFlight = (async () => {
     try {
-      const player = await authenticateGameCenter();
+      // Startup cloud sync must never trigger Apple's interactive Game Center UI.
+      // Authentication is initiated only from an explicit player action.
+      const player = await getCurrentGameCenterPlayer();
       if (!player.authenticated || !player.gamePlayerId) {
         return { synced: false, restored: false, reason: "game-center-not-signed-in" };
       }
@@ -215,7 +217,14 @@ export function startCloudProgressSync(): () => void {
   let active = true;
   const syncWithRetry = () => {
     void syncCloudProgressNow().then((result) => {
-      if (!active || result.synced || retryIndex >= retryDelays.length) return;
+      if (
+        !active ||
+        result.synced ||
+        result.reason === "game-center-not-signed-in" ||
+        retryIndex >= retryDelays.length
+      ) {
+        return;
+      }
       retryTimer = setTimeout(() => {
         retryTimer = null;
         retryIndex += 1;
