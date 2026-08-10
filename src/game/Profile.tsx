@@ -8,9 +8,20 @@ import { COMPOUNDS } from "./compounds";
 import { BOSSES, type BossId } from "./bosses";
 import {
   authenticateGameCenter,
+<<<<<<< Updated upstream
+=======
+  getCurrentGameCenterPlayer,
+  getCachedGameCenterPlayerName,
+>>>>>>> Stashed changes
   isGameCenterAvailable,
   showGameCenterLeaderboards,
 } from "./gameCenter";
+import {
+  getStoredReferralCode,
+  isReferralAvailable,
+  redeemReferralCode,
+  registerReferralCode,
+} from "./referrals";
 import {
   DAILY_BOARD_LEADERBOARD_ACHIEVEMENTS,
   type DailyBoardLeaderboardAchievementId,
@@ -42,6 +53,14 @@ export function Profile({ onBack }: Props) {
   const [transactionsOpen, setTransactionsOpen] = useState(false);
   const [gameCenterBusy, setGameCenterBusy] = useState(false);
   const [gameCenterStatus, setGameCenterStatus] = useState<string | null>(null);
+<<<<<<< Updated upstream
+=======
+  const [gameCenterName, setGameCenterName] = useState(() => getCachedGameCenterPlayerName());
+  const [referralCode, setReferralCode] = useState(() => getStoredReferralCode());
+  const [referralInput, setReferralInput] = useState("");
+  const [referralBusy, setReferralBusy] = useState(false);
+  const [referralStatus, setReferralStatus] = useState<string | null>(null);
+>>>>>>> Stashed changes
   const {
     unlockedLevel,
     highestElement,
@@ -144,6 +163,61 @@ export function Profile({ onBack }: Props) {
       );
     } finally {
       setGameCenterBusy(false);
+    }
+  }
+
+  async function getReferralPlayerId(): Promise<string | null> {
+    const player = await getCurrentGameCenterPlayer();
+    if (player.authenticated && player.gamePlayerId) return player.gamePlayerId;
+    const signedIn = await authenticateGameCenter();
+    return signedIn.authenticated && signedIn.gamePlayerId ? signedIn.gamePlayerId : null;
+  }
+
+  async function handleShareReferral() {
+    if (referralBusy) return;
+    setReferralBusy(true);
+    setReferralStatus(null);
+    try {
+      const playerId = await getReferralPlayerId();
+      if (!playerId) {
+        setReferralStatus(tr("Sign in to Game Center to create a referral code."));
+        return;
+      }
+      const code = await registerReferralCode(playerId);
+      setReferralCode(code);
+      const message = `${tr("Join me in Atomic Fusion Rush and we both get 20 gold after your first completed game!")} ${code}`;
+      if (navigator.share) {
+        await navigator.share({ text: message });
+      } else {
+        await navigator.clipboard?.writeText(message);
+        setReferralStatus(tr("Referral message copied."));
+      }
+    } catch (error) {
+      setReferralStatus(error instanceof Error ? error.message : tr("Could not create referral code."));
+    } finally {
+      setReferralBusy(false);
+    }
+  }
+
+  async function handleRedeemReferral() {
+    if (referralBusy) return;
+    setReferralBusy(true);
+    setReferralStatus(null);
+    try {
+      const playerId = await getReferralPlayerId();
+      if (!playerId) {
+        setReferralStatus(tr("Sign in to Game Center to redeem a referral."));
+        return;
+      }
+      const redeemed = await redeemReferralCode(referralInput, playerId);
+      setReferralStatus(
+        redeemed
+          ? tr("Referral saved. Complete your first game to earn 20 gold for both players.")
+          : tr("That referral code could not be redeemed."),
+      );
+      if (redeemed) setReferralInput("");
+    } finally {
+      setReferralBusy(false);
     }
   }
 
@@ -258,6 +332,48 @@ export function Profile({ onBack }: Props) {
               >
                 {tr("Open")}
               </button>
+            </div>
+          </section>
+        )}
+        {isReferralAvailable() && (
+          <section style={card} aria-label={tr("Referrals")}>
+            <div style={sectionHeading}>{tr("Invite a friend")}</div>
+            <p style={{ margin: "6px 0 12px", color: "var(--muted-foreground)", fontSize: 12, lineHeight: 1.45 }}>
+              {tr("Share your code. When your friend completes their first game, you both receive 20 gold.")}
+            </p>
+            <div style={{ display: "grid", gap: 8 }}>
+              <button
+                type="button"
+                onClick={handleShareReferral}
+                disabled={referralBusy}
+                style={{ ...gameCenterButton, opacity: referralBusy ? 0.6 : 1 }}
+              >
+                {referralBusy ? tr("Preparing...") : tr("Share referral code")}
+              </button>
+              {referralCode && (
+                <div style={{ color: "var(--muted-foreground)", fontSize: 12 }}>
+                  {tr("Your code")}: <strong>{referralCode}</strong>
+                </div>
+              )}
+              <div style={{ display: "flex", gap: 8 }}>
+                <input
+                  value={referralInput}
+                  onChange={(event) => setReferralInput(event.target.value.toUpperCase())}
+                  placeholder="AFR-XXXXXXX"
+                  aria-label={tr("Referral code")}
+                  maxLength={11}
+                  style={{ ...languageSelect, minWidth: 0, flex: 1, letterSpacing: 1 }}
+                />
+                <button
+                  type="button"
+                  onClick={handleRedeemReferral}
+                  disabled={referralBusy || referralInput.length !== 11}
+                  style={{ ...gameCenterButtonSecondary, ...gameCenterButton, opacity: referralBusy ? 0.6 : 1 }}
+                >
+                  {tr("Redeem")}
+                </button>
+              </div>
+              {referralStatus && <div style={{ color: "var(--muted-foreground)", fontSize: 12 }}>{referralStatus}</div>}
             </div>
           </section>
         )}

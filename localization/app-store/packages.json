@@ -1,9 +1,15 @@
 {
   "sourceLanguage": "en-US",
   "defaultInAppLanguage": "en",
+<<<<<<< Updated upstream
   "localeCount": 15,
+=======
+  "localeCount": 29,
+>>>>>>> Stashed changes
   "selectedLocales": [
     "en-US",
+    "en-GB",
+    "en-AU",
     "zh-Hans",
     "es-ES",
     "hi",
@@ -51,6 +57,26 @@
           "description": "The biggest gold coin pack for long progression."
         }
       }
+    },
+    "en-GB": {
+      "languageCode": "en",
+      "displayName": "English (UK)",
+      "appName": "Atomic Fusion Rush",
+      "subtitle": "Periodic table merge puzzle",
+      "promotionalText": "Fuse atoms, discover the periodic table, and chase every hidden compound.",
+      "description": "Atomic Fusion Rush is a science-inspired merge puzzle where you fuse atoms, discover compounds, and explore the periodic table.",
+      "keywords": "puzzle,chemistry,element,merge,atom,science,strategy,brain,logic,compound,periodic,table,alchemy,lab",
+      "reviewNotes": "Main purchase path: Main Menu -> Shop -> Unlock Pack. Coin packs are also shown in Shop."
+    },
+    "en-AU": {
+      "languageCode": "en",
+      "displayName": "English (Australia)",
+      "appName": "Atomic Fusion Rush",
+      "subtitle": "Periodic table merge puzzle",
+      "promotionalText": "Fuse atoms, discover the periodic table, and chase every hidden compound.",
+      "description": "Atomic Fusion Rush is a science-inspired merge puzzle where you fuse atoms, discover compounds, and explore the periodic table.",
+      "keywords": "puzzle,chemistry,element,merge,atom,science,strategy,brain,logic,compound,periodic,table,alchemy,lab",
+      "reviewNotes": "Main purchase path: Main Menu -> Shop -> Unlock Pack. Coin packs are also shown in Shop."
     },
     "zh-Hans": {
       "languageCode": "zh-Hans",

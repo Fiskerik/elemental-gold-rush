@@ -77,6 +77,7 @@ interface GameCenterPlugin {
 
 const GameCenterNative = registerPlugin<GameCenterPlugin>("GameCenterPlugin");
 const GAME_CENTER_DIAGNOSTICS_STORAGE_KEY = "elemental-gold-rush-game-center-diagnostics";
+const GAME_CENTER_PLAYER_ID_STORAGE_KEY = "elemental-gold-rush-game-center-player-id";
 let cachedGameCenterPlayer: GameCenterPlayer | null = null;
 
 export const DAILY_BOARD_LEADERBOARD_IDS: Record<GameCenterLeaderboardScope, string> = {
@@ -183,11 +184,69 @@ export async function authenticateGameCenter(): Promise<GameCenterPlayer> {
   if (!isGameCenterAvailable()) {
     return { authenticated: false };
   }
+
+  if (cachedGameCenterPlayer?.authenticated) return cachedGameCenterPlayer;
+
+  // Reading the already-authenticated local player does not present Apple's
+  // sign-in UI. Only call authenticate() when iOS has not restored a session
+  // yet (or when the player changed accounts).
+  const currentPlayer = await GameCenterNative.getCurrentPlayer();
+  const rememberedPlayerId = readRememberedPlayerId();
+  if (
+    currentPlayer.authenticated &&
+    currentPlayer.gamePlayerId &&
+    (!rememberedPlayerId || rememberedPlayerId === currentPlayer.gamePlayerId)
+  ) {
+    cachedGameCenterPlayer = currentPlayer;
+    rememberPlayerId(currentPlayer.gamePlayerId);
+    return currentPlayer;
+  }
+
   const player = await GameCenterNative.authenticate();
   cachedGameCenterPlayer = player;
+  if (player.authenticated && player.gamePlayerId) rememberPlayerId(player.gamePlayerId);
   return player;
 }
 
+<<<<<<< Updated upstream
+=======
+function readRememberedPlayerId(): string {
+  if (typeof window === "undefined") return "";
+  try {
+    return window.localStorage.getItem(GAME_CENTER_PLAYER_ID_STORAGE_KEY)?.trim() ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function rememberPlayerId(playerId: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(GAME_CENTER_PLAYER_ID_STORAGE_KEY, playerId);
+  } catch {
+    // Authentication still works if local persistence is unavailable.
+  }
+}
+
+export async function getCurrentGameCenterPlayer(): Promise<GameCenterPlayer> {
+  if (!isGameCenterAvailable()) return { authenticated: false };
+  return GameCenterNative.getCurrentPlayer();
+}
+
+export async function saveGameCloudSave(
+  payload: string,
+  version: number,
+): Promise<{ saved: boolean; version: number }> {
+  if (!isGameCenterAvailable()) return { saved: false, version };
+  return GameCenterNative.saveCloudSave({ payload, version });
+}
+
+export async function loadGameCloudSave(): Promise<CloudSaveRecord> {
+  if (!isGameCenterAvailable()) return { found: false };
+  return GameCenterNative.loadCloudSave();
+}
+
+>>>>>>> Stashed changes
 export function getCachedGameCenterPlayerName(): string {
   const displayName = cachedGameCenterPlayer?.displayName?.trim();
   if (displayName) return displayName;

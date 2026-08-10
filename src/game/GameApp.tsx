@@ -22,7 +22,24 @@ import { MOLECULE_CHALLENGE_BY_LEVEL, getCompoundChallengeKind, getLevelById } f
 import { MoleculeVisual } from "@/game/MoleculeVisual";
 import { useProgress } from "@/game/store";
 import { useDomLocalization } from "@/game/useDomLocalization";
+<<<<<<< Updated upstream
 import { trackOnboardingComplete, trackOnboardingStep } from "@/game/analytics";
+=======
+import { t, type AppLanguage } from "@/game/localization";
+import { getCurrentGameCenterPlayer } from "@/game/gameCenter";
+import {
+  REFERRAL_REWARD_COINS,
+  isReferralAvailable,
+  settleCompletedReferral,
+} from "@/game/referrals";
+
+const FIRST_ENTRY_TUTORIAL_TIP_IDS: Record<HowToPlayMode, string> = {
+  normal: "onboarding-normal-game",
+  "daily-board": "onboarding-daily-board-1.1.2",
+  compound: "onboarding-compound-level-1.1.2",
+  "daily-compound": "onboarding-daily-compound-1.1.2",
+};
+>>>>>>> Stashed changes
 
 type Screen =
   | { name: "menu" }
@@ -54,7 +71,11 @@ export function GameApp() {
   const appReviewMilestonePromptSeen = useProgress((s) => s.appReviewMilestonePromptSeen);
   const appReviewMilestoneRewardClaimed = useProgress((s) => s.appReviewMilestoneRewardClaimed);
   const refreshDailyFeatures = useProgress((s) => s.refreshDailyFeatures);
+<<<<<<< Updated upstream
   const markOnboardingSeen = useProgress((s) => s.markOnboardingSeen);
+=======
+  const grantGoldCoins = useProgress((s) => s.grantGoldCoins);
+>>>>>>> Stashed changes
   const markAppReviewMilestonePromptSeen = useProgress((s) => s.markAppReviewMilestonePromptSeen);
   const claimAppReviewMilestoneReward = useProgress((s) => s.claimAppReviewMilestoneReward);
   const [screen, setScreen] = useState<Screen>({ name: "menu" });
@@ -70,6 +91,81 @@ export function GameApp() {
   useDomLocalization(appLanguage);
 
   useEffect(() => {
+<<<<<<< Updated upstream
+=======
+    if (!isNativeIos) return;
+    return startCloudProgressSync();
+  }, [isNativeIos]);
+
+  useEffect(() => {
+    if (!isReferralAvailable() || completedGameCount <= 0) return;
+    let active = true;
+    void (async () => {
+      try {
+        const player = await getCurrentGameCenterPlayer();
+        if (!player.authenticated || !player.gamePlayerId) return;
+        const result = await settleCompletedReferral(player.gamePlayerId);
+        if (!active) return;
+        if (result.referredAwarded) {
+          grantGoldCoins(REFERRAL_REWARD_COINS, "Referral reward");
+        } else if (result.referrerCoins > 0) {
+          grantGoldCoins(result.referrerCoins, "Referral reward");
+        }
+      } catch (error) {
+        console.warn("[referral] Could not settle referral reward", error);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [completedGameCount, grantGoldCoins]);
+
+  useEffect(() => {
+    if (!isNativeIos) return;
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") recordPushActivity();
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [isNativeIos]);
+
+  useEffect(() => {
+    if (!isNativeIos) {
+      setAppUpdateCheckComplete(true);
+      return;
+    }
+
+    let active = true;
+    const safetyTimeoutId = window.setTimeout(() => {
+      if (active) {
+        console.warn(
+          "[app-update] Store version check timed out; continuing with the current build.",
+        );
+        setAppUpdateCheckComplete(true);
+      }
+    }, 6500);
+    const refreshAppUpdate = async () => {
+      const update = await checkForRequiredAppUpdate();
+      if (!active) return;
+      setRequiredAppUpdate(update);
+      setAppUpdateCheckComplete(true);
+      window.clearTimeout(safetyTimeoutId);
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") void refreshAppUpdate();
+    };
+
+    void refreshAppUpdate();
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      active = false;
+      window.clearTimeout(safetyTimeoutId);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [isNativeIos]);
+
+  useEffect(() => {
+>>>>>>> Stashed changes
     setSfxVolume(soundVolume / 100);
   }, [soundVolume]);
 
