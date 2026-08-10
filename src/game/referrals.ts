@@ -1,9 +1,17 @@
-import { Capacitor } from "@capacitor/core";
+import { Capacitor, registerPlugin } from "@capacitor/core";
 
 const REFERRAL_CODE_STORAGE_KEY = "atomic-fusion-referral-code";
+const DEFAULT_REFERRAL_FUNCTIONS_BASE_URL =
+  "https://europe-west1-atomicfusionrush.cloudfunctions.net";
 const REFERRAL_FUNCTIONS_BASE_URL = String(
-  import.meta.env.VITE_FIREBASE_FUNCTIONS_BASE_URL ?? "",
+  import.meta.env.VITE_FIREBASE_FUNCTIONS_BASE_URL ?? DEFAULT_REFERRAL_FUNCTIONS_BASE_URL,
 ).replace(/\/$/, "");
+
+interface ReferralSharePlugin {
+  share(options: { text: string }): Promise<{ completed: boolean }>;
+}
+
+const ReferralShareNative = registerPlugin<ReferralSharePlugin>("ReferralSharePlugin");
 
 export const REFERRAL_REWARD_COINS = 20;
 
@@ -28,7 +36,10 @@ function storeReferralCode(code: string): void {
   }
 }
 
-async function referralRequest<T>(path: string, payload: Record<string, unknown>): Promise<T | null> {
+async function referralRequest<T>(
+  path: string,
+  payload: Record<string, unknown>,
+): Promise<T | null> {
   if (!REFERRAL_FUNCTIONS_BASE_URL) return null;
   try {
     const response = await fetch(`${REFERRAL_FUNCTIONS_BASE_URL}${path}`, {
@@ -55,9 +66,29 @@ export function makeReferralCode(playerId: string): string {
 
 export async function registerReferralCode(playerId: string): Promise<string> {
   const code = makeReferralCode(playerId);
-  await referralRequest("/createReferralCode", { playerId, code });
+  const result = await referralRequest<{ ok?: boolean }>("/createReferralCode", { playerId, code });
+  if (!result?.ok) throw new Error("Referral code could not be registered. Please try again.");
   storeReferralCode(code);
   return code;
+}
+
+export async function shareReferralText(text: string): Promise<boolean> {
+  if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios") {
+    const result = await ReferralShareNative.share({ text });
+    return result.completed;
+  }
+
+  if (typeof navigator !== "undefined" && navigator.share) {
+    await navigator.share({ text });
+    return true;
+  }
+
+  if (typeof navigator !== "undefined" && navigator.clipboard) {
+    await navigator.clipboard.writeText(text);
+    return true;
+  }
+
+  return false;
 }
 
 export async function redeemReferralCode(code: string, playerId: string): Promise<boolean> {

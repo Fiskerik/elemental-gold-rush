@@ -29,6 +29,7 @@ import {
   isReferralAvailable,
   redeemReferralCode,
   registerReferralCode,
+  shareReferralText,
 } from "./referrals";
 import {
   DAILY_BOARD_LEADERBOARD_ACHIEVEMENTS,
@@ -234,9 +235,12 @@ export function Profile({ onBack, onOpenShop }: Props) {
       if (!playerId) throw new Error(tr("Sign in to Game Center first."));
       const code = await registerReferralCode(playerId);
       setReferralCode(code);
-      if (navigator.share) await navigator.share({ text: `${tr("Join me in Atomic Fusion Rush")}: ${code}` });
-      else await navigator.clipboard?.writeText(code);
-      setReferralStatus(tr("Referral code copied. You both receive 20 gold after their first completed game."));
+      const shared = await shareReferralText(`${tr("Join me in Atomic Fusion Rush")}: ${code}`);
+      setReferralStatus(
+        shared
+          ? tr("Referral code shared. You both receive 20 gold after their first completed game.")
+          : tr("Sharing cancelled. Your referral code is ready above."),
+      );
     } catch (error) {
       setReferralStatus(error instanceof Error ? error.message : tr("Referral sharing failed."));
     } finally {
@@ -406,7 +410,7 @@ export function Profile({ onBack, onOpenShop }: Props) {
                 {tr("Redeem")}
               </button>
             </div>
-            {referralStatus && <small>{referralStatus}</small>}
+            {referralStatus && <small style={referralStatusText}>{referralStatus}</small>}
           </section>
         )}
         <section style={card} aria-label="Daily Board placement badges">
@@ -1068,6 +1072,12 @@ const gameCenterActions: React.CSSProperties = {
   justifyContent: "flex-end",
   gap: 8,
   flexWrap: "wrap",
+};
+
+const referralStatusText: React.CSSProperties = {
+  display: "block",
+  marginTop: 12,
+  lineHeight: 1.5,
 };
 
 const gameCenterButton: React.CSSProperties = {
