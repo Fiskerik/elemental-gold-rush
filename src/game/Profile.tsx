@@ -19,10 +19,17 @@ import { COSMETIC_THEME_PURCHASES_ENABLED, PRODUCT_IDS, THEME_BUNDLE_PRODUCT_IDS
 import { restorePurchases } from "./purchases";
 import {
   authenticateGameCenter,
+  getCurrentGameCenterPlayer,
   getCachedGameCenterPlayerName,
   isGameCenterAvailable,
   showGameCenterLeaderboards,
 } from "./gameCenter";
+import {
+  getStoredReferralCode,
+  isReferralAvailable,
+  redeemReferralCode,
+  registerReferralCode,
+} from "./referrals";
 import {
   DAILY_BOARD_LEADERBOARD_ACHIEVEMENTS,
   type DailyBoardLeaderboardAchievementId,
@@ -62,6 +69,10 @@ export function Profile({ onBack, onOpenShop }: Props) {
   const [gameCenterBusy, setGameCenterBusy] = useState(false);
   const [gameCenterStatus, setGameCenterStatus] = useState<string | null>(null);
   const [gameCenterName, setGameCenterName] = useState(() => getCachedGameCenterPlayerName());
+  const [referralCode, setReferralCode] = useState(() => getStoredReferralCode());
+  const [referralInput, setReferralInput] = useState("");
+  const [referralBusy, setReferralBusy] = useState(false);
+  const [referralStatus, setReferralStatus] = useState<string | null>(null);
   const {
     unlockedLevel,
     highestElement,
@@ -210,6 +221,42 @@ export function Profile({ onBack, onOpenShop }: Props) {
     }
   }
 
+  async function getReferralPlayerId() {
+    const player = await getCurrentGameCenterPlayer();
+    return player.authenticated && player.gamePlayerId ? player.gamePlayerId : "";
+  }
+
+  async function handleShareReferral() {
+    if (referralBusy || !isReferralAvailable()) return;
+    setReferralBusy(true);
+    try {
+      const playerId = await getReferralPlayerId();
+      if (!playerId) throw new Error(tr("Sign in to Game Center first."));
+      const code = await registerReferralCode(playerId);
+      setReferralCode(code);
+      if (navigator.share) await navigator.share({ text: `${tr("Join me in Atomic Fusion Rush")}: ${code}` });
+      else await navigator.clipboard?.writeText(code);
+      setReferralStatus(tr("Referral code copied. You both receive 20 gold after their first completed game."));
+    } catch (error) {
+      setReferralStatus(error instanceof Error ? error.message : tr("Referral sharing failed."));
+    } finally {
+      setReferralBusy(false);
+    }
+  }
+
+  async function handleRedeemReferral() {
+    if (referralBusy || !isReferralAvailable()) return;
+    setReferralBusy(true);
+    try {
+      const playerId = await getReferralPlayerId();
+      const redeemed = await redeemReferralCode(referralInput, playerId);
+      setReferralStatus(redeemed ? tr("Code accepted. Complete your first game to receive 20 gold.") : tr("Referral code was not accepted."));
+      if (redeemed) setReferralInput("");
+    } finally {
+      setReferralBusy(false);
+    }
+  }
+
   async function handleRestorePurchases() {
     if (restoreBusy) return;
     setRestoreBusy(true);
@@ -341,6 +388,25 @@ export function Profile({ onBack, onOpenShop }: Props) {
                 {tr("Open")}
               </button>
             </div>
+          </section>
+        )}
+        {isReferralAvailable() && (
+          <section style={card}>
+            <div style={sectionHeading}>{tr("Invite a friend")}</div>
+            <p style={gameCenterCopy}>{tr("Share your code. You both receive 20 gold after your friend completes their first game.")}</p>
+            <div style={gameCenterActions}>
+              <button type="button" onClick={handleShareReferral} disabled={referralBusy} style={gameCenterButton}>
+                {tr(referralBusy ? "Working..." : "Share referral code")}
+              </button>
+            </div>
+            {referralCode && <small>{`${tr("Your code")}: ${referralCode}`}</small>}
+            <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+              <input value={referralInput} onChange={(event) => setReferralInput(event.target.value)} placeholder="AFR-XXXXXXX" />
+              <button type="button" onClick={handleRedeemReferral} disabled={referralBusy || !referralInput.trim()} style={gameCenterButton}>
+                {tr("Redeem")}
+              </button>
+            </div>
+            {referralStatus && <small>{referralStatus}</small>}
           </section>
         )}
         <section style={card} aria-label="Daily Board placement badges">

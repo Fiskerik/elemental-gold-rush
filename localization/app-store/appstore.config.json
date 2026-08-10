@@ -2,6 +2,8 @@
   "bundleId": "com.eaconsulting.atomicfusion",
   "platform": "IOS",
   "releaseNotesLocaleOrder": [
+    "en-GB",
+    "en-AU",
     "ar-SA",
     "zh-Hans",
     "zh-Hant",

@@ -26,6 +26,12 @@ import { consumePendingPushRoute, recordPushActivity } from "@/game/pushNotifica
 import { useProgress } from "@/game/store";
 import { useDomLocalization } from "@/game/useDomLocalization";
 import { t, type AppLanguage } from "@/game/localization";
+import { getCurrentGameCenterPlayer } from "@/game/gameCenter";
+import {
+  REFERRAL_REWARD_COINS,
+  isReferralAvailable,
+  settleCompletedReferral,
+} from "@/game/referrals";
 
 const FIRST_ENTRY_TUTORIAL_TIP_IDS: Record<HowToPlayMode, string> = {
   normal: "onboarding-normal-game",
@@ -63,6 +69,7 @@ export function GameApp() {
   const appReviewMilestonePromptSeen = useProgress((s) => s.appReviewMilestonePromptSeen);
   const appReviewMilestoneRewardClaimed = useProgress((s) => s.appReviewMilestoneRewardClaimed);
   const refreshDailyFeatures = useProgress((s) => s.refreshDailyFeatures);
+  const grantGoldCoins = useProgress((s) => s.grantGoldCoins);
   const markAppReviewMilestonePromptSeen = useProgress((s) => s.markAppReviewMilestonePromptSeen);
   const claimAppReviewMilestoneReward = useProgress((s) => s.claimAppReviewMilestoneReward);
   const [screen, setScreen] = useState<Screen>({ name: "menu" });
@@ -77,6 +84,25 @@ export function GameApp() {
   const isNativeIos = Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios";
 
   useDomLocalization(appLanguage);
+
+  useEffect(() => {
+    if (!isReferralAvailable() || completedGameCount <= 0) return;
+    let active = true;
+    void (async () => {
+      const player = await getCurrentGameCenterPlayer();
+      if (!player.authenticated || !player.gamePlayerId) return;
+      const result = await settleCompletedReferral(player.gamePlayerId);
+      if (!active) return;
+      if (result.referredAwarded) {
+        grantGoldCoins(REFERRAL_REWARD_COINS, "Referral reward");
+      } else if (result.referrerCoins > 0) {
+        grantGoldCoins(result.referrerCoins, "Referral reward");
+      }
+    })().catch((error) => console.warn("[referral] Could not settle reward", error));
+    return () => {
+      active = false;
+    };
+  }, [completedGameCount, grantGoldCoins]);
 
   useEffect(() => {
     if (!isNativeIos) return;

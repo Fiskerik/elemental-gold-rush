@@ -220,13 +220,15 @@ async function uploadMetadata(notes, version) {
   );
 
   let createdAppInfo = 0;
+  let updatedAppInfo = 0;
   let createdVersion = 0;
   let updatedVersion = 0;
   let unchangedVersion = 0;
 
   for (const [locale, entry] of notes.locales) {
-    if (!existingAppInfoLocalizations.has(locale)) {
-      const appLocale = sourceMetadata.locales[locale];
+    const appLocale = sourceMetadata.locales[locale];
+    const existingAppInfo = existingAppInfoLocalizations.get(locale);
+    if (!existingAppInfo) {
       await apiRequest(token, "/appInfoLocalizations", {
         method: "POST",
         body: {
@@ -245,11 +247,21 @@ async function uploadMetadata(notes, version) {
         },
       });
       createdAppInfo += 1;
+    } else {
+      const attributes = {};
+      if (existingAppInfo.attributes.name !== appLocale.appName) attributes.name = appLocale.appName;
+      if (existingAppInfo.attributes.subtitle !== appLocale.subtitle) attributes.subtitle = appLocale.subtitle;
+      if (Object.keys(attributes).length > 0) {
+        await apiRequest(token, `/appInfoLocalizations/${existingAppInfo.id}`, {
+          method: "PATCH",
+          body: { data: { type: "appInfoLocalizations", id: existingAppInfo.id, attributes } },
+        });
+        updatedAppInfo += 1;
+      }
     }
 
     const existing = existingVersionLocalizations.get(locale);
     if (!existing) {
-      const appLocale = sourceMetadata.locales[locale];
       await apiRequest(token, "/appStoreVersionLocalizations", {
         method: "POST",
         body: {
@@ -273,7 +285,6 @@ async function uploadMetadata(notes, version) {
     }
 
     const attributes = {};
-    const appLocale = sourceMetadata.locales[locale];
     const description = normalizeMetadataText(appLocale.description);
     const keywords = normalizeMetadataText(appLocale.keywords);
     if (existing.attributes.description !== description) {
@@ -307,6 +318,7 @@ async function uploadMetadata(notes, version) {
 
   console.log(`Uploaded metadata for iOS ${version}.`);
   console.log(`App-info localizations created: ${createdAppInfo}`);
+  console.log(`App-info localizations updated: ${updatedAppInfo}`);
   console.log(`Version localizations created: ${createdVersion}`);
   console.log(`Version localizations updated: ${updatedVersion}`);
   console.log(`Version localizations unchanged: ${unchangedVersion}`);

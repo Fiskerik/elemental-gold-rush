@@ -1,9 +1,11 @@
 {
   "sourceLanguage": "en-US",
   "defaultInAppLanguage": "en",
-  "localeCount": 27,
+  "localeCount": 29,
   "selectedLocales": [
     "en-US",
+    "en-GB",
+    "en-AU",
     "zh-Hans",
     "es-ES",
     "hi",
@@ -63,6 +65,26 @@
           "description": "The biggest gold coin pack for long progression."
         }
       }
+    },
+    "en-GB": {
+      "languageCode": "en-GB",
+      "displayName": "English (UK)",
+      "appName": "Atomic Fusion Rush",
+      "subtitle": "Periodic table merge puzzle",
+      "promotionalText": "Fuse atoms, discover the periodic table, and chase every hidden compound.",
+      "description": "Fuse atoms, discover compounds, and explore the periodic table in a strategic puzzle adventure.",
+      "keywords": "merge,atoms,chemistry,periodic table,puzzle,science,compound,lab,logic,strategy",
+      "reviewNotes": "Open the main menu, then Shop to view purchases."
+    },
+    "en-AU": {
+      "languageCode": "en-AU",
+      "displayName": "English (Australia)",
+      "appName": "Atomic Fusion Rush",
+      "subtitle": "Periodic table merge puzzle",
+      "promotionalText": "Fuse atoms, discover the periodic table, and chase every hidden compound.",
+      "description": "Fuse atoms, discover compounds, and explore the periodic table in a strategic puzzle adventure.",
+      "keywords": "merge,atoms,chemistry,periodic table,puzzle,science,compound,lab,logic,strategy",
+      "reviewNotes": "Open the main menu, then Shop to view purchases."
     },
     "zh-Hans": {
       "languageCode": "zh-Hans",

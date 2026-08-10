@@ -106,6 +106,63 @@ export const recordPlayerActivity = onRequest({ cors: true, region: FUNCTION_REG
   json(res, 200, { ok: true });
 });
 
+const REFERRAL_REWARD_COINS = 20;
+const referralCodeValid = (value: unknown): value is string => typeof value === "string" && /^AFR-[A-Z0-9]{7}$/.test(value);
+const playerIdValid = (value: unknown): value is string => typeof value === "string" && value.length >= 8 && value.length <= 200;
+
+export const createReferralCode = onRequest({ cors: true, region: FUNCTION_REGION }, async (req, res) => {
+  if (req.method !== "POST") return json(res, 405, { error: "POST required" });
+  const { playerId, code } = req.body as Record<string, unknown>;
+  if (!playerIdValid(playerId) || !referralCodeValid(code)) return json(res, 400, { error: "Invalid referral data" });
+  await db.collection("referralCodes").doc(code).set({ playerId, createdAt: Timestamp.now() }, { merge: true });
+  return json(res, 200, { ok: true, code });
+});
+
+export const redeemReferral = onRequest({ cors: true, region: FUNCTION_REGION }, async (req, res) => {
+  if (req.method !== "POST") return json(res, 405, { error: "POST required" });
+  const { playerId, code } = req.body as Record<string, unknown>;
+  if (!playerIdValid(playerId) || !referralCodeValid(code)) return json(res, 400, { error: "Invalid referral data" });
+  const owner = await db.collection("referralCodes").doc(code).get();
+  const referrerId = owner.data()?.playerId;
+  if (!owner.exists || !playerIdValid(referrerId) || referrerId === playerId) return json(res, 400, { error: "Referral code unavailable" });
+  await db.collection("referrals").doc(playerId).create({ code, referrerId, referredId: playerId, completed: false, createdAt: Timestamp.now() }).catch(() => undefined);
+  return json(res, 200, { ok: true });
+});
+
+export const completeReferral = onRequest({ cors: true, region: FUNCTION_REGION }, async (req, res) => {
+  if (req.method !== "POST") return json(res, 405, { error: "POST required" });
+  const { playerId } = req.body as Record<string, unknown>;
+  if (!playerIdValid(playerId)) return json(res, 400, { error: "Invalid playerId" });
+  const referralRef = db.collection("referrals").doc(playerId);
+  const result = await db.runTransaction(async (tx) => {
+    const referral = await tx.get(referralRef);
+    if (!referral.exists || referral.data()?.completed) return false;
+    const data = referral.data()!;
+    tx.update(referralRef, { completed: true, completedAt: Timestamp.now() });
+    const referrerReward = db.collection("referralRewards").doc(data.referrerId);
+    const referredReward = db.collection("referralRewards").doc(playerId);
+    const [referrer, referred] = await Promise.all([tx.get(referrerReward), tx.get(referredReward)]);
+    tx.set(referrerReward, { pendingCoins: (referrer.data()?.pendingCoins ?? 0) + REFERRAL_REWARD_COINS }, { merge: true });
+    tx.set(referredReward, { pendingCoins: (referred.data()?.pendingCoins ?? 0) + REFERRAL_REWARD_COINS }, { merge: true });
+    return true;
+  });
+  return json(res, 200, { awarded: result });
+});
+
+export const claimReferralRewards = onRequest({ cors: true, region: FUNCTION_REGION }, async (req, res) => {
+  if (req.method !== "POST") return json(res, 405, { error: "POST required" });
+  const { playerId } = req.body as Record<string, unknown>;
+  if (!playerIdValid(playerId)) return json(res, 400, { error: "Invalid playerId" });
+  const rewardRef = db.collection("referralRewards").doc(playerId);
+  const coins = await db.runTransaction(async (tx) => {
+    const snapshot = await tx.get(rewardRef);
+    const pendingCoins = Math.max(0, Math.floor(snapshot.data()?.pendingCoins ?? 0));
+    tx.set(rewardRef, { pendingCoins: 0 }, { merge: true });
+    return pendingCoins;
+  });
+  return json(res, 200, { coins });
+});
+
 async function sendToRegistrations(
   docs: QueryDocumentSnapshot[],
   message: Omit<MulticastMessage, "tokens">,
