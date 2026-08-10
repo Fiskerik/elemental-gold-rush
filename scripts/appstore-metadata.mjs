@@ -221,6 +221,7 @@ async function uploadMetadata(notes, version) {
 
   let createdAppInfo = 0;
   let updatedAppInfo = 0;
+  let existingAppInfoConflicts = 0;
   let createdVersion = 0;
   let updatedVersion = 0;
   let unchangedVersion = 0;
@@ -229,8 +230,9 @@ async function uploadMetadata(notes, version) {
     const appLocale = sourceMetadata.locales[locale];
     const existingAppInfo = existingAppInfoLocalizations.get(locale);
     if (!existingAppInfo) {
-      await apiRequest(token, "/appInfoLocalizations", {
+      const createResult = await apiRequest(token, "/appInfoLocalizations", {
         method: "POST",
+        allowConflict: true,
         body: {
           data: {
             type: "appInfoLocalizations",
@@ -246,7 +248,17 @@ async function uploadMetadata(notes, version) {
           },
         },
       });
-      createdAppInfo += 1;
+      if (createResult.conflict) {
+        // App Store Connect can keep the locale on another App Info record
+        // (for example, the live record) and still enforce locale uniqueness.
+        // The version metadata below is independent and must still be uploaded.
+        existingAppInfoConflicts += 1;
+        console.warn(
+          `App Info ${locale} already exists in App Store Connect; leaving its name and subtitle unchanged.`,
+        );
+      } else {
+        createdAppInfo += 1;
+      }
     } else {
       const attributes = {};
       if (existingAppInfo.attributes.name !== appLocale.appName) attributes.name = appLocale.appName;
@@ -260,10 +272,11 @@ async function uploadMetadata(notes, version) {
       }
     }
 
-    const existing = existingVersionLocalizations.get(locale);
+    let existing = existingVersionLocalizations.get(locale);
     if (!existing) {
-      await apiRequest(token, "/appStoreVersionLocalizations", {
+      const createResult = await apiRequest(token, "/appStoreVersionLocalizations", {
         method: "POST",
+        allowConflict: true,
         body: {
           data: {
             type: "appStoreVersionLocalizations",
@@ -280,8 +293,23 @@ async function uploadMetadata(notes, version) {
           },
         },
       });
-      createdVersion += 1;
-      continue;
+      if (!createResult.conflict) {
+        createdVersion += 1;
+        continue;
+      }
+
+      // Recover from stale/incomplete relationship results by reading the
+      // version localizations again and updating the record Apple says exists.
+      const refreshed = await apiRequest(
+        token,
+        `/appStoreVersions/${versionId}/appStoreVersionLocalizations?limit=200`,
+      );
+      existing = refreshed.data.find((item) => item.attributes.locale === locale);
+      if (!existing) {
+        fail(
+          `App Store Connect reports that version locale ${locale} already exists, but it was not returned for iOS ${version}.`,
+        );
+      }
     }
 
     const attributes = {};
@@ -319,6 +347,7 @@ async function uploadMetadata(notes, version) {
   console.log(`Uploaded metadata for iOS ${version}.`);
   console.log(`App-info localizations created: ${createdAppInfo}`);
   console.log(`App-info localizations updated: ${updatedAppInfo}`);
+  console.log(`Existing App-info locales skipped: ${existingAppInfoConflicts}`);
   console.log(`Version localizations created: ${createdVersion}`);
   console.log(`Version localizations updated: ${updatedVersion}`);
   console.log(`Version localizations unchanged: ${unchangedVersion}`);
@@ -405,7 +434,11 @@ async function resolveAppInfo(token, appId, versionResource) {
   );
 }
 
-async function apiRequest(token, endpoint, { method = "GET", body } = {}) {
+async function apiRequest(
+  token,
+  endpoint,
+  { method = "GET", body, allowConflict = false } = {},
+) {
   const response = await fetch(`${API_ROOT}${endpoint}`, {
     method,
     headers: {
@@ -422,11 +455,14 @@ async function apiRequest(token, endpoint, { method = "GET", body } = {}) {
   } catch {
     payload = { raw: text };
   }
+  if (response.status === 409 && allowConflict) {
+    return { conflict: true, payload };
+  }
   if (!response.ok) {
     const detail = payload?.errors?.map((error) => error.detail).filter(Boolean).join("; ");
     fail(`App Store Connect API ${response.status}: ${detail || text || response.statusText}`);
   }
-  return payload;
+  return { conflict: false, ...payload };
 }
 
 function displayName(metadata, locale) {

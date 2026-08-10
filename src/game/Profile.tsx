@@ -419,6 +419,7 @@ export function Profile({ onBack, onOpenShop }: Props) {
               <input
                 ref={referralInputRef}
                 type="text"
+                aria-label={tr("Referral code")}
                 placeholder="AFR-XXXXXXX"
                 autoCapitalize="characters"
                 autoCorrect="off"
@@ -1117,6 +1118,18 @@ const referralRedeemRow: React.CSSProperties = {
 const referralInputField: React.CSSProperties = {
   flex: "1 1 0",
   minWidth: 0,
+  minHeight: 40,
+  boxSizing: "border-box",
+  border: "1px solid var(--border)",
+  borderRadius: 12,
+  padding: "9px 12px",
+  background: "var(--surface)",
+  color: "var(--foreground)",
+  caretColor: "var(--accent)",
+  fontFamily: "inherit",
+  fontSize: 16,
+  fontWeight: 750,
+  outline: "none",
 };
 
 const gameCenterButton: React.CSSProperties = {
