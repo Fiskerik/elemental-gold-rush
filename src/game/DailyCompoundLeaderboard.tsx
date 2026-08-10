@@ -1,5 +1,5 @@
 import { useEffect, useState, type CSSProperties } from "react";
-import { Coins } from "lucide-react";
+import { Coins, Crown, Medal, Trophy } from "lucide-react";
 import {
   countryFlag,
   getDailyLeaderboard,
@@ -69,6 +69,8 @@ export function Leaderboard({ onBack }: { onBack: () => void }) {
   const currentPrize = getDailyLeaderboardReward(board.player.rank);
   const rewardKey = getDailyLeaderboardRewardKey(kind, getTodayQuestDate());
   const awardedPrize = dailyLeaderboardRewardClaims[rewardKey] ?? 0;
+  const topEntries = board.entries.filter((entry) => entry.rank <= 3);
+  const remainingEntries = board.entries.filter((entry) => entry.rank > 3);
 
   async function handleOpenGameCenter() {
     if (gameCenterBusy) return;
@@ -138,6 +140,28 @@ export function Leaderboard({ onBack }: { onBack: () => void }) {
           </SegmentButton>
         </div>
 
+        {topEntries.length > 0 && (
+          <section style={podiumPanel} aria-label={tr("Top three") as string}>
+            <div style={podiumHeader}>
+              <div>
+                <div style={summaryLabel}>{tr("Rank")} 1–3</div>
+                <h2 style={podiumTitle}>{tr("Leaderboard")}</h2>
+              </div>
+              <Trophy size={24} strokeWidth={2.4} color="var(--accent)" aria-hidden="true" />
+            </div>
+            <div style={podiumGrid}>
+              {[2, 1, 3].map((rank) => {
+                const entry = topEntries.find((candidate) => candidate.rank === rank);
+                return entry ? (
+                  <PodiumCard key={entry.id} entry={entry} kind={kind} featured={rank === 1} tr={tr} />
+                ) : (
+                  <div key={`empty-${rank}`} style={podiumPlaceholder} aria-hidden="true" />
+                );
+              })}
+            </div>
+          </section>
+        )}
+
         <section style={prizePanel} aria-label={tr("Daily leaderboard prizes")}>
           <div>
             <div style={summaryLabel}>Today’s top-three prizes</div>
@@ -194,8 +218,8 @@ export function Leaderboard({ onBack }: { onBack: () => void }) {
             {kind === "daily-board" && <span style={{ textAlign: "right" }}>{tr("Shots")}</span>}
           </div>
           <div style={{ display: "grid", gap: 7 }}>
-            {board.entries.length > 0 ? (
-              board.entries.map((entry) => (
+            {(topEntries.length > 0 ? remainingEntries : board.entries).length > 0 ? (
+              (topEntries.length > 0 ? remainingEntries : board.entries).map((entry) => (
                 <LeaderboardRow key={entry.id} entry={entry} kind={kind} />
               ))
             ) : (
@@ -207,6 +231,60 @@ export function Leaderboard({ onBack }: { onBack: () => void }) {
         </section>
       </div>
     </div>
+  );
+}
+
+function PodiumCard({
+  entry,
+  kind,
+  featured,
+  tr,
+}: {
+  entry: LeaderboardEntry;
+  kind: LeaderboardKind;
+  featured: boolean;
+  tr: (text: string) => string;
+}) {
+  const reward = getDailyLeaderboardReward(entry.rank);
+  const accent = entry.rank === 1 ? "#f6c945" : entry.rank === 2 ? "#b9d3e8" : "#e79855";
+  const RankIcon = entry.rank === 1 ? Crown : Medal;
+
+  return (
+    <article
+      style={{
+        ...podiumCard,
+        ...(featured ? podiumCardFeatured : undefined),
+        borderColor: accent,
+        boxShadow: `0 0 ${featured ? 24 : 14}px color-mix(in oklch, ${accent} 26%, transparent)`,
+      }}
+    >
+      <div style={{ ...podiumRank, color: accent }}>
+        <RankIcon size={featured ? 18 : 15} strokeWidth={2.7} aria-hidden="true" />
+        <span>#{entry.rank}</span>
+      </div>
+      <div style={{ ...podiumAvatar, borderColor: accent }} aria-hidden="true">
+        {entry.flag}
+      </div>
+      <strong
+        style={{
+          ...podiumName,
+          fontSize: leaderboardNameFontSize(entry.name),
+        }}
+        data-no-localize="true"
+      >
+        {entry.name}
+      </strong>
+      <strong style={podiumScore}>
+        {kind === "daily-compound" ? formatSeconds(entry.score) : formatScore(entry.score)}
+      </strong>
+      <span style={podiumReward}>
+        <Coins size={14} strokeWidth={2.8} aria-hidden="true" />
+        +{reward}
+      </span>
+      <span style={podiumMeta}>
+        {kind === "daily-board" ? `${entry.shots} ${tr("Shots")}` : tr("Time")}
+      </span>
+    </article>
   );
 }
 
@@ -403,6 +481,115 @@ const tabRow: CSSProperties = {
 const kindTabRow: CSSProperties = {
   ...tabRow,
   marginTop: 14,
+};
+
+const podiumPanel: CSSProperties = {
+  marginTop: 12,
+  padding: 12,
+  border: "1px solid color-mix(in oklch, var(--accent) 46%, var(--border))",
+  borderRadius: 18,
+  background:
+    "radial-gradient(circle at 50% -25%, color-mix(in oklch, var(--accent) 18%, transparent), transparent 55%), linear-gradient(145deg, color-mix(in oklch, var(--primary) 24%, var(--surface-elevated)), var(--surface-elevated))",
+  boxShadow: "0 18px 40px rgba(0,0,0,0.26)",
+};
+
+const podiumHeader: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 10,
+  padding: "2px 4px 10px",
+};
+
+const podiumTitle: CSSProperties = {
+  margin: "3px 0 0",
+  fontSize: 18,
+  lineHeight: 1,
+  fontWeight: 950,
+};
+
+const podiumGrid: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+  alignItems: "end",
+  gap: 7,
+};
+
+const podiumCard: CSSProperties = {
+  minWidth: 0,
+  minHeight: 142,
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "flex-end",
+  gap: 5,
+  padding: "10px 6px 11px",
+  border: "1px solid",
+  borderRadius: 14,
+  background:
+    "linear-gradient(180deg, color-mix(in oklch, var(--surface-high) 82%, transparent), color-mix(in oklch, var(--surface) 94%, transparent))",
+};
+
+const podiumCardFeatured: CSSProperties = {
+  minHeight: 162,
+  paddingTop: 13,
+  background:
+    "linear-gradient(180deg, color-mix(in oklch, #f6c945 18%, var(--surface-high)), color-mix(in oklch, var(--surface) 94%, transparent))",
+};
+
+const podiumPlaceholder: CSSProperties = {
+  minHeight: 142,
+};
+
+const podiumRank: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 3,
+  fontSize: 12,
+  fontWeight: 950,
+};
+
+const podiumAvatar: CSSProperties = {
+  width: 38,
+  height: 38,
+  display: "grid",
+  placeItems: "center",
+  border: "2px solid",
+  borderRadius: "50%",
+  background: "color-mix(in oklch, var(--primary) 28%, var(--surface))",
+  fontSize: 21,
+  boxShadow: "0 5px 14px rgba(0,0,0,0.28)",
+};
+
+const podiumName: CSSProperties = {
+  width: "100%",
+  minWidth: 0,
+  overflow: "hidden",
+  textAlign: "center",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+  fontWeight: 900,
+};
+
+const podiumScore: CSSProperties = {
+  fontSize: 17,
+  lineHeight: 1,
+  fontWeight: 1000,
+};
+
+const podiumReward: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 3,
+  color: "var(--accent)",
+  fontSize: 12,
+  fontWeight: 950,
+};
+
+const podiumMeta: CSSProperties = {
+  color: "var(--muted-foreground)",
+  fontSize: 10,
+  fontWeight: 800,
 };
 
 const prizePanel: CSSProperties = {
