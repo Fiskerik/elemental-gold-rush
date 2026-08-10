@@ -5,6 +5,7 @@ import { StatusBar, Style } from "@capacitor/status-bar";
 import { Coins } from "lucide-react";
 import { MainMenu } from "@/game/MainMenu";
 import { openAppStoreReview } from "@/game/appReview";
+import { startCloudProgressSync } from "@/game/cloudSync";
 import { clearSavedRun, GameBoard, getSavedRunSummary } from "@/game/GameBoard";
 import { setMusicVolume, setSfxVolume } from "@/game/audio";
 import { LevelSelect } from "@/game/LevelSelect";
@@ -15,14 +16,23 @@ import { LabModes } from "@/game/LabModes";
 import { GameLibrary } from "@/game/GameLibrary";
 import { Profile } from "@/game/Profile";
 import { Leaderboard } from "@/game/DailyCompoundLeaderboard";
+import { settleDailyLeaderboardRewards } from "@/game/leaderboard";
+import { getTodayQuestDate } from "@/game/quests";
 import { GameModeId } from "@/game/challenges";
-import { COMPOUNDS } from "@/game/compounds";
-import { ElementBall } from "@/game/ElementBall";
 import { MOLECULE_CHALLENGE_BY_LEVEL, getCompoundChallengeKind, getLevelById } from "@/game/levels";
-import { MoleculeVisual } from "@/game/MoleculeVisual";
+import type { HowToPlayMode } from "@/game/HowToPlay";
+import { APP_STORE_URL, checkForRequiredAppUpdate, type RequiredAppUpdate } from "@/game/appUpdate";
+import { consumePendingPushRoute, recordPushActivity } from "@/game/pushNotifications";
 import { useProgress } from "@/game/store";
 import { useDomLocalization } from "@/game/useDomLocalization";
-import { trackOnboardingComplete, trackOnboardingStep } from "@/game/analytics";
+import { t, type AppLanguage } from "@/game/localization";
+
+const FIRST_ENTRY_TUTORIAL_TIP_IDS: Record<HowToPlayMode, string> = {
+  normal: "onboarding-normal-game",
+  "daily-board": "onboarding-daily-board-1.1.2",
+  compound: "onboarding-compound-level-1.1.2",
+  "daily-compound": "onboarding-daily-compound-1.1.2",
+};
 
 type Screen =
   | { name: "menu" }
@@ -33,9 +43,10 @@ type Screen =
       mode?: GameModeId;
       resumeSavedRun?: boolean;
       secretCompoundId?: string;
+      initialHowToPlay?: HowToPlayMode;
     }
   | { name: "collection" }
-  | { name: "shop" }
+  | { name: "shop"; section?: "themes" }
   | { name: "lab" }
   | { name: "library" }
   | { name: "profile" }
@@ -49,18 +60,16 @@ export function GameApp() {
   const soundVolume = useProgress((s) => s.soundVolume);
   const musicVolume = useProgress((s) => s.musicVolume);
   const completedGameCount = useProgress((s) => s.completedGameCount);
-  const levelStars = useProgress((s) => s.levelStars);
-  const onboardingSeen = useProgress((s) => s.onboardingSeen);
   const appReviewMilestonePromptSeen = useProgress((s) => s.appReviewMilestonePromptSeen);
   const appReviewMilestoneRewardClaimed = useProgress((s) => s.appReviewMilestoneRewardClaimed);
   const refreshDailyFeatures = useProgress((s) => s.refreshDailyFeatures);
-  const markOnboardingSeen = useProgress((s) => s.markOnboardingSeen);
   const markAppReviewMilestonePromptSeen = useProgress((s) => s.markAppReviewMilestonePromptSeen);
   const claimAppReviewMilestoneReward = useProgress((s) => s.claimAppReviewMilestoneReward);
   const [screen, setScreen] = useState<Screen>({ name: "menu" });
   const [gameRunNonce, setGameRunNonce] = useState(0);
   const [showLaunchScreen, setShowLaunchScreen] = useState(true);
-  const [onboardingStep, setOnboardingStep] = useState(0);
+  const [appUpdateCheckComplete, setAppUpdateCheckComplete] = useState(false);
+  const [requiredAppUpdate, setRequiredAppUpdate] = useState<RequiredAppUpdate | null>(null);
   const [resumePrompt, setResumePrompt] = useState<ReturnType<typeof getSavedRunSummary>>(null);
   const [appReviewMilestonePromptOpen, setAppReviewMilestonePromptOpen] = useState(false);
   const [appReviewRequested, setAppReviewRequested] = useState(false);
@@ -70,16 +79,61 @@ export function GameApp() {
   useDomLocalization(appLanguage);
 
   useEffect(() => {
+    if (!isNativeIos) return;
+    return startCloudProgressSync();
+  }, [isNativeIos]);
+
+  useEffect(() => {
+    if (!isNativeIos) return;
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") recordPushActivity();
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [isNativeIos]);
+
+  useEffect(() => {
+    if (!isNativeIos) {
+      setAppUpdateCheckComplete(true);
+      return;
+    }
+
+    let active = true;
+    const safetyTimeoutId = window.setTimeout(() => {
+      if (active) {
+        console.warn(
+          "[app-update] Store version check timed out; continuing with the current build.",
+        );
+        setAppUpdateCheckComplete(true);
+      }
+    }, 6500);
+    const refreshAppUpdate = async () => {
+      const update = await checkForRequiredAppUpdate();
+      if (!active) return;
+      setRequiredAppUpdate(update);
+      setAppUpdateCheckComplete(true);
+      window.clearTimeout(safetyTimeoutId);
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") void refreshAppUpdate();
+    };
+
+    void refreshAppUpdate();
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      active = false;
+      window.clearTimeout(safetyTimeoutId);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [isNativeIos]);
+
+  useEffect(() => {
     setSfxVolume(soundVolume / 100);
   }, [soundVolume]);
 
   useEffect(() => {
     setMusicVolume(musicVolume / 100);
   }, [musicVolume]);
-
-  useEffect(() => {
-    if (!onboardingSeen) trackOnboardingStep(onboardingStep + 1);
-  }, [onboardingSeen, onboardingStep]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -103,31 +157,34 @@ export function GameApp() {
     return () => window.clearTimeout(timeoutId);
   }, [showLaunchScreen]);
 
-  if (showLaunchScreen) return <LaunchScreen />;
+  useEffect(() => {
+    const now = new Date();
+    const settlement = new Date(now);
+    settlement.setHours(23, 59, 0, 0);
+    if (settlement.getTime() <= now.getTime()) settlement.setDate(settlement.getDate() + 1);
+    const timer = window.setTimeout(
+      () => {
+        void settleDailyLeaderboardRewards(getTodayQuestDate());
+      },
+      Math.max(1000, settlement.getTime() - now.getTime()),
+    );
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    const route = consumePendingPushRoute();
+    if (route === "daily-board") startDailyChallenge();
+    if (route === "daily-compound") startSecretCompound();
+  }, []);
+
+  if (showLaunchScreen || !appUpdateCheckComplete) return <LaunchScreen />;
 
   const shouldShowAppReviewMilestone =
-    completedGameCount >= 5 &&
-    Object.values(levelStars).some((stars) => stars >= 3) &&
-    !appReviewMilestonePromptSeen &&
-    !appReviewMilestoneRewardClaimed;
-
-  const onboardingPrompt = !onboardingSeen ? (
-    <FirstInstallOnboarding
-      stepIndex={onboardingStep}
-      onBack={() => setOnboardingStep((step) => Math.max(0, step - 1))}
-      onNext={() => {
-        if (onboardingStep < ONBOARDING_STEPS.length - 1) {
-          setOnboardingStep((step) => Math.min(ONBOARDING_STEPS.length - 1, step + 1));
-          return;
-        }
-        trackOnboardingComplete();
-        markOnboardingSeen();
-      }}
-    />
-  ) : null;
+    completedGameCount >= 4 && !appReviewMilestonePromptSeen && !appReviewMilestoneRewardClaimed;
 
   const appReviewMilestonePrompt = appReviewMilestonePromptOpen ? (
     <AppReviewMilestonePrompt
+      language={appLanguage}
       showRating={isNativeIos}
       reviewRequested={appReviewRequested}
       onRate={() => {
@@ -148,8 +205,16 @@ export function GameApp() {
     return (
       <>
         {content}
-        {onboardingPrompt}
         {appReviewMilestonePrompt}
+        {requiredAppUpdate && (
+          <RequiredAppUpdatePrompt
+            language={appLanguage}
+            update={requiredAppUpdate}
+            onUpdate={() => {
+              window.location.href = requiredAppUpdate.storeUrl || APP_STORE_URL;
+            }}
+          />
+        )}
       </>
     );
   }
@@ -173,6 +238,24 @@ export function GameApp() {
     setAppReviewMilestonePromptOpen(true);
   }
 
+  function startGameWithFirstTutorial(
+    tutorialMode: HowToPlayMode | undefined,
+    startGame: (initialHowToPlay?: HowToPlayMode) => void,
+  ) {
+    startGameWithAppReviewMilestone(() => {
+      if (tutorialMode) {
+        const tipId = FIRST_ENTRY_TUTORIAL_TIP_IDS[tutorialMode];
+        const progress = useProgress.getState();
+        if (!progress.seenTips.includes(tipId)) {
+          progress.markTipSeen(tipId);
+          startGame(tutorialMode);
+          return;
+        }
+      }
+      startGame();
+    });
+  }
+
   function startCampaign() {
     const saved = getSavedRunSummary();
     if (saved) {
@@ -185,14 +268,19 @@ export function GameApp() {
   function startDailyChallenge() {
     refreshDailyFeatures();
     const dailyChallenge = useProgress.getState().dailyChallenge;
-    startGameWithAppReviewMilestone(() =>
-      setScreen({ name: "game", levelId: dailyChallenge.levelId, mode: "daily-challenge" }),
+    startGameWithFirstTutorial("daily-board", (initialHowToPlay) =>
+      setScreen({
+        name: "game",
+        levelId: dailyChallenge.levelId,
+        mode: "daily-challenge",
+        initialHowToPlay,
+      }),
     );
   }
 
   function startSecretCompound() {
     refreshDailyFeatures();
-    startGameWithAppReviewMilestone(() => {
+    startGameWithFirstTutorial("daily-compound", (initialHowToPlay) => {
       const { secretCompound, revealSecretCompound } = useProgress.getState();
       revealSecretCompound();
       setScreen({
@@ -200,17 +288,20 @@ export function GameApp() {
         levelId: getLevelById(unlockedLevel)?.id ?? 1,
         mode: "campaign",
         secretCompoundId: secretCompound.compoundId,
+        initialHowToPlay,
       });
     });
   }
 
   function startCampaignLevel(levelId: number) {
-    startGameWithAppReviewMilestone(() => {
-      const compoundId = MOLECULE_CHALLENGE_BY_LEVEL[levelId];
+    const compoundId = MOLECULE_CHALLENGE_BY_LEVEL[levelId];
+    const tutorialMode = levelId === 1 ? "normal" : compoundId ? "compound" : undefined;
+    startGameWithFirstTutorial(tutorialMode, (initialHowToPlay) => {
       setScreen({
         name: "game",
         levelId,
         mode: "campaign",
+        initialHowToPlay,
         secretCompoundId:
           compoundId && getCompoundChallengeKind(levelId) === "search-find"
             ? compoundId
@@ -228,7 +319,7 @@ export function GameApp() {
             onLevels={() => setScreen({ name: "levels" })}
             onCollection={() => setScreen({ name: "collection" })}
             onSettings={() => setScreen({ name: "settings" })}
-            onShop={() => setScreen({ name: "shop" })}
+            onShop={(section) => setScreen({ name: "shop", section })}
             onLab={() => setScreen({ name: "lab" })}
             onLibrary={() => setScreen({ name: "library" })}
             onProfile={() => setScreen({ name: "profile" })}
@@ -238,6 +329,7 @@ export function GameApp() {
           />
           {resumePrompt && (
             <ResumeRunPrompt
+              language={appLanguage}
               saved={resumePrompt}
               onContinue={() => {
                 const savedRun = resumePrompt;
@@ -279,6 +371,7 @@ export function GameApp() {
           mode={screen.mode}
           resumeSavedRun={screen.resumeSavedRun}
           secretCompoundId={screen.secretCompoundId}
+          initialHowToPlay={screen.initialHowToPlay}
           onExit={() => setScreen({ name: "menu" })}
           onMap={() => setScreen({ name: "levels" })}
           onWin={(nextId) => {
@@ -305,7 +398,9 @@ export function GameApp() {
     case "collection":
       return withGlobalModals(<Collection onBack={() => setScreen({ name: "menu" })} />);
     case "shop":
-      return withGlobalModals(<Shop onBack={() => setScreen({ name: "menu" })} />);
+      return withGlobalModals(
+        <Shop initialSection={screen.section} onBack={() => setScreen({ name: "menu" })} />,
+      );
     case "lab":
       return withGlobalModals(
         <LabModes
@@ -325,173 +420,22 @@ export function GameApp() {
     case "library":
       return withGlobalModals(<GameLibrary onBack={() => setScreen({ name: "menu" })} />);
     case "profile":
-      return withGlobalModals(<Profile onBack={() => setScreen({ name: "menu" })} />);
+      return withGlobalModals(
+        <Profile
+          onBack={() => setScreen({ name: "menu" })}
+          onOpenShop={(section) => setScreen({ name: "shop", section })}
+        />,
+      );
     case "leaderboard":
       return withGlobalModals(<Leaderboard onBack={() => setScreen({ name: "menu" })} />);
     case "settings":
-      return withGlobalModals(<Settings onBack={() => setScreen({ name: "menu" })} />);
+      return withGlobalModals(
+        <Settings
+          onBack={() => setScreen({ name: "menu" })}
+          onOpenShop={(section) => setScreen({ name: "shop", section })}
+        />,
+      );
   }
-}
-
-const ONBOARDING_STEPS = [
-  {
-    title: "Reach the target atom",
-    copy: "Merge atoms upward until the board creates the target element for the stage.",
-    visual: "target",
-  },
-  {
-    title: "Build chain reactions",
-    copy: "Drop matching atoms together. Every merge can trigger the next one in line.",
-    visual: "chain",
-  },
-  {
-    title: "Complete the table",
-    copy: "Discover every atom, synthesize common molecules, and push your best score higher.",
-    visual: "collection",
-  },
-] as const;
-
-function FirstInstallOnboarding({
-  stepIndex,
-  onBack,
-  onNext,
-}: {
-  stepIndex: number;
-  onBack: () => void;
-  onNext: () => void;
-}) {
-  const step = ONBOARDING_STEPS[stepIndex];
-  const isLast = stepIndex === ONBOARDING_STEPS.length - 1;
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="first-install-onboarding-title"
-      style={onboardingBackdrop}
-    >
-      <section style={onboardingModal}>
-        <div style={onboardingEyebrow}>{`STEP ${stepIndex + 1} OF ${ONBOARDING_STEPS.length}`}</div>
-        <OnboardingVisual kind={step.visual} />
-        <h2 id="first-install-onboarding-title" style={onboardingTitle}>
-          {step.title}
-        </h2>
-        <p style={onboardingCopy}>{step.copy}</p>
-        <div style={onboardingDots} aria-label={`Onboarding step ${stepIndex + 1}`}>
-          {ONBOARDING_STEPS.map((item, index) => (
-            <span
-              key={item.title}
-              style={{
-                ...onboardingDot,
-                width: index === stepIndex ? 24 : 8,
-                background:
-                  index === stepIndex
-                    ? "linear-gradient(90deg, var(--accent), var(--primary))"
-                    : "var(--surface-high)",
-              }}
-            />
-          ))}
-        </div>
-        <div style={onboardingActions}>
-          <button
-            type="button"
-            onClick={onBack}
-            disabled={stepIndex === 0}
-            style={{
-              ...promptSecondaryBtn,
-              opacity: stepIndex === 0 ? 0.42 : 1,
-              cursor: stepIndex === 0 ? "default" : "pointer",
-            }}
-          >
-            Back
-          </button>
-          <button type="button" onClick={onNext} style={promptPrimaryBtn}>
-            {isLast ? "Start discovering" : "Next"}
-          </button>
-        </div>
-      </section>
-    </div>
-  );
-}
-
-function OnboardingVisual({ kind }: { kind: (typeof ONBOARDING_STEPS)[number]["visual"] }) {
-  if (kind === "target") return <TargetOnboardingVisual />;
-  if (kind === "chain") return <ChainOnboardingVisual />;
-  return <CollectionOnboardingVisual />;
-}
-
-function TargetOnboardingVisual() {
-  return (
-    <div style={onboardingVisualFrame} aria-hidden="true">
-      <div style={onboardingMiniBoard}>
-        <span style={{ ...onboardingGridCell, gridColumn: "2", gridRow: "2" }}>
-          <ElementBall atomicNumber={1} size={34} glow />
-        </span>
-        <span style={{ ...onboardingGridCell, gridColumn: "3", gridRow: "2" }}>
-          <ElementBall atomicNumber={1} size={34} glow />
-        </span>
-        <span style={{ ...onboardingGridCell, gridColumn: "3", gridRow: "1" }}>
-          <ElementBall atomicNumber={2} size={34} glow />
-        </span>
-        <span style={onboardingTargetBadge}>TARGET</span>
-        <span style={{ position: "absolute", right: 18, top: 34 }}>
-          <ElementBall atomicNumber={3} size={50} glow />
-        </span>
-      </div>
-    </div>
-  );
-}
-
-function ChainOnboardingVisual() {
-  return (
-    <div style={onboardingVisualFrame} aria-hidden="true">
-      <div style={chainLane}>
-        <span style={{ ...chainAtomSlot, left: "9%", top: "48%" }}>
-          <ElementBall atomicNumber={1} size={30} glow />
-        </span>
-        <span style={{ ...chainAtomSlot, left: "24%", top: "48%" }}>
-          <ElementBall atomicNumber={1} size={30} glow />
-        </span>
-        <span style={{ ...chainAtomSlot, left: "40%", top: "32%" }}>
-          <ElementBall atomicNumber={2} size={34} glow />
-        </span>
-        <span style={{ ...chainAtomSlot, left: "56%", top: "32%" }}>
-          <ElementBall atomicNumber={2} size={34} glow />
-        </span>
-        <span style={{ ...chainAtomSlot, left: "73%", top: "18%" }}>
-          <ElementBall atomicNumber={3} size={42} glow />
-        </span>
-        <span style={{ ...chainSpark, left: "31%", top: "55%" }} />
-        <span style={{ ...chainSpark, left: "63%", top: "39%" }} />
-      </div>
-    </div>
-  );
-}
-
-function CollectionOnboardingVisual() {
-  const water = COMPOUNDS.find((compound) => compound.id === "water") ?? COMPOUNDS[0];
-  return (
-    <div style={onboardingVisualFrame} aria-hidden="true">
-      <div style={tableVisualGrid}>
-        {Array.from({ length: 28 }, (_, index) => (
-          <span
-            key={index}
-            style={{
-              ...tableVisualCell,
-              background:
-                index < 14
-                  ? "linear-gradient(135deg, color-mix(in oklch, var(--primary) 42%, var(--surface-high)), var(--surface-high))"
-                  : "var(--surface)",
-              borderColor: index < 14 ? "var(--primary)" : "var(--border)",
-            }}
-          />
-        ))}
-      </div>
-      <span style={moleculeBadge}>
-        <MoleculeVisual compound={water} size={70} />
-      </span>
-      <span style={scoreBadge}>HIGH SCORE</span>
-    </div>
-  );
 }
 
 function LaunchScreen() {
@@ -557,20 +501,23 @@ function LaunchScreen() {
 
 function ResumeRunPrompt({
   saved,
+  language,
   onContinue,
   onStartOver,
   onCancel,
 }: {
   saved: NonNullable<ReturnType<typeof getSavedRunSummary>>;
+  language: AppLanguage;
   onContinue: () => void;
   onStartOver: () => void;
   onCancel: () => void;
 }) {
+  const tr = (text: string) => t(text, language);
   return (
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="Resume saved run"
+      aria-label={tr("Resume saved run")}
       style={{
         position: "fixed",
         inset: 0,
@@ -595,21 +542,21 @@ function ResumeRunPrompt({
         }}
       >
         <div style={{ fontSize: 11, letterSpacing: 3, color: "var(--accent)", fontWeight: 800 }}>
-          SAVED RUN
+          {tr("SAVED RUN")}
         </div>
-        <h2 style={{ margin: "6px 0 4px", fontSize: 23 }}>Continue previous run?</h2>
+        <h2 style={{ margin: "6px 0 4px", fontSize: 23 }}>{tr("Continue previous run?")}</h2>
         <p style={{ margin: "0 0 16px", color: "var(--muted-foreground)", fontSize: 13 }}>
           Level {saved.levelId} · {saved.shots} shots · {saved.score.toLocaleString()} score
         </p>
         <div style={{ display: "grid", gap: 8 }}>
           <button type="button" onClick={onContinue} style={promptPrimaryBtn}>
-            Continue Run
+            {tr("Continue Run")}
           </button>
           <button type="button" onClick={onStartOver} style={promptSecondaryBtn}>
-            Start Over
+            {tr("Start Over")}
           </button>
           <button type="button" onClick={onCancel} style={promptGhostBtn}>
-            Cancel
+            {tr("Cancel")}
           </button>
         </div>
       </div>
@@ -618,23 +565,26 @@ function ResumeRunPrompt({
 }
 
 function AppReviewMilestonePrompt({
+  language,
   showRating,
   reviewRequested,
   onRate,
   onClaim,
   onSkip,
 }: {
+  language: AppLanguage;
   showRating: boolean;
   reviewRequested: boolean;
   onRate: () => void;
   onClaim: () => void;
   onSkip: () => void;
 }) {
+  const tr = (text: string) => t(text, language);
   return (
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="Game 5 bonus"
+      aria-label={tr("Game 5 bonus")}
       style={{
         position: "fixed",
         inset: 0,
@@ -659,29 +609,85 @@ function AppReviewMilestonePrompt({
         }}
       >
         <div style={{ fontSize: 11, letterSpacing: 3, color: "var(--accent)", fontWeight: 800 }}>
-          MILESTONE BONUS
+          {tr("MILESTONE BONUS")}
         </div>
         <h2 style={{ margin: "6px 0 8px", fontSize: 23 }}>
-          <CoinAmount amount={5} suffix="coins unlocked" />
+          <CoinAmount amount={5} suffix={tr("coins unlocked")} />
         </h2>
         <p style={{ margin: "0 0 16px", color: "var(--muted-foreground)", fontSize: 13 }}>
           {showRating
-            ? "Your milestone bonus is in your wallet. If Atomic Fusion Rush is hitting the spot, a quick App Store rating helps a lot."
-            : "Your milestone bonus is in your wallet. Keep building cleaner chains and pushing the next element."}
+            ? tr("Your milestone bonus is in your wallet. If Atomic Fusion Rush is hitting the spot, a quick App Store rating helps a lot.")
+            : tr("Your milestone bonus is in your wallet. Keep building cleaner chains and pushing the next element.")}
         </p>
         <div style={{ display: "grid", gap: 8 }}>
           {showRating && (
             <button type="button" onClick={onRate} style={promptSecondaryBtn}>
-              {reviewRequested ? "App Store opened" : "Rate App"}
+              {reviewRequested ? tr("App Store opened") : tr("Rate App")}
             </button>
           )}
           <button type="button" onClick={onClaim} style={promptPrimaryBtn}>
-            Continue
+            {tr("Continue")}
           </button>
           <button type="button" onClick={onSkip} style={promptGhostBtn}>
-            Not now
+            {tr("Not now")}
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function RequiredAppUpdatePrompt({
+  update,
+  language,
+  onUpdate,
+}: {
+  update: RequiredAppUpdate;
+  language: AppLanguage;
+  onUpdate: () => void;
+}) {
+  const tr = (text: string) => t(text, language);
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={tr("App update required")}
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 2400,
+        display: "grid",
+        placeItems: "center",
+        padding: 20,
+        background: "rgba(0,0,0,0.78)",
+        backdropFilter: "blur(7px)",
+      }}
+    >
+      <div
+        style={{
+          width: "100%",
+          maxWidth: 360,
+          padding: 22,
+          borderRadius: 18,
+          border: "1px solid var(--accent)",
+          background: "var(--surface-elevated)",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.6), 0 0 28px var(--accent-glow)",
+          textAlign: "center",
+        }}
+      >
+        <div style={{ fontSize: 11, letterSpacing: 3, color: "var(--accent)", fontWeight: 900 }}>
+          {tr("UPDATE REQUIRED")}
+        </div>
+        <h2 style={{ margin: "7px 0 8px", fontSize: 23 }}>{tr("New version available")}</h2>
+        <p style={{ margin: "0 0 8px", color: "var(--foreground)", fontSize: 14, fontWeight: 750 }}>
+          {tr("Update the app to continue playing.")}
+        </p>
+        <p style={{ margin: "0 0 18px", color: "var(--muted-foreground)", fontSize: 12 }}>
+          {tr("Version")} {update.storeVersion} {tr("is available in the App Store.")}
+        </p>
+        <button type="button" onClick={onUpdate} style={{ ...promptPrimaryBtn, width: "100%" }}>
+          {tr("Update in App Store")}
+        </button>
       </div>
     </div>
   );
@@ -731,173 +737,4 @@ const coinAmount: CSSProperties = {
   alignItems: "center",
   justifyContent: "center",
   gap: 7,
-};
-
-const onboardingBackdrop: CSSProperties = {
-  position: "fixed",
-  inset: 0,
-  zIndex: 2300,
-  display: "grid",
-  placeItems: "center",
-  padding: 20,
-  background: "rgba(0,0,0,0.74)",
-  backdropFilter: "blur(7px)",
-};
-
-const onboardingModal: CSSProperties = {
-  width: "100%",
-  maxWidth: 370,
-  display: "grid",
-  justifyItems: "center",
-  gap: 12,
-  padding: 20,
-  borderRadius: 18,
-  border: "1px solid color-mix(in oklch, var(--accent) 48%, var(--border))",
-  background:
-    "linear-gradient(150deg, color-mix(in oklch, var(--primary) 10%, var(--surface-elevated)), var(--surface))",
-  boxShadow: "0 24px 70px rgba(0,0,0,0.58), 0 0 36px var(--primary-glow)",
-  textAlign: "center",
-};
-
-const onboardingEyebrow: CSSProperties = {
-  fontSize: 10,
-  letterSpacing: 2.4,
-  color: "var(--accent)",
-  fontWeight: 900,
-};
-
-const onboardingTitle: CSSProperties = {
-  margin: "2px 0 0",
-  fontSize: 24,
-  lineHeight: 1.1,
-  fontWeight: 950,
-};
-
-const onboardingCopy: CSSProperties = {
-  margin: 0,
-  color: "var(--muted-foreground)",
-  fontSize: 14,
-  lineHeight: 1.45,
-};
-
-const onboardingVisualFrame: CSSProperties = {
-  position: "relative",
-  width: "min(100%, 270px)",
-  aspectRatio: "1.55",
-  overflow: "hidden",
-  borderRadius: 16,
-  border: "1px solid var(--border)",
-  background:
-    "radial-gradient(circle at 50% 52%, color-mix(in oklch, var(--primary) 24%, transparent), transparent 58%), linear-gradient(180deg, var(--surface-high), var(--surface))",
-  boxShadow: "inset 0 0 24px color-mix(in oklch, var(--primary) 18%, transparent)",
-};
-
-const onboardingMiniBoard: CSSProperties = {
-  position: "absolute",
-  inset: 12,
-  display: "grid",
-  gridTemplateColumns: "repeat(4, 1fr)",
-  gridTemplateRows: "repeat(3, 1fr)",
-  gap: 6,
-  borderRadius: 12,
-  backgroundImage:
-    "linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px)",
-  backgroundSize: "32px 32px",
-};
-
-const onboardingGridCell: CSSProperties = {
-  display: "grid",
-  placeItems: "center",
-};
-
-const onboardingTargetBadge: CSSProperties = {
-  position: "absolute",
-  right: 14,
-  top: 12,
-  padding: "5px 8px",
-  borderRadius: 999,
-  background: "linear-gradient(135deg, var(--accent), var(--primary))",
-  color: "var(--primary-foreground)",
-  fontSize: 9,
-  fontWeight: 950,
-};
-
-const chainLane: CSSProperties = {
-  position: "absolute",
-  inset: 0,
-  background:
-    "linear-gradient(110deg, transparent 0 17%, color-mix(in oklch, var(--accent) 44%, transparent) 18% 21%, transparent 22% 49%, color-mix(in oklch, var(--primary) 48%, transparent) 50% 53%, transparent 54%)",
-};
-
-const chainAtomSlot: CSSProperties = {
-  position: "absolute",
-  display: "grid",
-  placeItems: "center",
-};
-
-const chainSpark: CSSProperties = {
-  position: "absolute",
-  width: 24,
-  height: 24,
-  borderRadius: 999,
-  background: "radial-gradient(circle, var(--accent), transparent 65%)",
-  boxShadow: "0 0 20px var(--accent-glow)",
-};
-
-const tableVisualGrid: CSSProperties = {
-  position: "absolute",
-  left: 14,
-  top: 14,
-  width: 150,
-  display: "grid",
-  gridTemplateColumns: "repeat(7, 1fr)",
-  gap: 4,
-};
-
-const tableVisualCell: CSSProperties = {
-  aspectRatio: "1",
-  borderRadius: 4,
-  border: "1px solid var(--border)",
-  boxShadow: "0 0 8px color-mix(in oklch, var(--primary) 20%, transparent)",
-};
-
-const moleculeBadge: CSSProperties = {
-  position: "absolute",
-  right: 18,
-  top: 28,
-};
-
-const scoreBadge: CSSProperties = {
-  position: "absolute",
-  right: 18,
-  bottom: 18,
-  padding: "7px 10px",
-  borderRadius: 10,
-  background: "var(--surface-elevated)",
-  border: "1px solid color-mix(in oklch, var(--accent) 60%, var(--border))",
-  color: "var(--accent)",
-  fontSize: 10,
-  fontWeight: 950,
-  boxShadow: "0 0 16px var(--accent-glow)",
-};
-
-const onboardingDots: CSSProperties = {
-  display: "flex",
-  justifyContent: "center",
-  gap: 6,
-  marginTop: 2,
-};
-
-const onboardingDot: CSSProperties = {
-  height: 8,
-  borderRadius: 999,
-  transition: "width 180ms ease, background 180ms ease",
-};
-
-const onboardingActions: CSSProperties = {
-  width: "100%",
-  display: "grid",
-  gridTemplateColumns: "0.8fr 1.2fr",
-  gap: 10,
-  marginTop: 2,
 };

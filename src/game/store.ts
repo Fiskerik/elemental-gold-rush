@@ -32,6 +32,14 @@ import {
 } from "./dailyFeatures";
 import { COMPOUNDS } from "./compounds";
 import { ELEMENTS } from "./elements";
+import {
+  COSMETIC_THEME_PURCHASES_ENABLED,
+  PRODUCT_IDS,
+  THEME_BUNDLE_PRODUCT_IDS,
+  SHOP_SPEND_CENTS,
+  type ProductId,
+} from "./products";
+import { getDailyLeaderboardReward, getDailyLeaderboardRewardKey } from "./dailyLeaderboardRewards";
 
 export const INVENTORY_POWER_UPS = [
   "transmute",
@@ -118,11 +126,87 @@ function normalizeLabUpgradeEnabled(
 }
 
 export type AppTheme = "dark" | "light";
-export const BOARD_THEMES = ["reactor", "cryo", "forge"] as const;
+export const BOARD_THEMES = [
+  "reactor",
+  "cryo",
+  "forge",
+  "goldLab",
+  "neonPeriodic",
+  "quantumVoid",
+  "verdantCrystal",
+  "biohazard",
+  "mossHollow",
+] as const;
 export type BoardTheme = (typeof BOARD_THEMES)[number];
 
 export function isBoardTheme(value: unknown): value is BoardTheme {
   return typeof value === "string" && (BOARD_THEMES as readonly string[]).includes(value);
+}
+
+export const ATOM_SKINS = [
+  "classic",
+  "chrome",
+  "hologram",
+  "crystal",
+  "mineral",
+  "verdantCrystal",
+  "toxic",
+  "moss",
+] as const;
+export type AtomSkin = (typeof ATOM_SKINS)[number];
+
+export function isAtomSkin(value: unknown): value is AtomSkin {
+  return typeof value === "string" && (ATOM_SKINS as readonly string[]).includes(value);
+}
+
+export const THEME_PRODUCT_BY_BOARD_THEME: Partial<Record<BoardTheme, ProductId>> = {
+  goldLab: PRODUCT_IDS.themeGoldLab,
+  neonPeriodic: PRODUCT_IDS.themeNeonPeriodic,
+  quantumVoid: PRODUCT_IDS.themeQuantumVoid,
+  verdantCrystal: PRODUCT_IDS.themeVerdantCrystal,
+  biohazard: PRODUCT_IDS.themeBiohazard,
+  mossHollow: PRODUCT_IDS.themeMossHollow,
+};
+
+export const ATOM_SKIN_BY_BOARD_THEME: Partial<Record<BoardTheme, AtomSkin>> = {
+  goldLab: "chrome",
+  neonPeriodic: "hologram",
+  quantumVoid: "crystal",
+  verdantCrystal: "verdantCrystal",
+  biohazard: "toxic",
+  mossHollow: "moss",
+};
+
+// A theme may unlock more than its automatically selected skin. Crystal Cove
+// includes both the glassy Crystal Core and the faceted Mineral construction.
+export const BOARD_THEME_BY_ATOM_SKIN: Partial<Record<AtomSkin, BoardTheme>> = {
+  chrome: "goldLab",
+  hologram: "neonPeriodic",
+  crystal: "quantumVoid",
+  mineral: "quantumVoid",
+  verdantCrystal: "verdantCrystal",
+  toxic: "biohazard",
+  moss: "mossHollow",
+};
+
+export function isBoardThemeUnlocked(
+  theme: BoardTheme,
+  state: { hasProPack: boolean; ownedThemeProducts: ProductId[] },
+): boolean {
+  if (!COSMETIC_THEME_PURCHASES_ENABLED) return true;
+  if (theme === "reactor") return true;
+  if (theme === "cryo" || theme === "forge") return state.hasProPack;
+  const productId = THEME_PRODUCT_BY_BOARD_THEME[theme];
+  return productId ? state.ownedThemeProducts.includes(productId) : false;
+}
+
+export function isAtomSkinUnlocked(
+  skin: AtomSkin,
+  state: { hasProPack: boolean; ownedThemeProducts: ProductId[] },
+): boolean {
+  if (skin === "classic") return true;
+  const theme = BOARD_THEME_BY_ATOM_SKIN[skin];
+  return theme ? isBoardThemeUnlocked(theme, state) : false;
 }
 
 export const DEFAULT_PLAYER_DISPLAY_NAME = "You";
@@ -288,6 +372,8 @@ interface ProgressState {
   coinTransactions: CoinTransaction[];
   discoveredElements: number[]; // atomic numbers seen
   discoveredCompounds: string[];
+  viewedElementDiscoveries: number[];
+  viewedCompoundDiscoveries: string[];
   compoundCounts: Record<string, number>;
   soundEnabled: boolean;
   musicEnabled: boolean;
@@ -296,6 +382,9 @@ interface ProgressState {
   musicVolume: number; // 0-100
   appTheme: AppTheme;
   boardTheme: BoardTheme;
+  atomSkin: AtomSkin;
+  ownedThemeProducts: ProductId[];
+  shopSpendCents: number;
   appLanguage: AppLanguage;
   shootingStyle: "hold" | "press";
   hasChosenShootingStyle: boolean;
@@ -311,6 +400,7 @@ interface ProgressState {
   levelStars: Record<number, number>;
   levelStats: Record<number, LevelStats>;
   challengeBestScores: Partial<Record<GameModeId, number>>;
+  challengeBestScoreDates: Partial<Record<GameModeId, string>>;
   hasProPack: boolean;
   proStarterCoinsGranted: boolean;
   clearedStageCount: number;
@@ -332,6 +422,7 @@ interface ProgressState {
   dailyCompoundBestScore: number;
   dailyBoardLeaderboardAchievementCounts: DailyBoardLeaderboardAchievementCounts;
   dailyBoardLeaderboardAchievementRecords: string[];
+  dailyLeaderboardRewardClaims: Record<string, number>;
   markTipSeen: (id: string) => void;
   refreshDailyFeatures: () => void;
   completeDailyChallenge: (score: number) => boolean;
@@ -343,8 +434,10 @@ interface ProgressState {
   setUnlockedLevel: (id: number) => void;
   recordDiscovery: (atomicNumbers: number[]) => void;
   recordCompoundDiscovery: (compoundId: string) => void;
-  unlockLockedElementsForCoins: (coinCost: number) => boolean;
-  unlockLockedCompoundsForCoins: (coinCost: number) => boolean;
+  markElementDiscoveryViewed: (atomicNumber: number) => void;
+  markCompoundDiscoveryViewed: (compoundId: string) => void;
+  unlockLockedElementsForCoins: (atomicNumber: number, coinCost: number) => boolean;
+  unlockLockedCompoundsForCoins: (compoundId: string, coinCost: number) => boolean;
   addScore: (n: number) => void;
   recordSingleShotScore: (score: number) => void;
   spendScore: (cost: number) => boolean;
@@ -380,7 +473,13 @@ interface ProgressState {
     totalPlayerCount: number,
     date?: string,
   ) => void;
-  grantProPack: () => void;
+  claimDailyLeaderboardReward: (
+    kind: "daily-board" | "daily-compound",
+    rank: number,
+    date?: string,
+  ) => { awarded: number; totalAwarded: number };
+  grantProPack: (options?: { fromRestore?: boolean }) => void;
+  toggleProPack: () => void;
   recordGameAttemptForAd: () => void;
   markInterstitialShown: () => void;
   addInventoryPowerUps: (powerUps: Partial<Record<InventoryPowerUpId, number>>) => void;
@@ -393,6 +492,9 @@ interface ProgressState {
   setMusicVolume: (volume: number) => void;
   setAppTheme: (theme: AppTheme) => void;
   setBoardTheme: (theme: BoardTheme) => void;
+  setAtomSkin: (skin: AtomSkin) => void;
+  grantThemeProduct: (productId: ProductId) => void;
+  recordShopSpend: (productId: ProductId) => void;
   setAppLanguage: (language: AppLanguage) => void;
   setPlayerDisplayName: (name: string) => void;
   toggleAppTheme: () => void;
@@ -420,6 +522,8 @@ export const useProgress = create<ProgressState>()(
       coinTransactions: [],
       discoveredElements: [1],
       discoveredCompounds: [],
+      viewedElementDiscoveries: [1],
+      viewedCompoundDiscoveries: [],
       compoundCounts: {},
       soundEnabled: true,
       musicEnabled: true,
@@ -428,6 +532,9 @@ export const useProgress = create<ProgressState>()(
       musicVolume: 100,
       appTheme: "dark",
       boardTheme: "reactor",
+      atomSkin: "classic",
+      ownedThemeProducts: [],
+      shopSpendCents: 0,
       appLanguage: DEFAULT_LANGUAGE,
       shootingStyle: "hold",
       hasChosenShootingStyle: false,
@@ -443,6 +550,7 @@ export const useProgress = create<ProgressState>()(
       levelStars: {},
       levelStats: {},
       challengeBestScores: {},
+      challengeBestScoreDates: {},
       hasProPack: false,
       proStarterCoinsGranted: false,
       clearedStageCount: 0,
@@ -464,6 +572,7 @@ export const useProgress = create<ProgressState>()(
       dailyCompoundBestScore: 0,
       dailyBoardLeaderboardAchievementCounts: emptyDailyBoardLeaderboardAchievementCounts(),
       dailyBoardLeaderboardAchievementRecords: [],
+      dailyLeaderboardRewardClaims: {},
       markTipSeen: (id) =>
         set((s) => (s.seenTips.includes(id) ? s : { seenTips: [...s.seenTips, id] })),
       refreshDailyFeatures: () =>
@@ -560,7 +669,9 @@ export const useProgress = create<ProgressState>()(
           if (s.unlockedLevel < POWER_UP_UNLOCK_LEVELS[id]) return s;
           const levels = normalizeLabUpgradeLevels(s.labUpgradeLevels);
           const current = levels[id] ?? 0;
-          const cap = getLabUpgradeLevelCap(s.unlockedLevel);
+          const cap = s.hasProPack
+            ? LAB_UPGRADE_COSTS.length
+            : getLabUpgradeLevelCap(s.unlockedLevel);
           if (current >= cap || current >= LAB_UPGRADE_COSTS.length) return s;
           const cost = LAB_UPGRADE_COSTS[current];
           if (s.goldCoins < cost) return s;
@@ -620,7 +731,7 @@ export const useProgress = create<ProgressState>()(
           const discoveredElements = Array.from(next).sort((a, b) => a - b);
           return {
             discoveredElements,
-            earnedBadges: getEarnedBadgeIds(discoveredElements),
+            earnedBadges: getEarnedBadgeIds(discoveredElements, s.shopSpendCents),
           };
         }),
       recordCompoundDiscovery: (compoundId) =>
@@ -633,16 +744,32 @@ export const useProgress = create<ProgressState>()(
             [compoundId]: (s.compoundCounts[compoundId] ?? 0) + 1,
           },
         })),
-      unlockLockedElementsForCoins: (coinCost) => {
+      markElementDiscoveryViewed: (atomicNumber) =>
+        set((s) =>
+          s.viewedElementDiscoveries.includes(atomicNumber)
+            ? s
+            : { viewedElementDiscoveries: [...s.viewedElementDiscoveries, atomicNumber] },
+        ),
+      markCompoundDiscoveryViewed: (compoundId) =>
+        set((s) =>
+          s.viewedCompoundDiscoveries.includes(compoundId)
+            ? s
+            : { viewedCompoundDiscoveries: [...s.viewedCompoundDiscoveries, compoundId] },
+        ),
+      unlockLockedElementsForCoins: (atomicNumber, coinCost) => {
         let unlocked = false;
         set((s) => {
+          const target = ELEMENTS.find((element) => element.atomicNumber === atomicNumber);
           const normalizedCost = Math.max(0, Math.floor(coinCost));
+          if (
+            !target ||
+            s.discoveredElements.includes(atomicNumber) ||
+            s.goldCoins < normalizedCost
+          ) {
+            return s;
+          }
           const current = new Set(s.discoveredElements);
-          const locked = ELEMENTS.map((element) => element.atomicNumber).filter(
-            (atomicNumber) => !current.has(atomicNumber),
-          );
-          if (locked.length === 0 || s.goldCoins < normalizedCost) return s;
-          locked.forEach((atomicNumber) => current.add(atomicNumber));
+          current.add(atomicNumber);
           const discoveredElements = Array.from(current).sort((a, b) => a - b);
           unlocked = true;
           const refreshed = refreshDailyQuests(
@@ -658,29 +785,31 @@ export const useProgress = create<ProgressState>()(
               s.coinTransactions,
               -normalizedCost,
               balanceAfter,
-              "Collection elements unlock",
+              `Collection element unlock: ${target.symbol}`,
             ),
             discoveredElements,
-            earnedBadges: getEarnedBadgeIds(discoveredElements),
+            earnedBadges: getEarnedBadgeIds(discoveredElements, s.shopSpendCents),
             dailyQuests: applyQuestProgress(refreshed.dailyQuests, { itemsPurchased: 1 }),
           };
         });
         return unlocked;
       },
-      unlockLockedCompoundsForCoins: (coinCost) => {
+      unlockLockedCompoundsForCoins: (compoundId, coinCost) => {
         let unlocked = false;
         set((s) => {
+          const target = COMPOUNDS.find((compound) => compound.id === compoundId);
           const normalizedCost = Math.max(0, Math.floor(coinCost));
+          if (
+            !target ||
+            s.discoveredCompounds.includes(compoundId) ||
+            s.goldCoins < normalizedCost
+          ) {
+            return s;
+          }
           const current = new Set(s.discoveredCompounds);
-          const locked = COMPOUNDS.map((compound) => compound.id).filter(
-            (compoundId) => !current.has(compoundId),
-          );
-          if (locked.length === 0 || s.goldCoins < normalizedCost) return s;
-          locked.forEach((compoundId) => current.add(compoundId));
+          current.add(compoundId);
           const compoundCounts = { ...s.compoundCounts };
-          locked.forEach((compoundId) => {
-            compoundCounts[compoundId] = Math.max(1, compoundCounts[compoundId] ?? 0);
-          });
+          compoundCounts[compoundId] = Math.max(1, compoundCounts[compoundId] ?? 0);
           unlocked = true;
           const refreshed = refreshDailyQuests(
             s.dailyQuestDate,
@@ -695,7 +824,7 @@ export const useProgress = create<ProgressState>()(
               s.coinTransactions,
               -normalizedCost,
               balanceAfter,
-              "Collection compounds unlock",
+              `Collection compound unlock: ${target.name}`,
             ),
             discoveredCompounds: Array.from(current),
             compoundCounts,
@@ -961,12 +1090,21 @@ export const useProgress = create<ProgressState>()(
           };
         }),
       setChallengeBestScore: (mode, score) =>
-        set((s) => ({
-          challengeBestScores: {
-            ...s.challengeBestScores,
-            [mode]: Math.max(s.challengeBestScores[mode] ?? 0, score),
-          },
-        })),
+        set((s) => {
+          const normalizedScore = Math.max(0, Math.floor(score));
+          const previousBest = s.challengeBestScores[mode] ?? 0;
+          if (normalizedScore <= previousBest) return s;
+          return {
+            challengeBestScores: {
+              ...s.challengeBestScores,
+              [mode]: normalizedScore,
+            },
+            challengeBestScoreDates: {
+              ...s.challengeBestScoreDates,
+              [mode]: new Date().toISOString(),
+            },
+          };
+        }),
       recordDailyBoardLeaderboardPlacement: (rank, totalPlayerCount, date = getTodayQuestDate()) =>
         set((s) => {
           const achievementIds = getDailyBoardLeaderboardAchievementIds(rank, totalPlayerCount);
@@ -992,9 +1130,42 @@ export const useProgress = create<ProgressState>()(
             ].slice(-MAX_LEADERBOARD_ACHIEVEMENT_RECORDS),
           };
         }),
-      grantProPack: () =>
+      claimDailyLeaderboardReward: (kind, rank, date = getTodayQuestDate()) => {
+        let result = { awarded: 0, totalAwarded: 0 };
         set((s) => {
-          const shouldGrantStarter = !s.proStarterCoinsGranted;
+          const entitlement = getDailyLeaderboardReward(rank);
+          if (entitlement <= 0) return s;
+
+          const key = getDailyLeaderboardRewardKey(kind, date);
+          const alreadyAwarded = Math.max(0, Math.floor(s.dailyLeaderboardRewardClaims[key] ?? 0));
+          const awarded = Math.max(0, entitlement - alreadyAwarded);
+          const totalAwarded = Math.max(alreadyAwarded, entitlement);
+          result = { awarded, totalAwarded };
+          if (awarded <= 0) return s;
+
+          const balanceAfter = s.goldCoins + awarded;
+          return {
+            goldCoins: balanceAfter,
+            dailyLeaderboardRewardClaims: {
+              ...s.dailyLeaderboardRewardClaims,
+              [key]: totalAwarded,
+            },
+            coinTransactions: appendCoinTransaction(
+              s.coinTransactions,
+              awarded,
+              balanceAfter,
+              `${kind === "daily-board" ? "Daily Board" : "Daily Compound"} #${Math.floor(rank)} prize`,
+            ),
+          };
+        });
+        return result;
+      },
+      grantProPack: (options) =>
+        set((s) => {
+          // Restoring a non-consumable entitlement must never mint coins. The
+          // restore path may run after a reinstall, where this local flag is
+          // necessarily false even though the entitlement was already used.
+          const shouldGrantStarter = !options?.fromRestore && !s.proStarterCoinsGranted;
           const normalizedLevels = normalizeLabUpgradeLevels(s.labUpgradeLevels);
           // Refund the coins spent on any power-up already upgraded to Level 1,
           // since the Pro Lab Pack now grants that first level for free.
@@ -1007,21 +1178,30 @@ export const useProgress = create<ProgressState>()(
           const { levels: labUpgradeLevels, changed: grantedUpgrade } =
             grantUnlockedProStarterUpgrades(normalizedLevels, s.unlockedLevel);
           if (s.hasProPack && s.proStarterCoinsGranted && !grantedUpgrade) return s;
-          const coinDelta = shouldGrantStarter ? 100 + refundCoins : 0;
+          // Do not grant a large starter balance: it can be spent immediately
+          // on collection unlocks and bypasses the intended progression.
+          const coinDelta = shouldGrantStarter ? refundCoins : 0;
           const balanceAfter = s.goldCoins + coinDelta;
           return {
             hasProPack: true,
             proStarterCoinsGranted: true,
-            goldCoins: balanceAfter,
-            coinTransactions: appendCoinTransaction(
-              s.coinTransactions,
-              coinDelta,
-              balanceAfter,
-              "Pro Lab Pack coins",
-            ),
+            ...(coinDelta > 0
+              ? {
+                  goldCoins: balanceAfter,
+                  coinTransactions: appendCoinTransaction(
+                    s.coinTransactions,
+                    coinDelta,
+                    balanceAfter,
+                    "Pro Lab Pack coins",
+                  ),
+                }
+              : {}),
             labUpgradeLevels,
           };
         }),
+      // Temporary local debug switch. It changes only the entitlement flag so
+      // Pro Pack performance can be compared without altering purchases.
+      toggleProPack: () => set((s) => ({ hasProPack: !s.hasProPack })),
       recordGameAttemptForAd: () =>
         set((s) => ({
           completedGameCount: s.completedGameCount + 1,
@@ -1087,10 +1267,39 @@ export const useProgress = create<ProgressState>()(
         set(() => ({ musicVolume: Math.max(0, Math.min(100, Math.round(volume))) })),
       setAppTheme: (theme) => set({ appTheme: theme }),
       setBoardTheme: (theme) =>
+        set((s) => {
+          const boardTheme =
+            isBoardTheme(theme) && isBoardThemeUnlocked(theme, s) ? theme : "reactor";
+          const bundledAtomSkin = ATOM_SKIN_BY_BOARD_THEME[boardTheme];
+          return {
+            boardTheme,
+            atomSkin:
+              bundledAtomSkin && isAtomSkinUnlocked(bundledAtomSkin, s)
+                ? bundledAtomSkin
+                : s.atomSkin,
+          };
+        }),
+      setAtomSkin: (skin) =>
         set((s) => ({
-          boardTheme:
-            isBoardTheme(theme) && (theme === "reactor" || s.hasProPack) ? theme : "reactor",
+          atomSkin: isAtomSkin(skin) && isAtomSkinUnlocked(skin, s) ? skin : "classic",
         })),
+      grantThemeProduct: (productId) =>
+        set((s) =>
+          !(THEME_BUNDLE_PRODUCT_IDS as readonly ProductId[]).includes(productId) ||
+          s.ownedThemeProducts.includes(productId)
+            ? s
+            : { ownedThemeProducts: [...s.ownedThemeProducts, productId] },
+        ),
+      recordShopSpend: (productId) =>
+        set((s) => {
+          const spendCents = SHOP_SPEND_CENTS[productId] ?? 0;
+          if (spendCents <= 0) return s;
+          const shopSpendCents = s.shopSpendCents + spendCents;
+          return {
+            shopSpendCents,
+            earnedBadges: getEarnedBadgeIds(s.discoveredElements, shopSpendCents),
+          };
+        }),
       setAppLanguage: (language) => set({ appLanguage: normalizeLanguage(language) }),
       setPlayerDisplayName: (name) => set({ playerDisplayName: normalizePlayerDisplayName(name) }),
       toggleAppTheme: () => set((s) => ({ appTheme: s.appTheme === "dark" ? "light" : "dark" })),
@@ -1108,6 +1317,8 @@ export const useProgress = create<ProgressState>()(
           coinTransactions: s.coinTransactions,
           discoveredElements: [1],
           discoveredCompounds: [],
+          viewedElementDiscoveries: [1],
+          viewedCompoundDiscoveries: [],
           compoundCounts: {},
           soundEnabled: true,
           musicEnabled: true,
@@ -1116,6 +1327,9 @@ export const useProgress = create<ProgressState>()(
           musicVolume: 100,
           appTheme: "dark",
           boardTheme: "reactor",
+          atomSkin: "classic",
+          ownedThemeProducts: [],
+          shopSpendCents: s.shopSpendCents,
           appLanguage: DEFAULT_LANGUAGE,
           shootingStyle: "hold",
           hasChosenShootingStyle: false,
@@ -1126,10 +1340,11 @@ export const useProgress = create<ProgressState>()(
           weeklyPlayBonus: createWeeklyPlayBonus(),
           bestCombo: 0,
           bestComboDate: null,
-          earnedBadges: [],
+          earnedBadges: getEarnedBadgeIds([1], s.shopSpendCents),
           levelStars: {},
           levelStats: {},
           challengeBestScores: {},
+          challengeBestScoreDates: {},
           hasProPack: false,
           proStarterCoinsGranted: false,
           clearedStageCount: 0,
@@ -1151,15 +1366,45 @@ export const useProgress = create<ProgressState>()(
           dailyCompoundBestScore: 0,
           dailyBoardLeaderboardAchievementCounts: s.dailyBoardLeaderboardAchievementCounts,
           dailyBoardLeaderboardAchievementRecords: s.dailyBoardLeaderboardAchievementRecords,
+          dailyLeaderboardRewardClaims: s.dailyLeaderboardRewardClaims,
         })),
     }),
     {
       name: "elemental-gold-rush",
+      onRehydrateStorage: () => (_state, error) => {
+        if (!error) return;
+        console.warn(
+          "[store] Saved progress could not be restored; clearing the invalid local save.",
+          error,
+        );
+        try {
+          window.localStorage.removeItem("elemental-gold-rush");
+        } catch {
+          // The in-memory default state remains usable if storage is unavailable.
+        }
+      },
       merge: (persisted, current) => {
         const persistedState = persisted as Partial<ProgressState> | undefined;
-        const discoveredElements = persistedState?.discoveredElements ?? current.discoveredElements;
+        const discoveredElements = Array.isArray(persistedState?.discoveredElements)
+          ? persistedState.discoveredElements
+              .map(Number)
+              .filter((atomicNumber) => Number.isFinite(atomicNumber) && atomicNumber > 0)
+          : current.discoveredElements;
+        const viewedElementDiscoveries = Array.isArray(persistedState?.viewedElementDiscoveries)
+          ? persistedState.viewedElementDiscoveries
+          : discoveredElements;
+        const discoveredCompounds = Array.isArray(persistedState?.discoveredCompounds)
+          ? persistedState.discoveredCompounds.filter(
+              (compoundId): compoundId is string => typeof compoundId === "string",
+            )
+          : current.discoveredCompounds;
+        const viewedCompoundDiscoveries = Array.isArray(persistedState?.viewedCompoundDiscoveries)
+          ? persistedState.viewedCompoundDiscoveries.filter(
+              (compoundId): compoundId is string => typeof compoundId === "string",
+            )
+          : discoveredCompounds;
         const compoundCounts = {
-          ...Object.fromEntries((persistedState?.discoveredCompounds ?? []).map((id) => [id, 1])),
+          ...Object.fromEntries(discoveredCompounds.map((id) => [id, 1])),
           ...(persistedState?.compoundCounts ?? {}),
         };
         const levelStats = normalizeLevelStatsRecord(persistedState?.levelStats);
@@ -1203,17 +1448,39 @@ export const useProgress = create<ProgressState>()(
           boardTheme: isBoardTheme(persistedState?.boardTheme)
             ? persistedState.boardTheme
             : current.boardTheme,
+          ownedThemeProducts: Array.isArray(persistedState?.ownedThemeProducts)
+            ? persistedState.ownedThemeProducts.filter(
+                (id): id is ProductId =>
+                  typeof id === "string" &&
+                  (THEME_BUNDLE_PRODUCT_IDS as readonly string[]).includes(id),
+              )
+            : current.ownedThemeProducts,
+          atomSkin: isAtomSkin(persistedState?.atomSkin)
+            ? persistedState.atomSkin
+            : current.atomSkin,
           appLanguage: normalizeLanguage(persistedState?.appLanguage),
           shootingStyle: persistedState?.shootingStyle ?? current.shootingStyle,
           hasChosenShootingStyle:
             persistedState?.hasChosenShootingStyle ?? current.hasChosenShootingStyle,
           bestCombo: persistedState?.bestCombo ?? current.bestCombo,
           bestComboDate: persistedState?.bestComboDate ?? current.bestComboDate,
-          earnedBadges: getEarnedBadgeIds(discoveredElements),
-          discoveredCompounds: persistedState?.discoveredCompounds ?? current.discoveredCompounds,
+          shopSpendCents: Math.max(
+            0,
+            Math.floor(persistedState?.shopSpendCents ?? current.shopSpendCents),
+          ),
+          earnedBadges: getEarnedBadgeIds(
+            discoveredElements,
+            Math.max(0, Math.floor(persistedState?.shopSpendCents ?? current.shopSpendCents)),
+          ),
+          discoveredElements,
+          discoveredCompounds,
+          viewedElementDiscoveries,
+          viewedCompoundDiscoveries,
           compoundCounts,
           levelStars: persistedState?.levelStars ?? current.levelStars,
           challengeBestScores: persistedState?.challengeBestScores ?? current.challengeBestScores,
+          challengeBestScoreDates:
+            persistedState?.challengeBestScoreDates ?? current.challengeBestScoreDates,
           hasProPack: persistedState?.hasProPack ?? current.hasProPack,
           proStarterCoinsGranted:
             persistedState?.proStarterCoinsGranted ?? current.proStarterCoinsGranted,
@@ -1258,8 +1525,38 @@ export const useProgress = create<ProgressState>()(
           )
             .map(String)
             .slice(-MAX_LEADERBOARD_ACHIEVEMENT_RECORDS),
+          dailyLeaderboardRewardClaims:
+            persistedState?.dailyLeaderboardRewardClaims ?? current.dailyLeaderboardRewardClaims,
         } as ProgressState;
       },
     },
   ),
 );
+
+export type SerializableProgressSnapshot = Record<string, unknown>;
+
+/** Returns only JSON-safe progress data; Zustand actions are omitted by JSON.stringify. */
+export function getSerializableProgressSnapshot(): SerializableProgressSnapshot {
+  return JSON.parse(JSON.stringify(useProgress.getState())) as SerializableProgressSnapshot;
+}
+
+/** Applies a cloud snapshot without replacing the live Zustand action functions. */
+export function applySerializableProgressSnapshot(snapshot: SerializableProgressSnapshot): boolean {
+  if (
+    !snapshot ||
+    typeof snapshot !== "object" ||
+    !Array.isArray(snapshot.discoveredElements) ||
+    typeof snapshot.unlockedLevel !== "number"
+  ) {
+    return false;
+  }
+
+  const current = useProgress.getState() as unknown as Record<string, unknown>;
+  const next: Record<string, unknown> = { ...current };
+  for (const [key, value] of Object.entries(snapshot)) {
+    if (typeof current[key] === "function") continue;
+    next[key] = value;
+  }
+  useProgress.setState(next as unknown as ProgressState);
+  return true;
+}

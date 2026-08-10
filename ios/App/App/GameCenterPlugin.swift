@@ -1,4 +1,5 @@
 import Capacitor
+import CloudKit
 import GameKit
 import UIKit
 
@@ -8,6 +9,9 @@ public class GameCenterPlugin: CAPPlugin, CAPBridgedPlugin, GKGameCenterControll
     public let jsName = "GameCenterPlugin"
     public let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "authenticate", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getCurrentPlayer", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "saveCloudSave", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "loadCloudSave", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "submitScore", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "loadLeaderboard", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "showLeaderboard", returnType: CAPPluginReturnPromise)
@@ -15,6 +19,9 @@ public class GameCenterPlugin: CAPPlugin, CAPBridgedPlugin, GKGameCenterControll
 
     private var pendingAuthCalls: [CAPPluginCall] = []
     private var hasInstalledAuthHandler = false
+    private let cloudContainerIdentifier = "iCloud.com.eaconsulting.atomicfusionrush"
+    private let cloudRecordType = "GameSave"
+    private let cloudRecordName = "atomic-fusion-progress"
 
     @objc func authenticate(_ call: CAPPluginCall) {
         let player = GKLocalPlayer.local
@@ -50,6 +57,88 @@ public class GameCenterPlugin: CAPPlugin, CAPBridgedPlugin, GKGameCenterControll
 
             let payload = self.playerPayload(player)
             calls.forEach { $0.resolve(payload) }
+        }
+    }
+
+    @objc func getCurrentPlayer(_ call: CAPPluginCall) {
+        call.resolve(playerPayload(GKLocalPlayer.local))
+    }
+
+    @objc func saveCloudSave(_ call: CAPPluginCall) {
+        guard GKLocalPlayer.local.isAuthenticated else {
+            call.reject("Game Center player is not authenticated")
+            return
+        }
+
+        guard let payload = call.getString("payload"), !payload.isEmpty else {
+            call.reject("Missing cloud save payload")
+            return
+        }
+
+        let version = call.getInt("version", 1)
+        let database = CKContainer(identifier: cloudContainerIdentifier).privateCloudDatabase
+        let recordID = CKRecord.ID(recordName: cloudRecordName)
+
+        database.fetch(withRecordID: recordID) { [weak self] record, error in
+            guard let self = self else { return }
+
+            if let error = error as? CKError, error.code != .unknownItem {
+                call.reject("Cloud save could not be loaded before saving: \(error.localizedDescription)")
+                return
+            }
+
+            let saveRecord = record ?? CKRecord(recordType: self.cloudRecordType, recordID: recordID)
+            saveRecord["payload"] = payload as CKRecordValue
+            saveRecord["schemaVersion"] = NSNumber(value: version)
+            saveRecord["updatedAt"] = Date() as CKRecordValue
+
+            database.save(saveRecord) { savedRecord, saveError in
+                if let saveError = saveError {
+                    call.reject("Cloud save failed: \(saveError.localizedDescription)")
+                    return
+                }
+
+                call.resolve([
+                    "saved": savedRecord != nil,
+                    "version": version
+                ])
+            }
+        }
+    }
+
+    @objc func loadCloudSave(_ call: CAPPluginCall) {
+        guard GKLocalPlayer.local.isAuthenticated else {
+            call.reject("Game Center player is not authenticated")
+            return
+        }
+
+        let database = CKContainer(identifier: cloudContainerIdentifier).privateCloudDatabase
+        let recordID = CKRecord.ID(recordName: cloudRecordName)
+
+        database.fetch(withRecordID: recordID) { record, error in
+            if let cloudError = error as? CKError, cloudError.code == .unknownItem {
+                call.resolve(["found": false])
+                return
+            }
+            if let error = error {
+                call.reject("Cloud save could not be loaded: \(error.localizedDescription)")
+                return
+            }
+
+            guard let record = record, let payload = record["payload"] as? String else {
+                call.resolve(["found": false])
+                return
+            }
+
+            var result: [String: Any] = [
+                "found": true,
+                "payload": payload,
+                "version": (record["schemaVersion"] as? NSNumber)?.intValue ?? 1
+            ]
+            if let updatedAt = record["updatedAt"] as? Date {
+                result["updatedAt"] = ISO8601DateFormatter().string(from: updatedAt)
+            }
+            call.resolve(result)
         }
     }
 

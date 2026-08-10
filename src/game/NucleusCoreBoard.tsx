@@ -286,6 +286,7 @@ export function NucleusCoreBoard({
   const isTabletLayout = useIsTabletLayout();
   const arenaRef = useRef<HTMLDivElement | null>(null);
   const projectileRef = useRef<ProjectileAnim | null>(null);
+  const projectileVisualRef = useRef<HTMLDivElement | null>(null);
   const runStartRef = useRef(Date.now());
   const lastBossAttackRef = useRef(Date.now());
   const eyeClosedUntilRef = useRef(0);
@@ -607,7 +608,10 @@ export function NucleusCoreBoard({
       );
       const next = { ...active, index };
       projectileRef.current = next;
-      setProjectile(next);
+      const point = active.path[index] ?? active.path[0];
+      if (projectileVisualRef.current && point) {
+        projectileVisualRef.current.style.transform = `translate3d(${point.x - 18}px, ${point.y - 18}px, 0)`;
+      }
       if (progress >= 1) {
         resolveProjectile(active);
         return;
@@ -1046,12 +1050,16 @@ export function NucleusCoreBoard({
 
           {projectile && (
             <div
+              ref={projectileVisualRef}
               style={{
                 position: "absolute",
-                left: (projectile.path[projectile.index]?.x ?? launcher.x) - 18,
-                top: (projectile.path[projectile.index]?.y ?? launcher.y) - 18,
+                left: 0,
+                top: 0,
                 zIndex: 6,
                 pointerEvents: "none",
+                transform: `translate3d(${(projectile.path[projectile.index]?.x ?? launcher.x) - 18}px, ${(projectile.path[projectile.index]?.y ?? launcher.y) - 18}px, 0)`,
+                willChange: "transform",
+                backfaceVisibility: "hidden",
               }}
             >
               <ElementBall atomicNumber={projectile.atom} size={36} glow />

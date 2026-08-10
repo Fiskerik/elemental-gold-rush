@@ -25,6 +25,17 @@ export interface DailyBoardScoreInput {
   comboScore: number;
 }
 
+export interface DailyBoardScoreBreakdown {
+  baseScore: number;
+  comboBonus: number;
+  timeBonus: number;
+  shotEfficiency: number;
+  shotEfficiencyPenalty: number;
+  fastClearBonus: number;
+  powerUpPenalty: number;
+  finalScore: number;
+}
+
 export interface LeaderboardEntry {
   id: string;
   rank: number;
@@ -63,26 +74,9 @@ const LEGACY_DAILY_COMPOUND_LEADERBOARD_STORAGE_KEY = "elemental-gold-rush-daily
 const MAX_DAILY_COMPOUND_SECONDS = 24 * 60 * 60;
 const DAILY_BOARD_FAST_CLEAR_MS = 90_000;
 const DAILY_BOARD_SLOW_CLEAR_MS = 8 * 60_000;
-const DAILY_BOARD_IDEAL_SHOTS = 10;
-const DAILY_BOARD_SOFT_SHOT_LIMIT = 38;
-
-const SEEDED_NAMES = [
-  ["SE", "Astrid"],
-  ["US", "Nova"],
-  ["DE", "Klara"],
-  ["GB", "Morgan"],
-  ["JP", "Hana"],
-  ["FR", "Luc"],
-  ["BR", "Lia"],
-  ["CA", "Rowan"],
-  ["AU", "Mika"],
-  ["IN", "Asha"],
-  ["NO", "Sven"],
-  ["ES", "Iris"],
-  ["IT", "Enzo"],
-  ["NL", "Mila"],
-  ["DK", "Freja"],
-] as const;
+const DAILY_BOARD_FULL_SCORE_SHOTS = 20;
+const DAILY_BOARD_FLOOR_SCORE_SHOTS = 120;
+const DAILY_BOARD_MIN_SHOT_EFFICIENCY = 0.25;
 
 function normalizeCountryCode(value: string | undefined): string {
   const upper = (value ?? "").trim().toUpperCase();
@@ -202,6 +196,12 @@ function clamp01(value: number): number {
 }
 
 export function calculateDailyBoardLeaderboardScore(input: DailyBoardScoreInput): number {
+  return calculateDailyBoardScoreBreakdown(input).finalScore;
+}
+
+export function calculateDailyBoardScoreBreakdown(
+  input: DailyBoardScoreInput,
+): DailyBoardScoreBreakdown {
   const baseScore = Math.max(0, Math.floor(input.baseScore));
   const shots = Math.max(1, Math.floor(input.shots));
   const elapsedMs = Math.max(0, Math.floor(input.elapsedMs));
@@ -215,28 +215,38 @@ export function calculateDailyBoardLeaderboardScore(input: DailyBoardScoreInput)
       (elapsedMs - DAILY_BOARD_FAST_CLEAR_MS) /
         (DAILY_BOARD_SLOW_CLEAR_MS - DAILY_BOARD_FAST_CLEAR_MS),
   );
-  const shotRatio = clamp01(
-    1 - (shots - DAILY_BOARD_IDEAL_SHOTS) / (DAILY_BOARD_SOFT_SHOT_LIMIT - DAILY_BOARD_IDEAL_SHOTS),
-  );
   const timeBonus = Math.round(12000 * timeRatio);
-  const shotBonus = Math.round(9000 * shotRatio);
   const comboBonus = Math.round(
     Math.min(14000, bestCombo * bestCombo * 450 + mergeCount * 120 + comboScore * 0.18),
   );
+  // Daily Board shot efficiency is intentionally incremental: 20 shots or
+  // fewer keep full score value, then the multiplier falls linearly to 25%
+  // at 120 shots and stays there for longer runs.
+  const shotProgress = clamp01(
+    (shots - DAILY_BOARD_FULL_SCORE_SHOTS) /
+      (DAILY_BOARD_FLOOR_SCORE_SHOTS - DAILY_BOARD_FULL_SCORE_SHOTS),
+  );
+  const shotEfficiency =
+    1 - shotProgress * (1 - DAILY_BOARD_MIN_SHOT_EFFICIENCY);
+  const efficiencyAdjustedScore = Math.round((baseScore + comboBonus) * shotEfficiency);
+  const shotEfficiencyPenalty = Math.max(
+    0,
+    baseScore + comboBonus - efficiencyAdjustedScore,
+  );
+  const fastClearBonus = Math.round(9000 * shotEfficiency);
   const powerUpPenalty = Math.min(2500, powerUpsUsed * 350);
 
-  return Math.max(1, baseScore + timeBonus + shotBonus + comboBonus - powerUpPenalty);
-}
-
-function isBetterLeaderboardEntry(
-  kind: LeaderboardKind,
-  a: LeaderboardEntry,
-  b: LeaderboardEntry,
-): number {
-  if (kind === "daily-compound") {
-    return a.score - b.score || a.name.localeCompare(b.name);
-  }
-  return b.score - a.score || a.shots - b.shots || a.name.localeCompare(b.name);
+  const finalScore = Math.max(1, efficiencyAdjustedScore + timeBonus + fastClearBonus - powerUpPenalty);
+  return {
+    baseScore,
+    comboBonus,
+    timeBonus,
+    shotEfficiency,
+    shotEfficiencyPenalty,
+    fastClearBonus,
+    powerUpPenalty,
+    finalScore,
+  };
 }
 
 function recordDailyLeaderboardRun(kind: LeaderboardKind, score: number, shots: number): boolean {
@@ -245,12 +255,13 @@ function recordDailyLeaderboardRun(kind: LeaderboardKind, score: number, shots: 
   const today = getTodayQuestDate();
   const now = Date.now();
   const countryCode = inferPlayerCountryCode();
-  const records = readRecords();
-  if (
-    kind === "daily-compound" &&
-    records.some((record) => record.date === today && record.kind === kind)
-  ) {
-    return false;
+  let records = readRecords();
+  if (kind === "daily-compound") {
+    const previousBest = records
+      .filter((record) => record.date === today && record.kind === kind)
+      .sort((a, b) => a.score - b.score || a.recordedAt - b.recordedAt)[0];
+    if (previousBest && normalizedScore >= previousBest.score) return false;
+    records = records.filter((record) => !(record.date === today && record.kind === kind));
   }
   records.push({
     id: `${kind}-${today}-${now}`,
@@ -291,43 +302,6 @@ export function submitDailyCompoundLeaderboardScore(score: number, shots: number
   });
 }
 
-function seededNumber(seed: string): number {
-  let hash = 2166136261;
-  for (let index = 0; index < seed.length; index += 1) {
-    hash ^= seed.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-  return Math.abs(hash >>> 0);
-}
-
-function seededEntries(
-  kind: LeaderboardKind,
-  scope: LeaderboardScope,
-  countryCode: string,
-): LeaderboardEntry[] {
-  const today = getTodayQuestDate();
-  const rows = Array.from({ length: scope === "local" ? 10 : 18 }, (_, index) => {
-    const [seedCountry, name] = SEEDED_NAMES[index % SEEDED_NAMES.length];
-    const rowCountry = scope === "local" ? countryCode : seedCountry;
-    const variance = seededNumber(`daily-${kind}-${scope}-${today}-${index}-${rowCountry}`);
-    const score =
-      kind === "daily-board"
-        ? Math.max(1200, 62000 - index * 2450 + (variance % 1800))
-        : Math.max(12, 28 + index * 7 + (variance % 9));
-    const shots = kind === "daily-board" ? 12 + ((variance + index) % 17) : 0;
-    return {
-      id: `seed-daily-${kind}-${scope}-${index}`,
-      rank: 0,
-      countryCode: rowCountry,
-      flag: countryFlag(rowCountry),
-      name,
-      score,
-      shots,
-    };
-  });
-  return rows;
-}
-
 function playerEntry(kind: LeaderboardKind): LeaderboardEntry {
   const today = getTodayQuestDate();
   const records = readRecords();
@@ -336,7 +310,7 @@ function playerEntry(kind: LeaderboardKind): LeaderboardEntry {
     .filter((record) => record.date === today && record.kind === kind)
     .sort((a, b) =>
       kind === "daily-compound"
-        ? a.recordedAt - b.recordedAt
+        ? a.score - b.score || a.recordedAt - b.recordedAt
         : b.score - a.score || a.shots - b.shots,
     )[0];
   return {
@@ -361,12 +335,12 @@ export function getDailyLeaderboard(
 ): LeaderboardBoard {
   const countryCode = inferPlayerCountryCode();
   const player = playerEntry(kind);
-  const entries = [...seededEntries(kind, scope, countryCode), player]
-    .filter((entry) => scope === "global" || entry.countryCode === countryCode)
-    .sort((a, b) => isBetterLeaderboardEntry(kind, a, b))
-    .map((entry, index) => ({ ...entry, rank: index + 1 }));
+  const entries =
+    player.score > 0 && (scope === "global" || player.countryCode === countryCode)
+      ? [{ ...player, rank: 1 }]
+      : [];
   return {
-    entries: entries.slice(0, 20),
+    entries,
     player: entries.find((entry) => entry.isPlayer) ?? { ...player, rank: 0 },
     countryCode,
     totalPlayerCount: entries.length,
@@ -449,16 +423,47 @@ export async function loadDailyLeaderboard(
     }
     const result = await loadDailyGameCenterLeaderboard(kind, scope);
     const resolvedCountryCode = inferPlayerCountryCode();
-    const entries = result.entries.map((entry) =>
+    let entries = result.entries.map((entry) =>
       mapGameCenterEntry(entry, scope, resolvedCountryCode, result.localPlayer),
     );
-    const localPlayer = result.localPlayer
+    const gameCenterLocalPlayer = result.localPlayer
       ? mapGameCenterEntry(result.localPlayer, scope, resolvedCountryCode, result.localPlayer)
       : undefined;
-    const visibleEntries =
+    const localPlayer =
+      kind === "daily-compound" &&
+      fallbackBoard.player.score > 0 &&
+      (!gameCenterLocalPlayer || fallbackBoard.player.score < gameCenterLocalPlayer.score)
+        ? {
+            ...(gameCenterLocalPlayer ?? fallbackBoard.player),
+            score: fallbackBoard.player.score,
+            isPlayer: true,
+          }
+        : gameCenterLocalPlayer;
+    if (localPlayer && entries.some((entry) => entry.isPlayer)) {
+      entries = entries.map((entry) =>
+        entry.isPlayer ? { ...entry, score: localPlayer.score } : entry,
+      );
+    }
+    const combinedEntries =
       localPlayer && !entries.some((entry) => entry.isPlayer)
         ? [localPlayer, ...entries].sort((a, b) => a.rank - b.rank)
         : entries;
+    const visibleEntries =
+      kind === "daily-compound"
+        ? [...combinedEntries]
+            .sort((a, b) => a.score - b.score || a.name.localeCompare(b.name))
+            .map((entry, index) => ({ ...entry, rank: index + 1 }))
+        : combinedEntries;
+    const rankedLocalPlayer =
+      visibleEntries.find((entry) => entry.isPlayer) ??
+      (localPlayer && kind === "daily-compound"
+        ? {
+            ...localPlayer,
+            rank:
+              visibleEntries.findIndex((entry) => entry.score >= localPlayer.score) + 1 ||
+              visibleEntries.length + 1,
+          }
+        : localPlayer);
     const hasGameCenterScores =
       visibleEntries.length > 0 || Boolean(localPlayer && localPlayer.score > 0);
     if (!hasGameCenterScores) {
@@ -472,7 +477,7 @@ export async function loadDailyLeaderboard(
     }
     return {
       entries: visibleEntries,
-      player: localPlayer ??
+      player: rankedLocalPlayer ??
         visibleEntries.find((entry) => entry.isPlayer) ?? {
           ...playerEntry(kind),
           rank: 0,
@@ -487,5 +492,23 @@ export async function loadDailyLeaderboard(
       ...fallbackBoard,
       status: gameCenterDiagnosticStatus(kind, "Game Center unavailable - showing device scores"),
     };
+  }
+}
+
+/**
+ * Settles both daily competition prizes using the leaderboard ranks visible
+ * at the daily reset cutoff. The wallet claim is idempotent, so this can be
+ * called by the app timer and later by a server-backed settlement flow.
+ */
+export async function settleDailyLeaderboardRewards(date = getTodayQuestDate()): Promise<void> {
+  for (const kind of ["daily-board", "daily-compound"] as const) {
+    try {
+      const board = await loadDailyLeaderboard(kind, "global");
+      if (board.player.rank > 0 && board.player.rank <= 3) {
+        useProgress.getState().claimDailyLeaderboardReward(kind, board.player.rank, date);
+      }
+    } catch (error) {
+      console.warn(`Daily ${kind} prize settlement failed`, error);
+    }
   }
 }

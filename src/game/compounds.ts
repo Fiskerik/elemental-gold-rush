@@ -138,7 +138,7 @@ export const COMPOUNDS: CompoundDefinition[] = [
   compound("nitric-acid", "Nitric Acid", "HNO₃", { H: 1, N: 1, O: 3 }, 3400, "rare", "Nitric acid is a strong oxidizing acid used to make fertilizers and explosives."),
   compound("sodium-carbonate", "Sodium Carbonate", "Na₂CO₃", { Na: 2, C: 1, O: 3 }, 3500, "rare", "Sodium carbonate, or soda ash, is used in glassmaking and cleaning products."),
   compound("ethanol", "Ethanol", "C₂H₆O", { C: 2, H: 6, O: 1 }, 3600, "rare", "Ethanol is the alcohol in beverages and is also used as a fuel and solvent."),
-  compound("titanium-dioxide", "Titanium Dioxide", "TiO₂", { Ti: 1, O: 2 }, 2400, "uncommon", "Titanium dioxide is the bright white pigment in paint, toothpaste, and sunscreen."),
+  compound("titanium-dioxide", "Titanium Dioxide", "TiO₂", { Ti: 1, O: 2 }, 2400, "uncommon", "Titanium dioxide is a bright white compound used to impart whiteness to food products, cosmetics, personal-care products, toothpaste, paint, and sunscreen."),
   compound("zinc-oxide", "Zinc Oxide", "ZnO", { Zn: 1, O: 1 }, 2300, "uncommon", "Zinc oxide is used in diaper rash cream, calamine lotion, and sunscreen."),
   compound("aluminum-oxide", "Aluminum Oxide", "Al₂O₃", { Al: 2, O: 3 }, 2800, "uncommon", "Aluminum oxide (alumina) is extremely hard and used in sandpaper and many gemstones like sapphire."),
   compound("ethylene", "Ethylene", "C₂H₄", { C: 2, H: 4 }, 2200, "uncommon", "Ethylene is the gas that makes fruit ripen faster (bananas in a bag trick)."),
@@ -188,7 +188,7 @@ export const COMPOUND_HINTS: Record<string, string> = {
   "water": "A clear liquid that covers oceans, clouds, and cells.",
   "carbon-dioxide": "An invisible gas made by breathing, fire, and fizzy drinks.",
   "ammonia": "A sharp-smelling gas used to make fertilizers.",
-  "ammonium": "A nitrogen center surrounded by four hydrogens.",
+  "ammonium": "A positively charged ion common in fertilizers and many salts.",
   "methane": "A simple fuel gas found in natural gas.",
   "sodium-chloride": "A familiar white crystal sprinkled on food.",
   "hydrogen-peroxide": "A bubbling household disinfectant that releases oxygen.",
@@ -216,23 +216,23 @@ export const COMPOUND_HINTS: Record<string, string> = {
   "oxygen-gas": "The breathable gas cells use to release energy.",
   "hydrogen-gas": "The lightest gas, often used in rockets and fuel cells.",
   "nitrogen-gas": "The quiet main ingredient of the air around you.",
-  "hydrogen-fluoride": "A tiny hydrogen-halogen molecule that becomes a very aggressive acid in water.",
+  "hydrogen-fluoride": "A highly corrosive substance used to etch glass and process metals.",
   "lithium-fluoride": "A tough lithium salt used where clear crystals must resist radiation.",
-  "sodium-oxide": "A sodium-rich oxide that reacts eagerly with water.",
-  "magnesium-chloride": "A seawater salt with one metal atom and two chlorine atoms.",
+  "sodium-oxide": "A reactive solid used in specialized glass and ceramic production.",
+  "magnesium-chloride": "A moisture-loving salt recovered from seawater and brines.",
   "calcium-chloride": "A water-loving salt often scattered on icy roads.",
-  "iron-sulfide": "A dark mineral pairing iron with sulfur.",
+  "iron-sulfide": "A dark mineral found near hydrothermal vents and in meteorites.",
   "sodium-sulfide": "A sulfur salt used in tough industrial chemistry.",
-  "silicon-carbide": "A very hard ceramic built from silicon and carbon.",
-  "carbon-disulfide": "A carbon atom flanked by two sulfur atoms.",
-  "phosphine": "A simple phosphorus hydride with a sharp, reactive personality.",
-  "phosphorus-trichloride": "A phosphorus atom bonded to three chlorines.",
-  "carbon-tetrachloride": "A carbon center surrounded by four chlorine atoms.",
-  "silicon-tetrachloride": "A silicon center surrounded by four chlorine atoms.",
-  "calcium-hydroxide": "A lime compound with calcium and two hydroxide groups.",
-  "nitric-acid": "A strong acid with hydrogen, nitrogen, and three oxygens.",
+  "silicon-carbide": "An extremely hard ceramic used in abrasives, armor, and electronics.",
+  "carbon-disulfide": "A volatile industrial solvent used when making rayon and cellophane.",
+  "phosphine": "A reactive, toxic gas sometimes discussed as a possible biosignature.",
+  "phosphorus-trichloride": "A fuming industrial liquid used to manufacture pesticides and flame retardants.",
+  "carbon-tetrachloride": "A heavy solvent once used in fire extinguishers and dry cleaning.",
+  "silicon-tetrachloride": "A fuming liquid used to produce ultra-pure glass for optical fibers.",
+  "calcium-hydroxide": "Also called slaked lime, it is used in mortar, water treatment, and food processing.",
+  "nitric-acid": "A powerful oxidizing acid used for fertilizers, dyes, and metal processing.",
   "sodium-carbonate": "A soda-ash compound used in glass and cleaning.",
-  "ethanol": "A two-carbon alcohol with six hydrogens and one oxygen.",
+  "ethanol": "The alcohol in beverages, also widely used as a fuel and solvent.",
   "titanium-dioxide": "The bright white powder used in sunscreen, toothpaste, and most white paint.",
   "zinc-oxide": "A white compound famous for diaper rash creams, calamine lotion, and sunscreen.",
   "aluminum-oxide": "An extremely hard mineral found in sandpaper and beautiful gemstones like sapphire.",
@@ -250,8 +250,8 @@ export const COMPOUND_HINTS: Record<string, string> = {
   "sulfur-trioxide": "A reactive oxide that turns into sulfuric acid with water.",
   "hydrazine": "A high-energy nitrogen fuel that powers rocket thrusters.",
   "boric-acid": "A mild antiseptic powder also used to kill ants and roaches.",
-  "hydrogen-bromide": "A sharp hydrogen-halogen gas that makes a strong acid in water.",
-  "phosgene": "A hay-scented but deadly gas of carbon, oxygen, and chlorine.",
+  "hydrogen-bromide": "A sharp, colorless gas that creates a strong acid when dissolved in water.",
+  "phosgene": "A hay-scented but deadly gas once used as a chemical weapon.",
   "aluminum-chloride": "An industrial catalyst and the salt in many antiperspirants.",
   "calcium-fluoride": "The fluorite mineral that glows under ultraviolet light.",
   "sodium-fluoride": "The cavity-fighting salt added to toothpaste and water.",
@@ -719,11 +719,19 @@ export const COMPOUND_STRUCTURES: Record<string, CompoundStructure> = {
 };
 
 export function getCompoundHint(compound: CompoundDefinition): string {
-  return COMPOUND_HINTS[compound.id] ?? "A familiar substance waiting to be discovered.";
+  return COMPOUND_HINTS[compound.id] || "A familiar substance waiting to be discovered.";
 }
 
 export function getDailyCompoundClue(compound: CompoundDefinition): string {
   return getCompoundHint(compound);
+}
+
+export function getCompoundSecondaryHint(compound: CompoundDefinition): string {
+  const escapedName = compound.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const escapedFormula = compound.formula.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return compound.fact
+    .replace(new RegExp(escapedName, "gi"), "This compound")
+    .replace(new RegExp(escapedFormula, "gi"), "This compound");
 }
 
 export function getCompoundStructure(compound: CompoundDefinition): CompoundStructure {

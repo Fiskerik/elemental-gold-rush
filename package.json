@@ -1,6 +1,6 @@
 {
   "name": "tanstack_start_ts",
-  "version": "1.1.0",
+  "version": "1.1.2",
   "private": true,
   "sideEffects": false,
   "type": "module",
@@ -14,6 +14,8 @@
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "screenshots:store": "node scripts/generate-store-screenshots.mjs",
+    "appstore:validate": "node scripts/appstore-metadata.mjs validate",
+    "appstore:upload": "node scripts/appstore-metadata.mjs upload",
     "cap:prepare": "npm run build:web && npm run build:capacitor-client && node scripts/write-capacitor-index.mjs",
     "cap:add:ios": "cap add ios",
     "cap:sync": "npm run cap:prepare && cap sync ios",
@@ -24,6 +26,7 @@
   "dependencies": {
     "@capacitor-community/admob": "^7.0.3",
     "@capacitor-firebase/analytics": "^7.1.0",
+    "@capacitor-firebase/messaging": "^7.5.0",
     "@capacitor/cli": "^7.4.4",
     "@capacitor/core": "^7.4.4",
     "@capacitor/haptics": "^7.0.2",

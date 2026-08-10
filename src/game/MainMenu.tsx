@@ -2,9 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { Capacitor } from "@capacitor/core";
 import {
   Atom,
-  BookOpen,
   CheckCircle2,
-  ChevronDown,
   Clapperboard,
   FlaskConical,
   Layers,
@@ -42,6 +40,7 @@ import { t } from "./localization";
 import { PodiumMark } from "./DailyCompoundLeaderboard";
 import { openAppStoreReview } from "./appReview";
 import { toast } from "sonner";
+import { getTimeUntilDailyResetMs } from "./quests";
 
 const POWER_UP_STAGE_LABELS: Record<PowerUpStageId, string> = {
   shimmer: "Merge the shimmering queued atom",
@@ -64,7 +63,7 @@ interface Props {
   onLevels: () => void;
   onCollection: () => void;
   onSettings: () => void;
-  onShop: () => void;
+  onShop: (section?: "themes") => void;
   onLab: () => void;
   onLibrary: () => void;
   onProfile: () => void;
@@ -77,6 +76,13 @@ type NextRunGoal =
   | { kind: "atom"; text: string }
   | { kind: "compound"; text: string; compound: (typeof COMPOUNDS)[number] }
   | { kind: "powerup"; text: string; powerUp: PowerUpStageId };
+
+const NEW_THEME_ITEMS = [
+  { name: "Gummy Lab", image: "/themes/gummy-lab.webp" },
+  { name: "Cloud Nine", image: "/themes/cloud-nine.webp" },
+  { name: "Crystal Cove", image: "/themes/crystal-cove.webp" },
+  { name: "Moss Hollow", image: "/themes/moss-hollow.png" },
+] as const;
 
 function getNextRunGoal(level: (typeof LEVELS)[number]): NextRunGoal {
   if (level.powerUpStage) {
@@ -126,7 +132,6 @@ export function MainMenu({
     appLanguage,
     bestCombo,
     hasProPack,
-    clearedStageCount,
     refreshDailyLab,
     refreshDailyFeatures,
     claimDailyReward,
@@ -143,7 +148,6 @@ export function MainMenu({
   const dailyComplete = dailyQuests.length > 0 && completedDailyQuests >= 4;
   const dailyRewardAmount = hasProPack ? 10 : 3;
   const campaignProgress = Math.round((Math.min(unlockedLevel, MAX_LEVEL) / MAX_LEVEL) * 100);
-  const campaignPlayLabel = clearedStageCount > 0 ? "Continue" : "Start discovering";
   const weeklyBonus = getWeeklyPlayBonusView(weeklyPlayBonus);
   const isNativeIos = Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios";
   const [dailyRewardToast, setDailyRewardToast] = useState<{ id: number; text: string } | null>(
@@ -155,7 +159,6 @@ export function MainMenu({
   const [rewardedAdMessage, setRewardedAdMessage] = useState<string | null>(null);
   const rewardedAdMessageTimeoutRef = useRef<number | null>(null);
   const [ratePromptOpen, setRatePromptOpen] = useState(false);
-  const [questsExpanded, setQuestsExpanded] = useState(false);
 
   useEffect(() => {
     const id = window.setInterval(() => {
@@ -215,7 +218,7 @@ export function MainMenu({
   function handleDailyRewardClaim() {
     if (!dailyComplete || claimedDailyReward) return;
     claimDailyReward();
-    showDailyRewardToast(`+${dailyRewardAmount} gold coins claimed`);
+    showDailyRewardToast(`+${dailyRewardAmount} ${tr("gold coins claimed")}`);
   }
 
   function handleSecretCompoundPress() {
@@ -225,20 +228,20 @@ export function MainMenu({
   async function handleRewardedCoin() {
     if (rewardedAdBusy) return;
     setRewardedAdBusy(true);
-    showRewardedAdMessage("Loading ad...", false);
+    showRewardedAdMessage(tr("Loading ad..."), false);
     try {
       const result = await showRewardedForCoin(hasProPack);
       if (result.rewarded) {
         grantGoldCoins(1, "Rewarded ad");
         reportQuestProgress({ adsWatched: 1 });
         showRewardedAdMessage("");
-        showDailyRewardToast("+1 gold coin");
+        showDailyRewardToast(`+1 ${tr("gold coin")}`);
         return;
       }
-      showRewardedAdMessage(result.reason ?? "Loading failed - please try again in a moment");
+      showRewardedAdMessage(result.reason ? tr(result.reason) : tr("Loading failed - please try again in a moment"));
     } catch (error) {
       showRewardedAdMessage(
-        error instanceof Error ? error.message : "Loading failed - please try again in a moment",
+        error instanceof Error ? tr(error.message) : tr("Loading failed - please try again in a moment"),
       );
     } finally {
       setRewardedAdBusy(false);
@@ -263,7 +266,7 @@ export function MainMenu({
     setRatePromptOpen(false);
     const opened = await openAppStoreReview();
     if (!opened) {
-      toast("Could not open the App Store rating page.");
+      toast(tr("Could not open the App Store rating page."));
     }
   }
 
@@ -292,16 +295,16 @@ export function MainMenu({
               onSettings();
             }}
             style={iconButton}
-            aria-label="Open settings"
+            aria-label={tr("Open settings")}
           >
             <SettingsIcon size={18} aria-hidden="true" />
           </button>
           <div style={{ textAlign: "center", minWidth: 0 }}>
             <div className="gold-text" style={brandTitle}>
-              Atomic Fusion Rush
+              {tr("Atomic Fusion Rush")}
             </div>
             <div style={brandSubline}>{`Level ${unlockedLevel} of ${MAX_LEVEL}`}</div>
-            {hasProPack && <div style={proActiveChip}>PRO LAB ACTIVE</div>}
+            {hasProPack && <div style={proActiveChip}>{tr("PRO LAB ACTIVE")}</div>}
           </div>
           <button
             onClick={() => {
@@ -309,7 +312,7 @@ export function MainMenu({
               onProfile();
             }}
             style={profileCoinButton}
-            aria-label="Open profile"
+            aria-label={tr("Open profile")}
           >
             <GoldCoinIcon size={13} />
             <span>{goldCoins}</span>
@@ -320,9 +323,9 @@ export function MainMenu({
         <section style={{ ...playPanel, padding: isTabletLayout ? 22 : playPanel.padding }}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
             <div>
-              <div style={eyebrow}>NEXT RUN</div>
+              <div style={eyebrow}>{tr("NEXT RUN")}</div>
               <div style={{ fontSize: 22, fontWeight: 900, lineHeight: 1.1 }}>
-                Level {unlockedLevel}
+                {tr("Level")} {unlockedLevel}
               </div>
               <div style={{ fontSize: 13, color: "var(--muted-foreground)", marginTop: 4 }}>
                 {nextRunGoal.text}
@@ -333,23 +336,21 @@ export function MainMenu({
                 <button
                   onClick={handleRateApp}
                   style={{ ...chooseLevelBtn, paddingInline: 9, color: "var(--accent)" }}
-                  aria-label="Rate app"
+                  aria-label={tr("Rate app")}
                 >
                   <Star size={18} fill="currentColor" aria-hidden="true" />
                 </button>
               )}
-              {isNativeIos && (
-                <button
-                  onClick={() => {
-                    trackMenuAction("leaderboard");
-                    onLeaderboard();
-                  }}
-                  style={{ ...chooseLevelBtn, paddingInline: 9 }}
-                  aria-label="Open leaderboard"
-                >
-                  <PodiumMark size={20} />
-                </button>
-              )}
+              <button
+                onClick={() => {
+                  trackMenuAction("leaderboard");
+                  onLeaderboard();
+                }}
+                style={{ ...chooseLevelBtn, paddingInline: 9 }}
+                aria-label={tr("Open leaderboard")}
+              >
+                <PodiumMark size={20} />
+              </button>
               <button
                 onClick={() => {
                   trackMenuAction("levels");
@@ -358,7 +359,7 @@ export function MainMenu({
                 style={chooseLevelBtn}
               >
                 <Layers size={16} aria-hidden="true" />
-                Map
+                {tr("Map")}
               </button>
             </div>
           </div>
@@ -419,7 +420,7 @@ export function MainMenu({
           >
             <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
               <Play size={20} fill="currentColor" aria-hidden="true" />
-              {campaignPlayLabel}
+              {tr("Continue")}
             </span>
             {nextRunGoal.kind === "compound" ? (
               <MoleculeVisual compound={nextRunGoal.compound} size={54} />
@@ -443,7 +444,7 @@ export function MainMenu({
             >
               <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
                 <Clapperboard size={17} aria-hidden="true" />
-                {rewardedAdBusy ? "Loading ad..." : "Free coins"}
+                {rewardedAdBusy ? tr("Loading ad...") : tr("Free coins")}
               </span>
               <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
                 <GoldCoinIcon size={14} />
@@ -460,11 +461,31 @@ export function MainMenu({
             <div style={{ ...progressFill, width: `${campaignProgress}%` }} />
           </div>
           <div style={compactStatRow}>
-            <span>{`Highest ${highestEl?.symbol ?? "H"} #${highestElement}`}</span>
-            <span>{`${formatScore(totalScore)} score`}</span>
-            <span>{`${campaignProgress}% campaign`}</span>
+            <span>{`${tr("Highest")} ${highestEl?.symbol ?? "H"} #${highestElement}`}</span>
+            <span>{`${formatScore(totalScore)} ${tr("score")}`}</span>
+            <span>{`${campaignProgress}% ${tr("campaign")}`}</span>
           </div>
         </section>
+
+        {isNativeIos && (
+          <button
+            type="button"
+            onClick={() => onShop("themes")}
+            style={newThemesBanner}
+            aria-label={tr("Open new themes in the shop")}
+          >
+            <span style={{ minWidth: 0 }}>
+              <span style={newThemesEyebrow}>{tr("NEW IN SHOP")}</span>
+              <strong style={newThemesTitle}>{tr("Fresh themes are available")}</strong>
+              <span style={newThemesLink}>{tr("View themes")} →</span>
+            </span>
+            <span style={newThemesThumbnails} aria-hidden="true">
+              {NEW_THEME_ITEMS.map((item) => (
+                <img key={item.name} src={item.image} alt="" style={newThemesThumbnail} />
+              ))}
+            </span>
+          </button>
+        )}
 
         <nav
           style={{
@@ -474,17 +495,8 @@ export function MainMenu({
           aria-label="Main game sections"
         >
           <NavPill
-            icon={Layers}
-            label="Map"
-            tone="map"
-            onClick={() => {
-              trackMenuAction("levels");
-              onLevels();
-            }}
-          />
-          <NavPill
             icon={Atom}
-            label="Collection"
+            label={tr("Collection")}
             tone="collection"
             onClick={() => {
               trackMenuAction("collection");
@@ -493,7 +505,7 @@ export function MainMenu({
           />
           <NavPill
             icon={FlaskConical}
-            label="Lab"
+            label={tr("Lab")}
             tone="lab"
             onClick={() => {
               trackMenuAction("lab");
@@ -502,7 +514,7 @@ export function MainMenu({
           />
           <NavPill
             icon={Library}
-            label="Library"
+            label={tr("Library")}
             tone="library"
             onClick={() => {
               trackMenuAction("library");
@@ -510,8 +522,8 @@ export function MainMenu({
             }}
           />
           <NavPill
-            icon={hasProPack ? BookOpen : ShoppingBag}
-            label={hasProPack ? "Pro" : "Shop"}
+            icon={ShoppingBag}
+            label={tr("Shop")}
             tone="shop"
             onClick={() => {
               trackMenuAction("shop");
@@ -523,7 +535,7 @@ export function MainMenu({
         <section style={weeklyBonusCard}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
             <div>
-              <div style={sectionLabel}>PLAY A GAME A DAY</div>
+              <div style={sectionLabel}>{tr("PLAY A GAME A DAY")}</div>
               <div style={{ fontSize: 12, color: "var(--muted-foreground)", marginTop: 2 }}>
                 {`Streak ${weeklyBonus.currentStreak} - ${weeklyBonus.cycleProgress}/7 toward +5`}
               </div>
@@ -531,7 +543,7 @@ export function MainMenu({
             <div style={weeklyBonusPill}>
               {weeklyBonus.todayClaimed
                 ? `Today +${weeklyBonus.coinsEarnedToday}`
-                : "Play today +1"}
+                : tr("Play today +1")}
             </div>
           </div>
           <div
@@ -581,18 +593,18 @@ export function MainMenu({
                 </strong>
                 <small>
                   {day.claimed
-                    ? "Claimed"
+                    ? tr("Claimed")
                     : day.isToday
                       ? weeklyBonus.todayClaimed
-                        ? "Today"
-                        : "Claim"
-                      : "Next"}
+                        ? tr("Today")
+                        : tr("Claim")
+                      : tr("Next")}
                 </small>
               </button>
             ))}
           </div>
           <div style={{ fontSize: 10, color: "var(--muted-foreground)", lineHeight: 1.35 }}>
-            {`1 coin each day you play. ${weeklyBonus.nextRewardText}.`}
+            {`${tr("1 coin each day you play.")} ${tr(weeklyBonus.nextRewardText)}.`}
           </div>
         </section>
 
@@ -612,7 +624,7 @@ export function MainMenu({
             }}
           >
             <div>
-              <div style={sectionLabel}>DAILY LAB</div>
+              <div style={sectionLabel}>{tr("DAILY LAB")}</div>
               <div style={{ fontSize: 12, color: "var(--muted-foreground)" }}>
                 {`Streak ${dailyStreak} - ${completedDailyQuests}/${dailyQuests.length} quests`}
               </div>
@@ -632,7 +644,7 @@ export function MainMenu({
                   letterSpacing: 0.6,
                 }}
               >
-                {`Resets in ${resetCountdown}`}
+                {`${tr("Time until reset:")} ${resetCountdown}`}
               </div>
             </div>
             <div style={{ display: "grid", justifyItems: "end", gap: 8 }}>
@@ -652,34 +664,17 @@ export function MainMenu({
                   cursor: dailyComplete && !claimedDailyReward ? "pointer" : "not-allowed",
                 }}
               >
-                {claimedDailyReward ? "Claimed" : "Claim"}
+                {claimedDailyReward ? tr("Claimed") : tr("Claim")}
               </button>
               <div style={weeklyBonusPill}>
                 {weeklyBonus.todayClaimed
                   ? `Today +${weeklyBonus.coinsEarnedToday}`
-                  : "Play today +1"}
+                  : tr("Play today +1")}
               </div>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => setQuestsExpanded((current) => !current)}
-            aria-expanded={questsExpanded}
-            style={questToggleBtn}
-          >
-            <span>{questsExpanded ? "Hide quests" : "View quests"}</span>
-            <ChevronDown
-              size={16}
-              aria-hidden="true"
-              style={{
-                transform: questsExpanded ? "rotate(180deg)" : undefined,
-                transition: "transform 180ms ease",
-              }}
-            />
-          </button>
         </section>
 
-        {questsExpanded && (
         <section style={{ ...dailyPanel, padding: isTabletLayout ? 18 : dailyPanel.padding }}>
           <div
             style={dailyQuestClaimTrack}
@@ -732,7 +727,6 @@ export function MainMenu({
             ))}
           </div>
         </section>
-        )}
         {isNativeIos && ratePromptOpen && (
           <div style={modalBackdrop} role="presentation" onClick={() => setRatePromptOpen(false)}>
             <section
@@ -746,19 +740,19 @@ export function MainMenu({
                 <Star size={34} fill="currentColor" aria-hidden="true" />
               </div>
               <h2 id="rate-app-title" style={rateTitle}>
-                Enjoying Atomic Fusion Rush?
+                {tr("Enjoying Atomic Fusion Rush?")}
               </h2>
-              <p style={rateCopy}>A quick App Store rating helps the game grow.</p>
+              <p style={rateCopy}>{tr("A quick App Store rating helps the game grow.")}</p>
               <div style={rateActions}>
                 <button
                   type="button"
                   onClick={() => setRatePromptOpen(false)}
                   style={rateSecondaryBtn}
                 >
-                  Later
+                  {tr("Later")}
                 </button>
                 <button type="button" onClick={handleRateConfirm} style={ratePrimaryBtn}>
-                  Rate App
+                  {tr("Rate App")}
                 </button>
               </div>
             </section>
@@ -797,12 +791,12 @@ const topBar: CSSProperties = {
 };
 
 const brandTitle: CSSProperties = {
-  fontSize: 22,
+  fontSize: "clamp(13px, 4.2vw, 22px)",
   fontWeight: 1000,
   lineHeight: 1,
   overflow: "hidden",
-  textOverflow: "ellipsis",
   whiteSpace: "nowrap",
+  letterSpacing: "-0.25px",
 };
 
 const brandSubline: CSSProperties = {
@@ -885,6 +879,60 @@ const heroPlayBtn: CSSProperties = {
   fontSize: 20,
   cursor: "pointer",
   marginTop: 16,
+};
+
+const newThemesBanner: CSSProperties = {
+  width: "100%",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 12,
+  marginTop: 12,
+  padding: "12px 13px",
+  border: "1px solid color-mix(in oklch, var(--accent) 48%, var(--border))",
+  borderRadius: 14,
+  background: "linear-gradient(135deg, color-mix(in oklch, var(--accent) 15%, var(--surface)), var(--surface))",
+  color: "var(--foreground)",
+  textAlign: "left",
+  cursor: "pointer",
+};
+
+const newThemesEyebrow: CSSProperties = {
+  display: "block",
+  color: "var(--accent)",
+  fontSize: 9,
+  letterSpacing: 1.8,
+  fontWeight: 900,
+};
+
+const newThemesTitle: CSSProperties = {
+  display: "block",
+  marginTop: 3,
+  fontSize: 13,
+};
+
+const newThemesLink: CSSProperties = {
+  display: "block",
+  marginTop: 5,
+  color: "var(--accent)",
+  fontSize: 11,
+  fontWeight: 900,
+};
+
+const newThemesThumbnails: CSSProperties = {
+  display: "flex",
+  flexShrink: 0,
+  paddingLeft: 8,
+};
+
+const newThemesThumbnail: CSSProperties = {
+  width: 42,
+  height: 42,
+  objectFit: "cover",
+  borderRadius: 10,
+  border: "2px solid var(--surface)",
+  marginLeft: -8,
+  boxShadow: "0 4px 10px rgba(0,0,0,.28)",
 };
 
 const chooseLevelBtn: CSSProperties = {
@@ -1047,35 +1095,8 @@ const compactStatRow: CSSProperties = {
 
 const subpageRow: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
+  gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
   gap: 10,
-  position: "sticky",
-  bottom: 8,
-  zIndex: 20,
-  padding: 8,
-  marginInline: -8,
-  border: "1px solid color-mix(in oklch, var(--border) 72%, transparent)",
-  borderRadius: 14,
-  background: "color-mix(in oklch, var(--background) 86%, transparent)",
-  backdropFilter: "blur(14px)",
-};
-
-const questToggleBtn: CSSProperties = {
-  width: "100%",
-  minHeight: 38,
-  marginTop: 12,
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  gap: 6,
-  border: "1px solid var(--border)",
-  borderRadius: 10,
-  background: "var(--surface-high)",
-  color: "var(--foreground)",
-  fontFamily: "inherit",
-  fontSize: 12,
-  fontWeight: 850,
-  cursor: "pointer",
 };
 
 const dailyPanel: CSSProperties = {
@@ -1182,9 +1203,7 @@ const weeklyReward: CSSProperties = {
 };
 
 function formatResetCountdown(now: Date = new Date()): string {
-  const next = new Date(now);
-  next.setHours(24, 0, 0, 0);
-  const diff = Math.max(0, next.getTime() - now.getTime());
+  const diff = getTimeUntilDailyResetMs(now);
   const totalSec = Math.floor(diff / 1000);
   const h = Math.floor(totalSec / 3600);
   const m = Math.floor((totalSec % 3600) / 60);
@@ -1357,11 +1376,10 @@ function NavPill({
 }: {
   icon: LucideIcon;
   label: string;
-  tone: "map" | "collection" | "lab" | "library" | "shop";
+  tone: "collection" | "lab" | "library" | "shop";
   onClick: () => void;
 }) {
-  const tones: Record<"map" | "collection" | "lab" | "library" | "shop", string> = {
-    map: "linear-gradient(135deg, color-mix(in oklch, var(--secondary) 25%, var(--surface)), color-mix(in oklch, var(--accent) 16%, var(--surface)))",
+  const tones: Record<"collection" | "lab" | "library" | "shop", string> = {
     collection:
       "linear-gradient(135deg, color-mix(in oklch, var(--primary) 32%, var(--surface)), color-mix(in oklch, var(--accent) 18%, var(--surface)))",
     lab: "linear-gradient(135deg, color-mix(in oklch, var(--success) 30%, var(--surface)), color-mix(in oklch, var(--primary) 18%, var(--surface)))",
@@ -1369,9 +1387,8 @@ function NavPill({
       "linear-gradient(135deg, color-mix(in oklch, var(--secondary) 30%, var(--surface)), color-mix(in oklch, var(--primary) 15%, var(--surface)))",
     shop: "linear-gradient(135deg, color-mix(in oklch, var(--accent) 32%, var(--surface)), color-mix(in oklch, var(--primary) 22%, var(--surface)))",
   };
-  const shimmerDelay: Record<"map" | "collection" | "lab" | "library" | "shop", string> = {
-    map: "0s",
-    collection: "0.25s",
+  const shimmerDelay: Record<"collection" | "lab" | "library" | "shop", string> = {
+    collection: "0s",
     lab: "0.35s",
     library: "0.7s",
     shop: "1.05s",

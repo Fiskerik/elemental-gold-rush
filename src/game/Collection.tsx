@@ -10,28 +10,47 @@ import { useIsTabletLayout } from "./responsive";
 import { getElementCollectionDetails } from "./elementDetails";
 import { t } from "./localization";
 
-type CollectionView = "elements" | "compounds" | "badges";
+const BADGE_TONES = [
+  "oklch(0.9 0.18 88)",
+  "oklch(0.82 0.18 35)",
+  "oklch(0.82 0.16 205)",
+  "oklch(0.8 0.18 145)",
+  "oklch(0.82 0.14 285)",
+  "oklch(0.86 0.16 330)",
+];
+
+function badgeTone(id: string): string {
+  const value = Array.from(id).reduce((sum, character) => sum + character.charCodeAt(0), 0);
+  return BADGE_TONES[value % BADGE_TONES.length] ?? BADGE_TONES[0];
+}
 
 export function Collection({ onBack }: { onBack: () => void }) {
   const isTabletLayout = useIsTabletLayout();
   const {
     discoveredElements,
     discoveredCompounds,
+    viewedElementDiscoveries,
+    viewedCompoundDiscoveries,
     compoundCounts,
     earnedBadges,
+    shopSpendCents,
     appLanguage,
     goldCoins,
     unlockLockedElementsForCoins,
     unlockLockedCompoundsForCoins,
+    markElementDiscoveryViewed,
+    markCompoundDiscoveryViewed,
   } = useProgress();
   const tr = (text: string) => t(text, appLanguage);
   const [selected, setSelected] = useState<number | null>(null);
   const [selectedCompound, setSelectedCompound] = useState<CompoundDefinition | null>(null);
   const [purchaseMessage, setPurchaseMessage] = useState("");
-  const [collectionView, setCollectionView] = useState<CollectionView>("elements");
-  const [periodFilter, setPeriodFilter] = useState<number | "all">("all");
+  const [showUndiscoveredCompounds, setShowUndiscoveredCompounds] = useState(false);
+  const [expandedBadgeGroups, setExpandedBadgeGroups] = useState<Record<string, boolean>>({});
   const found = new Set(discoveredElements);
   const foundCompounds = new Set(discoveredCompounds);
+  const viewedElements = new Set(viewedElementDiscoveries);
+  const viewedCompounds = new Set(viewedCompoundDiscoveries);
   const earned = new Set(earnedBadges);
   const el = selected ? ELEMENTS[selected - 1] : null;
   const elementDetails = el ? getElementCollectionDetails(el) : null;
@@ -43,27 +62,39 @@ export function Collection({ onBack }: { onBack: () => void }) {
     : null;
   const lockedElementCount = ELEMENTS.length - discoveredElements.length;
   const lockedCompoundCount = COMPOUNDS.length - discoveredCompounds.length;
-  const visibleElements =
-    isTabletLayout || periodFilter === "all"
-      ? ELEMENTS
-      : ELEMENTS.filter((element) => element.period === periodFilter);
+  const visibleCompounds = showUndiscoveredCompounds
+    ? COMPOUNDS
+    : COMPOUNDS.filter((compound) => foundCompounds.has(compound.id));
 
   function handleUnlockElements() {
-    const unlocked = unlockLockedElementsForCoins(50);
     setPurchaseMessage(
-      unlocked
-        ? tr("Locked elements unlocked.")
-        : tr("Need 50 gold coins or no locked elements remain."),
+      lockedElementCount > 0
+        ? tr("Select one locked element in the periodic table to unlock it for 50 gold coins.")
+        : tr("No locked elements remain."),
     );
   }
 
   function handleUnlockCompounds() {
-    const unlocked = unlockLockedCompoundsForCoins(100);
+    setShowUndiscoveredCompounds(true);
     setPurchaseMessage(
-      unlocked
-        ? tr("Locked compounds unlocked.")
-        : tr("Need 100 gold coins or no locked compounds remain."),
+      lockedCompoundCount > 0
+        ? tr("Select one undiscovered compound to unlock it for 100 gold coins.")
+        : tr("No locked compounds remain."),
     );
+  }
+
+  function toggleBadgeGroup(groupId: string) {
+    setExpandedBadgeGroups((current) => ({ ...current, [groupId]: !current[groupId] }));
+  }
+
+  function openElement(atomicNumber: number) {
+    setSelected(atomicNumber);
+    if (found.has(atomicNumber)) markElementDiscoveryViewed(atomicNumber);
+  }
+
+  function openCompound(compound: CompoundDefinition) {
+    setSelectedCompound(compound);
+    if (foundCompounds.has(compound.id)) markCompoundDiscoveryViewed(compound.id);
   }
 
   return (
@@ -92,15 +123,15 @@ export function Collection({ onBack }: { onBack: () => void }) {
               cursor: "pointer",
             }}
           >
-            ← Back
+            ← {tr("Back")}
           </button>
           <div style={{ flex: 1 }}>
-            <h1 style={{ fontSize: 22, margin: 0, fontWeight: 800 }}>Collection</h1>
+            <h1 style={{ fontSize: 22, margin: 0, fontWeight: 800 }}>{tr("Collection")}</h1>
             <div style={{ fontSize: 12, color: "var(--muted-foreground)" }}>
-              {`${discoveredElements.length} / 118 elements discovered`}
+              {`${discoveredElements.length} / 118 ${tr("elements discovered")}`}
             </div>
           </div>
-          <div style={collectionWalletPill}>{goldCoins} gold</div>
+          <div style={collectionWalletPill}>{goldCoins} {tr("gold")}</div>
         </div>
 
         <section style={collectionUnlockPanel}>
@@ -138,72 +169,19 @@ export function Collection({ onBack }: { onBack: () => void }) {
         </section>
 
         {/* Real periodic-table layout: 18 columns × 7 periods + lanthanide/actinide rows */}
-        <nav style={collectionTabs} aria-label="Collection sections">
-          {(
-            [
-              ["elements", `Elements ${discoveredElements.length}/118`],
-              ["compounds", `Molecules ${discoveredCompounds.length}/${COMPOUNDS.length}`],
-              ["badges", `Badges ${earnedBadges.length}/${BADGES.length}`],
-            ] as const
-          ).map(([view, label]) => (
-            <button
-              key={view}
-              type="button"
-              onClick={() => setCollectionView(view)}
-              aria-current={collectionView === view ? "page" : undefined}
-              style={{
-                ...collectionTabBtn,
-                borderColor: collectionView === view ? "var(--accent)" : "var(--border)",
-                background:
-                  collectionView === view
-                    ? "color-mix(in oklch, var(--accent) 18%, var(--surface))"
-                    : "var(--surface)",
-                color:
-                  collectionView === view ? "var(--foreground)" : "var(--muted-foreground)",
-              }}
-            >
-              {label}
-            </button>
-          ))}
-        </nav>
-
-        {collectionView === "elements" && (
-          <>
-            {!isTabletLayout && (
-              <div style={periodFilterRow} aria-label="Filter elements by period">
-                {(["all", 1, 2, 3, 4, 5, 6, 7] as const).map((period) => (
-                  <button
-                    key={period}
-                    type="button"
-                    onClick={() => setPeriodFilter(period)}
-                    style={{
-                      ...periodFilterBtn,
-                      borderColor: periodFilter === period ? "var(--accent)" : "var(--border)",
-                      color:
-                        periodFilter === period
-                          ? "var(--foreground)"
-                          : "var(--muted-foreground)",
-                    }}
-                  >
-                    {period === "all" ? "All" : `P${period}`}
-                  </button>
-                ))}
-              </div>
-            )}
         <div style={{ paddingBottom: 8 }}>
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: isTabletLayout
-                ? "repeat(18, minmax(0, 1fr))"
-                : "repeat(4, minmax(0, 1fr))",
+              gridTemplateColumns: "repeat(18, minmax(0, 1fr))",
               gridAutoRows: "1fr",
-              gap: isTabletLayout ? 2 : 8,
+              gap: 2,
               width: "100%",
             }}
           >
-            {visibleElements.map((e) => {
+            {ELEMENTS.map((e) => {
               const isFound = found.has(e.atomicNumber);
+              const isNewDiscovery = isFound && !viewedElements.has(e.atomicNumber);
               // Place lanthanides (57–71) and actinides (89–103) in their own rows below.
               let row: number;
               let col: number;
@@ -220,13 +198,15 @@ export function Collection({ onBack }: { onBack: () => void }) {
               return (
                 <button
                   key={e.atomicNumber}
-                  onClick={() => setSelected(e.atomicNumber)}
+                  onClick={() => openElement(e.atomicNumber)}
+                  className={isNewDiscovery ? "collection-discovery-new" : undefined}
+                  aria-label={isNewDiscovery ? `${e.name}, newly discovered` : e.name}
                   style={{
-                    gridColumn: isTabletLayout ? col : undefined,
-                    gridRow: isTabletLayout ? row : undefined,
+                    gridColumn: col,
+                    gridRow: row,
                     aspectRatio: "1 / 1",
                     border: `1px solid ${isFound ? e.color : "var(--border)"}`,
-                    borderRadius: isTabletLayout ? 4 : 8,
+                    borderRadius: 4,
                     background: isFound ? `${e.color}33` : "var(--surface)",
                     color: isFound ? "var(--foreground)" : "var(--muted-foreground)",
                     display: "flex",
@@ -238,21 +218,15 @@ export function Collection({ onBack }: { onBack: () => void }) {
                     minWidth: 0,
                   }}
                 >
-                  <div
-                    style={{ fontSize: isTabletLayout ? 7 : 10, opacity: 0.7, lineHeight: 1 }}
-                  >
-                    {e.atomicNumber}
-                  </div>
-                  <div
-                    style={{ fontSize: isTabletLayout ? 10 : 18, fontWeight: 800, lineHeight: 1.1 }}
-                  >
+                  <div style={{ fontSize: 7, opacity: 0.7, lineHeight: 1 }}>{e.atomicNumber}</div>
+                  <div style={{ fontSize: 10, fontWeight: 800, lineHeight: 1.1 }}>
                     {isFound ? e.symbol : "?"}
                   </div>
                 </button>
               );
             })}
             {/* Placeholder markers in main table for lanthanide/actinide series */}
-            {isTabletLayout && <div
+            <div
               style={{
                 gridColumn: 3,
                 gridRow: 6,
@@ -267,8 +241,8 @@ export function Collection({ onBack }: { onBack: () => void }) {
               }}
             >
               57–71
-            </div>}
-            {isTabletLayout && <div
+            </div>
+            <div
               style={{
                 gridColumn: 3,
                 gridRow: 7,
@@ -283,13 +257,11 @@ export function Collection({ onBack }: { onBack: () => void }) {
               }}
             >
               89–103
-            </div>}
+            </div>
           </div>
         </div>
-          </>
-        )}
 
-        {collectionView === "compounds" && <section style={{ marginTop: 18 }}>
+        <section style={{ marginTop: 18 }}>
           <div
             style={{
               fontSize: 11,
@@ -298,7 +270,7 @@ export function Collection({ onBack }: { onBack: () => void }) {
               marginBottom: 8,
             }}
           >
-            COMPOUNDS
+            {tr("COMPOUNDS")}
           </div>
           <div
             style={{
@@ -307,14 +279,17 @@ export function Collection({ onBack }: { onBack: () => void }) {
               gap: isTabletLayout ? 12 : 8,
             }}
           >
-            {COMPOUNDS.map((compound) => {
+            {visibleCompounds.map((compound) => {
               const unlocked = foundCompounds.has(compound.id);
+              const isNewDiscovery = unlocked && !viewedCompounds.has(compound.id);
               const foundCount = compoundCounts[compound.id] ?? (unlocked ? 1 : 0);
               return (
                 <button
                   key={compound.id}
                   type="button"
-                  onClick={() => setSelectedCompound(compound)}
+                  onClick={() => openCompound(compound)}
+                  className={isNewDiscovery ? "collection-discovery-new" : undefined}
+                  aria-label={isNewDiscovery ? `${compound.name}, newly discovered` : compound.name}
                   style={{
                     display: "flex",
                     gap: 9,
@@ -334,7 +309,7 @@ export function Collection({ onBack }: { onBack: () => void }) {
                   <MoleculeVisual compound={compound} locked={!unlocked} size={44} />
                   <span style={{ minWidth: 0 }}>
                     <span style={{ display: "block", fontSize: 12, fontWeight: 900 }}>
-                      {unlocked ? compound.name : "Unknown"}
+                      {unlocked ? tr(compound.name) : tr("Unknown")}
                     </span>
                     <span
                       style={{ display: "block", fontSize: 11, color: "var(--muted-foreground)" }}
@@ -350,7 +325,7 @@ export function Collection({ onBack }: { onBack: () => void }) {
                           marginTop: 2,
                         }}
                       >
-                        {`Found x${foundCount}`}
+                        {`${tr("Found")} x${foundCount}`}
                       </span>
                     )}
                   </span>
@@ -358,10 +333,21 @@ export function Collection({ onBack }: { onBack: () => void }) {
               );
             })}
           </div>
-        </section>}
+          {lockedCompoundCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowUndiscoveredCompounds((current) => !current)}
+              style={collectionExpandBtn}
+            >
+              {showUndiscoveredCompounds
+                ? tr("Hide undiscovered")
+                : `${tr("Show undiscovered")} (${lockedCompoundCount})`}
+            </button>
+          )}
+        </section>
 
         {/* Badges */}
-        {collectionView === "badges" && <div style={{ marginTop: 20 }}>
+        <div style={{ marginTop: 20 }}>
           <div
             style={{
               fontSize: 11,
@@ -370,12 +356,16 @@ export function Collection({ onBack }: { onBack: () => void }) {
               marginBottom: 8,
             }}
           >
-            BADGES
+            {tr("BADGES")}
           </div>
           <div style={{ display: "grid", gap: 12 }}>
             {BADGE_GROUPS.map((group) => {
               const groupBadges = BADGES.filter((badge) => badge.group === group.id);
               const unlockedCount = groupBadges.filter((badge) => earned.has(badge.id)).length;
+              const showUndiscovered = expandedBadgeGroups[group.id] ?? false;
+              const visibleBadges = showUndiscovered
+                ? groupBadges
+                : groupBadges.filter((badge) => earned.has(badge.id));
               return (
                 <section
                   key={group.id}
@@ -395,9 +385,9 @@ export function Collection({ onBack }: { onBack: () => void }) {
                     }}
                   >
                     <div>
-                      <div style={{ fontSize: 13, fontWeight: 900 }}>{group.title}</div>
+                      <div style={{ fontSize: 13, fontWeight: 900 }}>{tr(group.title)}</div>
                       <div style={{ fontSize: 10, color: "var(--muted-foreground)" }}>
-                        {group.description}
+                        {tr(group.description)}
                       </div>
                     </div>
                     <div style={{ fontSize: 11, color: "var(--accent)", fontWeight: 800 }}>
@@ -411,11 +401,15 @@ export function Collection({ onBack }: { onBack: () => void }) {
                       gap: isTabletLayout ? 12 : 8,
                     }}
                   >
-                    {groupBadges.map((badge) => {
+                    {visibleBadges.map((badge) => {
                       const unlocked = earned.has(badge.id);
+                      const tone = badgeTone(badge.id);
                       const progress = badge.requiredAtomicNumbers.filter((atomicNumber) =>
                         found.has(atomicNumber),
                       ).length;
+                      const shopProgress = badge.requiredShopSpendCents
+                        ? `$${(shopSpendCents / 100).toFixed(2)} / $${(badge.requiredShopSpendCents / 100).toFixed(2)}`
+                        : `${progress}/${badge.requiredAtomicNumbers.length}`;
                       return (
                         <div
                           key={badge.id}
@@ -425,9 +419,9 @@ export function Collection({ onBack }: { onBack: () => void }) {
                             alignItems: "center",
                             padding: 10,
                             borderRadius: 12,
-                            border: `1px solid ${unlocked ? "var(--accent)" : "var(--border)"}`,
+                            border: `1px solid ${unlocked ? tone : "var(--border)"}`,
                             background: unlocked
-                              ? "color-mix(in oklch, var(--accent) 15%, var(--surface))"
+                              ? `color-mix(in oklch, ${tone} 15%, var(--surface))`
                               : "var(--surface)",
                             opacity: unlocked ? 1 : 0.65,
                           }}
@@ -440,14 +434,14 @@ export function Collection({ onBack }: { onBack: () => void }) {
                                 size={22}
                                 strokeWidth={2}
                                 aria-hidden="true"
-                                color={unlocked ? "var(--accent)" : "var(--muted-foreground)"}
+                                color={unlocked ? tone : "var(--muted-foreground)"}
                               />
                             ) : (
                               badge.icon
                             )}
                           </div>
                           <div>
-                            <div style={{ fontSize: 12, fontWeight: 800 }}>{badge.name}</div>
+                          <div style={{ fontSize: 12, fontWeight: 800 }}>{tr(badge.name)}</div>
                             <div
                               style={{
                                 fontSize: 10,
@@ -455,29 +449,40 @@ export function Collection({ onBack }: { onBack: () => void }) {
                                 lineHeight: 1.35,
                               }}
                             >
-                              {badge.description}
+                              {tr(badge.description)}
                             </div>
                             <div
                               style={{
                                 fontSize: 10,
-                                color: unlocked ? "var(--accent)" : "var(--muted-foreground)",
+                                color: unlocked ? tone : "var(--muted-foreground)",
                                 marginTop: 2,
                               }}
                             >
                               {unlocked
-                                ? "Unlocked"
-                                : `${progress}/${badge.requiredAtomicNumbers.length}`}
+                                ? tr("Unlocked")
+                                : shopProgress}
                             </div>
                           </div>
                         </div>
                       );
                     })}
                   </div>
+                  {unlockedCount < groupBadges.length && (
+                    <button
+                      type="button"
+                      onClick={() => toggleBadgeGroup(group.id)}
+                      style={collectionExpandBtn}
+                    >
+                      {showUndiscovered
+                        ? tr("Hide undiscovered")
+                        : `${tr("Show undiscovered")} (${groupBadges.length - unlockedCount})`}
+                    </button>
+                  )}
                 </section>
               );
             })}
           </div>
-        </div>}
+        </div>
       </div>
 
       {el && (
@@ -516,7 +521,7 @@ export function Collection({ onBack }: { onBack: () => void }) {
               aria-label={tr("Close")}
               style={collectionModalCloseBtn}
             >
-              X
+              {tr("Close")}
             </button>
             <div style={{ display: "flex", justifyContent: "center", marginBottom: 14 }}>
               <ElementBall
@@ -536,7 +541,7 @@ export function Collection({ onBack }: { onBack: () => void }) {
               {tr(el.category.toUpperCase().replace("-", " "))}
             </div>
             <div style={{ fontSize: 26, fontWeight: 800, textAlign: "center", marginTop: 4 }}>
-              {el.name}
+              {tr(el.name)}
             </div>
             <div
               style={{
@@ -605,17 +610,34 @@ export function Collection({ onBack }: { onBack: () => void }) {
                 </div>
               </div>
             ) : (
-              <p
-                style={{
-                  fontSize: 13,
-                  lineHeight: 1.55,
-                  margin: 0,
-                  color: "var(--muted-foreground)",
-                  fontStyle: "italic",
-                }}
-              >
-                {tr("Locked. Discover this element through fusion to unlock its facts.")}
-              </p>
+              <div style={{ display: "grid", gap: 12 }}>
+                <p
+                  style={{
+                    fontSize: 13,
+                    lineHeight: 1.55,
+                    margin: 0,
+                    color: "var(--muted-foreground)",
+                    fontStyle: "italic",
+                  }}
+                >
+                  {tr("Locked. Discover this element through fusion to unlock its facts.")}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const unlocked = unlockLockedElementsForCoins(el.atomicNumber, 50);
+                    setPurchaseMessage(
+                      unlocked
+                        ? tr("Element unlocked.")
+                        : tr("Need 50 gold coins to unlock this element."),
+                    );
+                  }}
+                  disabled={goldCoins < 50}
+                  style={{ ...collectionUnlockBtn, opacity: goldCoins >= 50 ? 1 : 0.55 }}
+                >
+                  {tr("Unlock this element")} - 50
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -655,7 +677,7 @@ export function Collection({ onBack }: { onBack: () => void }) {
               aria-label={tr("Close")}
               style={collectionModalCloseBtn}
             >
-              X
+              {tr("Close")}
             </button>
             <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
               <MoleculeVisual
@@ -665,7 +687,7 @@ export function Collection({ onBack }: { onBack: () => void }) {
               />
             </div>
             <div style={{ fontSize: 24, fontWeight: 900, textAlign: "center" }}>
-              {selectedCompoundUnlocked ? selectedCompound.name : tr("Unknown Compound")}
+              {selectedCompoundUnlocked ? tr(selectedCompound.name) : tr("Unknown Compound")}
             </div>
             <div
               style={{
@@ -687,11 +709,9 @@ export function Collection({ onBack }: { onBack: () => void }) {
                   marginBottom: 10,
                 }}
               >
-                {tr(
-                  `Found ${compoundCounts[selectedCompound.id] ?? 1} time${
-                    (compoundCounts[selectedCompound.id] ?? 1) === 1 ? "" : "s"
-                  }`,
-                )}
+                  {`${tr("Found")} ${compoundCounts[selectedCompound.id] ?? 1} ${tr(
+                    (compoundCounts[selectedCompound.id] ?? 1) === 1 ? "time" : "times",
+                  )}`}
               </div>
             )}
             {selectedCompoundUnlocked && selectedCompoundDetails ? (
@@ -731,9 +751,26 @@ export function Collection({ onBack }: { onBack: () => void }) {
                 </div>
               </div>
             ) : (
-              <p style={{ fontSize: 13, lineHeight: 1.55, margin: 0, color: "var(--foreground)" }}>
-                {getCompoundHint(selectedCompound)}
-              </p>
+              <div style={{ display: "grid", gap: 12 }}>
+                <p style={{ fontSize: 13, lineHeight: 1.55, margin: 0, color: "var(--foreground)" }}>
+                  {getCompoundHint(selectedCompound)}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const unlocked = unlockLockedCompoundsForCoins(selectedCompound.id, 100);
+                    setPurchaseMessage(
+                      unlocked
+                        ? tr("Compound unlocked.")
+                        : tr("Need 100 gold coins to unlock this compound."),
+                    );
+                  }}
+                  disabled={goldCoins < 100}
+                  style={{ ...collectionUnlockBtn, opacity: goldCoins >= 100 ? 1 : 0.55 }}
+                >
+                  {tr("Unlock this compound")} - 100
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -762,46 +799,6 @@ const collectionWalletPill: CSSProperties = {
   color: "var(--accent)",
   fontSize: 12,
   fontWeight: 900,
-};
-
-const collectionTabs: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-  gap: 7,
-  marginBottom: 12,
-};
-
-const collectionTabBtn: CSSProperties = {
-  minWidth: 0,
-  minHeight: 42,
-  padding: "7px 4px",
-  border: "1px solid var(--border)",
-  borderRadius: 9,
-  fontFamily: "inherit",
-  fontSize: 10,
-  lineHeight: 1.2,
-  fontWeight: 900,
-  cursor: "pointer",
-};
-
-const periodFilterRow: CSSProperties = {
-  display: "flex",
-  gap: 6,
-  overflowX: "auto",
-  paddingBottom: 10,
-};
-
-const periodFilterBtn: CSSProperties = {
-  flex: "0 0 auto",
-  minWidth: 42,
-  minHeight: 34,
-  border: "1px solid var(--border)",
-  borderRadius: 9,
-  background: "var(--surface)",
-  fontFamily: "inherit",
-  fontSize: 11,
-  fontWeight: 850,
-  cursor: "pointer",
 };
 
 const collectionUnlockPanel: CSSProperties = {
@@ -835,6 +832,18 @@ const collectionPurchaseMessage: CSSProperties = {
   color: "var(--muted-foreground)",
   fontSize: 11,
   fontWeight: 800,
+};
+
+const collectionExpandBtn: CSSProperties = {
+  marginTop: 10,
+  border: "1px solid var(--border)",
+  borderRadius: 999,
+  padding: "7px 11px",
+  background: "var(--surface)",
+  color: "var(--accent)",
+  fontSize: 11,
+  fontWeight: 900,
+  cursor: "pointer",
 };
 
 const collectionModalCloseBtn: CSSProperties = {

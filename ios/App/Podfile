@@ -11,9 +11,11 @@ install! 'cocoapods', :disable_input_output_paths => true
 def capacitor_pods
   pod 'Capacitor', :path => '../../node_modules/@capacitor/ios'
   pod 'CapacitorCordova', :path => '../../node_modules/@capacitor/ios'
-  # Retained for a future AdMob reactivation; runtime ad calls currently use the LevelPlay bridge.
+  # AdMob is the runtime mediation layer. The mediation adapters below provide
+  # Unity Ads and ironSource Ads demand inside AdMob.
   pod 'CapacitorCommunityAdmob', :path => '../../node_modules/@capacitor-community/admob'
   pod 'CapacitorFirebaseAnalytics', :path => '../../node_modules/@capacitor-firebase/analytics'
+  pod 'CapacitorFirebaseMessaging', :path => '../../node_modules/@capacitor-firebase/messaging'
   pod 'CapacitorHaptics', :path => '../../node_modules/@capacitor/haptics'
   pod 'CapacitorKeyboard', :path => '../../node_modules/@capacitor/keyboard'
   pod 'CapacitorSplashScreen', :path => '../../node_modules/@capacitor/splash-screen'
@@ -24,11 +26,12 @@ end
 target 'App' do
   capacitor_pods
   # Add your Pods here
-  pod 'IronSourceSDK', '9.4.0.0'
-  pod 'IronSourceUnityAdsAdapter', '5.5.0'
+  # CapacitorCommunityAdmob 7.x pins Google Mobile Ads SDK 12.12.0.
+  # These adapter releases are the latest compatible family for that SDK;
+  # newer adapter releases require Google Mobile Ads 13.x.
+  pod 'GoogleMobileAdsMediationUnity', '4.16.3.0'
+  pod 'GoogleMobileAdsMediationIronSource', '9.0.0.0.0'
   pod 'CapacitorFirebaseAnalytics/Analytics', :path => '../../node_modules/@capacitor-firebase/analytics'
-  # Additional LevelPlay network adapters can be added here when enabled in
-  # the LevelPlay dashboard.
 end
 
 post_install do |installer|

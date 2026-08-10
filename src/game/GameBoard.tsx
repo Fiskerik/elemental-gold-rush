@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import type { MouseEvent as ReactMouseEvent, ReactNode } from "react";
 import { Capacitor } from "@capacitor/core";
-import { Coins, Settings as SettingsIcon } from "lucide-react";
+import { Coins, Info, Settings as SettingsIcon } from "lucide-react";
 import { ELEMENTS } from "./elements";
 import {
   LEVELS,
@@ -29,24 +29,19 @@ import {
 import { ElementBall } from "./ElementBall";
 import {
   emptyPowerUpInventory,
+  isAtomSkinUnlocked,
+  isBoardThemeUnlocked,
   type InventoryPowerUpId,
   type LabUpgradeId,
   type PowerUpInventory,
+  type AtomSkin,
+  type BoardTheme,
   useProgress,
 } from "./store";
 import { playShootSound, primeAudio, startAmbientMusic, stopAmbientMusic, vibrate } from "./audio";
 import { playFeedback, type FeedbackEvent } from "./feedback";
 import { GameModeId, getGameMode, getModeLevelLabel } from "./challenges";
-import {
-  trackFirstMerge,
-  trackGameOver,
-  trackGameStart,
-  trackLevelWin,
-  trackMerge,
-  trackResultAction,
-  trackRunEnd,
-  trackShot,
-} from "./analytics";
+import { trackGameOver, trackGameStart, trackLevelWin, trackMerge, trackShot } from "./analytics";
 import {
   COMPOUNDS,
   type CompoundDefinition,
@@ -62,12 +57,16 @@ import { DAILY_FEATURE_REWARD_COINS, hashDailySeed } from "./dailyFeatures";
 import { getTodayQuestDate } from "./quests";
 import { showInterstitialIfReady, showRewardedForCoin } from "./ads";
 import { useIsTabletLayout, useWideBoardLayout } from "./responsive";
+import { t } from "./localization";
 import { ElementalBossBoard } from "./ElementalBossBoard";
 import { PeriodicGuardianBoard } from "./PeriodicGuardianBoard";
 import { NucleusCoreBoard } from "./NucleusCoreBoard";
+import { HowToPlay, type HowToPlayMode } from "./HowToPlay";
 import {
+  calculateDailyBoardScoreBreakdown,
   submitDailyBoardLeaderboardScore,
   submitDailyCompoundLeaderboardScore,
+  type DailyBoardScoreBreakdown,
 } from "./leaderboard";
 
 interface Props {
@@ -78,9 +77,17 @@ interface Props {
   mode?: GameModeId;
   resumeSavedRun?: boolean;
   secretCompoundId?: string;
+  initialHowToPlay?: HowToPlayMode;
+  preview?: boolean;
+  previewBoardTheme?: BoardTheme;
+  previewAtomSkin?: AtomSkin;
+  previewLabel?: string;
+  previewShotLimit?: number;
+  previewOnFinish?: () => void;
 }
 
 const QUEUE_SIZE = 4;
+const PREVIEW_QUEUE = [1, 6, 8, 10, 14, 17, 26, 79, 1, 6];
 const MAX_AIM_DEG = 75;
 const SHIMMER_MIN_LEVEL = POWER_UP_UNLOCK_LEVELS.shimmer;
 const UNSTABLE_UNLOCK_LEVEL = POWER_UP_UNLOCK_LEVELS.unstable;
@@ -123,7 +130,7 @@ const SEEDED_BOARD_TARGET_OFFSET = 3;
 const TRANSMUTE_SHOT_INTERVAL = 30;
 const CATALYST_AURA_SHOTS = 5;
 const CATALYST_ADJ_FACTOR = 2.3;
-const SHOT_MERGE_RADIUS_BONUS_FACTOR = 0.33;
+const SHOT_MERGE_RADIUS_BONUS_FACTOR = 0.25;
 const DISCOVERY_DECAY_STEP = 5;
 const DISCOVERY_DECAY_BOOST = 0.04;
 const STAGE_CLEAR_ANIMATION_MS = 6200;
@@ -140,9 +147,7 @@ const CHALLENGE_CLEAR_SCORE = 5000;
 const POWER_UP_CLEAR_DELAY_MS = 2000;
 const DAILY_COMPOUND_GRID_COLS = 10;
 const DAILY_COMPOUND_GRID_ROWS = 15;
-const REACTION_STREAK_MAX = 5;
-const FUSION_RUSH_DURATION_MS = 8_000;
-const INTERSTITIAL_COOLDOWN_MS = 10 * 60 * 1000;
+const TIME_STAR_LIMIT_SEC = 5 * 60;
 const TARGET_BAND_QUEUE_CHANCE = 0.1;
 const TARGET_BAND_OFFSET_MIN = 2;
 const TARGET_BAND_OFFSET_MAX = 12;
@@ -150,13 +155,6 @@ const TARGET_BAND_PRESPAWN_COUNT = 2;
 
 function mergeComboCueDelay(index: number): number {
   return index * MERGE_COMBO_SOUND_STEP_MS;
-}
-
-function reactionMultiplierFor(streak: number, fusionRushActive: boolean): number {
-  if (fusionRushActive || streak >= REACTION_STREAK_MAX) return 2;
-  if (streak >= 3) return 1.5;
-  if (streak >= 2) return 1.25;
-  return 1;
 }
 
 const INVENTORY_PICK_LIMIT = 3;
@@ -176,9 +174,6 @@ interface SavedRunSnapshot {
   highest: number;
   shots: number;
   runBestCombo: number;
-  reactionStreak?: number;
-  reactionMisses?: number;
-  fusionRushRemainingMs?: number;
   runMergeCount?: number;
   runComboScore?: number;
   earnedStars: number;
@@ -246,6 +241,7 @@ type StageClearStats = {
   shots: number;
   bestCombo: number;
   compound?: CompoundDefinition;
+  dailyBoardScoreBreakdown?: DailyBoardScoreBreakdown;
 };
 
 export function getSavedRunSummary(): {
@@ -725,7 +721,7 @@ function calculateStars(
   let stars = 1;
   const efficiencyTarget = getShotStarGoal(level);
   if (shots <= efficiencyTarget) stars += 1;
-  if (timeSec <= (level.parTimeSec ?? 8 * 60)) stars += 1;
+  if (timeSec <= TIME_STAR_LIMIT_SEC) stars += 1;
   return Math.min(3, stars);
 }
 
@@ -775,6 +771,7 @@ function DailyCompoundGridBoard({
   onWin,
   onMap,
   onExit,
+  initialHowToPlay,
 }: Props & { secretCompoundId: string }) {
   const {
     soundEnabled,
@@ -790,7 +787,15 @@ function DailyCompoundGridBoard({
     reportQuestProgress,
     completeSecretCompound,
     recordGameAttemptForAd,
+    hasProPack,
+    atomSkin,
+    ownedThemeProducts,
+    appLanguage,
   } = useProgress();
+  const tr = (text: string) => t(text, appLanguage);
+  const activeAtomSkin = isAtomSkinUnlocked(atomSkin, { hasProPack, ownedThemeProducts })
+    ? atomSkin
+    : "classic";
   const isCampaignSearchFind =
     getCompoundChallengeKind(levelId) === "search-find" &&
     MOLECULE_CHALLENGE_BY_LEVEL[levelId] === secretCompoundId;
@@ -800,7 +805,7 @@ function DailyCompoundGridBoard({
   );
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [revealedIds, setRevealedIds] = useState<Set<number>>(new Set());
-  const [moleculeHintUsed, setMoleculeHintUsed] = useState(false);
+  const [hintedIds, setHintedIds] = useState<Set<number>>(new Set());
   const [wrongGuesses, setWrongGuesses] = useState(0);
   const [message, setMessage] = useState("Find the hidden compound atoms.");
   const [checkFx, setCheckFx] = useState<null | {
@@ -808,6 +813,7 @@ function DailyCompoundGridBoard({
     tone: "right" | "wrong";
     text: string;
   }>(null);
+  const [howToPlayOpen, setHowToPlayOpen] = useState(initialHowToPlay === "daily-compound");
   const [elapsedMs, setElapsedMs] = useState(0);
   const [result, setResult] = useState<null | {
     score: number;
@@ -854,13 +860,13 @@ function DailyCompoundGridBoard({
       }, {}),
     [selectedCells],
   );
-  const hintsAvailable = wrongGuesses >= 3 ? 1 : 0;
-  const hintsUsed = moleculeHintUsed ? 1 : 0;
+  const hintsAvailable = Math.min(2, Math.floor(wrongGuesses / 2));
+  const hintsUsed = hintedIds.size;
   const canRevealHint = !result && hintsAvailable > hintsUsed;
   const elapsedSec = Math.floor(elapsedMs / 1000);
 
   function toggleCell(cell: DailyCompoundCell) {
-    if (result || revealedIds.has(cell.id)) return;
+    if (result || revealedIds.has(cell.id) || hintedIds.has(cell.id)) return;
     setSelectedIds((current) => {
       const next = new Set(current);
       if (next.has(cell.id)) next.delete(cell.id);
@@ -871,20 +877,29 @@ function DailyCompoundGridBoard({
   }
 
   function revealHint() {
-    if (!canRevealHint || !compound) return;
-    setMoleculeHintUsed(true);
-    setMessage(`Molecule hint: look for ${compound.formula} as one connected group.`);
+    if (result || !compound) return;
+    if (!canRevealHint) {
+      const unlockAt = hintsUsed === 0 ? 2 : 4;
+      showCompoundCheck("wrong", `Hint unlocks after ${unlockAt} wrong guesses`);
+      setMessage(`${tr("Make")} ${unlockAt - wrongGuesses} ${tr(unlockAt - wrongGuesses === 1 ? "more wrong guess" : "more wrong guesses")} ${tr("to unlock a hint.")}`);
+      if (hapticsEnabled) vibrate(12);
+      return;
+    }
+    const nextHint = cells.find((cell) => cell.secret && !hintedIds.has(cell.id));
+    if (!nextHint) return;
+    setHintedIds((current) => new Set([...current, nextHint.id]));
+    setSelectedIds((current) => new Set([...current, nextHint.id]));
+    setMessage(
+      hintsUsed === 0
+        ? tr("A correct atom was marked. Your final score will be reduced.")
+        : tr("A second correct atom was marked. Your final score will be reduced."),
+    );
     if (hapticsEnabled) vibrate([15, 25, 15]);
   }
 
   async function exitAfterResult() {
     const progress = useProgress.getState();
-    if (
-      !progress.hasProPack &&
-      progress.completedGameCount >= 4 &&
-      progress.clearedStagesSinceAd >= 3 &&
-      Date.now() - progress.lastInterstitialAt >= INTERSTITIAL_COOLDOWN_MS
-    ) {
+    if (!progress.hasProPack && progress.clearedStagesSinceAd >= 3) {
       const shown = await showInterstitialIfReady(progress.hasProPack);
       if (shown) progress.markInterstitialShown();
     }
@@ -904,11 +919,11 @@ function DailyCompoundGridBoard({
     if (compoundKey(selectedCounts) !== compoundKey(compound.elements)) {
       const nextWrong = wrongGuesses + 1;
       setWrongGuesses(nextWrong);
-      setSelectedIds(new Set());
+      setSelectedIds(new Set(hintedIds));
       setMessage(
-        nextWrong === 3
-          ? "Not the compound. An optional hint is now available."
-          : "Not the compound. Adjust your marked atoms.",
+        nextWrong === 2 || nextWrong === 4
+          ? tr("Not the compound. A reveal hint is now available.")
+          : tr("Not the compound. Adjust your marked atoms."),
       );
       showCompoundCheck("wrong", "Wrong");
       if (hapticsEnabled) vibrate(24);
@@ -917,11 +932,11 @@ function DailyCompoundGridBoard({
     if (!isLinkedCompoundSelection(selectedCells, secretAtoms, DAILY_COMPOUND_GRID_COLS)) {
       const nextWrong = wrongGuesses + 1;
       setWrongGuesses(nextWrong);
-      setSelectedIds(new Set());
+      setSelectedIds(new Set(hintedIds));
       setMessage(
-        nextWrong === 3
-          ? "Those atoms match the formula, but not the hidden compound. An optional hint is available."
-          : "Those atoms match the formula, but they are not linked in the compound pattern.",
+        nextWrong === 2 || nextWrong === 4
+          ? tr("Those atoms match the formula, but not the hidden compound. A reveal hint is now available.")
+          : tr("Those atoms match the formula, but they are not linked in the compound pattern."),
       );
       showCompoundCheck("wrong", "Wrong");
       if (hapticsEnabled) vibrate(24);
@@ -949,8 +964,8 @@ function DailyCompoundGridBoard({
     setRevealedIds(new Set(formedIds));
     setSelectedIds(new Set(formedIds));
     setResult({ score, awarded, wasNew, count });
-    setMessage("Compound formed.");
-    showCompoundCheck("right", "Right");
+    setMessage(tr("Compound formed."));
+    showCompoundCheck("right", tr("Right"));
     if (soundEnabled) playShootSound();
     if (hapticsEnabled) vibrate([20, 40, 20]);
   }
@@ -959,12 +974,12 @@ function DailyCompoundGridBoard({
     return (
       <div className="daily-compound-shell" style={dailyCompoundShell}>
         <div style={dailyCompoundMissingCard}>
-          <h2 style={{ margin: "0 0 8px" }}>Daily compound unavailable</h2>
+          <h2 style={{ margin: "0 0 8px" }}>{tr("Daily compound unavailable")}</h2>
           <p style={{ color: "var(--muted-foreground)", margin: "0 0 14px" }}>
-            The selected compound could not be found.
+            {tr("The selected compound could not be found.")}
           </p>
           <button type="button" onClick={onExit} style={modalBtn}>
-            Back to Menu
+            {tr("Back to Menu")}
           </button>
         </div>
       </div>
@@ -972,20 +987,37 @@ function DailyCompoundGridBoard({
   }
 
   return (
-    <div className="daily-compound-shell" style={dailyCompoundShell}>
+    <div
+      className={`daily-compound-shell atom-skin-${activeAtomSkin}-active`}
+      style={dailyCompoundShell}
+    >
       <div style={dailyCompoundHeader}>
-        <button type="button" onClick={onExit} style={dailyCompoundExitBtn}>
-          Exit
-        </button>
+        <div style={{ display: "grid", justifyItems: "start", gap: 5 }}>
+          <button type="button" onClick={onExit} style={dailyCompoundExitBtn}>
+            {tr("Exit")}
+          </button>
+          <button
+            type="button"
+            onClick={() => setHowToPlayOpen(true)}
+            title={tr("How to play")}
+            aria-label={tr("How to play Daily Compound")}
+            style={dailyCompoundInfoBtn}
+          >
+            <Info size={16} aria-hidden="true" />
+          </button>
+        </div>
         <div style={{ minWidth: 0 }}>
-          <div style={dailyCompoundKicker}>DAILY COMPOUND</div>
-          <div style={dailyCompoundTitle}>{getDailyCompoundClue(compound)}</div>
+          <div style={dailyCompoundKicker}>{tr("DAILY COMPOUND")}</div>
+          <div style={dailyCompoundTitle}>
+            <span style={{ color: "var(--accent)", fontWeight: 900 }}>{tr("Hint:")} </span>
+            {getDailyCompoundClue(compound)}
+          </div>
           <div style={dailyCompoundMeta}>
             <span style={dailyCompoundMetaBox}>
-              {selectedCells.length}/{compound.totalAtoms} marked
+              {selectedCells.length}/{secretAtoms.length} {tr("atoms")}
             </span>
-            <span style={dailyCompoundMetaBox}>{wrongGuesses} wrong</span>
-            <span style={dailyCompoundMetaBox}>{hintsUsed} hints</span>
+            <span style={dailyCompoundMetaBox}>{wrongGuesses} {tr("wrong")}</span>
+            <span style={dailyCompoundMetaBox}>{hintsUsed} {tr("hints")}</span>
             <span style={dailyCompoundMetaBox}>{elapsedSec}s</span>
           </div>
         </div>
@@ -1008,19 +1040,20 @@ function DailyCompoundGridBoard({
           {cells.map((cell) => {
             const selected = selectedIds.has(cell.id);
             const revealed = revealedIds.has(cell.id);
+            const hinted = hintedIds.has(cell.id);
             const size = Math.max(22, Math.min(38, Math.floor(520 / DAILY_COMPOUND_GRID_ROWS)));
             return (
               <button
                 key={cell.id}
                 type="button"
                 onClick={() => toggleCell(cell)}
-                aria-label={`${selected ? "Unmark" : "Mark"} ${ELEMENTS[cell.atom - 1]?.name ?? "atom"}`}
+                aria-label={`${tr(selected ? "Unmark" : "Mark")} ${ELEMENTS[cell.atom - 1]?.name ?? tr("atom")}`}
                 style={{
                   minWidth: 0,
                   minHeight: 0,
                   borderRadius: 8,
                   border: selected
-                    ? `2px solid ${revealed ? "var(--success, var(--accent))" : "var(--accent)"}`
+                    ? `2px solid ${revealed || hinted ? "var(--success, var(--accent))" : "var(--accent)"}`
                     : "1px solid color-mix(in oklch, var(--border) 80%, transparent)",
                   background: selected
                     ? "color-mix(in oklch, var(--accent) 18%, var(--surface-high))"
@@ -1031,12 +1064,20 @@ function DailyCompoundGridBoard({
                   cursor: result || revealed ? "default" : "pointer",
                   boxShadow: revealed
                     ? "0 0 18px var(--success, var(--accent))"
+                    : hinted
+                      ? "0 0 18px var(--success, var(--accent))"
                     : selected
                       ? "0 0 12px var(--accent-glow)"
                       : undefined,
                 }}
               >
-                <ElementBall atomicNumber={cell.atom} size={size} glow={selected || revealed} />
+                <ElementBall
+                  atomicNumber={cell.atom}
+                  size={size}
+                  glow={selected || revealed}
+                  atomSkin={activeAtomSkin}
+                  patternSeed={cell.id}
+                />
               </button>
             );
           })}
@@ -1056,18 +1097,20 @@ function DailyCompoundGridBoard({
         )}
         <div style={dailyCompoundMessage}>{message}</div>
         <div style={{ display: "flex", gap: 8 }}>
-          <button
-            type="button"
-            onClick={revealHint}
-            disabled={!canRevealHint}
-            style={{
-              ...dailyCompoundSecondaryBtn,
-              opacity: canRevealHint ? 1 : 0.5,
-              cursor: canRevealHint ? "pointer" : "not-allowed",
-            }}
-          >
-            Molecule Hint
-          </button>
+          {hintsUsed < 2 && (
+            <button
+              type="button"
+              onClick={revealHint}
+              disabled={Boolean(result)}
+              style={{
+                ...dailyCompoundSecondaryBtn,
+                opacity: result ? 0.5 : canRevealHint ? 1 : 0.72,
+                cursor: result ? "not-allowed" : "pointer",
+              }}
+            >
+              {tr("Reveal atom hint")}
+            </button>
+          )}
           <button
             type="button"
             onClick={formCompound}
@@ -1078,7 +1121,7 @@ function DailyCompoundGridBoard({
               cursor: selectedCells.length > 0 && !result ? "pointer" : "not-allowed",
             }}
           >
-            Form Compound
+            {tr("Form Compound")}
           </button>
         </div>
       </div>
@@ -1086,7 +1129,7 @@ function DailyCompoundGridBoard({
       {result && (
         <Modal>
           <div style={{ textAlign: "center" }}>
-            <div style={dailyCompoundKicker}>COMPOUND FORMED</div>
+            <div style={dailyCompoundKicker}>{tr("COMPOUND FORMED")}</div>
             <MoleculeVisual compound={compound} size={104} />
             <h2 style={{ margin: "10px 0 4px", fontSize: 24 }}>{compound.name}</h2>
             <div style={{ fontSize: 18, fontWeight: 900, color: "var(--accent)", marginBottom: 8 }}>
@@ -1098,14 +1141,14 @@ function DailyCompoundGridBoard({
             <div
               style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}
             >
-              <ResultStat label="Score" value={formatScore(result.score)} color="var(--accent)" />
-              <ResultStat label="Wrong" value={`${wrongGuesses}`} color="var(--foreground)" />
-              <ResultStat label="Hints" value={`${hintsUsed}`} color="var(--foreground)" />
-              <ResultStat label="Time" value={`${elapsedSec}s`} color="var(--foreground)" />
+              <ResultStat label={tr("Score")} value={formatScore(result.score)} color="var(--accent)" />
+              <ResultStat label={tr("Wrong")} value={`${wrongGuesses}`} color="var(--foreground)" />
+              <ResultStat label={tr("Hints")} value={`${hintsUsed}`} color="var(--foreground)" />
+              <ResultStat label={tr("Time")} value={`${elapsedSec}s`} color="var(--foreground)" />
             </div>
             <div style={{ color: "var(--success, var(--accent))", fontSize: 12, fontWeight: 900 }}>
-              {result.wasNew ? "Added to collection" : `Collection count ${result.count}`}
-              {result.awarded ? ` - Daily reward +${DAILY_FEATURE_REWARD_COINS} coins` : ""}
+              {result.wasNew ? tr("Added to collection") : `${tr("Collection count")} ${result.count}`}
+              {result.awarded ? ` - ${tr("Daily reward")} +${DAILY_FEATURE_REWARD_COINS} ${tr("coins")}` : ""}
             </div>
             <button
               type="button"
@@ -1119,10 +1162,17 @@ function DailyCompoundGridBoard({
               }}
               style={{ ...modalBtn, width: "100%" }}
             >
-              {isCampaignSearchFind ? "Map" : "Back to Menu"}
+              {isCampaignSearchFind ? tr("Map") : tr("Back to Menu")}
             </button>
           </div>
         </Modal>
+      )}
+      {howToPlayOpen && (
+        <HowToPlay
+          mode="daily-compound"
+          atomSkin={activeAtomSkin}
+          onClose={() => setHowToPlayOpen(false)}
+        />
       )}
     </div>
   );
@@ -1254,14 +1304,21 @@ function StandardGameBoard({
   mode = "campaign",
   resumeSavedRun = false,
   secretCompoundId,
+  initialHowToPlay,
+  preview = false,
+  previewBoardTheme,
+  previewAtomSkin,
+  previewLabel,
+  previewShotLimit = 10,
+  previewOnFinish,
 }: Props) {
   const isTabletLayout = useIsTabletLayout();
   const wideBoard = useWideBoardLayout();
   const level = getLevelById(levelId) ?? LEVELS[0];
   const gameMode = getGameMode(mode);
-  const powerUpStage = mode === "campaign" && !secretCompoundId ? level.powerUpStage : undefined;
+  const powerUpStage = !preview && mode === "campaign" && !secretCompoundId ? level.powerUpStage : undefined;
   const isPowerUpStage = powerUpStage != null;
-  const compoundEnabled = mode === "campaign" && !isPowerUpStage;
+  const compoundEnabled = !preview && mode === "campaign" && !isPowerUpStage;
   const {
     recordDiscovery,
     addScore,
@@ -1301,40 +1358,42 @@ function StandardGameBoard({
     setShootingStyle,
     hasProPack,
     boardTheme,
+    atomSkin,
+    ownedThemeProducts,
     clearedStagesSinceAd,
-    clearedStageCount,
-    completedGameCount,
-    lastInterstitialAt,
     markInterstitialShown,
+    appLanguage,
   } = useProgress();
-  const activeBoardTheme = hasProPack ? boardTheme : "reactor";
+  const tr = (text: string) => t(text, appLanguage);
+  const activeBoardTheme = previewBoardTheme ?? (isBoardThemeUnlocked(boardTheme, { hasProPack, ownedThemeProducts })
+    ? boardTheme
+    : "reactor");
+  const activeAtomSkin = previewAtomSkin ?? (isAtomSkinUnlocked(atomSkin, { hasProPack, ownedThemeProducts })
+    ? atomSkin
+    : "classic");
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.toggle("board-theme-verdant-active", activeBoardTheme === "verdantCrystal");
+
+    return () => {
+      root.classList.remove("board-theme-verdant-active");
+    };
+  }, [activeBoardTheme]);
+
   const isNativeIos = Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios";
-  const isFirstCampaignRun =
-    mode === "campaign" &&
-    levelId === 1 &&
-    clearedStageCount === 0 &&
-    !secretCompoundId &&
-    !isMoleculeChallenge &&
-    !isPowerUpStage;
-  const isEarlyCampaignRun =
-    mode === "campaign" &&
-    levelId <= 3 &&
-    clearedStageCount < 3 &&
-    !secretCompoundId &&
-    !isMoleculeChallenge &&
-    !isPowerUpStage;
   const resultPowerUpSaveCost = isNativeIos ? MOBILE_RESULT_POWER_UP_SAVE_COST : 0;
   const progressionPowerUpLevel = Math.max(level.id, unlockedLevel);
-  const shimmerEnabled = progressionPowerUpLevel >= SHIMMER_MIN_LEVEL;
-  const grabEnabled = progressionPowerUpLevel >= GRAB_MIN_LEVEL;
-  const eGunEnabled = progressionPowerUpLevel >= EGUN_MIN_LEVEL;
-  const gravityEnabled = progressionPowerUpLevel >= GRAVITY_MIN_LEVEL;
-  const emissionEnabled = progressionPowerUpLevel >= EMISSION_MIN_LEVEL;
-  const transmuteEnabled = progressionPowerUpLevel >= TRANSMUTE_MIN_LEVEL;
-  const fusionJumpEnabled = progressionPowerUpLevel >= FUSION_JUMP_MIN_LEVEL;
-  const catalystEnabled = progressionPowerUpLevel >= CATALYST_MIN_LEVEL;
-  const stoneEnabled = progressionPowerUpLevel >= STONE_MIN_LEVEL;
-  const blankEnabled = progressionPowerUpLevel >= BLANK_MIN_LEVEL;
+  const shimmerEnabled = !preview && progressionPowerUpLevel >= SHIMMER_MIN_LEVEL;
+  const grabEnabled = !preview && progressionPowerUpLevel >= GRAB_MIN_LEVEL;
+  const eGunEnabled = !preview && progressionPowerUpLevel >= EGUN_MIN_LEVEL;
+  const gravityEnabled = !preview && progressionPowerUpLevel >= GRAVITY_MIN_LEVEL;
+  const emissionEnabled = !preview && progressionPowerUpLevel >= EMISSION_MIN_LEVEL;
+  const transmuteEnabled = !preview && progressionPowerUpLevel >= TRANSMUTE_MIN_LEVEL;
+  const fusionJumpEnabled = !preview && progressionPowerUpLevel >= FUSION_JUMP_MIN_LEVEL;
+  const catalystEnabled = !preview && progressionPowerUpLevel >= CATALYST_MIN_LEVEL;
+  const stoneEnabled = !preview && progressionPowerUpLevel >= STONE_MIN_LEVEL;
+  const blankEnabled = !preview && progressionPowerUpLevel >= BLANK_MIN_LEVEL;
 
   const labUpgradeLevel = useCallback(
     (id: LabUpgradeId) => (labUpgradeEnabled[id] ? (labUpgradeLevels[id] ?? 0) : 0),
@@ -1457,20 +1516,19 @@ function StandardGameBoard({
   const [highest, setHighest] = useState(1);
   const [shots, setShots] = useState(0);
   const [runBestCombo, setRunBestCombo] = useState(0);
-  const [reactionStreak, setReactionStreak] = useState(0);
-  const [reactionMisses, setReactionMisses] = useState(0);
-  const [fusionRushUntil, setFusionRushUntil] = useState(0);
-  const [reactionBurstDepth, setReactionBurstDepth] = useState(0);
   const runMergeCountRef = useRef(0);
   const runComboScoreRef = useRef(0);
-  const firstMergeTrackedRef = useRef(false);
-  const runEndTrackedRef = useRef(false);
   const [earnedStars, setEarnedStars] = useState(0);
   const [aimDeg, setAimDeg] = useState(0); // 0 = straight up, negative = left
   const [playStylePromptOpen, setPlayStylePromptOpen] = useState(!hasChosenShootingStyle);
   const [popups, setPopups] = useState<{ id: number; text: string; x: number; y: number }[]>([]);
   const [busy, setBusy] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [howToPlayOpen, setHowToPlayOpen] = useState(false);
+  useEffect(() => {
+    if (!initialHowToPlay || initialHowToPlay === "daily-compound" || playStylePromptOpen) return;
+    setHowToPlayOpen(true);
+  }, [initialHowToPlay, playStylePromptOpen]);
   const [gameOver, setGameOver] = useState(false);
   const [gameOverContinueOpen, setGameOverContinueOpen] = useState(false);
   const [gameOverContinueUsed, setGameOverContinueUsed] = useState(false);
@@ -1506,7 +1564,9 @@ function StandardGameBoard({
   const [grabMode, setGrabMode] = useState(false);
   const [grabbing, setGrabbing] = useState<{ id: number; x: number; y: number } | null>(null);
 
-  const [compoundCharges, setCompoundCharges] = useState(() => loadCompoundChargeState().charges);
+  const [compoundCharges, setCompoundCharges] = useState(() =>
+    isCompoundFormationLevel(level) ? 1 : loadCompoundChargeState().charges,
+  );
   const [compoundMode, setCompoundMode] = useState(false);
   const [selectedCompoundIds, setSelectedCompoundIds] = useState<Set<number>>(new Set());
   const [secretCompoundFormulaRevealed, setSecretCompoundFormulaRevealed] = useState(false);
@@ -1599,6 +1659,7 @@ function StandardGameBoard({
   } | null>(null);
   const stageClearTimeoutRef = useRef<number | null>(null);
   const projectileFrameRef = useRef<number | null>(null);
+  const projectileVisualRef = useRef<HTMLDivElement | null>(null);
   const hasClaimedUnusedInventoryRef = useRef(false);
   const [claimedResultPowerUp, setClaimedResultPowerUp] = useState<InventoryPowerUpId | null>(null);
   const runPowerUpsUsedRef = useRef(0);
@@ -1694,8 +1755,8 @@ function StandardGameBoard({
 
   // === Pre-level shuffle (lvl 10+) ===
   // Player gets 3 reshuffles of 4 starting atoms before the level begins.
-  const shuffleEnabled = progressionPowerUpLevel >= SHUFFLE_MIN_LEVEL;
-  const gammaEnabled = progressionPowerUpLevel >= GAMMA_MIN_LEVEL;
+  const shuffleEnabled = !preview && progressionPowerUpLevel >= SHUFFLE_MIN_LEVEL;
+  const gammaEnabled = !preview && progressionPowerUpLevel >= GAMMA_MIN_LEVEL;
   const [shuffleStartOpen, setShuffleStartOpen] = useState(false);
   const [shufflesLeft, setShufflesLeft] = useState(SHUFFLE_LIMIT);
   const [shuffleAtoms, setShuffleAtoms] = useState<number[]>([]);
@@ -1743,8 +1804,9 @@ function StandardGameBoard({
   const isDailyAtomChallenge = mode === "daily-challenge";
   const isMoleculeChallenge =
     moleculeObjective != null && (mode === "campaign" || isSecretCompoundChallenge);
-  const canIntroducePowerUps = mode === "campaign" && !isMoleculeChallenge && !isPowerUpStage;
-  const unstableEnabled = progressionPowerUpLevel >= UNSTABLE_UNLOCK_LEVEL;
+  const isAmmoniumChallenge = isMoleculeChallenge && moleculeObjective?.id === "ammonium";
+  const canIntroducePowerUps = !preview && mode === "campaign" && !isMoleculeChallenge && !isPowerUpStage;
+  const unstableEnabled = !preview && progressionPowerUpLevel >= UNSTABLE_UNLOCK_LEVEL;
   const current = queue[0];
   const currentIsEGun = eGunQueue[0] ?? false;
   const currentIsBlank = blankQueue[0] ?? false;
@@ -1949,27 +2011,17 @@ function StandardGameBoard({
     setActiveTip({ id, title, body, tone });
   }
 
-  useEffect(() => {
-    if (!isFirstCampaignRun || playStylePromptOpen || shots > 0 || won || gameOver) return;
-    showTip(
-      "first-run-opening-discovery",
-      "First discovery",
-      "Create Helium by merging two Hydrogen atoms. The first clear starts your periodic table.",
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isFirstCampaignRun, playStylePromptOpen, shots, won, gameOver]);
-
   function getCollectibleDiscoveries(atoms: number[]) {
     const uniqueAtoms = atoms.filter((atom, index) => atom > 1 && atoms.indexOf(atom) === index);
     return mode === "daily-challenge" ? uniqueAtoms.filter((atom) => atom === target) : uniqueAtoms;
   }
 
-  function registerDiscoveries(atoms: number[]) {
+  function registerDiscoveries(atoms: number[]): number[] {
     const collectibleAtoms = getCollectibleDiscoveries(atoms);
-    if (collectibleAtoms.length === 0) return;
+    if (collectibleAtoms.length === 0) return [];
     const knownAtoms = new Set([...discoveredElements, ...pendingDiscoveryAtomsRef.current]);
     const newAtoms = collectibleAtoms.filter((atom) => !knownAtoms.has(atom));
-    if (newAtoms.length === 0) return;
+    if (newAtoms.length === 0) return [];
     pendingDiscoveryAtomsRef.current = [...pendingDiscoveryAtomsRef.current, ...newAtoms].sort(
       (a, b) => a - b,
     );
@@ -1980,6 +2032,7 @@ function StandardGameBoard({
       });
       return merged.sort((a, b) => a - b);
     });
+    return newAtoms;
   }
 
   function isCompoundDiscoveredOrPending(compoundId: string) {
@@ -2040,9 +2093,6 @@ function StandardGameBoard({
       highest,
       shots,
       runBestCombo,
-      reactionStreak,
-      reactionMisses,
-      fusionRushRemainingMs: Math.max(0, fusionRushUntil - Date.now()),
       runMergeCount: runMergeCountRef.current,
       runComboScore: runComboScoreRef.current,
       earnedStars,
@@ -2153,14 +2203,8 @@ function StandardGameBoard({
         setHighest(saved.highest);
         setShots(saved.shots);
         setRunBestCombo(saved.runBestCombo);
-        setReactionStreak(saved.reactionStreak ?? 0);
-        setReactionMisses(saved.reactionMisses ?? 0);
-        setFusionRushUntil(Date.now() + Math.max(0, saved.fusionRushRemainingMs ?? 0));
-        setReactionBurstDepth(0);
         runMergeCountRef.current = saved.runMergeCount ?? 0;
         runComboScoreRef.current = saved.runComboScore ?? 0;
-        firstMergeTrackedRef.current = saved.shots > 0;
-        runEndTrackedRef.current = false;
         setEarnedStars(saved.earnedStars);
         setGameOver(false);
         setGameOverContinueOpen(false);
@@ -2242,7 +2286,7 @@ function StandardGameBoard({
         startTimeRef.current = Date.now() - saved.elapsedMs;
         setElapsedMs(saved.elapsedMs);
         clearSavedRun();
-        trackGameStart(levelId, mode);
+        if (!preview) trackGameStart(levelId, mode);
         return;
       }
     }
@@ -2251,8 +2295,10 @@ function StandardGameBoard({
     pendingDiscoveryAtomsRef.current = [];
     pendingCompoundDiscoveryIdsRef.current = [];
     setSecretCompoundFormulaRevealed(false);
-    const initialBalls = isPowerUpStage
-      ? createPowerUpStageBoard(powerUpStage)
+    const initialBalls = preview
+      ? createPreviewBoard()
+      : isPowerUpStage
+        ? createPowerUpStageBoard(powerUpStage)
       : isMoleculeChallenge
         ? createMoleculeChallengeBoard(moleculeObjective, {
             useHelpfulAtomPlan: isSecretCompoundChallenge || isDailyMoleculeChallenge,
@@ -2266,26 +2312,30 @@ function StandardGameBoard({
               : createSeededBoard();
     setBalls(initialBalls);
     const initialHighest = Math.max(1, getHighestOnBoard(initialBalls));
-    if (initialHighest > 1) setHighestElement(initialHighest);
+    if (!preview && initialHighest > 1) setHighestElement(initialHighest);
     const initialDiscoveries = initialBalls
       .map((b) => b.atom)
       .filter((n, i, atoms) => n > 1 && atoms.indexOf(n) === i && !discoveredElements.includes(n));
-    if (initialDiscoveries.length > 0) registerDiscoveries(initialDiscoveries);
+    if (!preview && initialDiscoveries.length > 0) registerDiscoveries(initialDiscoveries);
     const powerUpQueuePrefix = isPowerUpStage ? powerUpStageQueuePrefix(powerUpStage) : [];
     const challengeQueuePrefix = isMoleculeChallenge
-      ? moleculeChallengeQueuePrefix(moleculeObjective, {
-          useHelpfulAtomPlan: isSecretCompoundChallenge || isDailyMoleculeChallenge,
-        })
+      ? isAmmoniumChallenge
+        ? Array.from({ length: QUEUE_SIZE }, () => 1)
+        : moleculeChallengeQueuePrefix(moleculeObjective, {
+            useHelpfulAtomPlan: isSecretCompoundChallenge || isDailyMoleculeChallenge,
+          })
       : isDailyAtomChallenge
         ? dailyTargetAtomPlan().queueAtoms
         : [];
     challengeQueuePlanRef.current = challengeQueuePrefix.slice(QUEUE_SIZE);
     challengeQueuePoolRef.current = challengeQueuePrefix;
-    const initialQueue = [
-      ...powerUpQueuePrefix,
-      ...challengeQueuePrefix,
-      ...generateInitialQueue(level.maxQueueElement, QUEUE_SIZE, currentQueueDecay(), dailyRandom),
-    ].slice(0, QUEUE_SIZE);
+    const initialQueue = preview
+      ? PREVIEW_QUEUE.slice(0, QUEUE_SIZE)
+      : [
+          ...powerUpQueuePrefix,
+          ...challengeQueuePrefix,
+          ...generateInitialQueue(level.maxQueueElement, QUEUE_SIZE, currentQueueDecay(), dailyRandom),
+        ].slice(0, QUEUE_SIZE);
     const initialPlannedCount = Math.min(QUEUE_SIZE, challengeQueuePrefix.length);
     const initialEGun = Array.from(
       { length: QUEUE_SIZE },
@@ -2303,6 +2353,7 @@ function StandardGameBoard({
           (!isEGun && !initialBlank[i] && shimmerEnabled && dailyRandom() < shimmerChance)),
     );
     const resolvedInitialQueue = initialQueue.map((atom, i) => {
+      if (preview) return atom;
       if (i < initialPlannedCount) return atom;
       if (isPowerUpStage || initialBlank[i] || initialEGun[i]) return atom;
       if (initialShimmer[i])
@@ -2340,14 +2391,8 @@ function StandardGameBoard({
     setHighest(initialHighest);
     setShots(0);
     setRunBestCombo(0);
-    setReactionStreak(0);
-    setReactionMisses(0);
-    setFusionRushUntil(0);
-    setReactionBurstDepth(0);
     runMergeCountRef.current = 0;
     runComboScoreRef.current = 0;
-    firstMergeTrackedRef.current = false;
-    runEndTrackedRef.current = false;
     setEarnedStars(0);
     setGameOver(false);
     setGameOverContinueOpen(false);
@@ -2426,9 +2471,11 @@ function StandardGameBoard({
     setTransmuteStagePending(false);
     setQueueShuffleStagePending(false);
     runRecordedRef.current = false;
-    incrementLevelAttempt(levelId);
+    if (!preview) incrementLevelAttempt(levelId);
     setSelectedInventoryPowerUps(emptyPowerUpInventory());
-    setInventoryPickerOpen(!isPowerUpStage && hasPowerUps(powerUpInventory));
+    setInventoryPickerOpen(
+      !preview && !isPowerUpStage && !isMoleculeChallenge && hasPowerUps(powerUpInventory),
+    );
     setShotHistory([]);
     setHistoryOpen(false);
     setGammaCharges((powerUpStage === "gamma" ? 1 : 0) + initialLabCharge("gamma", 3));
@@ -2444,7 +2491,7 @@ function StandardGameBoard({
     eGunCooldownSlots.current = 0;
     startTimeRef.current = Date.now();
     setElapsedMs(0);
-    trackGameStart(levelId, mode);
+    if (!preview) trackGameStart(levelId, mode);
     // Per-level intro tooltips for newly unlocked features.
     if (canIntroducePowerUps && shimmerEnabled) {
       showTip(
@@ -2691,6 +2738,9 @@ function StandardGameBoard({
 
   function generateQueueAtom(maxElement: number, board: Board, forceUniform = false): number {
     const minElement = queueFloorFromBoard(board);
+    if (isAmmoniumChallenge) {
+      return Math.random() < 0.5 ? 7 : 1;
+    }
     if (isMoleculeChallenge && moleculeObjective) {
       const highestRecipeAtom = Math.max(...atomsForCompound(moleculeObjective), 1);
       return randomAvailableElement(highestRecipeAtom, 1);
@@ -2874,6 +2924,15 @@ function StandardGameBoard({
   }
 
   function advanceQueueAfterFiredShot(board: Board = balls) {
+    if (preview) {
+      const nextAtom = PREVIEW_QUEUE[(shots + QUEUE_SIZE) % PREVIEW_QUEUE.length] ?? 1;
+      setQueue((q) => [...q.slice(1), nextAtom]);
+      setShimmerQueue((s) => [...s.slice(1), false]);
+      setEGunQueue((e) => [...e.slice(1), false]);
+      setBlankQueue((b) => [...b.slice(1), false]);
+      setUnstableQueue((u) => [...u.slice(1), false]);
+      return;
+    }
     const nextSlot = makeNextQueueSlot(dynamicMaxQueue(board.length), board);
     setQueue((q) => [...q.slice(1), nextSlot.atom]);
     setShimmerQueue((s) => [...s.slice(1), nextSlot.shimmer]);
@@ -2914,21 +2973,28 @@ function StandardGameBoard({
     if (stageClearTimeoutRef.current !== null) {
       window.clearTimeout(stageClearTimeoutRef.current);
     }
-    const finalStats =
+    const dailyBoardScoreInput =
       mode === "daily-challenge" && !stats.compound
         ? {
-            ...stats,
-            score: submitDailyBoardLeaderboardScore({
-              baseScore: stats.score,
-              shots: stats.shots,
-              elapsedMs: Date.now() - startTimeRef.current,
-              powerUpsUsed: runPowerUpsUsedRef.current,
-              bestCombo: stats.bestCombo,
-              mergeCount: runMergeCountRef.current,
-              comboScore: runComboScoreRef.current,
-            }),
+            baseScore: stats.score,
+            shots: stats.shots,
+            elapsedMs: Date.now() - startTimeRef.current,
+            powerUpsUsed: runPowerUpsUsedRef.current,
+            bestCombo: stats.bestCombo,
+            mergeCount: runMergeCountRef.current,
+            comboScore: runComboScoreRef.current,
           }
-        : stats;
+        : null;
+    const dailyBoardScoreBreakdown = dailyBoardScoreInput
+      ? calculateDailyBoardScoreBreakdown(dailyBoardScoreInput)
+      : undefined;
+    const finalStats = dailyBoardScoreInput
+      ? {
+          ...stats,
+          score: submitDailyBoardLeaderboardScore(dailyBoardScoreInput),
+          dailyBoardScoreBreakdown,
+        }
+      : stats;
     if (finalStats.score !== stats.score) {
       setScore(finalStats.score);
       addScore(Math.max(0, finalStats.score - stats.score));
@@ -2947,8 +3013,6 @@ function StandardGameBoard({
           shots: finalStats.shots,
           powerUpsUsed: runPowerUpsUsedRef.current,
           won: true,
-          durationMs: Date.now() - startTimeRef.current,
-          bestChain: finalStats.bestCombo,
         });
       }
     }
@@ -3128,22 +3192,6 @@ function StandardGameBoard({
         shots,
         powerUpsUsed: runPowerUpsUsedRef.current,
         won,
-        durationMs: Date.now() - startTimeRef.current,
-        bestChain: runBestCombo,
-      });
-    }
-    if ((won || gameOver) && !runEndTrackedRef.current) {
-      runEndTrackedRef.current = true;
-      trackRunEnd({
-        levelId,
-        mode,
-        outcome: won ? "win" : "game_over",
-        durationSec: (Date.now() - startTimeRef.current) / 1000,
-        shots,
-        score,
-        highestElement: highest,
-        bestChain: runBestCombo,
-        boardOccupancy: balls.length,
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -3342,8 +3390,33 @@ function StandardGameBoard({
     feedback({ type: "danger", severity: dangerFeedbackState });
   }, [dangerFeedbackState, gameOver, won, hapticsEnabled, soundEnabled]);
 
+  function createPreviewBoard(): Board {
+    const atoms = [1, 6, 8, 10, 14, 17, 26, 79, 1];
+    const positions = [
+      [0.14, 0.18],
+      [0.37, 0.12],
+      [0.64, 0.17],
+      [0.86, 0.29],
+      [0.24, 0.42],
+      [0.52, 0.37],
+      [0.76, 0.55],
+      [0.17, 0.72],
+      [0.48, 0.66],
+    ] as const;
+    return atoms.map((atom, index) => {
+      const r = radiusFor(atom);
+      const [xRatio, yRatio] = positions[index];
+      return {
+        id: nextBallId(),
+        x: Math.max(SIDE_PAD + r, Math.min(boardW - SIDE_PAD - r, boardW * xRatio)),
+        y: Math.max(TOP_PAD + r, Math.min(dangerY - r - 8, boardH * yRatio)),
+        atom,
+        r,
+      };
+    });
+  }
+
   function createSeededBoard(): Board {
-    if (isFirstCampaignRun) return createPlannedAtomBoard([1]);
     if (target < SEEDED_BOARD_MIN_TARGET) return createEmptyBoard();
     const maxSeedAtom = Math.max(1, target - SEEDED_BOARD_TARGET_OFFSET);
     const availableAtoms = discoveredSeedAtoms(maxSeedAtom);
@@ -3926,10 +3999,16 @@ function StandardGameBoard({
       const local = exact - index;
       const from = path[index];
       const to = path[nextIndex];
-      setProjectile({
+      const nextPosition = {
         x: from.x + (to.x - from.x) * local,
         y: from.y + (to.y - from.y) * local,
-      });
+      };
+      // Keep the flying atom on its own compositor layer. Updating React state
+      // here used to rerender the entire board every animation frame, which is
+      // especially costly with illustrated themes and textured atom skins.
+      if (projectileVisualRef.current) {
+        projectileVisualRef.current.style.transform = `translate3d(${nextPosition.x - projShotSize / 2}px, ${nextPosition.y - projShotSize / 2}px, 0)`;
+      }
       if (progress >= 1) {
         projectileFrameRef.current = null;
         onComplete();
@@ -4013,9 +4092,10 @@ function StandardGameBoard({
       confirmAction
     )
       return;
+    if (preview && shots >= previewShotLimit) return;
     primeAudio();
     if (musicEnabled) startAmbientMusic(ambientMusicTheme);
-    trackShot(levelId, pendingStone ? -1 : currentIsEGun ? 0 : current, aimDeg, mode);
+    if (!preview) trackShot(levelId, pendingStone ? -1 : currentIsEGun ? 0 : current, aimDeg, mode);
     queueUndoRef.current = null;
     setPendingReversiblePowerUp(null);
     if (pendingGamma) {
@@ -4128,8 +4208,8 @@ function StandardGameBoard({
     });
     window.setTimeout(() => setGammaImpactFx((fx) => (fx?.id === gammaFxId ? null : fx)), 820);
     setShots(nextShots);
-    applyShotMilestones(nextShots);
-    consumeEmissionBoostShot();
+    if (!preview) applyShotMilestones(nextShots);
+    if (!preview) consumeEmissionBoostShot();
     feedback({ type: "drop" });
     const updatedWithEffects = applyShotModeEffects(updated, nextShots);
     setBalls(updatedWithEffects);
@@ -4137,11 +4217,11 @@ function StandardGameBoard({
     setTimeout(() => setWiggleIds(new Set()), 380);
     setNoMergeStreak(0);
     const discoveries = Array.from(upgradedAtoms).filter((n) => !discoveredElements.includes(n));
-    const firstDiscovery = [...discoveries].sort((a, b) => b - a)[0];
     if (upgradedAtoms.size > 0) {
+      const registeredDiscoveries = discoveries.length > 0 ? registerDiscoveries(discoveries) : [];
+      const firstDiscovery = [...registeredDiscoveries].sort((a, b) => b - a)[0];
       if (discoveries.length > 0) {
-        registerDiscoveries(discoveries);
-        if (firstDiscovery > 1 && !discoveries.includes(target)) {
+        if (firstDiscovery > 1 && !registeredDiscoveries.includes(target)) {
           feedback({ type: "milestone", atomicNumber: firstDiscovery });
         }
       }
@@ -4233,7 +4313,7 @@ function StandardGameBoard({
     setShots(nextShots);
     applyShotMilestones(nextShots);
     setPendingGamma(false);
-    consumeEmissionBoostShot();
+    if (!preview) consumeEmissionBoostShot();
     const updated = applyShotModeEffects(relaxBoard(remaining), nextShots);
     setBalls(updated);
     setWiggleIds(hitIds);
@@ -4804,7 +4884,7 @@ function StandardGameBoard({
         mergeScoreMultiplier: fusionJumpArmed ? fusionJumpScoreMultiplier : 1,
       },
     );
-    consumeEmissionBoostShot();
+    if (!preview) consumeEmissionBoostShot();
     if (fusionJumpArmed && result.fusionJumpConsumed) {
       setFusionJumpArmed(false);
       if (pendingReversiblePowerUp === "fusion-jump") setPendingReversiblePowerUp(null);
@@ -4816,13 +4896,14 @@ function StandardGameBoard({
     }
     const nextShots = shots + 1;
     setShots(nextShots);
-    applyShotMilestones(nextShots);
+    if (!preview) applyShotMilestones(nextShots);
 
     const newAtoms = new Set<number>([atomOverride]);
     result.merges.forEach((m) => newAtoms.add(m.resultAtomicNumber));
     const undiscovered = Array.from(newAtoms).filter((n) => !discoveredElements.includes(n));
-    const firstDiscovery = undiscovered.sort((a, b) => b - a)[0];
-    if (undiscovered.length > 0) registerDiscoveries(undiscovered);
+    const registeredDiscoveries =
+      !preview && undiscovered.length > 0 ? registerDiscoveries(undiscovered) : [];
+    const firstDiscovery = [...registeredDiscoveries].sort((a, b) => b - a)[0];
 
     let mergeStoneBonus = 0;
     const mergeStoneDamage = damageStones(
@@ -4875,36 +4956,27 @@ function StandardGameBoard({
     // Refresh radii on any merged survivors (their atom changed).
     setBalls(result.balls.map((b) => (b.stoneHp != null ? b : { ...b, r: radiusFor(b.atom) })));
     setHighlightId(result.finalBallId);
+    if (preview) {
+      const previewScore = Math.floor(result.scoreGained * level.scoreMultiplier);
+      setScore((currentScore) => currentScore + previewScore);
+      setHighest((currentHighest) => Math.max(currentHighest, result.highestElement));
+      if (result.merges.length > 0) {
+        recordRunMergeStats(result.merges);
+        const comboLabel = getComboLabel(result.merges.length);
+        if (comboLabel) spawnPopup(comboLabel);
+        showMergeJuice(result.merges, result.balls, result.finalBallId, level.scoreMultiplier);
+        setRunBestCombo((best) => Math.max(best, result.merges.length));
+      }
+      window.setTimeout(() => {
+        setHighlightId(null);
+        setBusy(false);
+        if (nextShots >= previewShotLimit) previewOnFinish?.();
+      }, MERGE_COMBO_START_MS + result.merges.length * MERGE_COMBO_STEP_MS + MERGE_COMBO_END_PAD_MS);
+      return;
+    }
     const shimmerHit = currentIsShimmer && result.merges.length > 0;
     const grabAdd = result.merges.length * (shimmerHit ? activeShimmerGrabSteps : 1);
-    let scoringReactionStreak = reactionStreak;
-    let fusionRushTriggered = false;
     if (result.merges.length > 0) {
-      if (!firstMergeTrackedRef.current) {
-        firstMergeTrackedRef.current = true;
-        trackFirstMerge(levelId, (Date.now() - startTimeRef.current) / 1000, mode);
-      }
-      scoringReactionStreak = Math.min(REACTION_STREAK_MAX, reactionStreak + 1);
-      setReactionStreak(scoringReactionStreak);
-      setReactionMisses(0);
-      if (scoringReactionStreak === REACTION_STREAK_MAX && reactionStreak < REACTION_STREAK_MAX) {
-        fusionRushTriggered = true;
-        setFusionRushUntil(Date.now() + FUSION_RUSH_DURATION_MS);
-        setShimmerQueue((currentQueue) =>
-          currentQueue.map((isShimmer, index) => (index === 0 ? true : isShimmer)),
-        );
-        spawnPopup("FUSION RUSH x2");
-      } else if (scoringReactionStreak > reactionStreak && scoringReactionStreak >= 2) {
-        spawnPopup(
-          `REACTION x${reactionMultiplierFor(scoringReactionStreak, false).toFixed(
-            scoringReactionStreak === 2 ? 2 : 1,
-          )}`,
-        );
-      }
-      if (result.merges.length >= 4) {
-        setReactionBurstDepth(result.merges.length);
-        window.setTimeout(() => setReactionBurstDepth(0), 420);
-      }
       recordRunMergeStats(result.merges);
       const comboLabel = getComboLabel(result.merges.length);
       if (comboLabel) spawnPopup(comboLabel);
@@ -4930,33 +5002,6 @@ function StandardGameBoard({
           }
         }, mergeComboCueDelay(i));
       });
-      if (isEarlyCampaignRun && result.merges.length >= 2) {
-        showTip(
-          "early-chain-reaction",
-          "Chain reaction",
-          "Several fusions resolved from one shot. Bigger chains build score faster and unlock deeper elements.",
-        );
-      } else if (isEarlyCampaignRun && firstDiscovery > 1) {
-        showTip(
-          "early-element-discovery",
-          "Element added",
-          `${ELEMENTS[firstDiscovery - 1]?.name ?? "A new element"} is now part of your discovery run. Clear the stage to keep it in the table.`,
-        );
-      } else if (isEarlyCampaignRun && !result.levelComplete) {
-        showTip(
-          "early-match-next-pair",
-          "Build the next pair",
-          "Each matched pair becomes the next element. Leave matching atoms close together to set up a cascade.",
-        );
-      }
-    } else {
-      const nextMisses = reactionMisses + 1;
-      if (nextMisses >= 2) {
-        setReactionStreak((currentStreak) => Math.max(0, currentStreak - 1));
-        setReactionMisses(0);
-      } else {
-        setReactionMisses(nextMisses);
-      }
     }
     if (shimmerHit) spawnPopup(`✦ SHIMMER ×${activeShimmerScoreMultiplier} ✦`);
     if (grabAdd > 0) {
@@ -4991,9 +5036,7 @@ function StandardGameBoard({
     const nextHighest = Math.max(highest, result.highestElement);
     setHighest(nextHighest);
     setHighestElement(nextHighest);
-    const fusionRushActive = fusionRushTriggered || Date.now() < fusionRushUntil;
-    const reactionMultiplier = reactionMultiplierFor(scoringReactionStreak, fusionRushActive);
-    const gained = Math.floor(result.scoreGained * level.scoreMultiplier * reactionMultiplier);
+    const gained = Math.floor(result.scoreGained * level.scoreMultiplier);
     const nextScore = isPowerUpStage ? score : score + gained + mergeStoneBonus + impactStoneBonus;
     const nextBestCombo = Math.max(runBestCombo, result.merges.length);
     const shotPowerUps = [
@@ -5015,10 +5058,7 @@ function StandardGameBoard({
           ? `Merged ${result.merges.length} chain${result.merges.length === 1 ? "" : "s"}`
           : "Placed without a merge",
       points: gained + mergeStoneBonus + impactStoneBonus,
-      powerUp:
-        [...shotPowerUps, reactionMultiplier > 1 ? `Reaction x${reactionMultiplier}` : null]
-          .filter((label): label is string => Boolean(label))
-          .join(", ") || undefined,
+      powerUp: shotPowerUps.join(", ") || undefined,
       merges: result.merges,
     });
     if (gained + mergeStoneBonus + impactStoneBonus > 0) {
@@ -5087,7 +5127,7 @@ function StandardGameBoard({
               shots: nextShots,
               bestCombo: nextBestCombo,
             },
-            undiscovered.includes(target) ? target : undefined,
+            registeredDiscoveries.includes(target) ? target : undefined,
           );
           return;
         }
@@ -5236,11 +5276,19 @@ function StandardGameBoard({
   function triggerTransmutePowerUp() {
     if (busy || gameOver || won || transmuteCharges <= 0 || pendingReversiblePowerUp) return;
     if (currentIsEGun || currentIsBlank) return;
-    const maxTier = Math.min(118, Math.max(current + 1, target - 1));
+    const dailyMaxTier = Math.max(1, target - 2);
+    const maxTier = isDailyAtomChallenge
+      ? Math.min(118, dailyMaxTier)
+      : Math.min(118, Math.max(current + 1, target - 1));
     if (current >= maxTier) return;
-    // Only reroll into atoms the player has already discovered, so Transmute
-    // never hands out a fresh element for free.
-    const candidates = discoveredElements.filter((n) => n > current && n <= maxTier);
+    // Campaign Transmute stays discovery-gated. Daily Board instead uses the
+    // day's seeded atom pool, so a new player can still use the power-up.
+    const dailyPool = isDailyAtomChallenge
+      ? uniqueAtomList([...dailyTargetAtomPlan().queueAtoms, dailyMaxTier])
+      : [];
+    const candidates = (isDailyAtomChallenge ? dailyPool : discoveredElements).filter(
+      (n) => n > current && n <= maxTier,
+    );
     if (candidates.length === 0 && powerUpStage !== "transmute") {
       spawnPopup("🔀 NO HIGHER DISCOVERED");
       return;
@@ -5249,14 +5297,12 @@ function StandardGameBoard({
     const transmuteStep = skipTier ? 2 : 1;
     const preferredMinTier = Math.min(maxTier, current + transmuteStep);
     const preferredCandidates = candidates.filter((n) => n >= preferredMinTier);
+    const candidatePool = preferredCandidates.length > 0 ? preferredCandidates : candidates;
     const atom =
       powerUpStage === "transmute"
         ? preferredMinTier
-        : (preferredCandidates.length > 0 ? preferredCandidates : candidates)[
-            Math.floor(
-              Math.random() *
-                (preferredCandidates.length > 0 ? preferredCandidates : candidates).length,
-            )
+        : candidatePool[
+            Math.floor((isDailyAtomChallenge ? dailyRandom() : Math.random()) * candidatePool.length)
           ];
     setTransmuteCharges((g) => Math.max(0, g - 1));
     runPowerUpsUsedRef.current += 1;
@@ -5703,8 +5749,9 @@ function StandardGameBoard({
     });
     result.merges.forEach((m) => newAtoms.add(m.resultAtomicNumber));
     const undiscovered = Array.from(newAtoms).filter((n) => !discoveredElements.includes(n));
-    const firstDiscovery = undiscovered.sort((a, b) => b - a)[0];
-    if (undiscovered.length > 0) registerDiscoveries(undiscovered);
+    const registeredDiscoveries =
+      undiscovered.length > 0 ? registerDiscoveries(undiscovered) : [];
+    const firstDiscovery = [...registeredDiscoveries].sort((a, b) => b - a)[0];
 
     setBalls(result.balls.map((b) => (b.stoneHp != null ? b : { ...b, r: radiusFor(b.atom) })));
     setHighlightId(result.finalBallId);
@@ -5803,7 +5850,7 @@ function StandardGameBoard({
               shots,
               bestCombo: Math.max(runBestCombo, result.merges.length),
             },
-            undiscovered.includes(target) ? target : undefined,
+            registeredDiscoveries.includes(target) ? target : undefined,
           );
           return;
         }
@@ -5899,8 +5946,9 @@ function StandardGameBoard({
     const newAtoms = new Set<number>([grabbed.atom]);
     result.merges.forEach((m) => newAtoms.add(m.resultAtomicNumber));
     const undiscovered = Array.from(newAtoms).filter((n) => !discoveredElements.includes(n));
-    const firstDiscovery = undiscovered.sort((a, b) => b - a)[0];
-    if (undiscovered.length > 0) registerDiscoveries(undiscovered);
+    const registeredDiscoveries =
+      undiscovered.length > 0 ? registerDiscoveries(undiscovered) : [];
+    const firstDiscovery = [...registeredDiscoveries].sort((a, b) => b - a)[0];
 
     let mergeStoneBonus = 0;
     const mergeStoneDamage = damageStones(
@@ -6028,7 +6076,7 @@ function StandardGameBoard({
           shots,
           bestCombo: nextBestCombo,
         },
-        undiscovered.includes(target) ? target : undefined,
+        registeredDiscoveries.includes(target) ? target : undefined,
       );
     } else if (firstDiscovery && firstDiscovery > 1) {
       feedback({ type: "milestone", atomicNumber: firstDiscovery });
@@ -6138,7 +6186,7 @@ function StandardGameBoard({
       if (dy >= -2) return; // pointer below launcher — ignore
       const angle = (Math.atan2(dx, -dy) * 180) / Math.PI;
       const clamped = Math.max(-MAX_AIM_DEG, Math.min(MAX_AIM_DEG, angle));
-      setAimDeg(clamped);
+      setAimDeg((current) => (Math.abs(current - clamped) < 0.15 ? current : clamped));
     },
     [launcherX, launcherY],
   );
@@ -6186,8 +6234,6 @@ function StandardGameBoard({
   }, [balls, currentIsEGun, pendingStone, previewPath]);
 
   const progressPct = Math.min(100, (highest / target) * 100);
-  const fusionRushActive = fusionRushUntil > Date.now();
-  const reactionMultiplier = reactionMultiplierFor(reactionStreak, fusionRushActive);
   const continueChoiceStats = continueClaimPromptOpen
     ? {
         stars: earnedStars || 1,
@@ -6196,51 +6242,29 @@ function StandardGameBoard({
         bestCombo: runBestCombo,
       }
     : winChoice;
-  const firstRunGuideText =
-    shots === 0
-      ? "Opening discovery: combine Hydrogen with Hydrogen to create Helium."
-      : highest < target
-        ? "Keep matching equal atoms. A chain reaction can jump several discoveries at once."
-        : "Target formed. Claim the clear and start filling the periodic table.";
-  const nextCampaignLevel = mode === "campaign" ? getNextLevel(levelId) : undefined;
 
   async function runAttemptAdIfDue() {
-    if (
-      hasProPack ||
-      completedGameCount < 4 ||
-      clearedStagesSinceAd < 3 ||
-      Date.now() - lastInterstitialAt < INTERSTITIAL_COOLDOWN_MS
-    ) {
-      return;
-    }
+    if (clearedStagesSinceAd < 3 || hasProPack) return;
     const shown = await showInterstitialIfReady(hasProPack);
     if (shown) markInterstitialShown();
   }
 
   async function handleWonMain() {
-    trackResultAction("main_menu", levelId, "win");
     await runAttemptAdIfDue();
     onExit();
   }
 
-  async function handleWonNext() {
-    trackResultAction(nextCampaignLevel ? "next_stage" : "map", levelId, "win");
+  async function handleWonMap() {
     await runAttemptAdIfDue();
-    if (nextCampaignLevel) {
-      onWin(nextCampaignLevel.id);
-      return;
-    }
     onMap();
   }
 
   async function handleGameOverMain() {
-    trackResultAction("main_menu", levelId, "game_over");
     await runAttemptAdIfDue();
     onExit();
   }
 
   async function handleGameOverRetry() {
-    trackResultAction("retry", levelId, "game_over");
     await runAttemptAdIfDue();
     onWin(levelId);
   }
@@ -6253,7 +6277,7 @@ function StandardGameBoard({
 
   return (
     <div
-      className={`app-shell game-board-shell board-theme-${activeBoardTheme}`}
+      className={`app-shell game-board-shell board-theme-${activeBoardTheme} atom-skin-${activeAtomSkin}-active`}
       style={{
         display: "flex",
         flexDirection: "column",
@@ -6276,6 +6300,44 @@ function StandardGameBoard({
         }}
       >
         {/* HEADER */}
+        {preview ? (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+              marginBottom: 10,
+              padding: "8px 10px",
+              borderRadius: 12,
+              background: "var(--game-panel-bg, var(--surface))",
+              border: "1px solid var(--game-panel-border, var(--border))",
+              boxShadow: "var(--game-panel-shadow, none)",
+            }}
+          >
+            <div>
+              <div style={{ fontSize: 10, letterSpacing: 2, color: "var(--muted-foreground)" }}>
+                THEME PREVIEW
+              </div>
+              <div style={{ fontSize: 15, fontWeight: 900 }}>{previewLabel ?? "Theme test board"}</div>
+            </div>
+            <button
+              type="button"
+              onClick={onExit}
+              style={{
+                border: "1px solid var(--game-panel-accent-border, var(--border))",
+                borderRadius: 10,
+                padding: "8px 11px",
+                background: "var(--game-panel-accent-bg, var(--surface))",
+                color: "var(--foreground)",
+                fontWeight: 800,
+                cursor: "pointer",
+              }}
+            >
+              Close preview
+            </button>
+          </div>
+        ) : (
         <div
           style={{
             display: "flex",
@@ -6293,6 +6355,15 @@ function StandardGameBoard({
               style={{ ...iconBtn, minWidth: 0, padding: "6px 8px" }}
             >
               <SettingsIcon size={17} aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setHowToPlayOpen(true)}
+              title="How to play"
+              aria-label={isMoleculeChallenge ? "How to play compound levels" : "How to play"}
+              style={{ ...iconBtn, minWidth: 0, padding: "6px 8px" }}
+            >
+              <Info size={17} aria-hidden="true" />
             </button>
             <button
               type="button"
@@ -6316,10 +6387,12 @@ function StandardGameBoard({
           </div>
           <div style={{ textAlign: "center" }}>
             <div style={{ fontSize: 10, letterSpacing: 2, color: "var(--muted-foreground)" }}>
-              {getModeLevelLabel(gameMode, level)}
+              {preview ? "THEME PREVIEW" : getModeLevelLabel(gameMode, level)}
             </div>
             <div style={{ fontSize: 14, fontWeight: 700 }}>
-              {gameMode.id === "campaign"
+              {preview
+                ? previewLabel ?? "Theme test board"
+                : gameMode.id === "campaign"
                 ? level.name
                 : gameMode.emoji
                   ? `${gameMode.emoji} ${gameMode.name}`
@@ -6334,13 +6407,15 @@ function StandardGameBoard({
                 fontVariantNumeric: "tabular-nums",
               }}
             >
-              {mode === "gold-rush-timer"
+              {preview
+                ? `${Math.max(0, previewShotLimit - shots)} shots left`
+                : mode === "gold-rush-timer"
                 ? `⏱ ${formatTime(Math.max(0, (gameMode.timerSec ?? 180) * 1000 - elapsedMs))}`
                 : `⏱ ${formatTime(elapsedMs)}`}
             </div>
           </div>
           <div style={{ ...iconBtn, cursor: "default", minWidth: 74, textAlign: "right" }}>
-            <div style={{ fontSize: 10, color: "var(--muted-foreground)" }}>SCORE</div>
+            <div style={{ fontSize: 10, color: "var(--muted-foreground)" }}>{tr("SCORE")}</div>
             <div
               style={{
                 fontSize: 14,
@@ -6374,8 +6449,9 @@ function StandardGameBoard({
             </div>
           </div>
         </div>
+        )}
 
-        {!isMoleculeChallenge && (
+        {!preview && !isMoleculeChallenge && (
           <div
             style={{
               display: "flex",
@@ -6391,7 +6467,7 @@ function StandardGameBoard({
               marginBottom: 10,
             }}
           >
-            <ElementBall atomicNumber={highest} size={36} />
+            <ElementBall atomicNumber={highest} size={36} atomSkin={activeAtomSkin} />
             <div style={{ flex: 1 }}>
               <div
                 style={{
@@ -6401,9 +6477,9 @@ function StandardGameBoard({
                   color: "var(--muted-foreground)",
                 }}
               >
-                <span>Highest reached</span>
+                <span>{tr("Highest reached")}</span>
                 <span>
-                  Target: {targetEl?.symbol} (#{target})
+                  {tr("Target:")} {targetEl?.symbol} (#{target})
                 </span>
               </div>
               <div
@@ -6465,17 +6541,15 @@ function StandardGameBoard({
                           animation: read ? undefined : "icon-shimmer 1.5s ease-in-out infinite",
                         }}
                       >
-                        <ElementBall atomicNumber={atomicNumber} size={22} glow={!read} />
+                        <ElementBall
+                          atomicNumber={atomicNumber}
+                          size={22}
+                          glow={!read}
+                          atomSkin={activeAtomSkin}
+                        />
                       </button>
                     );
                   })}
-              </div>
-              <div style={evolutionRail} aria-label="Element evolution path">
-                <ElementBall atomicNumber={Math.max(1, highest)} size={20} />
-                <span aria-hidden="true">→</span>
-                <ElementBall atomicNumber={Math.min(target, Math.max(1, highest + 1))} size={20} />
-                <span aria-hidden="true">→</span>
-                <ElementBall atomicNumber={target} size={20} glow />
               </div>
             </div>
             <button
@@ -6499,41 +6573,8 @@ function StandardGameBoard({
                 cursor: continuingPastTarget ? "pointer" : "default",
               }}
             >
-              <ElementBall atomicNumber={target} size={36} glow />
+              <ElementBall atomicNumber={target} size={36} glow atomSkin={activeAtomSkin} />
             </button>
-          </div>
-        )}
-
-        {isFirstCampaignRun && !won && !gameOver && (
-          <FirstRunGuidePanel targetSymbol={targetEl?.symbol ?? "He"} text={firstRunGuideText} />
-        )}
-
-        {!isMoleculeChallenge && !isPowerUpStage && (
-          <div
-            className={fusionRushActive ? "reaction-meter fusion-rush-active" : "reaction-meter"}
-            style={reactionMeter}
-          >
-            <div style={reactionMeterHeader}>
-              <span>{fusionRushActive ? "Fusion Rush" : "Reaction streak"}</span>
-              <strong>{`x${reactionMultiplier}`}</strong>
-            </div>
-            <div style={reactionMeterTrack}>
-              <span
-                style={{
-                  ...reactionMeterFill,
-                  width: `${(reactionStreak / REACTION_STREAK_MAX) * 100}%`,
-                }}
-              />
-            </div>
-            <span style={reactionMeterHint}>
-              {reactionStreak === 0
-                ? "Merge on consecutive shots to raise the score multiplier."
-                : reactionMisses === 1
-                  ? "One more miss drops a tier."
-                  : `${REACTION_STREAK_MAX - reactionStreak} merge${
-                      REACTION_STREAK_MAX - reactionStreak === 1 ? "" : "s"
-                    } to Fusion Rush.`}
-            </span>
           </div>
         )}
 
@@ -6574,6 +6615,18 @@ function StandardGameBoard({
                     : getCompoundHint(moleculeObjective)
                   : `Form ${moleculeObjective.name} (${moleculeObjective.formula}) to clear`}
               </div>
+              {isAmmoniumChallenge && (
+                <div
+                  style={{
+                    marginTop: 4,
+                    color: "var(--muted-foreground)",
+                    fontSize: 11,
+                    lineHeight: 1.35,
+                  }}
+                >
+                  Place 1x N and 4x H on the board and form ammonium.
+                </div>
+              )}
               {isSecretCompoundChallenge && secretCompoundConcealed && (
                 <div style={{ marginTop: 3, color: "var(--muted-foreground)", fontSize: 11 }}>
                   Compound reveals after 50 shots
@@ -6613,7 +6666,7 @@ function StandardGameBoard({
                   color: "var(--muted-foreground)",
                 }}
               >
-                <span>Grab combo</span>
+                <span>{tr("Grab combo")}</span>
                 <span>
                   {grabProgress}/{GRAB_THRESHOLD}
                   {grabs > 0 ? `  •  ×${grabs} ready` : ""}
@@ -6707,17 +6760,13 @@ function StandardGameBoard({
             updateAimFromPointer(e.clientX, e.clientY);
             if (shootingStyle === "hold") shoot();
           }}
-          className={[
-            "game-board-surface",
+          className={
             dangerFeedbackState === "high"
-              ? "danger-high"
+              ? "game-board-surface danger-high"
               : dangerFeedbackState === "low"
-                ? "danger-low"
-                : "",
-            reactionBurstDepth >= 4 ? "reaction-burst" : "",
-          ]
-            .filter(Boolean)
-            .join(" ")}
+                ? "game-board-surface danger-low"
+                : "game-board-surface"
+          }
           style={{
             position: "relative",
             background:
@@ -6735,6 +6784,13 @@ function StandardGameBoard({
             userSelect: "none",
           }}
         >
+          <div aria-hidden="true" className="game-board-background-art" />
+          <div aria-hidden="true" className="crystal-border-formations">
+            {Array.from({ length: 14 }, (_, index) => (
+              <span key={index} className="crystal-border-shard" />
+            ))}
+          </div>
+          <div aria-hidden="true" className="game-board-theme-emblem" />
           {/* danger zone shading near the launcher (bottom) */}
           <div
             className={
@@ -6889,6 +6945,8 @@ function StandardGameBoard({
                     glow={isDrag || isCompoundSelected}
                     shimmer={b.shimmer}
                     unstableShots={b.unstableShots}
+                    atomSkin={activeAtomSkin}
+                    patternSeed={b.id}
                   />
                 </div>
               );
@@ -7073,7 +7131,7 @@ function StandardGameBoard({
             <div
               className="stage-clear-fx"
               aria-live="polite"
-              aria-label={stageClearFx.compound ? "Target compound formed" : "Target atom formed"}
+              aria-label={stageClearFx.compound ? tr("Target compound formed") : tr("Target atom formed")}
             >
               <div className="stage-clear-wash" />
               <div className="stage-clear-ring stage-clear-ring-a" />
@@ -7092,7 +7150,7 @@ function StandardGameBoard({
               </div>
               <div className="stage-clear-card">
                 <div className="stage-clear-eyebrow">
-                  {stageClearFx.compound ? "TARGET COMPOUND FORMED" : "TARGET ATOM FORMED"}
+                  {stageClearFx.compound ? tr("TARGET COMPOUND FORMED") : tr("TARGET ATOM FORMED")}
                 </div>
                 <div className="stage-clear-atom">
                   {stageClearFx.compound ? (
@@ -7103,10 +7161,10 @@ function StandardGameBoard({
                 </div>
                 <div className="stage-clear-title">
                   {stageClearFx.compound
-                    ? `${stageClearFx.compound.name} formed!`
-                    : `${targetEl?.name ?? "Target"} discovered!`}
+                    ? `${stageClearFx.compound.name} ${tr("formed!")}`
+                    : `${targetEl?.name ?? tr("Target")} ${tr("discovered!")}`}
                 </div>
-                <div className="stage-clear-subtitle">Clearing the stage…</div>
+                <div className="stage-clear-subtitle">{tr("Clearing the stage…")}</div>
                 <div className="stage-clear-stars">
                   {Array.from({ length: 3 }, (_, i) => (i < stageClearFx.stars ? "★" : "☆")).join(
                     "",
@@ -7133,7 +7191,7 @@ function StandardGameBoard({
                 pointerEvents: "none",
               }}
             >
-              Drag any atom to a new spot
+              {tr("Drag any atom to a new spot")}
             </div>
           )}
 
@@ -7237,12 +7295,17 @@ function StandardGameBoard({
           {/* PROJECTILE */}
           {projectile && (
             <div
+              ref={projectileVisualRef}
+              className="game-projectile"
               style={{
                 position: "absolute",
-                left: projectile.x - projShotSize / 2,
-                top: projectile.y - projShotSize / 2,
+                left: 0,
+                top: 0,
                 pointerEvents: "none",
                 zIndex: 12,
+                transform: `translate3d(${projectile.x - projShotSize / 2}px, ${projectile.y - projShotSize / 2}px, 0)`,
+                willChange: "transform",
+                background: "transparent",
               }}
             >
               {showCatalystShotRadius && (
@@ -7263,6 +7326,8 @@ function StandardGameBoard({
                   glow
                   shimmer={currentIsShimmer}
                   unstableShots={currentIsUnstable ? unstableChargeCapacity(current) : undefined}
+                  atomSkin={activeAtomSkin}
+                  patternSeed={current}
                 />
               )}
             </div>
@@ -7318,6 +7383,8 @@ function StandardGameBoard({
                   glow
                   shimmer={currentIsShimmer}
                   unstableShots={currentIsUnstable ? unstableChargeCapacity(current) : undefined}
+                  atomSkin={activeAtomSkin}
+                  patternSeed={current}
                 />
               ))}
           </div>
@@ -7358,6 +7425,9 @@ function StandardGameBoard({
             alignItems: "center",
             justifyContent: "space-between",
             gap: 10,
+            position: "relative",
+            zIndex: 20,
+            overflow: "visible",
           }}
         >
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-start", flex: "0 0 auto" }}>
@@ -7381,13 +7451,15 @@ function StandardGameBoard({
                         ? unstableChargeCapacity(atom)
                         : undefined
                     }
+                    atomSkin={activeAtomSkin}
+                    patternSeed={atom}
                   />
                 ),
               )}
           </div>
           <div
             style={{
-              display: "flex",
+              display: preview ? "none" : "flex",
               alignItems: "center",
               justifyContent: "flex-end",
               gap: 6,
@@ -7396,7 +7468,7 @@ function StandardGameBoard({
               overflowX: "auto",
               flexWrap: "nowrap",
               flexDirection: "row",
-              padding: "2px 2px 4px",
+              padding: "6px 12px 8px 4px",
             }}
           >
             {(transmuteCharges > 0 || pendingReversiblePowerUp === "transmute") && (
@@ -7643,6 +7715,7 @@ function StandardGameBoard({
                   }
                   style={{
                     ...powerUpIconBtn,
+                    zIndex: 30,
                     border: `1px solid ${compoundMode ? "var(--accent)" : "oklch(0.75 0.16 145)"}`,
                     background: compoundMode
                       ? "linear-gradient(135deg, var(--accent), oklch(0.55 0.16 145))"
@@ -7773,6 +7846,13 @@ function StandardGameBoard({
             onLeave={() => setConfirmAction("leave")}
           />
         )}
+        {howToPlayOpen && !gameOver && !won && (
+          <HowToPlay
+            mode={initialHowToPlay ?? (isMoleculeChallenge ? "compound" : "normal")}
+            atomSkin={activeAtomSkin}
+            onClose={() => setHowToPlayOpen(false)}
+          />
+        )}
         {paused && !gameOver && !won && (
           <div
             role="dialog"
@@ -7809,9 +7889,9 @@ function StandardGameBoard({
                   fontWeight: 800,
                 }}
               >
-                PAUSED
+                {tr("PAUSED")}
               </div>
-              <h2 style={{ margin: "6px 0 4px", fontSize: 24 }}>Game paused</h2>
+              <h2 style={{ margin: "6px 0 4px", fontSize: 24 }}>{tr("Game paused")}</h2>
               <p
                 style={{
                   margin: "0 0 16px",
@@ -7820,7 +7900,7 @@ function StandardGameBoard({
                   lineHeight: 1.45,
                 }}
               >
-                All power-up timers are frozen until you resume.
+                {tr("All power-up timers are frozen until you resume.")}
               </p>
               <div style={{ display: "grid", gap: 8 }}>
                 <button
@@ -7851,7 +7931,7 @@ function StandardGameBoard({
                     cursor: "pointer",
                   }}
                 >
-                  Exit to menu
+                  {tr("Exit to menu")}
                 </button>
               </div>
             </div>
@@ -7910,6 +7990,7 @@ function StandardGameBoard({
             clearTimeMs={elapsedMs}
             newDiscoveries={newlyDiscoveredThisRun}
             formedCompounds={formedCompoundsThisRun}
+            dailyBoardScoreBreakdown={winChoice?.dailyBoardScoreBreakdown}
             isPowerUpPass={isPowerUpStage}
             claimablePowerUps={
               isPowerUpStage || hasClaimedUnusedInventoryRef.current ? {} : collectUnusedPowerUps()
@@ -7920,8 +8001,8 @@ function StandardGameBoard({
             onClaimPowerUp={claimResultPowerUp}
             onDiscoveryClick={setDiscoveryEl}
             onMain={handleWonMain}
-            onNext={handleWonNext}
-            nextLabel={nextCampaignLevel ? "Next stage" : "Map"}
+            onNext={handleWonMap}
+            nextLabel="Map"
           />
         )}
         {gameOverContinueOpen && !won && !gameOver && (
@@ -7949,6 +8030,7 @@ function StandardGameBoard({
             clearTimeMs={elapsedMs}
             newDiscoveries={newlyDiscoveredThisRun}
             formedCompounds={formedCompoundsThisRun}
+            dailyBoardScoreBreakdown={undefined}
             claimablePowerUps={
               isPowerUpStage || hasClaimedUnusedInventoryRef.current ? {} : collectUnusedPowerUps()
             }
@@ -7971,6 +8053,8 @@ const powerUpIconBtn: React.CSSProperties = {
   position: "relative",
   width: 40,
   height: 40,
+  flex: "0 0 40px",
+  overflow: "visible",
   borderRadius: 12,
   display: "flex",
   alignItems: "center",
@@ -8029,112 +8113,6 @@ const iconBtn: React.CSSProperties = {
   boxShadow: "var(--game-panel-shadow, none)",
 };
 
-const firstRunGuidePanel: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "auto minmax(0, 1fr)",
-  alignItems: "center",
-  gap: 10,
-  padding: "9px 10px",
-  marginBottom: 10,
-  borderRadius: 12,
-  border: "1px solid var(--game-panel-accent-border, color-mix(in oklch, var(--accent) 45%, var(--border)))",
-  background:
-    "linear-gradient(135deg, color-mix(in oklch, var(--accent) 13%, var(--game-panel-bg, var(--surface))), var(--game-panel-bg, var(--surface)))",
-  boxShadow: "var(--game-panel-shadow, 0 10px 24px rgba(0,0,0,0.28))",
-};
-
-const firstRunGuideVisual: React.CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  gap: 4,
-  minWidth: 112,
-};
-
-const firstRunGuidePlus: React.CSSProperties = {
-  color: "var(--muted-foreground)",
-  fontSize: 13,
-  fontWeight: 950,
-};
-
-const firstRunGuideArrow: React.CSSProperties = {
-  color: "var(--accent)",
-  fontSize: 14,
-  fontWeight: 950,
-};
-
-const firstRunGuideLabel: React.CSSProperties = {
-  fontSize: 10,
-  letterSpacing: 1.7,
-  color: "var(--accent)",
-  fontWeight: 950,
-};
-
-const firstRunGuideCopy: React.CSSProperties = {
-  marginTop: 2,
-  color: "var(--foreground)",
-  fontSize: 12,
-  lineHeight: 1.35,
-  fontWeight: 750,
-};
-
-const evolutionRail: React.CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  gap: 6,
-  minWidth: 0,
-  marginTop: 8,
-  color: "var(--muted-foreground)",
-  fontSize: 11,
-  fontWeight: 850,
-};
-
-const reactionMeter: React.CSSProperties = {
-  display: "grid",
-  gap: 6,
-  padding: "8px 10px",
-  marginBottom: 10,
-  borderRadius: 10,
-  border: "1px solid var(--game-panel-border, var(--border))",
-  background: "var(--game-panel-bg, var(--surface))",
-  boxShadow: "var(--game-panel-shadow, none)",
-};
-
-const reactionMeterHeader: React.CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  gap: 10,
-  color: "var(--foreground)",
-  fontSize: 11,
-  fontWeight: 900,
-};
-
-const reactionMeterTrack: React.CSSProperties = {
-  height: 7,
-  overflow: "hidden",
-  borderRadius: 999,
-  border: "1px solid var(--border)",
-  background: "var(--surface-high)",
-};
-
-const reactionMeterFill: React.CSSProperties = {
-  display: "block",
-  height: "100%",
-  borderRadius: 999,
-  background: "linear-gradient(90deg, var(--primary), var(--accent))",
-  boxShadow: "0 0 10px var(--accent-glow)",
-  transition: "width 180ms ease",
-};
-
-const reactionMeterHint: React.CSSProperties = {
-  color: "var(--muted-foreground)",
-  fontSize: 10,
-  lineHeight: 1.25,
-  fontWeight: 750,
-};
-
 function formatTime(ms: number): string {
   const total = Math.floor(ms / 1000);
   const m = Math.floor(total / 60);
@@ -8174,6 +8152,7 @@ function FeatureTip({
       }}
     >
       <div
+        className="game-board-message-surface"
         style={{
           maxWidth: isTabletLayout ? 460 : 360,
           width: "100%",
@@ -8218,24 +8197,6 @@ function FeatureTip({
   );
 }
 
-function FirstRunGuidePanel({ targetSymbol, text }: { targetSymbol: string; text: string }) {
-  return (
-    <div style={firstRunGuidePanel}>
-      <div style={firstRunGuideVisual} aria-hidden="true">
-        <ElementBall atomicNumber={1} size={26} glow />
-        <span style={firstRunGuidePlus}>+</span>
-        <ElementBall atomicNumber={1} size={26} glow />
-        <span style={firstRunGuideArrow}>→</span>
-        <ElementBall atomicNumber={2} size={30} glow />
-      </div>
-      <div style={{ minWidth: 0 }}>
-        <div style={firstRunGuideLabel}>{`TARGET ${targetSymbol}`}</div>
-        <div style={firstRunGuideCopy}>{text}</div>
-      </div>
-    </div>
-  );
-}
-
 function selectedPowerUpSlots(selected: PowerUpInventory): InventoryPowerUpId[] {
   const slots: InventoryPowerUpId[] = [];
   for (const id of Object.keys(POWER_UP_INVENTORY_META) as InventoryPowerUpId[]) {
@@ -8253,12 +8214,14 @@ function PlayStyleModal({
   selected: "hold" | "press";
   onSelect: (style: "hold" | "press") => void;
 }) {
+  const { appLanguage } = useProgress();
+  const tr = (text: string) => t(text, appLanguage);
   return (
     <Modal zIndex={1200}>
       <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--accent)", marginBottom: 8 }}>
-        PLAY STYLE
+        {tr("PLAY STYLE")}
       </div>
-      <h2 style={{ margin: "0 0 8px", fontSize: 24, fontWeight: 900 }}>Choose how you shoot</h2>
+      <h2 style={{ margin: "0 0 8px", fontSize: 24, fontWeight: 900 }}>{tr("Choose how you shoot")}</h2>
       <p
         style={{
           margin: "0 0 14px",
@@ -8267,13 +8230,13 @@ function PlayStyleModal({
           lineHeight: 1.45,
         }}
       >
-        You can change this anytime in in-game settings or the main settings screen.
+        {tr("You can change this anytime in in-game settings or the main settings screen.")}
       </p>
       <div style={{ display: "grid", gap: 8 }}>
         {(
           [
-            ["hold", "Hold", "Aim by holding the board, then release to shoot."],
-            ["press", "Toggle", "Aim on the board first, then press the queued atom to shoot."],
+            ["hold", tr("Hold"), tr("Aim by holding the board, then release to shoot.")],
+            ["press", tr("Toggle"), tr("Aim on the board first, then press the queued atom to shoot.")],
           ] as const
         ).map(([style, title, body]) => (
           <button
@@ -8320,13 +8283,15 @@ function ConfirmRunExitModal({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
+  const { appLanguage } = useProgress();
+  const tr = (text: string) => t(text, appLanguage);
   return (
     <Modal zIndex={1300}>
       <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--destructive)", marginBottom: 8 }}>
-        {action === "restart" ? "RESTART LEVEL" : "LEAVE GAME"}
+        {action === "restart" ? tr("RESTART LEVEL") : tr("LEAVE GAME")}
       </div>
       <h2 style={{ margin: "0 0 8px", fontSize: 24, fontWeight: 900 }}>
-        Progress and loaded power-ups will be lost.
+        {tr("Progress and loaded power-ups will be lost.")}
       </h2>
       <p
         style={{
@@ -8337,8 +8302,8 @@ function ConfirmRunExitModal({
         }}
       >
         {action === "restart"
-          ? "Restarting returns you to the pre-game inventory screen for this level."
-          : "Leaving discards this run and returns you to the map."}
+          ? tr("Restarting returns you to the pre-game inventory screen for this level.")
+          : tr("Leaving discards this run and returns you to the map.")}
       </p>
       <div style={{ display: "flex", gap: 8 }}>
         <button
@@ -8346,10 +8311,10 @@ function ConfirmRunExitModal({
           onClick={onCancel}
           style={{ ...modalBtn, background: "var(--surface-high)", color: "var(--foreground)" }}
         >
-          Cancel
+          {tr("Cancel")}
         </button>
         <button type="button" onClick={onConfirm} style={modalBtn}>
-          {action === "restart" ? "Restart" : "Leave game"}
+          {action === "restart" ? tr("Restart") : tr("Leave game")}
         </button>
       </div>
     </Modal>
@@ -8369,6 +8334,8 @@ function InventoryStartModal({
   onStart: () => void;
   onBack: () => void;
 }) {
+  const { appLanguage } = useProgress();
+  const tr = (text: string) => t(text, appLanguage);
   const selectedCount = countPowerUps(selected);
   const selectedSlots = selectedPowerUpSlots(selected);
   const availablePowerUps = (Object.keys(POWER_UP_INVENTORY_META) as InventoryPowerUpId[]).filter(
@@ -8378,11 +8345,11 @@ function InventoryStartModal({
   return (
     <Modal>
       <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--accent)", marginBottom: 8 }}>
-        POWER-UP INVENTORY
+        {tr("POWER-UP INVENTORY")}
       </div>
-      <h2 style={{ margin: "0 0 8px", fontSize: 24, fontWeight: 900 }}>Pick up to 3 boosts</h2>
+      <h2 style={{ margin: "0 0 8px", fontSize: 24, fontWeight: 900 }}>{tr("Pick up to 3 boosts")}</h2>
       <p style={{ margin: "0 0 14px", color: "var(--muted-foreground)", fontSize: 13 }}>
-        Fill up to 3 starting slots from your saved power-ups. Tap a filled slot to remove it.
+        {tr("Fill up to 3 starting slots from your saved power-ups. Tap a filled slot to remove it.")}
       </p>
       <div
         style={{
@@ -8424,7 +8391,7 @@ function InventoryStartModal({
                   <span style={{ fontSize: 10 }}>{meta?.name}</span>
                 </>
               ) : (
-                <span style={{ fontSize: 11 }}>Empty</span>
+                <span style={{ fontSize: 11 }}>{tr("Empty")}</span>
               )}
             </button>
           );
@@ -8547,10 +8514,10 @@ function InventoryStartModal({
           ← Back
         </button>
         <span style={{ flex: "1 1 70px", textAlign: "center" }}>
-          Selected {selectedCount}/{INVENTORY_PICK_LIMIT}
+          {tr("Selected")} {selectedCount}/{INVENTORY_PICK_LIMIT}
         </span>
         <button onClick={onStart} style={{ ...modalBtn, marginTop: 0, flex: "1 1 150px" }}>
-          {selectedCount > 0 ? "Start with boosts" : "Start without boosts"}
+          {selectedCount > 0 ? tr("Start with boosts") : tr("Start without boosts")}
         </button>
       </div>
     </Modal>
@@ -8558,12 +8525,14 @@ function InventoryStartModal({
 }
 
 function DiscoveryModal({ atomicNumber, onClose }: { atomicNumber: number; onClose: () => void }) {
+  const { appLanguage } = useProgress();
+  const tr = (text: string) => t(text, appLanguage);
   const el = ELEMENTS[atomicNumber - 1];
   if (!el) return null;
   return (
     <Modal zIndex={200}>
       <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--accent)", marginBottom: 8 }}>
-        NEW DISCOVERY
+        {tr("NEW DISCOVERY")}
       </div>
       <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
         <ElementBall atomicNumber={atomicNumber} size={96} glow />
@@ -8576,7 +8545,7 @@ function DiscoveryModal({ atomicNumber, onClose }: { atomicNumber: number; onClo
         {el.fact}
       </p>
       <button onClick={onClose} style={modalBtn}>
-        Continue
+        {tr("Continue")}
       </button>
     </Modal>
   );
@@ -8621,6 +8590,8 @@ function CompoundSelectionPanel({
   hideNonObjectiveMatches?: boolean;
   onCancel: () => void;
 }) {
+  const { appLanguage } = useProgress();
+  const tr = (text: string) => t(text, appLanguage);
   const entries = Object.entries(counts).sort(([a], [b]) => a.localeCompare(b));
   const objectiveMismatch = objective != null && match != null && match.id !== objective.id;
   const canForm = match != null && !objectiveMismatch;
@@ -8629,12 +8600,13 @@ function CompoundSelectionPanel({
   const visibleMatchIsNew = visibleMatch ? matchIsNew : false;
   return (
     <div
+      className="compound-mode-panel"
       style={{
         position: "absolute",
         left: 10,
         right: 10,
         bottom: 10,
-        zIndex: 8,
+        zIndex: 30,
         padding: 10,
         borderRadius: 12,
         border: "1px solid var(--border)",
@@ -8650,7 +8622,7 @@ function CompoundSelectionPanel({
           <div
             style={{ fontSize: 10, letterSpacing: 1.5, color: "var(--accent)", fontWeight: 900 }}
           >
-            COMPOUND MODE
+            {tr("COMPOUND MODE")}
           </div>
           <div style={{ fontSize: 12, color: "var(--muted-foreground)" }}>
             {selectedCount}/{COMPOUND_MAX_SELECTION} atoms · max {COMPOUND_MAX_ELEMENT_TYPES}{" "}
@@ -8658,13 +8630,13 @@ function CompoundSelectionPanel({
           </div>
         </div>
         <button type="button" onClick={onCancel} style={miniPanelBtn}>
-          Cancel
+          {tr("Cancel")}
         </button>
       </div>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
         {entries.length === 0 ? (
           <span style={{ fontSize: 12, color: "var(--muted-foreground)" }}>
-            Tap atoms to select
+            {tr("Tap atoms to select")}
           </span>
         ) : (
           entries.map(([symbol, count]) => (
@@ -8688,7 +8660,7 @@ function CompoundSelectionPanel({
                 cursor: canAffordHint ? "pointer" : "not-allowed",
               }}
             >
-              Hint {hintCost} coins
+              {tr("Hint")} {hintCost} {tr("coins")}
             </button>
           )}
           {newHint && (
@@ -8705,7 +8677,7 @@ function CompoundSelectionPanel({
                 cursor: canAffordSuperHint ? "pointer" : "not-allowed",
               }}
             >
-              Super Hint {superHintCost} coins
+              {tr("Super Hint")} {superHintCost} {tr("coins")}
             </button>
           )}
         </div>
@@ -8734,16 +8706,16 @@ function CompoundSelectionPanel({
               }}
             >
               {hideMatchDetails
-                ? "SECRET COMPOUND PREVIEW"
+                ? tr("SECRET COMPOUND PREVIEW")
                 : visibleMatchIsNew
-                  ? "NEW COMPOUND PREVIEW"
-                  : "COMPOUND PREVIEW"}
+                  ? tr("NEW COMPOUND PREVIEW")
+                  : tr("COMPOUND PREVIEW")}
             </div>
             <div style={{ fontSize: 14, fontWeight: 900 }}>
-              {hideMatchDetails ? "Secret compound" : visibleMatch.name}
+              {hideMatchDetails ? tr("Secret compound") : visibleMatch.name}
             </div>
             <div style={{ fontSize: 12, color: "var(--muted-foreground)" }}>
-              {hideMatchDetails ? "Reveals after 50 shots" : visibleMatch.formula}
+              {hideMatchDetails ? tr("Reveals after 50 shots") : visibleMatch.formula}
             </div>
           </div>
         </div>
@@ -8766,17 +8738,17 @@ function CompoundSelectionPanel({
       >
         {objectiveMismatch
           ? hideObjectiveFormula
-            ? "Need secret compound"
-            : `Need ${objective?.formula ?? "target"}`
+            ? tr("Need secret compound")
+            : `${tr("Need")} ${objective?.formula ?? tr("target")}`
           : match
             ? hideMatchDetails
-              ? "Form Secret Compound"
-              : `Form ${match.name}`
+              ? tr("Form Secret Compound")
+              : `${tr("Form")} ${match.name}`
             : objective
               ? hideObjectiveFormula
-                ? "Form Secret Compound"
-                : `Form ${objective.formula}`
-              : "Form Compound"}
+                ? tr("Form Secret Compound")
+                : `${tr("Form")} ${objective.formula}`
+              : tr("Form Compound")}
       </button>
       {visibleMatch && (
         <div
@@ -8790,7 +8762,7 @@ function CompoundSelectionPanel({
             color: "var(--accent)",
           }}
         >
-          <span>{visibleMatchIsNew ? "NEW compound" : "Already discovered"}</span>
+          <span>{visibleMatchIsNew ? tr("NEW compound") : tr("Already discovered")}</span>
           <span>+{formatScore(matchScore)}</span>
         </div>
       )}
@@ -8854,10 +8826,12 @@ function CompoundDiscoveryModal({
   bonusScore: number;
   onClose: () => void;
 }) {
+  const { appLanguage } = useProgress();
+  const tr = (text: string) => t(text, appLanguage);
   return (
     <Modal zIndex={210}>
       <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--accent)", marginBottom: 8 }}>
-        {isNew ? "NEW COMPOUND" : "COMPOUND FOUND AGAIN"}
+        {isNew ? tr("NEW COMPOUND") : tr("COMPOUND FOUND AGAIN")}
       </div>
       <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
         <MoleculeVisual compound={compound} size={118} />
@@ -8867,7 +8841,7 @@ function CompoundDiscoveryModal({
         {compound.formula}
       </div>
       <div style={{ fontSize: 12, color: "var(--muted-foreground)", marginBottom: 8 }}>
-        {isNew ? "Added to your collection" : `Already discovered - found ${count} times`}
+        {isNew ? tr("Added to your collection") : `${tr("Already discovered - found")} ${count} ${tr(count === 1 ? "time" : "times")}`}
       </div>
       <div style={{ fontSize: 20, fontWeight: 900, color: "var(--primary)", marginBottom: 10 }}>
         +{formatScore(bonusScore)}
@@ -8876,7 +8850,7 @@ function CompoundDiscoveryModal({
         {compound.fact}
       </p>
       <button onClick={onClose} style={modalBtn}>
-        Continue
+        {tr("Continue")}
       </button>
     </Modal>
   );
@@ -8903,14 +8877,16 @@ function ShotHistoryModal({
   }[];
   onClose: () => void;
 }) {
+  const { appLanguage } = useProgress();
+  const tr = (text: string) => t(text, appLanguage);
   return (
     <Modal>
       <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--accent)", marginBottom: 8 }}>
-        SHOT LOG
+        {tr("SHOT LOG")}
       </div>
-      <h2 style={{ margin: "0 0 12px", fontSize: 22, fontWeight: 900 }}>This run, step by step</h2>
+      <h2 style={{ margin: "0 0 12px", fontSize: 22, fontWeight: 900 }}>{tr("This run, step by step")}</h2>
       {entries.length === 0 ? (
-        <p style={{ color: "var(--muted-foreground)", fontSize: 13 }}>No shots logged yet.</p>
+        <p style={{ color: "var(--muted-foreground)", fontSize: 13 }}>{tr("No shots logged yet.")}</p>
       ) : (
         <div
           style={{
@@ -9069,6 +9045,8 @@ function GameOverContinueModal({
   onAdContinue: () => void;
   onResults: () => void;
 }) {
+  const { appLanguage } = useProgress();
+  const tr = (text: string) => t(text, appLanguage);
   const canPay = coins >= 5 && !busy;
   return (
     <Modal>
@@ -9081,9 +9059,9 @@ function GameOverContinueModal({
           marginBottom: 8,
         }}
       >
-        GAME OVER
+        {tr("GAME OVER")}
       </div>
-      <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 6 }}>Continue this run?</div>
+      <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 6 }}>{tr("Continue this run?")}</div>
       <p
         style={{
           fontSize: 13,
@@ -9092,13 +9070,13 @@ function GameOverContinueModal({
           margin: "0 0 14px",
         }}
       >
-        Continue once to lower the danger bar by half and reset the stone streak.
+        {tr("Continue once to lower the danger bar by half and reset the stone streak.")}
       </p>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
-        <ResultStat label="Score" value={formatScore(score)} color="var(--accent)" />
-        <ResultStat label="Shots" value={`${shots}`} color="var(--foreground)" />
-        <ResultStat label="Coins" value={<CoinValue amount={coins} />} color="var(--accent)" />
-        <ResultStat label="Continue" value={<CoinValue amount={5} />} color="var(--foreground)" />
+        <ResultStat label={tr("Score")} value={formatScore(score)} color="var(--accent)" />
+        <ResultStat label={tr("Shots")} value={`${shots}`} color="var(--foreground)" />
+        <ResultStat label={tr("Coins")} value={<CoinValue amount={coins} />} color="var(--accent)" />
+        <ResultStat label={tr("Continue")} value={<CoinValue amount={5} />} color="var(--foreground)" />
       </div>
       {message && (
         <div
@@ -9139,7 +9117,7 @@ function GameOverContinueModal({
               cursor: busy ? "wait" : "pointer",
             }}
           >
-            {busy ? "Loading ad..." : "Watch ad to continue"}
+            {busy ? tr("Loading ad...") : tr("Watch ad to continue")}
           </button>
         )}
         <button
@@ -9154,7 +9132,7 @@ function GameOverContinueModal({
             opacity: busy ? 0.65 : 1,
           }}
         >
-          Results
+          {tr("Results")}
         </button>
       </div>
     </Modal>
@@ -9182,6 +9160,8 @@ function ContinueChoiceModal({
   onClaim: () => void;
   onContinue: () => void;
 }) {
+  const { appLanguage } = useProgress();
+  const tr = (text: string) => t(text, appLanguage);
   return (
     <Modal>
       <div
@@ -9193,14 +9173,14 @@ function ContinueChoiceModal({
           marginBottom: 8,
         }}
       >
-        {isContinuing ? "FINISH LEVEL?" : "TARGET REACHED"}
+        {isContinuing ? tr("FINISH LEVEL?") : tr("TARGET REACHED")}
       </div>
       <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 6 }}>
         {isContinuing
-          ? "Ready to claim?"
+          ? tr("Ready to claim?")
           : compound
             ? `${compound.name} formed!`
-            : `${ELEMENTS[level.targetElement - 1]?.name ?? "?"} discovered!`}
+            : `${ELEMENTS[level.targetElement - 1]?.name ?? "?"} ${tr("discovered!")}`}
       </div>
       <p
         style={{
@@ -9210,7 +9190,7 @@ function ContinueChoiceModal({
           margin: "0 0 14px",
         }}
       >
-        The level is clear. Finish the stage, or restart this level and try a cleaner run.
+        {tr("The level is clear. Finish the stage, or restart this level and try a cleaner run.")}
       </p>
       {stars > 0 && (
         <div
@@ -9226,18 +9206,18 @@ function ContinueChoiceModal({
         </div>
       )}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 4 }}>
-        <ResultStat label="Score" value={formatScore(score)} color="var(--accent)" />
-        <ResultStat label="Shots" value={`${shots}`} color="var(--foreground)" />
+        <ResultStat label={tr("Score")} value={formatScore(score)} color="var(--accent)" />
+        <ResultStat label={tr("Shots")} value={`${shots}`} color="var(--foreground)" />
       </div>
       <div style={{ display: "flex", gap: 8 }}>
         <button
           onClick={onContinue}
           style={{ ...modalBtn, background: "var(--surface-high)", color: "var(--foreground)" }}
         >
-          Restart
+          {tr("Restart")}
         </button>
         <button onClick={onClaim} style={modalBtn}>
-          Finish Level
+          {tr("Finish Level")}
         </button>
       </div>
     </Modal>
@@ -9255,6 +9235,7 @@ function ResultModal({
   clearTimeMs,
   newDiscoveries = [],
   formedCompounds = [],
+  dailyBoardScoreBreakdown,
   claimablePowerUps = {},
   claimedPowerUp = null,
   coins = 0,
@@ -9276,6 +9257,7 @@ function ResultModal({
   clearTimeMs: number;
   newDiscoveries?: number[];
   formedCompounds?: string[];
+  dailyBoardScoreBreakdown?: DailyBoardScoreBreakdown;
   claimablePowerUps?: Partial<Record<InventoryPowerUpId, number>>;
   claimedPowerUp?: InventoryPowerUpId | null;
   coins?: number;
@@ -9287,6 +9269,8 @@ function ResultModal({
   onNext: () => void;
   nextLabel?: string;
 }) {
+  const { appLanguage } = useProgress();
+  const tr = (text: string) => t(text, appLanguage);
   const [selectedSavePowerUp, setSelectedSavePowerUp] = useState<InventoryPowerUpId | null>(null);
   const [selectedCompound, setSelectedCompound] = useState<CompoundDefinition | null>(null);
   const formedCompoundDefinitions = formedCompounds
@@ -9316,10 +9300,8 @@ function ResultModal({
   );
   const canAffordPowerUpSave = savePowerUpCost <= 0 || coins >= savePowerUpCost;
   const shotGoal = getShotStarGoal(level);
-  const timeGoalSec = level.parTimeSec ?? 8 * 60;
   const didComplete = title === "LEVEL COMPLETE";
-  const isFirstLevelComplete = didComplete && level.id === 1;
-  const timeMet = didComplete && clearTimeMs <= timeGoalSec * 1000;
+  const timeMet = didComplete && clearTimeMs <= TIME_STAR_LIMIT_SEC * 1000;
   const shotsMet = didComplete && shots <= shotGoal;
   const isCompoundPass = isCompoundFormationLevel(level);
   return (
@@ -9327,9 +9309,9 @@ function ResultModal({
       <div
         style={{ fontSize: 12, letterSpacing: 3, color: accent, fontWeight: 800, marginBottom: 8 }}
       >
-        {title}
+        {tr(title)}
       </div>
-      <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 12 }}>{level.name}</div>
+      <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 12 }}>{tr(level.name)}</div>
       {isPowerUpPass && (
         <div
           style={{
@@ -9358,7 +9340,7 @@ function ResultModal({
             ✓
           </div>
           <div style={{ fontSize: 24, fontWeight: 900, color: "var(--success, var(--accent))" }}>
-            Pass
+            {tr("Pass")}
           </div>
         </div>
       )}
@@ -9385,19 +9367,6 @@ function ResultModal({
           }}
         >
           {powerUpUnlockMessage}
-        </p>
-      )}
-      {isFirstLevelComplete && (
-        <p
-          style={{
-            fontSize: 13,
-            color: "var(--success, var(--accent))",
-            lineHeight: 1.5,
-            margin: "0 0 14px",
-            fontWeight: 850,
-          }}
-        >
-          Helium is secured in your table. Next up: keep merging to discover Lithium.
         </p>
       )}
       {stars > 0 && !isPowerUpPass && (
@@ -9433,7 +9402,7 @@ function ResultModal({
           />
           <StarRequirementRow
             met={timeMet}
-            label={`Clear under ${formatTime(timeGoalSec * 1000)}`}
+            label="Clear under 5 minutes"
             detail={`Your time was ${formatTime(clearTimeMs)}`}
           />
           <StarRequirementRow
@@ -9466,6 +9435,54 @@ function ResultModal({
           />
           <ResultStat label="Shots" value={`${shots} / ${shotGoal}`} color="var(--foreground)" />
           <ResultStat label="Best Combo" value={`${bestCombo}`} color="var(--foreground)" />
+        </div>
+      )}
+      {dailyBoardScoreBreakdown && (
+        <div
+          style={{
+            display: "grid",
+            gap: 6,
+            marginBottom: 12,
+            padding: 10,
+            borderRadius: 12,
+            border: "1px solid color-mix(in oklch, var(--accent) 42%, var(--border))",
+            background: "color-mix(in oklch, var(--accent) 8%, var(--surface))",
+            textAlign: "left",
+          }}
+        >
+            <div style={{ fontSize: 10, letterSpacing: 1.4, fontWeight: 900, color: "var(--accent)" }}>
+            {tr("DAILY BOARD SCORE CALCULATION")}
+          </div>
+          <ScoreBreakdownRow label={tr("Points earned")} value={dailyBoardScoreBreakdown.baseScore} />
+          <ScoreBreakdownRow label={tr("Combo bonus")} value={dailyBoardScoreBreakdown.comboBonus} />
+          <ScoreBreakdownRow label={tr("Time bonus")} value={dailyBoardScoreBreakdown.timeBonus} />
+          <ScoreBreakdownRow
+            label={`${shots} shots — ${Math.round(dailyBoardScoreBreakdown.shotEfficiency * 100)}% efficiency`}
+            value={-dailyBoardScoreBreakdown.shotEfficiencyPenalty}
+            negative
+          />
+          <ScoreBreakdownRow label={tr("Fast-clear bonus")} value={dailyBoardScoreBreakdown.fastClearBonus} />
+          {dailyBoardScoreBreakdown.powerUpPenalty > 0 && (
+            <ScoreBreakdownRow
+              label={tr("Power-up penalty")}
+              value={-dailyBoardScoreBreakdown.powerUpPenalty}
+              negative
+            />
+          )}
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              gap: 12,
+              paddingTop: 5,
+              marginTop: 2,
+              borderTop: "1px solid var(--border)",
+              fontWeight: 950,
+            }}
+          >
+            <span>{tr("Final leaderboard score")}</span>
+            <span style={{ color: "var(--accent)" }}>{formatScore(dailyBoardScoreBreakdown.finalScore)}</span>
+          </div>
         </div>
       )}
       {newDiscoveries.length > 0 && !isPowerUpPass && (
@@ -9523,7 +9540,7 @@ function ResultModal({
               textAlign: "center",
             }}
           >
-            COMPOUNDS FORMED
+            {tr("COMPOUNDS FORMED")}
           </div>
           <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
             {formedCompoundDefinitions.map((compound, index) => (
@@ -9580,7 +9597,7 @@ function ResultModal({
               textAlign: "center",
             }}
           >
-            KEEP ONE POWER-UP
+            {tr("KEEP ONE POWER-UP")}
           </div>
           {!claimedPowerUp && (
             <div
@@ -9594,10 +9611,10 @@ function ResultModal({
             >
               {savePowerUpCost > 0 ? (
                 <>
-                  Save one unused power-up for <CoinValue amount={savePowerUpCost} />.
+                  {tr("Save one unused power-up for")} <CoinValue amount={savePowerUpCost} />.
                 </>
               ) : (
-                "Collect one unused power-up for free on web."
+                tr("Collect one unused power-up for free on web.")
               )}
             </div>
           )}
@@ -9610,7 +9627,7 @@ function ResultModal({
                 fontWeight: 900,
               }}
             >
-              Saved {POWER_UP_INVENTORY_META[claimedPowerUp].name} to inventory
+              {tr("Saved")} {tr(POWER_UP_INVENTORY_META[claimedPowerUp].name)} {tr("to inventory")}
             </div>
           ) : (
             <>
@@ -9670,14 +9687,14 @@ function ResultModal({
               >
                 {savePowerUpCost > 0 ? (
                   <span style={coinContinueLabel}>
-                    <span>Save selected</span>
+                    <span>{tr("Save selected")}</span>
                     <span style={coinContinueCost}>
                       <Coins size={15} aria-hidden="true" />
                       <span>{savePowerUpCost}</span>
                     </span>
                   </span>
                 ) : (
-                  "Collect selected"
+                  tr("Collect selected")
                 )}
               </button>
               {savePowerUpCost > 0 && !canAffordPowerUpSave && (
@@ -9691,7 +9708,7 @@ function ResultModal({
                     fontWeight: 900,
                   }}
                 >
-                  Need {savePowerUpCost} gold coins.
+                  {tr("Need")} {savePowerUpCost} {tr("gold coins")}.
                 </div>
               )}
             </>
@@ -9703,10 +9720,10 @@ function ResultModal({
           onClick={onMain}
           style={{ ...modalBtn, background: "var(--surface-high)", color: "var(--foreground)" }}
         >
-          Menu
+          {tr("Menu")}
         </button>
         <button onClick={onNext} style={modalBtn}>
-          {nextLabel ?? "Next"}
+          {nextLabel ? tr(nextLabel) : tr("Next")}
         </button>
       </div>
     </Modal>
@@ -9751,6 +9768,26 @@ function StarRequirementRow({
   );
 }
 
+function ScoreBreakdownRow({
+  label,
+  value,
+  negative = false,
+}: {
+  label: string;
+  value: number;
+  negative?: boolean;
+}) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 11 }}>
+      <span style={{ color: "var(--muted-foreground)" }}>{label}</span>
+      <strong style={{ color: negative ? "var(--destructive)" : "var(--foreground)" }}>
+        {value >= 0 ? "+" : ""}
+        {formatScore(value)}
+      </strong>
+    </div>
+  );
+}
+
 function CoinValue({ amount }: { amount: number }) {
   return (
     <span style={coinValue}>
@@ -9761,9 +9798,10 @@ function CoinValue({ amount }: { amount: number }) {
 }
 
 function CoinContinueLabel() {
+  const { appLanguage } = useProgress();
   return (
     <span style={coinContinueLabel}>
-      <span>Continue run</span>
+      <span>{t("Continue run", appLanguage)}</span>
       <span style={coinContinueCost}>
         <Coins size={15} aria-hidden="true" />
         <span>5</span>
@@ -9783,8 +9821,15 @@ function ResultStat({ label, value, color }: { label: string; value: ReactNode; 
         textAlign: "center",
       }}
     >
-      <div style={{ fontSize: 9, letterSpacing: 1.5, color: "var(--muted-foreground)" }}>
-        {label.toUpperCase()}
+      <div
+        style={{
+          fontSize: 9,
+          letterSpacing: 1.5,
+          color: "var(--muted-foreground)",
+          textTransform: "uppercase",
+        }}
+      >
+        {label}
       </div>
       <div style={{ fontSize: 18, fontWeight: 800, color }}>{value}</div>
     </div>
@@ -9812,25 +9857,27 @@ function InGameSettingsModal({
   onRestart: () => void;
   onLeave: () => void;
 }) {
+  const { appLanguage } = useProgress();
+  const tr = (text: string) => t(text, appLanguage);
   return (
     <Modal zIndex={1000}>
       <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--accent)", fontWeight: 900 }}>
-        SETTINGS
+        {tr("SETTINGS")}
       </div>
-      <h2 style={{ margin: "6px 0 12px", fontSize: 24, fontWeight: 900 }}>Game settings</h2>
+      <h2 style={{ margin: "6px 0 12px", fontSize: 24, fontWeight: 900 }}>{tr("Game settings")}</h2>
       <div style={{ display: "grid", gap: 10 }}>
         <label style={settingsCheckRow}>
           <input type="checkbox" checked={musicEnabled} onChange={onToggleMusic} />
           <span style={settingsLabelText}>
-            <strong>Music</strong>
-            <small style={settingsLabelSubtext}>Ambient background track</small>
+            <strong>{tr("Music")}</strong>
+            <small style={settingsLabelSubtext}>{tr("Ambient background track")}</small>
           </span>
         </label>
         <label style={settingsCheckRow}>
           <input type="checkbox" checked={soundEnabled} onChange={onToggleSound} />
           <span style={settingsLabelText}>
-            <strong>Sound</strong>
-            <small style={settingsLabelSubtext}>Shot, merge, and win effects</small>
+            <strong>{tr("Sound")}</strong>
+            <small style={settingsLabelSubtext}>{tr("Shot, merge, and win effects")}</small>
           </span>
         </label>
         <label style={settingsCheckRow}>
@@ -9840,18 +9887,18 @@ function InGameSettingsModal({
             onChange={onToggleShootingStyle}
           />
           <span style={settingsLabelText}>
-            <strong>Shooting: {shootingStyle === "hold" ? "Hold" : "Toggle"}</strong>
+            <strong>{tr("Shooting:")} {shootingStyle === "hold" ? tr("Hold") : tr("Toggle")}</strong>
             <small style={settingsLabelSubtext}>
               {shootingStyle === "hold"
-                ? "Aim and release to shoot"
-                : "Aim on the board, then press the queued atom"}
+                ? tr("Aim and release to shoot")
+                : tr("Aim on the board, then press the queued atom")}
             </small>
           </span>
         </label>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10, marginTop: 16 }}>
         <button type="button" onClick={onClose} style={{ ...modalBtn, marginTop: 0 }}>
-          Resume
+          {tr("Resume")}
         </button>
         <button
           type="button"
@@ -9863,7 +9910,7 @@ function InGameSettingsModal({
             color: "var(--foreground)",
           }}
         >
-          Restart
+          {tr("Restart")}
         </button>
         <button
           type="button"
@@ -9875,7 +9922,7 @@ function InGameSettingsModal({
             color: "var(--foreground)",
           }}
         >
-          Leave game
+          {tr("Leave game")}
         </button>
       </div>
     </Modal>
@@ -9899,6 +9946,7 @@ function Modal({ children, zIndex = 100 }: { children: React.ReactNode; zIndex?:
       }}
     >
       <div
+        className="game-modal-surface"
         style={{
           background: "var(--surface-elevated)",
           border: "1px solid var(--border)",
@@ -9955,6 +10003,19 @@ const dailyCompoundExitBtn: React.CSSProperties = {
   background: "var(--surface)",
   color: "var(--foreground)",
   fontWeight: 850,
+  cursor: "pointer",
+};
+
+const dailyCompoundInfoBtn: React.CSSProperties = {
+  width: 38,
+  height: 38,
+  display: "grid",
+  placeItems: "center",
+  border: "1px solid var(--border)",
+  borderRadius: 10,
+  padding: 0,
+  background: "var(--surface)",
+  color: "var(--foreground)",
   cursor: "pointer",
 };
 

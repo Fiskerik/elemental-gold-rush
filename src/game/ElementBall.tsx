@@ -1,4 +1,6 @@
+import { memo } from "react";
 import { ELEMENTS } from "./elements";
+import type { AtomSkin } from "./store";
 
 interface Props {
   atomicNumber: number;
@@ -12,6 +14,8 @@ interface Props {
   wiggle?: boolean;
   shimmer?: boolean;
   unstableShots?: number;
+  atomSkin?: AtomSkin;
+  patternSeed?: number;
 }
 
 function isotopeChargeCapacity(period: number): number {
@@ -20,7 +24,70 @@ function isotopeChargeCapacity(period: number): number {
   return 16;
 }
 
-export function ElementBall({
+const CRYSTAL_SHARD_LAYOUTS = [
+  [
+    ["50,3 67,39 51,57 34,38", "var(--atom-glow-color)", 0.86],
+    ["51,57 73,75 51,96 39,66", "var(--atom-dark-color)", 0.76],
+    ["34,38 51,57 39,66 22,57", "var(--atom-color)", 0.7],
+    ["50,3 51,57 67,39", "white", 0.7],
+  ],
+  [
+    ["39,6 58,34 49,62 27,42", "var(--atom-color)", 0.82],
+    ["58,34 84,52 57,95 49,62", "var(--atom-glow-color)", 0.78],
+    ["27,42 49,62 31,76 16,58", "var(--atom-dark-color)", 0.68],
+    ["39,6 49,62 58,34", "white", 0.62],
+  ],
+  [
+    ["53,4 76,31 60,51 38,36", "var(--atom-glow-color)", 0.84],
+    ["60,51 82,70 53,95 43,65", "var(--atom-color)", 0.76],
+    ["38,36 60,51 43,65 19,58", "var(--atom-dark-color)", 0.72],
+    ["53,4 60,51 76,31", "white", 0.68],
+  ],
+  [
+    ["45,5 64,28 53,53 28,34", "var(--atom-color)", 0.82],
+    ["53,53 79,65 55,94 38,69", "var(--atom-glow-color)", 0.78],
+    ["28,34 53,53 38,69 17,53", "var(--atom-dark-color)", 0.7],
+    ["45,5 53,53 64,28", "white", 0.64],
+  ],
+] as const;
+
+const GUMMY_BORDER_RADII: string[] = [
+  "43% 57% 50% 50% / 55% 45% 58% 42%",
+  "52% 48% 42% 58% / 46% 58% 42% 54%",
+  "58% 42% 55% 45% / 44% 52% 48% 56%",
+  "47% 53% 59% 41% / 50% 43% 57% 50%",
+];
+
+type CrystalShard = readonly [string, string, number];
+
+function CrystalShardCluster({
+  patternIndex,
+  verdant = false,
+}: {
+  patternIndex: number;
+  verdant?: boolean;
+}) {
+  const shards: readonly CrystalShard[] =
+    CRYSTAL_SHARD_LAYOUTS[patternIndex] ?? CRYSTAL_SHARD_LAYOUTS[0];
+  const verdantShards: readonly CrystalShard[] = verdant
+    ? [
+        ["50,7 59,43 53,73 47,46", "white", 0.78],
+        ["39,29 48,48 42,87 31,58", "var(--atom-glow-color)", 0.8],
+        ["60,34 70,59 58,91 52,70", "var(--atom-dark-color)", 0.72],
+      ]
+    : [];
+  return (
+    <div aria-hidden="true" className="atom-crystal-core">
+      <svg className="atom-crystal-shards" viewBox="0 0 100 100" focusable="false">
+        {[...shards, ...verdantShards].map(([points, fill, opacity], index) => (
+          <polygon key={`${patternIndex}-${index}`} points={points} fill={fill} opacity={opacity} />
+        ))}
+      </svg>
+    </div>
+  );
+}
+
+export const ElementBall = memo(function ElementBall({
   atomicNumber,
   size = 44,
   glow = false,
@@ -32,6 +99,8 @@ export function ElementBall({
   wiggle,
   shimmer,
   unstableShots,
+  atomSkin = "classic",
+  patternSeed,
 }: Props) {
   const el = ELEMENTS[atomicNumber - 1];
   if (!el) return null;
@@ -54,36 +123,143 @@ export function ElementBall({
   const unstableDashArray = Array.from({ length: unstableMaxSegments }, (_, index) =>
     index < unstableSegments ? `${unstableDash} ${unstableGap}` : `0 ${unstableSegment}`,
   ).join(" ");
+  const patternValue = Number.isFinite(patternSeed)
+    ? Math.abs(Math.floor(patternSeed!))
+    : atomicNumber;
+  const patternIndex = (patternValue * 17 + atomicNumber * 31) % 4;
+  const useTextStroke =
+    atomSkin === "chrome" ||
+    atomSkin === "crystal" ||
+    atomSkin === "mineral" ||
+    atomSkin === "verdantCrystal" ||
+    atomSkin === "toxic" ||
+    atomSkin === "moss";
+  const textColor =
+    atomSkin === "moss"
+      ? "#102017"
+      : atomSkin === "crystal" || atomSkin === "mineral" || atomSkin === "verdantCrystal"
+        ? "#fff8e8"
+      : "#0A0A1A";
+  const textStrokeColor =
+    atomSkin === "moss"
+      ? "rgba(232,255,194,0.98)"
+      : atomSkin === "crystal" || atomSkin === "verdantCrystal"
+      ? "rgba(0,0,0,0.96)"
+      : atomSkin === "mineral"
+        ? "rgba(18,10,3,0.92)"
+        : "rgba(255,255,255,0.9)";
+  const baseBackground = `radial-gradient(circle at 30% 28%, ${el.glowColor}, ${el.color} 65%, oklch(0 0 0 / 0.35))`;
+  const isGummy = atomSkin === "chrome";
+  const isCrystal = atomSkin === "crystal" || atomSkin === "verdantCrystal";
+  const isMineral = atomSkin === "mineral";
+  const gummyRadius = GUMMY_BORDER_RADII[patternIndex] ?? GUMMY_BORDER_RADII[0];
+  const skinBackground: Record<AtomSkin, string> = {
+    classic: baseBackground,
+    chrome: `radial-gradient(circle at 27% 22%, color-mix(in oklch, ${el.glowColor} 78%, white) 0 7%, transparent 24%), radial-gradient(circle at 35% 30%, ${el.glowColor}, ${el.color} 68%, color-mix(in oklch, ${el.color} 62%, black))`,
+    hologram: `radial-gradient(circle at 31% 24%, color-mix(in oklch, ${el.glowColor} 70%, white), transparent 32%), radial-gradient(circle at 56% 59%, color-mix(in oklch, ${el.color} 78%, white), ${el.color} 64%, color-mix(in oklch, ${el.color} 64%, #5c6295))`,
+    crystal: `radial-gradient(circle at 28% 20%, oklch(1 0 0 / 0.86) 0 5%, transparent 18%), radial-gradient(circle at 31% 25%, color-mix(in oklch, ${el.glowColor} 64%, white) 0 8%, transparent 31%), radial-gradient(circle at 50% 57%, color-mix(in oklch, ${el.color} 56%, white), color-mix(in oklch, ${el.color} 78%, transparent) 54%, color-mix(in oklch, ${el.color} 45%, #102331) 100%)`,
+    mineral: "transparent",
+    verdantCrystal: `radial-gradient(circle at 26% 18%, oklch(1 0 0 / 0.9) 0 5%, transparent 18%), radial-gradient(circle at 31% 25%, color-mix(in oklch, ${el.glowColor} 70%, white) 0 9%, transparent 30%), radial-gradient(circle at 52% 58%, color-mix(in oklch, ${el.color} 44%, white), color-mix(in oklch, ${el.color} 72%, #7fe0ba) 54%, color-mix(in oklch, ${el.color} 42%, #16463f) 100%)`,
+    toxic: `radial-gradient(circle at 30% 24%, ${el.glowColor}, ${el.color} 58%, color-mix(in oklch, ${el.color} 55%, #12220c))`,
+      moss: `radial-gradient(circle at 27% 20%, color-mix(in oklch, ${el.glowColor} 72%, white) 0 5%, transparent 18%), radial-gradient(circle at 72% 74%, color-mix(in oklch, ${el.glowColor} 36%, white) 0 4%, transparent 17%), radial-gradient(circle at 42% 42%, ${el.color}, color-mix(in oklch, ${el.color} 90%, #193b28) 68%, color-mix(in oklch, ${el.color} 78%, #071a13) 100%)`,
+  };
+  const materialVariables = {
+    "--atom-color": el.color,
+    "--atom-glow-color": el.glowColor,
+    "--atom-dark-color": `color-mix(in oklch, ${el.color} 58%, black)`,
+  } as React.CSSProperties;
+  const gummyVariables = { "--gummy-radius": gummyRadius } as React.CSSProperties;
   return (
     <div
       onClick={onClick}
-      className={[className, shimmer ? "shimmer-atom" : ""].filter(Boolean).join(" ")}
+      className={[
+        className,
+        shimmer ? "shimmer-atom" : "",
+        atomSkin !== "classic" ? `atom-skin-${atomSkin}` : "",
+        isGummy ? "atom-skin-gummy" : "",
+        isGummy ? `atom-gummy-shape-${patternIndex}` : "",
+        `atom-pattern-${patternIndex}`,
+      ]
+        .filter(Boolean)
+        .join(" ")}
       style={{
         width: size,
         height: size,
-        borderRadius: "50%",
+        borderRadius: isMineral ? "18%" : isGummy ? gummyRadius : "50%",
+        // Keep the mineral silhouette on its dedicated surface layer so the
+        // shimmer ring and unstable-isotope shell can render outside the facets.
+        clipPath: undefined,
         position: "relative",
-        background: `radial-gradient(circle at 30% 28%, ${el.glowColor}, ${el.color} 65%, oklch(0 0 0 / 0.35))`,
+        background: skinBackground[atomSkin],
+        border: isGummy
+          ? "1px solid color-mix(in oklch, var(--atom-glow-color) 62%, white)"
+          : isCrystal
+            ? "1px solid oklch(1 0 0 / 0.72)"
+            : undefined,
         boxShadow: glow
           ? `0 0 ${size * 0.45}px ${el.glowColor}99, inset 0 -${size * 0.12}px ${size * 0.12}px oklch(0 0 0 / 0.35)`
-          : `0 ${size * 0.06}px ${size * 0.12}px oklch(0 0 0 / 0.45), inset 0 -${size * 0.1}px ${size * 0.12}px oklch(0 0 0 / 0.3), inset 0 ${size * 0.08}px ${size * 0.1}px oklch(1 0 0 / 0.18)`,
+          : atomSkin === "mineral"
+            ? "none"
+            : isCrystal
+              ? `0 ${size * 0.06}px ${size * 0.14}px rgba(10, 22, 42, 0.34), inset ${size * 0.08}px ${size * 0.08}px ${size * 0.12}px oklch(1 0 0 / 0.46), inset -${size * 0.1}px -${size * 0.12}px ${size * 0.16}px oklch(0.05 0.08 250 / 0.38), 0 0 ${size * 0.22}px color-mix(in oklch, var(--atom-glow-color) 45%, transparent)`
+            : isGummy
+              ? `0 ${size * 0.07}px ${size * 0.14}px rgba(18, 8, 32, 0.42), inset 0 -${size * 0.14}px ${size * 0.16}px rgba(30, 5, 35, 0.26), inset 0 ${size * 0.1}px ${size * 0.14}px rgba(255,255,255,0.32), 0 0 ${size * 0.18}px color-mix(in oklch, var(--atom-glow-color) 48%, transparent)`
+            : `0 ${size * 0.06}px ${size * 0.12}px oklch(0 0 0 / 0.45), inset 0 -${size * 0.1}px ${size * 0.12}px oklch(0 0 0 / 0.3), inset 0 ${size * 0.08}px ${size * 0.1}px oklch(1 0 0 / 0.18)`,
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        color: "#0A0A1A",
+        color: textColor,
         fontWeight: 800,
         cursor: onClick ? "pointer" : "default",
         userSelect: "none",
-        textShadow: "0 1px 0 rgba(255,255,255,0.4)",
+        textShadow:
+          atomSkin === "mineral" ? "0 1px 2px rgba(0,0,0,0.9)" : "0 1px 0 rgba(255,255,255,0.4)",
         animation: wiggle
           ? "wiggle 360ms ease-in-out"
           : highlight
             ? "pop-in 320ms ease-out, pulse-glow 1.6s ease-in-out infinite 320ms"
             : undefined,
+        ...materialVariables,
+        ...gummyVariables,
         ...style,
       }}
     >
+      {atomSkin === "mineral" && (
+        <>
+          <div aria-hidden="true" className="atom-mineral-shadow" />
+          <div aria-hidden="true" className="atom-mineral-surface" />
+        </>
+      )}
+      {isCrystal && (
+        <CrystalShardCluster patternIndex={patternIndex} verdant={atomSkin === "verdantCrystal"} />
+      )}
+      {atomSkin !== "classic" && (
+        <div
+          aria-hidden="true"
+          className={[
+            "atom-skin-overlay",
+            `atom-skin-overlay-${atomSkin}`,
+            isCrystal ? "atom-skin-overlay-crystal" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+          style={{
+            position: "absolute",
+            inset: 0,
+            borderRadius: isGummy ? "var(--gummy-radius)" : "50%",
+            pointerEvents: "none",
+            overflow: "hidden",
+          }}
+        />
+      )}
+      {atomSkin === "moss" && <div aria-hidden="true" className="atom-moss-texture" />}
+      {isGummy && (
+        <>
+          <div aria-hidden="true" className="atom-gummy-glaze" />
+          <div aria-hidden="true" className="atom-gummy-bubbles" />
+        </>
+      )}
       {unstableSegments > 0 && (
         <svg
           aria-hidden="true"
@@ -96,6 +272,7 @@ export function ElementBall({
             overflow: "visible",
             pointerEvents: "none",
             transform: "rotate(-90deg)",
+            zIndex: 4,
             filter: "drop-shadow(0 0 5px oklch(0.78 0.2 55 / 0.8))",
           }}
         >
@@ -112,17 +289,56 @@ export function ElementBall({
           />
         </svg>
       )}
-      <div style={{ fontSize: numberSize, lineHeight: 1, opacity: 0.85 }}>
+      <div
+        className="atom-ball-label"
+        style={{
+          position: "relative",
+          zIndex: 2,
+          fontSize: numberSize,
+          lineHeight: 1,
+          opacity: 0.85,
+          WebkitTextStroke: useTextStroke
+            ? `${Math.max(0.7, size * 0.035)}px ${textStrokeColor}`
+            : undefined,
+          paintOrder: useTextStroke ? "stroke fill" : undefined,
+        }}
+      >
         {el.atomicNumber}
       </div>
-      <div style={{ fontSize: symbolSize, lineHeight: 1, fontWeight: 900 }}>
+      <div
+        className="atom-ball-label"
+        style={{
+          position: "relative",
+          zIndex: 2,
+          fontSize: symbolSize,
+          lineHeight: 1,
+          fontWeight: 900,
+          WebkitTextStroke: useTextStroke
+            ? `${Math.max(0.8, size * 0.04)}px ${textStrokeColor}`
+            : undefined,
+          paintOrder: useTextStroke ? "stroke fill" : undefined,
+        }}
+      >
         {el.symbol}
       </div>
       {showMass && (
-        <div style={{ fontSize: numberSize * 0.85, lineHeight: 1, opacity: 0.7 }}>
+        <div
+          className="atom-ball-label"
+          style={{
+            position: "relative",
+            zIndex: 2,
+            fontSize: numberSize * 0.85,
+            lineHeight: 1,
+            opacity: 0.7,
+            WebkitTextStroke: useTextStroke
+              ? `${Math.max(0.6, size * 0.03)}px ${textStrokeColor}`
+              : undefined,
+            paintOrder: useTextStroke ? "stroke fill" : undefined,
+          }}
+        >
           {el.atomicMass}
         </div>
       )}
     </div>
   );
-}
+});

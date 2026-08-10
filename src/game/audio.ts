@@ -7,10 +7,17 @@ let ctx: AudioContext | null = null;
 let musicTimer: number | null = null;
 let musicMaster: GainNode | null = null;
 let musicStep = 0;
+let musicNextTime = 0;
+let musicStartRequest = 0;
+let pendingMusicStart: { request: number; context: AudioContext; theme: MusicTheme } | null = null;
 export type MusicTheme = "default" | "boss" | "powerup" | "compound";
 let currentMusicTheme: MusicTheme = "default";
 const MIN_EXP_VALUE = 0.0001;
 const BASE_MUSIC_GAIN = 0.072;
+const MUSIC_STEP_SECONDS = 2;
+const MUSIC_LOOKAHEAD_SECONDS = 0.85;
+const MUSIC_INITIAL_DELAY_SECONDS = 0.2;
+const MUSIC_TIMER_INTERVAL_MS = 250;
 let sfxMaster: GainNode | null = null;
 let sfxVolume = 1; // 0..1
 let musicVolume = 1; // 0..1
@@ -757,16 +764,45 @@ function playMusicStep(c: AudioContext, now: number) {
   }
 }
 
+function scheduleAmbientMusic(c: AudioContext) {
+  if (!musicMaster || musicMaster.context !== c) return;
+
+  const now = c.currentTime;
+  // If the JS thread was paused for a long time, skip missed musical blocks
+  // instead of trying to start them in the past and creating a burst of work.
+  if (musicNextTime < now - 0.25) musicNextTime = now + MUSIC_INITIAL_DELAY_SECONDS;
+
+  while (musicNextTime <= now + MUSIC_LOOKAHEAD_SECONDS) {
+    playMusicStep(c, musicNextTime);
+    musicNextTime += MUSIC_STEP_SECONDS;
+  }
+}
+
 export function startAmbientMusic(theme: MusicTheme = "default") {
   const c = getCtx();
   if (!c) return;
   if (c.state === "suspended") {
+    if (pendingMusicStart?.context === c && pendingMusicStart.theme === theme) return;
+    const request = ++musicStartRequest;
+    pendingMusicStart = { request, context: c, theme };
     void c
       .resume()
-      .then(() => startAmbientMusic(theme))
-      .catch(() => {});
+      .then(() => {
+        if (
+          pendingMusicStart?.request !== request ||
+          pendingMusicStart.context !== c ||
+          pendingMusicStart.theme !== theme
+        )
+          return;
+        pendingMusicStart = null;
+        startAmbientMusic(theme);
+      })
+      .catch(() => {
+        if (pendingMusicStart?.request === request) pendingMusicStart = null;
+      });
     return;
   }
+  pendingMusicStart = null;
   if (musicTimer != null && musicMaster && currentMusicTheme === theme) return;
   if (musicTimer != null) stopAmbientMusic();
 
@@ -777,7 +813,8 @@ export function startAmbientMusic(theme: MusicTheme = "default") {
   musicMaster.connect(c.destination);
 
   musicStep = 0;
-  playMusicStep(c, c.currentTime + 0.05);
+  musicNextTime = c.currentTime + MUSIC_INITIAL_DELAY_SECONDS;
+  scheduleAmbientMusic(c);
 
   musicTimer = window.setInterval(() => {
     const active = getCtx();
@@ -786,15 +823,18 @@ export function startAmbientMusic(theme: MusicTheme = "default") {
       void active.resume().catch((error) => console.log("Audio context resume failed", error));
       return;
     }
-    playMusicStep(active, active.currentTime + 0.05);
-  }, 2000);
+    scheduleAmbientMusic(active);
+  }, MUSIC_TIMER_INTERVAL_MS);
 }
 
 export function stopAmbientMusic() {
+  musicStartRequest += 1;
+  pendingMusicStart = null;
   if (musicTimer != null) {
     window.clearInterval(musicTimer);
     musicTimer = null;
   }
+  musicNextTime = 0;
   if (musicMaster) {
     const master = musicMaster;
     musicMaster = null;

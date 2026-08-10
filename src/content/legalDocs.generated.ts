@@ -87,7 +87,7 @@ export const PRIVACY_CONTENT: Record<LegalLang, LegalDoc> = {
       {
         "heading": "Storage and Retention",
         "body": [
-          "Gameplay state is primarily stored locally on your device or browser. If you delete the app or clear browser storage, local progress may be lost unless external backup systems are later added."
+          "Gameplay state is stored locally on your device or browser. Cloud backup is not currently enabled. Browser progress may be lost if local storage is cleared."
         ]
       },
       {

@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { Capacitor } from "@capacitor/core";
-import { useProgress } from "./store";
 
 export const TABLET_BREAKPOINT_PX = 768;
 
@@ -37,10 +36,10 @@ export function useIsTabletLayout(): boolean {
 /**
  * Whether the board/play area should use the wide layout.
  * - Native: follows the device (tablets get the wide layout).
- * - Web: follows the user's preference (defaults to the compact "mobile" view).
+ * - Web: stays on the compact mobile presentation so desktop browsers do not
+ *   scale the playfield into a different game experience.
  */
 export function useWideBoardLayout(): boolean {
   const isTabletLayout = useIsTabletLayout();
-  const webBoardWide = useProgress((s) => s.webBoardWide);
-  return isNativePlatform() ? isTabletLayout : webBoardWide;
+  return isNativePlatform() && isTabletLayout;
 }

@@ -1,13 +1,25 @@
 import { useState } from "react";
+import { Capacitor } from "@capacitor/core";
 import { ELEMENTS } from "./elements";
 import { getLevelById, MAX_LEVEL } from "./levels";
-import { DEFAULT_PLAYER_DISPLAY_NAME, useProgress, type CoinTransaction } from "./store";
+import { isAtomSkinUnlocked, useProgress, type CoinTransaction } from "./store";
 import { useIsTabletLayout } from "./responsive";
-import { SUPPORTED_LANGUAGES, t, toIntlLocale, type AppLanguage } from "./localization";
+import {
+  getLanguageFlag,
+  SUPPORTED_LANGUAGES,
+  t,
+  toIntlLocale,
+  type AppLanguage,
+} from "./localization";
 import { COMPOUNDS } from "./compounds";
 import { BOSSES, type BossId } from "./bosses";
+import { ElementBall } from "./ElementBall";
+import { AtomSkinPicker, BoardThemePicker } from "./Settings";
+import { COSMETIC_THEME_PURCHASES_ENABLED, PRODUCT_IDS, THEME_BUNDLE_PRODUCT_IDS } from "./products";
+import { restorePurchases } from "./purchases";
 import {
   authenticateGameCenter,
+  getCachedGameCenterPlayerName,
   isGameCenterAvailable,
   showGameCenterLeaderboards,
 } from "./gameCenter";
@@ -35,13 +47,21 @@ import {
 
 interface Props {
   onBack: () => void;
+  onOpenShop?: (section?: "themes") => void;
 }
 
-export function Profile({ onBack }: Props) {
+const SETTINGS_LANGUAGES = [...SUPPORTED_LANGUAGES].sort((left, right) => {
+  if (left.code === "en") return -1;
+  if (right.code === "en") return 1;
+  return left.name.localeCompare(right.name, "en", { sensitivity: "base" });
+});
+
+export function Profile({ onBack, onOpenShop }: Props) {
   const isTabletLayout = useIsTabletLayout();
   const [transactionsOpen, setTransactionsOpen] = useState(false);
   const [gameCenterBusy, setGameCenterBusy] = useState(false);
   const [gameCenterStatus, setGameCenterStatus] = useState<string | null>(null);
+  const [gameCenterName, setGameCenterName] = useState(() => getCachedGameCenterPlayerName());
   const {
     unlockedLevel,
     highestElement,
@@ -60,6 +80,7 @@ export function Profile({ onBack }: Props) {
     levelStars,
     levelStats,
     challengeBestScores,
+    challengeBestScoreDates,
     hasProPack,
     dailyBoardRuns,
     dailyBoardBestScore,
@@ -67,23 +88,39 @@ export function Profile({ onBack }: Props) {
     dailyCompoundBestScore,
     dailyBoardLeaderboardAchievementCounts,
     appTheme,
+    boardTheme,
+    atomSkin,
+    ownedThemeProducts,
     appLanguage,
     setAppTheme,
+    setBoardTheme,
+    setAtomSkin,
     setAppLanguage,
+    grantProPack,
+    grantThemeProduct,
   } = useProgress();
-  const displayName = DEFAULT_PLAYER_DISPLAY_NAME;
   const tr = (text: string) => t(text, appLanguage);
   const intlLocale = toIntlLocale(appLanguage);
   const numberFormatter = new Intl.NumberFormat(intlLocale);
   const highestEl = ELEMENTS[highestElement - 1];
+  const activeAtomSkin = isAtomSkinUnlocked(atomSkin, { hasProPack, ownedThemeProducts })
+    ? atomSkin
+    : "classic";
   const totalStars = Object.values(levelStars).reduce((sum, stars) => sum + stars, 0);
   const perfectLevels = Object.values(levelStars).filter((stars) => stars >= 3).length;
   const bestChallengeEntry = Object.entries(challengeBestScores).reduce<{
     mode: string;
     score: number;
+    date: string | null;
   } | null>((best, [mode, score]) => {
     const safeScore = score ?? 0;
-    if (!best || safeScore > best.score) return { mode, score: safeScore };
+    if (!best || safeScore > best.score) {
+      return {
+        mode,
+        score: safeScore,
+        date: challengeBestScoreDates[mode as keyof typeof challengeBestScoreDates] ?? null,
+      };
+    }
     return best;
   }, null);
   const bestLevelScoreEntry = Object.entries(levelStats).reduce<{
@@ -122,7 +159,11 @@ export function Profile({ onBack }: Props) {
       day: "numeric",
       hour: "2-digit",
       minute: "2-digit",
-    });
+      });
+  const isNativeIos = Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios";
+  const nativeStoreOpener = isNativeIos ? onOpenShop : undefined;
+  const [restoreBusy, setRestoreBusy] = useState(false);
+  const [restoreMessage, setRestoreMessage] = useState("");
   async function handleGameCenterSignIn() {
     if (gameCenterBusy) return;
     if (!isGameCenterAvailable()) {
@@ -133,6 +174,8 @@ export function Profile({ onBack }: Props) {
     setGameCenterStatus(tr("Opening Game Center..."));
     try {
       const player = await authenticateGameCenter();
+      const authenticatedName = player.displayName?.trim() || player.alias?.trim() || "";
+      setGameCenterName(authenticatedName || getCachedGameCenterPlayerName());
       setGameCenterStatus(
         player.authenticated
           ? `${tr("Signed in as")} ${player.displayName || player.alias || tr("Player")}`
@@ -167,6 +210,29 @@ export function Profile({ onBack }: Props) {
     }
   }
 
+  async function handleRestorePurchases() {
+    if (restoreBusy) return;
+    setRestoreBusy(true);
+    setRestoreMessage(tr("Checking App Store purchases..."));
+    try {
+      const restored = await restorePurchases();
+      if (restored.includes(PRODUCT_IDS.proLabPack)) grantProPack({ fromRestore: true });
+      const restoredThemes = restored.filter((productId) =>
+        THEME_BUNDLE_PRODUCT_IDS.includes(productId as (typeof THEME_BUNDLE_PRODUCT_IDS)[number]),
+      );
+      if (COSMETIC_THEME_PURCHASES_ENABLED) restoredThemes.forEach(grantThemeProduct);
+      setRestoreMessage(
+        restored.length
+          ? `${restored.length} ${tr(restored.length === 1 ? "purchase restored." : "purchases restored.")}`
+          : tr("No purchases were found."),
+      );
+    } catch (error) {
+      setRestoreMessage(error instanceof Error ? tr(error.message) : tr("Purchases could not be restored."));
+    } finally {
+      setRestoreBusy(false);
+    }
+  }
+
   return (
     <div
       className="app-shell"
@@ -185,28 +251,44 @@ export function Profile({ onBack }: Props) {
         }}
       >
         <button onClick={onBack} style={backBtn}>
-          ← Menu
+          ← {tr("Menu")}
         </button>
 
         <header style={heroCard}>
-          <div style={avatar}>{highestEl?.symbol ?? "H"}</div>
-          <div style={{ flex: 1 }}>
+          <div
+            style={avatar}
+            aria-label={`${highestEl?.name ?? "Hydrogen"} atom`}
+          >
+            <ElementBall atomicNumber={highestElement} size={58} glow atomSkin={activeAtomSkin} />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <div
               style={{ fontSize: 12, letterSpacing: 3, color: "var(--accent)", fontWeight: 900 }}
             >
-              PLAYER PROFILE
+              {tr("PLAYER PROFILE")}
             </div>
-            <h1
-              className="gold-text"
-              style={{ margin: "4px 0", fontSize: 34 }}
-              data-no-localize="true"
-            >
-              {displayName}
-            </h1>
+            {gameCenterName && (
+              <h1
+                className="gold-text"
+                style={{
+                  margin: "4px 0",
+                  fontSize: "clamp(16px, 5.5vw, 30px)",
+                  lineHeight: 1.05,
+                  minWidth: 0,
+                  maxWidth: "100%",
+                  whiteSpace: "normal",
+                  overflowWrap: "anywhere",
+                  wordBreak: "break-word",
+                }}
+                data-no-localize="true"
+              >
+                {gameCenterName}
+              </h1>
+            )}
             <p style={{ margin: 0, color: "var(--muted-foreground)", fontSize: 13 }}>
               {`${tr(hasProPack ? "Pro Lab active" : "Free Lab")} • ${tr("Level")} ${unlockedLevel} / ${MAX_LEVEL}`}
             </p>
-            {hasProPack && <div style={proBadge}>PRO LAB PACK ACTIVE</div>}
+            {hasProPack && <div style={proBadge}>{tr("PRO LAB PACK ACTIVE")}</div>}
           </div>
           <div style={heroIconStack} aria-hidden="true">
             <Crown size={20} />
@@ -228,7 +310,7 @@ export function Profile({ onBack }: Props) {
               <div style={sectionHeading}>{tr("Game Center")}</div>
               <div style={gameCenterCopy}>
                 {gameCenterStatus ??
-                  tr("Sign in once to keep Daily Board and Daily Compound submissions connected.")}
+                  tr("Sign in once to connect leaderboards and keep progress synced across installs.")}
               </div>
             </div>
             <div style={gameCenterActions}>
@@ -269,20 +351,37 @@ export function Profile({ onBack }: Props) {
             </div>
             <span style={dailyBoardBadgeScope}>{tr("Global")}</span>
           </div>
-          <div style={dailyBoardBadgeGrid}>
-            {DAILY_BOARD_LEADERBOARD_ACHIEVEMENTS.map((achievement) => (
-              <div key={achievement.id} style={dailyBoardBadgeCard} title={achievement.description}>
-                <span style={dailyBoardBadgeIcon}>
-                  <DailyBoardBadgeIcon id={achievement.id} />
-                </span>
-                <span style={{ minWidth: 0 }}>
-                  <strong style={dailyBoardBadgeName}>{tr(achievement.name)}</strong>
-                  <small style={dailyBoardBadgeCount}>
-                    {`${dailyBoardLeaderboardAchievementCounts[achievement.id] ?? 0}x ${tr("earned")}`}
-                  </small>
-                </span>
-              </div>
-            ))}
+          <div style={dailyBoardBadgeColumns}>
+            {[DAILY_BOARD_LEADERBOARD_ACHIEVEMENTS.slice(0, 3), DAILY_BOARD_LEADERBOARD_ACHIEVEMENTS.slice(3)].map(
+              (column, columnIndex) => (
+                <div key={columnIndex} style={dailyBoardBadgeColumn}>
+                  {column.map((achievement, achievementIndex) => {
+                    const iconColor = placementIconColors[achievementIndex];
+                    return (
+                      <div key={achievement.id} style={dailyBoardBadgeCard} title={achievement.description}>
+                        <span
+                          style={{
+                            ...dailyBoardBadgeIcon,
+                            color: iconColor,
+                            background: `${iconColor}22`,
+                            border: `1px solid ${iconColor}88`,
+                            boxShadow: `0 0 14px ${iconColor}55`,
+                          }}
+                        >
+                          <DailyBoardBadgeIcon id={achievement.id} />
+                        </span>
+                        <span style={{ minWidth: 0 }}>
+                          <strong style={dailyBoardBadgeName}>{tr(achievement.name)}</strong>
+                          <small style={dailyBoardBadgeCount}>
+                            {`${dailyBoardLeaderboardAchievementCounts[achievement.id] ?? 0}x ${tr("earned")}`}
+                          </small>
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ),
+            )}
           </div>
         </section>
         <section style={card}>
@@ -304,7 +403,7 @@ export function Profile({ onBack }: Props) {
               value={bestChallengeEntry ? exactScore(bestChallengeEntry.score) : "0"}
               sub={
                 bestChallengeEntry
-                  ? bestChallengeEntry.mode.replaceAll("-", " ")
+                  ? formatDate(bestChallengeEntry.date)
                   : tr("no record yet")
               }
             />
@@ -396,12 +495,14 @@ export function Profile({ onBack }: Props) {
             label={tr("Total Score")}
             value={exactScore(totalScore)}
             sub={tr("career")}
+            tone="oklch(0.86 0.18 88)"
           />
           <ProfileStat
             icon={Zap}
             label={tr("Best Shot")}
             value={exactScore(highestSingleShotScore)}
             sub={formatDate(highestSingleShotScoreDate)}
+            tone="oklch(0.78 0.18 205)"
           />
           <CoinProfileStat
             value={`${goldCoins}`}
@@ -413,6 +514,7 @@ export function Profile({ onBack }: Props) {
             label={tr("Daily Streak")}
             value={`${dailyStreak}`}
             sub={tr(claimedDailyReward ? "claimed" : "active")}
+            tone="oklch(0.78 0.18 150)"
           />
           <ProfileStat
             icon={Zap}
@@ -427,38 +529,80 @@ export function Profile({ onBack }: Props) {
                   })
                 : tr("no record yet")
             }
+            tone="oklch(0.86 0.18 48)"
           />
           <ProfileStat
             icon={Atom}
             label={tr("Highest Atom")}
             value={tr(highestEl?.name ?? "Hydrogen")}
             sub={`${highestEl?.symbol ?? "H"} • #${highestElement}`}
+            tone="oklch(0.78 0.16 250)"
           />
           <ProfileStat
             icon={FlaskConical}
             label={tr("Elements")}
             value={`${discoveredElements.length}`}
             sub={tr(`${completionPercent}% found`)}
+            tone="oklch(0.78 0.18 320)"
           />
           <ProfileStat
             icon={Star}
             label={tr("Stars")}
             value={`${totalStars}`}
             sub={tr(`${perfectLevels} perfect`)}
+            tone="oklch(0.9 0.18 82)"
           />
         </section>
 
         <section style={card}>
           <div style={sectionHeading}>{tr("Display")}</div>
-          <div style={{ ...preferenceRow, marginBottom: 18 }}>
-            <span style={preferenceLabel}>{tr("Profile name")}</span>
-            <strong data-no-localize="true" style={profileNameValue}>
-              {DEFAULT_PLAYER_DISPLAY_NAME}
-            </strong>
+          <div style={{ marginBottom: 14 }}>
+            <BoardThemePicker
+              value={boardTheme}
+              hasProPack={hasProPack}
+              ownedThemeProducts={ownedThemeProducts}
+              onChange={setBoardTheme}
+              onOpenShop={nativeStoreOpener}
+            />
           </div>
+          <AtomSkinPicker
+            value={atomSkin}
+            hasProPack={hasProPack}
+            ownedThemeProducts={ownedThemeProducts}
+            onChange={setAtomSkin}
+            onOpenShop={nativeStoreOpener}
+          />
+          {isNativeIos && (
+            <div style={restorePurchasesRow}>
+              <div>
+                <strong>{tr("Purchases")}</strong>
+                <div style={{ color: "var(--muted-foreground)", fontSize: 11 }}>
+                  {tr("Restore your App Store purchases on this device.")}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleRestorePurchases}
+                disabled={restoreBusy}
+                style={{ ...themeChoiceButton, opacity: restoreBusy ? 0.6 : 1 }}
+              >
+                {restoreBusy ? tr("Checking...") : tr("Restore Purchases")}
+              </button>
+              {restoreMessage && <div style={restoreMessageStyle}>{restoreMessage}</div>}
+            </div>
+          )}
           <div style={preferenceRow}>
             <span style={preferenceLabel}>{tr("Theme")}</span>
-            <div style={{ display: "inline-grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 12,
+                padding: 3,
+                borderRadius: 999,
+                background: "color-mix(in oklch, var(--surface) 70%, transparent)",
+              }}
+            >
               {(["dark", "light"] as const).map((theme) => (
                 <button
                   key={theme}
@@ -485,9 +629,9 @@ export function Profile({ onBack }: Props) {
               aria-label={tr("Language")}
               data-no-localize="true"
             >
-              {SUPPORTED_LANGUAGES.map((language) => (
+              {SETTINGS_LANGUAGES.map((language) => (
                 <option key={language.code} value={language.code}>
-                  {language.nativeName} - {language.name}
+                  {getLanguageFlag(language.code)} {language.name} — {language.nativeName}
                 </option>
               ))}
             </select>
@@ -495,10 +639,11 @@ export function Profile({ onBack }: Props) {
         </section>
 
         {transactionsOpen && (
-          <CoinTransactionsModal
-            transactions={coinTransactions}
-            formatDateTime={formatDateTime}
-            onClose={() => setTransactionsOpen(false)}
+            <CoinTransactionsModal
+              transactions={coinTransactions}
+              formatDateTime={formatDateTime}
+              language={appLanguage}
+              onClose={() => setTransactionsOpen(false)}
           />
         )}
       </div>
@@ -556,16 +701,26 @@ function ProfileStat({
   label,
   value,
   sub,
+  tone = "var(--primary)",
 }: {
   icon?: LucideIcon;
   label: string;
   value: string;
   sub: string;
+  tone?: string;
 }) {
   return (
     <div style={statCard}>
       {Icon && (
-        <div style={statIcon}>
+        <div
+          style={{
+            ...statIcon,
+            background: `color-mix(in oklch, ${tone} 18%, var(--surface-high))`,
+            color: tone,
+            borderColor: `color-mix(in oklch, ${tone} 42%, var(--border))`,
+            boxShadow: `0 0 14px color-mix(in oklch, ${tone} 22%, transparent)`,
+          }}
+        >
           <Icon size={18} aria-hidden="true" />
         </div>
       )}
@@ -582,7 +737,7 @@ function ProfileStat({
       <div
         style={{
           fontSize: value.length > 9 ? 16 : value.length > 6 ? 20 : 24,
-          color: "var(--primary)",
+          color: tone,
           fontWeight: 900,
           marginTop: 3,
           lineHeight: 1.1,
@@ -605,9 +760,20 @@ function CoinProfileStat({
   sub: string;
   onTransactions: () => void;
 }) {
+  const appLanguage = useProgress((state) => state.appLanguage);
+  const tr = (text: string) => t(text, appLanguage);
+  const tone = "oklch(0.86 0.18 88)";
   return (
     <div style={statCard}>
-      <div style={statIcon}>
+      <div
+        style={{
+          ...statIcon,
+          background: `color-mix(in oklch, ${tone} 18%, var(--surface-high))`,
+          color: tone,
+          borderColor: `color-mix(in oklch, ${tone} 42%, var(--border))`,
+          boxShadow: `0 0 14px color-mix(in oklch, ${tone} 22%, transparent)`,
+        }}
+      >
         <Coins size={18} aria-hidden="true" />
       </div>
       <div
@@ -618,12 +784,12 @@ function CoinProfileStat({
           fontWeight: 800,
         }}
       >
-        GOLD COINS
+        {tr("GOLD COINS")}
       </div>
       <div
         style={{
           fontSize: value.length > 9 ? 16 : value.length > 6 ? 20 : 24,
-          color: "var(--primary)",
+          color: tone,
           fontWeight: 900,
           marginTop: 3,
           lineHeight: 1.1,
@@ -634,7 +800,7 @@ function CoinProfileStat({
       </div>
       <div style={{ fontSize: 11, color: "var(--muted-foreground)" }}>{sub}</div>
       <button type="button" onClick={onTransactions} style={transactionButton}>
-        Transactions
+        {tr("Transactions")}
       </button>
     </div>
   );
@@ -643,33 +809,36 @@ function CoinProfileStat({
 function CoinTransactionsModal({
   transactions,
   formatDateTime,
+  language,
   onClose,
 }: {
   transactions: CoinTransaction[];
   formatDateTime: (value: string) => string;
+  language: AppLanguage;
   onClose: () => void;
 }) {
+  const tr = (text: string) => t(text, language);
   const rows = [...transactions].reverse();
   return (
     <div
       style={transactionOverlay}
       role="dialog"
       aria-modal="true"
-      aria-label="Gold coin transactions"
+      aria-label={tr("Gold coin transactions")}
     >
       <div style={transactionModal}>
         <div style={transactionHeader}>
           <div>
-            <div style={sectionHeading}>GOLD COINS</div>
-            <h2 style={{ margin: 0, fontSize: 22 }}>Transactions</h2>
+            <div style={sectionHeading}>{tr("GOLD COINS")}</div>
+            <h2 style={{ margin: 0, fontSize: 22 }}>{tr("Transactions")}</h2>
           </div>
           <button type="button" onClick={onClose} style={transactionCloseButton}>
-            Close
+            {tr("Close")}
           </button>
         </div>
         <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
           {rows.length === 0 ? (
-            <div style={emptyTransactions}>No coin transactions recorded yet.</div>
+            <div style={emptyTransactions}>{tr("No coin transactions recorded yet.")}</div>
           ) : (
             rows.map((transaction) => (
               <div key={transaction.id} style={transactionRow}>
@@ -767,11 +936,11 @@ const avatar: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  background: "radial-gradient(circle at 30% 25%, var(--accent), var(--primary))",
-  color: "var(--primary-foreground)",
-  fontSize: 30,
-  fontWeight: 1000,
-  boxShadow: "0 0 24px var(--primary-glow)",
+  flex: "0 0 auto",
+  background: "color-mix(in oklch, var(--primary) 22%, var(--surface-high))",
+  border: "1px solid color-mix(in oklch, var(--accent) 55%, var(--border))",
+  boxShadow: "0 0 24px color-mix(in oklch, var(--primary) 42%, transparent)",
+  overflow: "visible",
 };
 
 const heroIconStack: React.CSSProperties = {
@@ -884,7 +1053,8 @@ const statIcon: React.CSSProperties = {
 
 const proBadge: React.CSSProperties = {
   marginTop: 8,
-  display: "inline-block",
+  display: "block",
+  width: "fit-content",
   padding: "4px 10px",
   borderRadius: 999,
   background:
@@ -894,6 +1064,7 @@ const proBadge: React.CSSProperties = {
   fontSize: 10,
   letterSpacing: 1.4,
   fontWeight: 900,
+  textAlign: "center",
 };
 
 const grid: React.CSSProperties = {
@@ -945,11 +1116,18 @@ const dailyBoardBadgeScope: React.CSSProperties = {
   textTransform: "uppercase",
 };
 
-const dailyBoardBadgeGrid: React.CSSProperties = {
+const dailyBoardBadgeColumns: React.CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
   gap: 8,
 };
+
+const dailyBoardBadgeColumn: React.CSSProperties = {
+  display: "grid",
+  gap: 8,
+};
+
+const placementIconColors = ["#f4c95d", "#cfd5df", "#cd7f32"];
 
 const dailyBoardBadgeCard: React.CSSProperties = {
   display: "flex",
@@ -1005,12 +1183,6 @@ const preferenceLabel: React.CSSProperties = {
   lineHeight: 1.15,
 };
 
-const profileNameValue: React.CSSProperties = {
-  color: "var(--foreground)",
-  fontSize: 16,
-  fontWeight: 950,
-};
-
 const themeChoiceButton: React.CSSProperties = {
   border: "1px solid var(--border)",
   borderRadius: 999,
@@ -1018,6 +1190,22 @@ const themeChoiceButton: React.CSSProperties = {
   fontSize: 12,
   fontWeight: 900,
   cursor: "pointer",
+};
+
+const restorePurchasesRow: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "minmax(0, 1fr) auto",
+  alignItems: "center",
+  gap: 10,
+  marginTop: 12,
+  padding: "12px 0 0",
+  borderTop: "1px solid var(--border)",
+};
+
+const restoreMessageStyle: React.CSSProperties = {
+  gridColumn: "1 / -1",
+  color: "var(--muted-foreground)",
+  fontSize: 11,
 };
 
 const languageSelect: React.CSSProperties = {
@@ -1040,6 +1228,18 @@ const sectionHeading: React.CSSProperties = {
   color: "var(--accent)",
   fontWeight: 900,
   marginBottom: 8,
+};
+
+const debugToggleButton: React.CSSProperties = {
+  width: "100%",
+  marginTop: 12,
+  minHeight: 38,
+  border: "1px dashed var(--border)",
+  borderRadius: 10,
+  background: "transparent",
+  fontSize: 12,
+  fontWeight: 900,
+  cursor: "pointer",
 };
 
 const transactionButton: React.CSSProperties = {

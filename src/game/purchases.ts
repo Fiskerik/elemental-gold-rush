@@ -1,11 +1,19 @@
 import { Capacitor } from "@capacitor/core";
 import { logDebug } from "../lib/debugLogger";
-import { APP_STORE_PURCHASE_PRODUCT_IDS, PRODUCT_IDS, ProductId, getProductById } from "./products";
+import {
+  APP_STORE_PURCHASE_PRODUCT_IDS,
+  PRODUCT_IDS,
+  THEME_BUNDLE_PRODUCT_IDS,
+  ProductId,
+  getProductById,
+} from "./products";
 
 type CustomerInfo = {
   entitlements?: { active?: Record<string, unknown> };
   managementURL?: string | null;
   managementUrl?: string | null;
+  allPurchasedProductIdentifiers?: string[];
+  nonSubscriptionTransactions?: Array<{ productIdentifier?: string }>;
 };
 
 type PurchasesStoreProduct = { identifier: string };
@@ -1104,18 +1112,20 @@ export async function redeemOfferCode(
   const configuredForPurchases = await ensureConfigured(reportStep);
   const purchases = getConfiguredPurchases();
   if (!configuredForPurchases || !purchases) {
-    const reason =
-      lastConfigurationReason ||
-      "RevenueCat is not configured in this build. Add VITE_REVENUECAT_IOS_API_KEY in Codemagic.";
-    showPurchaseDebugAlert("RevenueCat not configured", reason);
-    return { purchased: false, reason };
+    return {
+      purchased: false,
+      reason:
+        lastConfigurationReason ||
+        "RevenueCat is not configured in this build. Add VITE_REVENUECAT_IOS_API_KEY in Codemagic.",
+    };
   }
 
   if (!purchases.presentCodeRedemptionSheet) {
-    const reason =
-      "This build does not support App Store code redemption. Update @revenuecat/purchases-capacitor and rebuild the iOS app.";
-    showPurchaseDebugAlert("Code redemption unavailable", reason);
-    return { purchased: false, reason };
+    return {
+      purchased: false,
+      reason:
+        "This build does not support App Store code redemption. Update @revenuecat/purchases-capacitor and rebuild the iOS app.",
+    };
   }
 
   try {
@@ -1126,7 +1136,6 @@ export async function redeemOfferCode(
       "App Store offer code redemption",
     );
 
-    reportStep?.("Code sheet opened. Complete redemption in the App Store sheet.");
     const { customerInfo } = await withNativeTimeout(
       () => purchases.getCustomerInfo(),
       NATIVE_SETUP_TIMEOUT_MS,
@@ -1139,6 +1148,7 @@ export async function redeemOfferCode(
         "Offer code redemption",
       );
     }
+
     return {
       purchased: false,
       reason:
@@ -1149,10 +1159,8 @@ export async function redeemOfferCode(
       describePurchaseError(error) ||
       "Offer code redemption could not be completed right now.";
     if (isPurchaseCancellation(error, reason)) {
-      purchaseDebugLog("Offer code redemption cancelled by user.");
       return { purchased: false, reason: "Offer code redemption was cancelled." };
     }
-    showPurchaseDebugAlert("Offer code redemption failed", summarizeErrorForDebug(error) || reason);
     return { purchased: false, reason };
   }
 }
@@ -1349,5 +1357,16 @@ export async function restorePurchases(): Promise<ProductId[]> {
     NATIVE_SETUP_TIMEOUT_MS,
     "RevenueCat restore purchases",
   );
-  return hasProEntitlement(customerInfo) ? [PRODUCT_IDS.proLabPack] : [];
+  const restored = new Set<ProductId>();
+  if (hasProEntitlement(customerInfo)) restored.add(PRODUCT_IDS.proLabPack);
+  const purchasedProductIds = new Set([
+    ...(customerInfo.allPurchasedProductIdentifiers ?? []),
+    ...(customerInfo.nonSubscriptionTransactions ?? [])
+      .map((transaction) => transaction.productIdentifier)
+      .filter((id): id is string => Boolean(id)),
+  ]);
+  for (const productId of THEME_BUNDLE_PRODUCT_IDS) {
+    if (purchasedProductIds.has(productId)) restored.add(productId);
+  }
+  return Array.from(restored);
 }

@@ -1,4 +1,5 @@
 import { useEffect, useState, type CSSProperties } from "react";
+import { Coins } from "lucide-react";
 import {
   countryFlag,
   getDailyLeaderboard,
@@ -11,6 +12,13 @@ import { formatScore } from "./logic";
 import { useIsTabletLayout } from "./responsive";
 import { useProgress } from "./store";
 import { isGameCenterAvailable, showGameCenterLeaderboards } from "./gameCenter";
+import {
+  DAILY_LEADERBOARD_REWARDS,
+  getDailyLeaderboardReward,
+  getDailyLeaderboardRewardKey,
+} from "./dailyLeaderboardRewards";
+import { getTodayQuestDate } from "./quests";
+import { t } from "./localization";
 
 export function Leaderboard({ onBack }: { onBack: () => void }) {
   const isTabletLayout = useIsTabletLayout();
@@ -23,11 +31,15 @@ export function Leaderboard({ onBack }: { onBack: () => void }) {
   const recordDailyBoardLeaderboardPlacement = useProgress(
     (s) => s.recordDailyBoardLeaderboardPlacement,
   );
+  const dailyLeaderboardRewardClaims = useProgress((s) => s.dailyLeaderboardRewardClaims);
+  const appLanguage = useProgress((s) => s.appLanguage);
+  const tr = (text: string) => t(text, appLanguage);
   const playerRank = board.player.rank > 0 ? `#${board.player.rank}` : "-";
-  const leaderboardLabel = kind === "daily-board" ? "Daily Board" : "Daily Compound";
+  const leaderboardLabel = tr(kind === "daily-board" ? "Daily Board" : "Daily Compound");
 
   useEffect(() => {
     let cancelled = false;
+    setBoard(getDailyLeaderboard(kind, scope));
     setLoading(true);
     void loadDailyLeaderboard(kind, scope)
       .then((nextBoard) => {
@@ -42,8 +54,10 @@ export function Leaderboard({ onBack }: { onBack: () => void }) {
   }, [kind]);
 
   useEffect(() => {
-    if (kind !== "daily-board" || scope !== "global") return;
-    recordDailyBoardLeaderboardPlacement(board.player.rank, board.totalPlayerCount);
+    if (scope !== "global" || board.player.rank <= 0) return;
+    if (kind === "daily-board") {
+      recordDailyBoardLeaderboardPlacement(board.player.rank, board.totalPlayerCount);
+    }
   }, [
     kind,
     scope,
@@ -52,19 +66,23 @@ export function Leaderboard({ onBack }: { onBack: () => void }) {
     recordDailyBoardLeaderboardPlacement,
   ]);
 
+  const currentPrize = getDailyLeaderboardReward(board.player.rank);
+  const rewardKey = getDailyLeaderboardRewardKey(kind, getTodayQuestDate());
+  const awardedPrize = dailyLeaderboardRewardClaims[rewardKey] ?? 0;
+
   async function handleOpenGameCenter() {
     if (gameCenterBusy) return;
     if (!isGameCenterAvailable()) {
-      setGameCenterMessage("Game Center is available on iOS devices.");
+      setGameCenterMessage(tr("Game Center is available on iOS devices."));
       return;
     }
     setGameCenterBusy(true);
     setGameCenterMessage(null);
     try {
       const shown = await showGameCenterLeaderboards(kind, scope);
-      if (!shown) setGameCenterMessage("Game Center did not open.");
+      if (!shown) setGameCenterMessage(tr("Game Center did not open."));
     } catch (error) {
-      setGameCenterMessage(error instanceof Error ? error.message : "Could not open Game Center.");
+      setGameCenterMessage(error instanceof Error ? tr(error.message) : tr("Could not open Game Center."));
     } finally {
       setGameCenterBusy(false);
     }
@@ -78,22 +96,22 @@ export function Leaderboard({ onBack }: { onBack: () => void }) {
       <div style={{ position: "relative", zIndex: 1, maxWidth: 620, margin: "0 auto" }}>
         <header style={headerRow}>
           <button type="button" onClick={onBack} style={backButton}>
-            Back
+            {tr("Back")}
           </button>
           <div style={{ minWidth: 0 }}>
             <div style={kicker}>{leaderboardLabel.toUpperCase()}</div>
-            <h1 style={title}>Leaderboard</h1>
+            <h1 style={title}>{tr("Leaderboard")}</h1>
           </div>
           <PodiumMark />
         </header>
 
         <section style={summaryPanel}>
           <div>
-            <div style={summaryLabel}>Your Rank</div>
+            <div style={summaryLabel}>{tr("Your Rank")}</div>
             <strong style={summaryValue}>{playerRank}</strong>
           </div>
           <div style={{ textAlign: "center" }}>
-            <div style={summaryLabel}>{kind === "daily-compound" ? "Seconds" : "Score"}</div>
+            <div style={summaryLabel}>{tr(kind === "daily-compound" ? "Time" : "Score")}</div>
             <strong style={summaryValue}>
               {kind === "daily-compound"
                 ? formatSeconds(board.player.score)
@@ -101,24 +119,45 @@ export function Leaderboard({ onBack }: { onBack: () => void }) {
             </strong>
           </div>
           <div style={{ textAlign: "right" }}>
-            <div style={summaryLabel}>Country</div>
+            <div style={summaryLabel}>{tr("Country")}</div>
             <strong style={summaryValue}>
               {countryFlag(board.countryCode)} {board.countryCode}
             </strong>
           </div>
         </section>
 
-        <div style={kindTabRow} role="tablist" aria-label="Leaderboard type">
+        <div style={kindTabRow} role="tablist" aria-label={tr("Leaderboard type")}>
           <SegmentButton active={kind === "daily-board"} onClick={() => setKind("daily-board")}>
-            Daily Board
+            {tr("Daily Board")}
           </SegmentButton>
           <SegmentButton
             active={kind === "daily-compound"}
             onClick={() => setKind("daily-compound")}
           >
-            Daily Compound
+            {tr("Daily Compound")}
           </SegmentButton>
         </div>
+
+        <section style={prizePanel} aria-label={tr("Daily leaderboard prizes")}>
+          <div>
+            <div style={summaryLabel}>Today’s top-three prizes</div>
+            <div style={prizeLine}>
+              <PrizeReward place={tr("1st")} amount={DAILY_LEADERBOARD_REWARDS[1]} />
+              <PrizeReward place={tr("2nd")} amount={DAILY_LEADERBOARD_REWARDS[2]} />
+              <PrizeReward place={tr("3rd")} amount={DAILY_LEADERBOARD_REWARDS[3]} />
+            </div>
+          </div>
+          <div style={prizeStatus}>
+            {currentPrize > 0 ? (
+              <>
+                {tr("You are currently entitled to")} <CoinReward amount={currentPrize} />
+                {awardedPrize >= currentPrize ? ` (${tr("awarded")})` : ""}.
+              </>
+            ) : (
+              tr("Finish a run to enter today’s leaderboard.")
+            )}
+          </div>
+        </section>
 
         {isGameCenterAvailable() && (
           <button
@@ -131,7 +170,7 @@ export function Leaderboard({ onBack }: { onBack: () => void }) {
               cursor: gameCenterBusy ? "not-allowed" : "pointer",
             }}
           >
-            {gameCenterBusy ? "Opening Game Center..." : "Open Game Center"}
+            {gameCenterBusy ? tr("Opening Game Center...") : tr("Open Game Center")}
           </button>
         )}
 
@@ -139,20 +178,20 @@ export function Leaderboard({ onBack }: { onBack: () => void }) {
           <div style={statusLine} role="status" aria-live="polite">
             {loading
               ? isGameCenterAvailable()
-                ? "Loading Game Center..."
-                : "Loading scores..."
+                ? tr("Loading Game Center...")
+                : tr("Loading scores...")
               : (gameCenterMessage ?? board.status)}
           </div>
         )}
 
-        <section style={tablePanel} aria-label={`${leaderboardLabel} ${scope} leaderboard`}>
+        <section style={tablePanel} aria-label={`${leaderboardLabel} ${tr(scope)} ${tr("leaderboard")}`}>
           <div style={{ ...tableHeader, gridTemplateColumns: leaderboardGridColumns(kind) }}>
-            <span>Rank</span>
-            <span>Player</span>
+            <span>{tr("Rank")}</span>
+            <span>{tr("Player")}</span>
             <span style={{ textAlign: "right" }}>
-              {kind === "daily-compound" ? "Seconds" : "Score"}
+              {tr(kind === "daily-compound" ? "Time" : "Score")}
             </span>
-            {kind === "daily-board" && <span style={{ textAlign: "right" }}>Shots</span>}
+            {kind === "daily-board" && <span style={{ textAlign: "right" }}>{tr("Shots")}</span>}
           </div>
           <div style={{ display: "grid", gap: 7 }}>
             {board.entries.length > 0 ? (
@@ -161,7 +200,7 @@ export function Leaderboard({ onBack }: { onBack: () => void }) {
               ))
             ) : (
               <div style={emptyRows}>
-                {isGameCenterAvailable() ? "No Game Center scores yet." : "No scores yet."}
+                {isGameCenterAvailable() ? tr("No Game Center scores yet.") : tr("No scores yet.")}
               </div>
             )}
           </div>
@@ -185,11 +224,26 @@ function LeaderboardRow({ entry, kind }: { entry: LeaderboardEntry; kind: Leader
           : "var(--surface)",
       }}
     >
-      <strong style={rankCell}>{entry.rank}</strong>
+      <strong style={rankCell}>
+        <span>{entry.rank}</span>
+        {getDailyLeaderboardReward(entry.rank) > 0 && (
+          <span style={rowPrize}>
+            <Coins size={11} strokeWidth={3} aria-hidden="true" />
+            <span>+{getDailyLeaderboardReward(entry.rank)}</span>
+          </span>
+        )}
+      </strong>
       <span style={playerCell}>
         <span aria-hidden="true">{entry.flag}</span>
         <span
-          style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+          style={{
+            minWidth: 0,
+            flex: 1,
+            overflow: "hidden",
+            whiteSpace: "nowrap",
+            fontSize: leaderboardNameFontSize(entry.name),
+            letterSpacing: entry.name.length > 12 ? "-0.2px" : undefined,
+          }}
           data-no-localize="true"
         >
           {entry.name}
@@ -203,12 +257,41 @@ function LeaderboardRow({ entry, kind }: { entry: LeaderboardEntry; kind: Leader
   );
 }
 
+function PrizeReward({ place, amount }: { place: string; amount: number }) {
+  return (
+    <span style={prizeReward}>
+      <span>{place}</span>
+      <CoinReward amount={amount} />
+    </span>
+  );
+}
+
+function CoinReward({ amount }: { amount: number }) {
+  return (
+    <span style={coinReward}>
+      <Coins size={14} strokeWidth={2.8} aria-hidden="true" />
+      <strong>+{amount}</strong>
+    </span>
+  );
+}
+
+function leaderboardNameFontSize(name: string): number {
+  const length = Array.from(name).length;
+  if (length <= 8) return 15;
+  if (length <= 12) return 13;
+  if (length <= 16) return 11;
+  return 9.5;
+}
+
 function leaderboardGridColumns(kind: LeaderboardKind): string {
   return kind === "daily-compound" ? "52px minmax(0, 1fr) 92px" : "52px minmax(0, 1fr) 82px 48px";
 }
 
 function formatSeconds(seconds: number): string {
-  return `${Math.max(0, Math.floor(seconds))}s`;
+  const totalSeconds = Math.max(0, Math.floor(seconds));
+  const minutes = Math.floor(totalSeconds / 60);
+  const remainingSeconds = totalSeconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`;
 }
 
 function SegmentButton({
@@ -322,6 +405,46 @@ const kindTabRow: CSSProperties = {
   marginTop: 14,
 };
 
+const prizePanel: CSSProperties = {
+  display: "grid",
+  gap: 8,
+  marginTop: 10,
+  padding: "11px 13px",
+  border: "1px solid color-mix(in oklch, var(--accent) 42%, var(--border))",
+  borderRadius: 14,
+  background: "color-mix(in oklch, var(--accent) 9%, var(--surface))",
+};
+
+const prizeLine: CSSProperties = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: 12,
+  marginTop: 5,
+  color: "var(--foreground)",
+  fontSize: 13,
+  fontWeight: 850,
+};
+
+const prizeReward: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 5,
+};
+
+const coinReward: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 3,
+  color: "var(--accent)",
+  whiteSpace: "nowrap",
+};
+
+const prizeStatus: CSSProperties = {
+  color: "var(--success, var(--accent))",
+  fontSize: 12,
+  fontWeight: 850,
+};
+
 const statusLine: CSSProperties = {
   marginTop: 10,
   color: "var(--muted-foreground)",
@@ -396,8 +519,19 @@ const emptyRows: CSSProperties = {
 };
 
 const rankCell: CSSProperties = {
+  display: "grid",
+  gap: 1,
   color: "var(--accent)",
   fontSize: 16,
+};
+
+const rowPrize: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 2,
+  color: "var(--success, var(--accent))",
+  fontSize: 9,
+  fontWeight: 900,
 };
 
 const playerCell: CSSProperties = {

@@ -25,9 +25,9 @@ Set `VITE_REVENUECAT_IOS_API_KEY` to the iOS `appl_...` public API key for iOS b
 
 ## Ads
 
-- AdMob interstitials are loaded through `src/game/ads.ts`.
-- Set `VITE_ADMOB_IOS_INTERSTITIAL_ID` for production.
-- The fallback id is Google's test interstitial id.
+- AdMob interstitials and rewarded ads are loaded through `src/game/ads.ts`.
+- Set `VITE_ADMOB_IOS_INTERSTITIAL_ID` and `VITE_ADMOB_IOS_REWARDED_ID` for production.
+- Set `VITE_ADMOB_TEST_MODE=true` only for controlled QA builds; keep it `false` for production.
 - Forced ads are skipped for users with the `pro` entitlement.
 - Ads are only attempted after a cleared-stage result action, never during active gameplay.
 
