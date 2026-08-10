@@ -8,11 +8,8 @@ import { COMPOUNDS } from "./compounds";
 import { BOSSES, type BossId } from "./bosses";
 import {
   authenticateGameCenter,
-<<<<<<< Updated upstream
-=======
   getCurrentGameCenterPlayer,
   getCachedGameCenterPlayerName,
->>>>>>> Stashed changes
   isGameCenterAvailable,
   showGameCenterLeaderboards,
 } from "./gameCenter";
@@ -53,14 +50,11 @@ export function Profile({ onBack }: Props) {
   const [transactionsOpen, setTransactionsOpen] = useState(false);
   const [gameCenterBusy, setGameCenterBusy] = useState(false);
   const [gameCenterStatus, setGameCenterStatus] = useState<string | null>(null);
-<<<<<<< Updated upstream
-=======
   const [gameCenterName, setGameCenterName] = useState(() => getCachedGameCenterPlayerName());
   const [referralCode, setReferralCode] = useState(() => getStoredReferralCode());
   const [referralInput, setReferralInput] = useState("");
   const [referralBusy, setReferralBusy] = useState(false);
   const [referralStatus, setReferralStatus] = useState<string | null>(null);
->>>>>>> Stashed changes
   const {
     unlockedLevel,
     highestElement,

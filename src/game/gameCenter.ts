@@ -208,8 +208,6 @@ export async function authenticateGameCenter(): Promise<GameCenterPlayer> {
   return player;
 }
 
-<<<<<<< Updated upstream
-=======
 function readRememberedPlayerId(): string {
   if (typeof window === "undefined") return "";
   try {
@@ -246,7 +244,6 @@ export async function loadGameCloudSave(): Promise<CloudSaveRecord> {
   return GameCenterNative.loadCloudSave();
 }
 
->>>>>>> Stashed changes
 export function getCachedGameCenterPlayerName(): string {
   const displayName = cachedGameCenterPlayer?.displayName?.trim();
   if (displayName) return displayName;

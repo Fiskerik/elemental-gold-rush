@@ -1,11 +1,7 @@
 {
   "sourceLanguage": "en-US",
   "defaultInAppLanguage": "en",
-<<<<<<< Updated upstream
-  "localeCount": 15,
-=======
   "localeCount": 29,
->>>>>>> Stashed changes
   "selectedLocales": [
     "en-US",
     "en-GB",
