@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { ELEMENTS } from "./elements";
 import { getLevelById, MAX_LEVEL } from "./levels";
@@ -28,6 +28,7 @@ import {
 import {
   getStoredReferralCode,
   isReferralAvailable,
+  promptForReferralCode,
   redeemReferralCode,
   registerReferralCode,
   shareReferralText,
@@ -72,7 +73,7 @@ export function Profile({ onBack, onOpenShop }: Props) {
   const [gameCenterStatus, setGameCenterStatus] = useState<string | null>(null);
   const [gameCenterName, setGameCenterName] = useState(() => getCachedGameCenterPlayerName());
   const [referralCode, setReferralCode] = useState(() => getStoredReferralCode());
-  const referralInputRef = useRef<HTMLInputElement>(null);
+  const [referralInput, setReferralInput] = useState("");
   const [referralBusy, setReferralBusy] = useState(false);
   const [referralStatus, setReferralStatus] = useState<string | null>(null);
   const {
@@ -254,15 +255,29 @@ export function Profile({ onBack, onOpenShop }: Props) {
 
   async function handleRedeemReferral() {
     if (referralBusy || !isReferralAvailable()) return;
-    const referralInput = referralInputRef.current?.value ?? "";
     setReferralBusy(true);
     try {
       const playerId = await getReferralPlayerId();
       const redeemed = await redeemReferralCode(referralInput, playerId);
       setReferralStatus(redeemed ? tr("Code accepted. Complete your first game to receive 20 gold.") : tr("Referral code was not accepted."));
-      if (redeemed && referralInputRef.current) referralInputRef.current.value = "";
+      if (redeemed) setReferralInput("");
     } finally {
       setReferralBusy(false);
+    }
+  }
+
+  async function handleEnterReferralCode() {
+    if (referralBusy || !isReferralAvailable()) return;
+    try {
+      const code = await promptForReferralCode(referralInput, {
+        title: tr("Referral code"),
+        cancel: tr("Cancel"),
+        confirm: tr("Use code"),
+      });
+      if (code != null) setReferralInput(code);
+    } catch (error) {
+      console.warn("[referral] Native code entry failed", error);
+      setReferralStatus(tr("Referral code entry is unavailable. Please try again."));
     }
   }
 
@@ -416,19 +431,19 @@ export function Profile({ onBack, onOpenShop }: Props) {
               }}
               style={{ ...referralRedeemRow, marginTop: referralCode ? 0 : 14 }}
             >
-              <input
-                ref={referralInputRef}
-                type="text"
+              <button
+                type="button"
                 aria-label={tr("Referral code")}
-                placeholder="AFR-XXXXXXX"
-                autoCapitalize="characters"
-                autoCorrect="off"
-                spellCheck={false}
-                enterKeyHint="done"
-                maxLength={11}
+                onClick={() => void handleEnterReferralCode()}
                 style={referralInputField}
-              />
-              <button type="submit" disabled={referralBusy} style={gameCenterButton}>
+              >
+                {referralInput || "AFR-XXXXXXX"}
+              </button>
+              <button
+                type="submit"
+                disabled={referralBusy || !referralInput}
+                style={gameCenterButton}
+              >
                 {tr("Redeem")}
               </button>
             </form>
@@ -1130,6 +1145,8 @@ const referralInputField: React.CSSProperties = {
   fontSize: 16,
   fontWeight: 750,
   outline: "none",
+  textAlign: "left",
+  opacity: 1,
 };
 
 const gameCenterButton: React.CSSProperties = {

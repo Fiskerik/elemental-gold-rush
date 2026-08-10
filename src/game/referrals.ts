@@ -9,6 +9,12 @@ const REFERRAL_FUNCTIONS_BASE_URL = String(
 
 interface ReferralSharePlugin {
   share(options: { text: string }): Promise<{ completed: boolean }>;
+  promptForCode(options: {
+    title: string;
+    value: string;
+    cancelTitle: string;
+    confirmTitle: string;
+  }): Promise<{ cancelled: boolean; code?: string }>;
 }
 
 const ReferralShareNative = registerPlugin<ReferralSharePlugin>("ReferralSharePlugin");
@@ -89,6 +95,21 @@ export async function shareReferralText(text: string): Promise<boolean> {
   }
 
   return false;
+}
+
+export async function promptForReferralCode(
+  value: string,
+  labels: { title: string; cancel: string; confirm: string },
+): Promise<string | null> {
+  if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== "ios") return null;
+  const result = await ReferralShareNative.promptForCode({
+    title: labels.title,
+    value,
+    cancelTitle: labels.cancel,
+    confirmTitle: labels.confirm,
+  });
+  if (result.cancelled) return null;
+  return (result.code ?? "").trim().toUpperCase().slice(0, 11);
 }
 
 export async function redeemReferralCode(code: string, playerId: string): Promise<boolean> {
