@@ -9,6 +9,7 @@ const REFERRAL_FUNCTIONS_BASE_URL = String(
 
 interface ReferralSharePlugin {
   share(options: { text: string }): Promise<{ completed: boolean }>;
+  copyCode(options: { code: string }): Promise<void>;
   promptForCode(options: {
     title: string;
     value: string;
@@ -94,6 +95,24 @@ export async function shareReferralText(text: string): Promise<boolean> {
     return true;
   }
 
+  return false;
+}
+
+export async function copyReferralCode(code: string): Promise<boolean> {
+  const normalized = code.trim().toUpperCase();
+  if (!normalized) return false;
+  try {
+    if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios") {
+      await ReferralShareNative.copyCode({ code: normalized });
+      return true;
+    }
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      await navigator.clipboard.writeText(normalized);
+      return true;
+    }
+  } catch (error) {
+    console.warn("[referral] Could not copy code", error);
+  }
   return false;
 }
 

@@ -7,8 +7,22 @@ public class ReferralSharePlugin: CAPPlugin, CAPBridgedPlugin {
     public let jsName = "ReferralSharePlugin"
     public let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "share", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "promptForCode", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "promptForCode", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "copyCode", returnType: CAPPluginReturnPromise)
     ]
+
+    @objc func copyCode(_ call: CAPPluginCall) {
+        guard let code = call.getString("code")?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !code.isEmpty else {
+            call.reject("Referral code is required")
+            return
+        }
+
+        DispatchQueue.main.async {
+            UIPasteboard.general.string = code
+            call.resolve()
+        }
+    }
 
     @objc func promptForCode(_ call: CAPPluginCall) {
         DispatchQueue.main.async {

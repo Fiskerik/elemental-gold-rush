@@ -55,7 +55,7 @@ const SHOP_POWER_UPS: Array<{
   {
     id: "catalyst",
     name: "Catalyst Aura",
-    coinCost: 12,
+    coinCost: 30,
     unlockLevel: POWER_UP_UNLOCK_LEVELS.catalyst,
     description: "Start a level with 5 shots of wider fusion radius available.",
   },

@@ -4,9 +4,10 @@ import { GAME_MODES } from "./challenges";
 import { BOSSES, type BossId } from "./bosses";
 import { PowerUpBadge } from "./PowerUpLibrary";
 import { POWER_UPS } from "./powerUps";
-import { useProgress } from "./store";
+import { LAB_UPGRADE_IDS, useProgress } from "./store";
 import { useIsTabletLayout } from "./responsive";
 import { t } from "./localization";
+import { LAB_UPGRADE_META } from "./labUpgradeMeta";
 
 interface Props {
   onBack: () => void;
@@ -16,6 +17,7 @@ export function GameLibrary({ onBack }: Props) {
   const isTabletLayout = useIsTabletLayout();
   const unlockedLevel = useProgress((s) => s.unlockedLevel);
   const levelStats = useProgress((s) => s.levelStats);
+  const labUpgradeLevels = useProgress((s) => s.labUpgradeLevels);
   const appLanguage = useProgress((s) => s.appLanguage);
   const [tab, setTab] = useState<"challenges" | "powerups" | "bosses">("powerups");
   const [selectedPowerUpId, setSelectedPowerUpId] = useState(POWER_UPS[0]?.icon ?? "molecule");
@@ -31,6 +33,7 @@ export function GameLibrary({ onBack }: Props) {
   const selectedPowerUp =
     powerUpsByOccurrence.find((powerUp) => powerUp.icon === selectedPowerUpId) ??
     powerUpsByOccurrence[0];
+  const selectedLabUpgradeId = LAB_UPGRADE_IDS.find((id) => id === selectedPowerUp?.icon);
   const selectedChallenge = challengeModes.find((mode) => mode.id === selectedChallengeId);
   const selectedBoss = BOSS_LIBRARY.find((boss) => boss.id === selectedBossId) ?? BOSS_LIBRARY[0];
   const selectedBossConfig = selectedBoss ? BOSSES[selectedBoss.id] : null;
@@ -93,6 +96,32 @@ export function GameLibrary({ onBack }: Props) {
                   <span>{tr("Unlocked at level:")} {selectedPowerUp.unlock.replace(/^Level /, "").split(" /")[0]}</span>
                   <span>{tr("Obtained by")} {tr(selectedPowerUp.obtainedBy)}</span>
                 </div>
+                {selectedLabUpgradeId && (
+                  <div style={powerUpLevels}>
+                    <div style={powerUpLevelsTitle}>{tr("Power-up levels")}</div>
+                    {LAB_UPGRADE_META[selectedLabUpgradeId].bonuses.map((bonus, index) => {
+                      const level = index + 1;
+                      const researched = (labUpgradeLevels[selectedLabUpgradeId] ?? 0) >= level;
+                      return (
+                        <div
+                          key={bonus}
+                          style={{
+                            ...powerUpLevelRow,
+                            borderColor: researched
+                              ? "color-mix(in oklch, var(--success, var(--accent)) 48%, var(--border))"
+                              : "var(--border)",
+                          }}
+                        >
+                          <span style={{ ...powerUpLevelNumber, opacity: researched ? 1 : 0.65 }}>
+                            {level}
+                          </span>
+                          <span>{tr(bonus)}</span>
+                          {researched && <span style={researchedPill}>{tr("Researched")}</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </>
             }
             isTabletLayout={isTabletLayout}
@@ -545,6 +574,55 @@ const unlockDetails: React.CSSProperties = {
   fontWeight: 900,
   letterSpacing: 0.35,
   lineHeight: 1.3,
+};
+
+const powerUpLevels: React.CSSProperties = {
+  display: "grid",
+  gap: 6,
+  marginTop: 16,
+};
+
+const powerUpLevelsTitle: React.CSSProperties = {
+  color: "var(--foreground)",
+  fontSize: 11,
+  fontWeight: 950,
+  letterSpacing: 1.2,
+  textTransform: "uppercase",
+};
+
+const powerUpLevelRow: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "24px minmax(0, 1fr) auto",
+  alignItems: "center",
+  gap: 7,
+  minHeight: 32,
+  padding: "5px 7px",
+  border: "1px solid var(--border)",
+  borderRadius: 10,
+  background: "color-mix(in oklch, var(--surface-high) 74%, transparent)",
+  color: "var(--muted-foreground)",
+  fontSize: 10,
+  fontWeight: 750,
+  lineHeight: 1.25,
+};
+
+const powerUpLevelNumber: React.CSSProperties = {
+  width: 22,
+  height: 22,
+  display: "grid",
+  placeItems: "center",
+  borderRadius: 999,
+  background: "var(--surface-elevated)",
+  color: "var(--accent)",
+  fontWeight: 950,
+};
+
+const researchedPill: React.CSSProperties = {
+  color: "var(--success, var(--accent))",
+  fontSize: 8,
+  fontWeight: 950,
+  letterSpacing: 0.4,
+  textTransform: "uppercase",
 };
 
 const tabBar: React.CSSProperties = {

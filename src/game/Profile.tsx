@@ -26,6 +26,7 @@ import {
   showGameCenterLeaderboards,
 } from "./gameCenter";
 import {
+  copyReferralCode,
   getStoredReferralCode,
   isReferralAvailable,
   promptForReferralCode,
@@ -43,6 +44,7 @@ import {
   BadgeCheck,
   CalendarDays,
   Coins,
+  Copy,
   Crown,
   FlaskConical,
   Gamepad2,
@@ -281,6 +283,12 @@ export function Profile({ onBack, onOpenShop }: Props) {
     }
   }
 
+  async function handleCopyReferralCode() {
+    if (!referralCode) return;
+    const copied = await copyReferralCode(referralCode);
+    setReferralStatus(tr(copied ? "Friend code copied." : "Friend code could not be copied."));
+  }
+
   async function handleRestorePurchases() {
     if (restoreBusy) return;
     setRestoreBusy(true);
@@ -423,7 +431,20 @@ export function Profile({ onBack, onOpenShop }: Props) {
                 {tr(referralBusy ? "Working..." : "Share referral code")}
               </button>
             </div>
-            {referralCode && <small style={referralCodeText}>{`${tr("Your code")}: ${referralCode}`}</small>}
+            {referralCode && (
+              <div style={referralCodeRow}>
+                <small style={referralCodeText}>{`${tr("Your code")}: ${referralCode}`}</small>
+                <button
+                  type="button"
+                  onClick={() => void handleCopyReferralCode()}
+                  aria-label={tr("Copy friend code")}
+                  title={tr("Copy friend code")}
+                  style={referralCopyButton}
+                >
+                  <Copy size={15} aria-hidden="true" />
+                </button>
+              </div>
+            )}
             <form
               onSubmit={(event) => {
                 event.preventDefault();
@@ -1119,9 +1140,29 @@ const referralStatusText: React.CSSProperties = {
 
 const referralCodeText: React.CSSProperties = {
   display: "block",
+  lineHeight: 1.4,
+};
+
+const referralCodeRow: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 7,
   marginTop: 12,
   marginBottom: 14,
-  lineHeight: 1.4,
+};
+
+const referralCopyButton: React.CSSProperties = {
+  width: 30,
+  height: 30,
+  display: "grid",
+  placeItems: "center",
+  flex: "0 0 auto",
+  padding: 0,
+  borderRadius: 9,
+  border: "1px solid color-mix(in oklch, var(--primary) 48%, var(--border))",
+  background: "color-mix(in oklch, var(--primary) 12%, var(--surface))",
+  color: "var(--primary)",
+  cursor: "pointer",
 };
 
 const referralRedeemRow: React.CSSProperties = {
