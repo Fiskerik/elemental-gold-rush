@@ -1236,7 +1236,7 @@ export function NucleusCoreBoard({
                         cursor: "pointer",
                       }}
                     >
-                      {nextLevel ? "Continue" : "Finish"}
+                      {nextLevel ? "Next level" : "Finish"}
                     </button>
                   )}
                 </div>

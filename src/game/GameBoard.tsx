@@ -874,6 +874,7 @@ function DailyCompoundGridBoard({
   const isCampaignSearchFind =
     getCompoundChallengeKind(levelId) === "search-find" &&
     MOLECULE_CHALLENGE_BY_LEVEL[levelId] === secretCompoundId;
+  const nextCampaignLevel = isCampaignSearchFind ? getNextLevel(levelId) : undefined;
   const compound = useMemo(
     () => COMPOUNDS.find((item) => item.id === secretCompoundId) ?? null,
     [secretCompoundId],
@@ -1225,20 +1226,34 @@ function DailyCompoundGridBoard({
               {result.wasNew ? tr("Added to collection") : `${tr("Collection count")} ${result.count}`}
               {result.awarded ? ` - ${tr("Daily reward")} +${DAILY_FEATURE_REWARD_COINS} ${tr("coins")}` : ""}
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                if (isCampaignSearchFind) {
-                  if (onMap) onMap();
-                  else onWin(getNextLevel(levelId)?.id ?? null);
-                  return;
-                }
-                onExit();
-              }}
-              style={{ ...modalBtn, width: "100%" }}
-            >
-              {isCampaignSearchFind ? tr("Map") : tr("Back to Menu")}
-            </button>
+            {isCampaignSearchFind ? (
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => (onMap ? onMap() : onExit())}
+                  style={{
+                    ...modalBtn,
+                    background: "var(--surface-high)",
+                    color: "var(--foreground)",
+                  }}
+                >
+                  {tr("Map")}
+                </button>
+                {nextCampaignLevel && (
+                  <button
+                    type="button"
+                    onClick={() => onWin(nextCampaignLevel.id)}
+                    style={modalBtn}
+                  >
+                    {tr("Next level")}
+                  </button>
+                )}
+              </div>
+            ) : (
+              <button type="button" onClick={onExit} style={{ ...modalBtn, width: "100%" }}>
+                {tr("Back to Menu")}
+              </button>
+            )}
           </div>
         </Modal>
       )}
@@ -1391,6 +1406,7 @@ function StandardGameBoard({
   const wideBoard = useWideBoardLayout();
   const level = getLevelById(levelId) ?? LEVELS[0];
   const gameMode = getGameMode(mode);
+  const nextCampaignLevel = mode === "campaign" ? getNextLevel(levelId) : undefined;
   const powerUpStage = !preview && mode === "campaign" && !secretCompoundId ? level.powerUpStage : undefined;
   const isPowerUpStage = powerUpStage != null;
   const compoundEnabled = !preview && mode === "campaign" && !isPowerUpStage;
@@ -6333,6 +6349,11 @@ function StandardGameBoard({
     onMap();
   }
 
+  async function handleWonNext() {
+    await runAttemptAdIfDue();
+    onWin(nextCampaignLevel?.id ?? null);
+  }
+
   async function handleGameOverMain() {
     await runAttemptAdIfDue();
     onExit();
@@ -8148,8 +8169,10 @@ function StandardGameBoard({
             onClaimPowerUp={claimResultPowerUp}
             onDiscoveryClick={setDiscoveryEl}
             onMain={handleWonMain}
-            onNext={handleWonMap}
-            nextLabel="Map"
+            onSecondary={nextCampaignLevel ? handleWonMap : undefined}
+            secondaryLabel="Map"
+            onNext={nextCampaignLevel ? handleWonNext : handleWonMap}
+            nextLabel={nextCampaignLevel ? "Next level" : "Map"}
           />
         )}
         {gameOverContinueOpen && !won && !gameOver && (
@@ -9391,6 +9414,8 @@ function ResultModal({
   onClaimPowerUp,
   onDiscoveryClick,
   onMain,
+  onSecondary,
+  secondaryLabel,
   onNext,
   nextLabel,
 }: {
@@ -9413,6 +9438,8 @@ function ResultModal({
   onClaimPowerUp?: (powerUp: InventoryPowerUpId) => void;
   onDiscoveryClick?: (atomicNumber: number) => void;
   onMain: () => void;
+  onSecondary?: () => void;
+  secondaryLabel?: string;
   onNext: () => void;
   nextLabel?: string;
 }) {
@@ -9869,6 +9896,14 @@ function ResultModal({
         >
           {tr("Menu")}
         </button>
+        {onSecondary && (
+          <button
+            onClick={onSecondary}
+            style={{ ...modalBtn, background: "var(--surface-high)", color: "var(--foreground)" }}
+          >
+            {secondaryLabel ? tr(secondaryLabel) : tr("Map")}
+          </button>
+        )}
         <button onClick={onNext} style={modalBtn}>
           {nextLabel ? tr(nextLabel) : tr("Next")}
         </button>

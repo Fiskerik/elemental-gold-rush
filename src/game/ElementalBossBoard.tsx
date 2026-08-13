@@ -1339,7 +1339,7 @@ export function ElementalBossBoard({
                           cursor: "pointer",
                         }}
                       >
-                        {nextLevel ? "Continue" : "Finish"}
+                        {nextLevel ? "Next level" : "Finish"}
                       </button>
                     )}
                   </div>
