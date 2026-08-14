@@ -8,6 +8,8 @@ const API_ROOT = "https://api.appstoreconnect.apple.com/v1";
 const PROMOTIONAL_TEXT_LIMIT = 170;
 const WHATS_NEW_LIMIT = 4000;
 const DESCRIPTION_LIMIT = 4000;
+const DESCRIPTION_SECTION_COUNT = 5;
+const DESCRIPTION_BULLET_COUNT = 13;
 const KEYWORDS_LIMIT = 100;
 
 const CONFIG_PATH = path.join(ROOT, "localization", "app-store", "appstore.config.json");
@@ -163,8 +165,24 @@ function validateNotes(notes, metadata) {
     }
     if (!description || description.startsWith("<")) {
       errors.push(`${locale}: Description is empty or still a placeholder.`);
-    } else if (characterCount(description) > DESCRIPTION_LIMIT) {
-      errors.push(`${locale}: Description is ${characterCount(description)}/${DESCRIPTION_LIMIT} characters.`);
+    } else {
+      if (characterCount(description) > DESCRIPTION_LIMIT) {
+        errors.push(`${locale}: Description is ${characterCount(description)}/${DESCRIPTION_LIMIT} characters.`);
+      }
+      const sectionCount = description.split(/\n\n/).filter(Boolean).length;
+      if (sectionCount !== DESCRIPTION_SECTION_COUNT) {
+        errors.push(
+          `${locale}: Description must contain ${DESCRIPTION_SECTION_COUNT} sections; found ${sectionCount}.`,
+        );
+      }
+      const bulletCount = description
+        .split("\n")
+        .filter((line) => line.startsWith("• ")).length;
+      if (bulletCount !== DESCRIPTION_BULLET_COUNT) {
+        errors.push(
+          `${locale}: Description must contain ${DESCRIPTION_BULLET_COUNT} bullet points; found ${bulletCount}.`,
+        );
+      }
     }
     if (!keywords || keywords.startsWith("<")) {
       errors.push(`${locale}: Keywords are empty or still a placeholder.`);
