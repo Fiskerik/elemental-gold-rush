@@ -43,11 +43,14 @@ if (!validation.ok) {
   process.exitCode = 1;
 } else if (command === "validate") {
   printValidation(notes, notesPath);
-} else if (options.dryRun) {
+} else if (options.dryRun && !options.onlyWhatsNew) {
   printValidation(notes, notesPath);
   console.log(`DRY RUN: would upload ${notes.locales.size} locale(s) for iOS ${version}.`);
 } else {
-  await uploadMetadata(notes, version);
+  await uploadMetadata(notes, version, {
+    onlyWhatsNew: options.onlyWhatsNew,
+    dryRun: options.dryRun,
+  });
 }
 
 function parseOptions(values) {
@@ -56,8 +59,8 @@ function parseOptions(values) {
     const value = values[index];
     if (!value.startsWith("--")) fail(`Unexpected argument "${value}".`);
     const name = value.slice(2);
-    if (name === "dry-run") {
-      parsed.dryRun = true;
+    if (name === "dry-run" || name === "only-whats-new") {
+      parsed[name === "dry-run" ? "dryRun" : "onlyWhatsNew"] = true;
       continue;
     }
     const next = values[index + 1];
@@ -215,7 +218,7 @@ function normalizeMetadataText(value) {
   return String(value ?? "").replace(/\\n/g, "\n").replace(/\r\n?/g, "\n");
 }
 
-async function uploadMetadata(notes, version) {
+async function uploadMetadata(notes, version, { onlyWhatsNew = false, dryRun = false } = {}) {
   const token = createAppStoreConnectToken();
   const appId = await resolveAppId(token);
   const versionResource = await resolveVersion(token, appId, version);
@@ -227,6 +230,21 @@ async function uploadMetadata(notes, version) {
   const existingVersionLocalizations = new Map(
     versionLocalizations.data.map((item) => [item.attributes.locale, item]),
   );
+
+  if (onlyWhatsNew) {
+    if (versionLocalizations.data.length !== existingVersionLocalizations.size) {
+      fail(
+        `Cannot safely upload only What's New for iOS ${version}: App Store Connect returned duplicate locale records. No metadata was changed.`,
+      );
+    }
+    if (versionLocalizations.data.some((item) => !item.id || !item.attributes?.locale)) {
+      fail(
+        `Cannot safely upload only What's New for iOS ${version}: App Store Connect returned an invalid locale record. No metadata was changed.`,
+      );
+    }
+    await uploadWhatsNewOnly(token, notes, version, existingVersionLocalizations, { dryRun });
+    return;
+  }
 
   const appInfo = await resolveAppInfo(token, appId, versionResource);
   const appInfoLocalizations = await apiRequest(
@@ -369,6 +387,56 @@ async function uploadMetadata(notes, version) {
   console.log(`Version localizations created: ${createdVersion}`);
   console.log(`Version localizations updated: ${updatedVersion}`);
   console.log(`Version localizations unchanged: ${unchangedVersion}`);
+}
+
+async function uploadWhatsNewOnly(
+  token,
+  notes,
+  version,
+  existingVersionLocalizations,
+  { dryRun = false } = {},
+) {
+  const missingLocales = [...notes.locales.keys()].filter(
+    (locale) => !existingVersionLocalizations.has(locale),
+  );
+  if (missingLocales.length > 0) {
+    fail(
+      `Cannot safely upload only What's New for iOS ${version}: App Store Connect is missing version localizations for ${missingLocales.join(", ")}. No metadata was changed.`,
+    );
+  }
+
+  const updates = [...notes.locales].filter(([locale, entry]) => {
+    const existing = existingVersionLocalizations.get(locale);
+    return existing.attributes.whatsNew !== entry.whatsNew;
+  });
+
+  console.log(
+    `Preflight passed: all ${notes.locales.size} iOS ${version} locale records exist.`,
+  );
+  console.log("Upload scope: appStoreVersionLocalizations.attributes.whatsNew only.");
+
+  if (dryRun) {
+    console.log(`DRY RUN: would update ${updates.length} locale(s); no metadata was changed.`);
+    return;
+  }
+
+  for (const [locale, entry] of updates) {
+    const existing = existingVersionLocalizations.get(locale);
+    await apiRequest(token, `/appStoreVersionLocalizations/${existing.id}`, {
+      method: "PATCH",
+      body: {
+        data: {
+          type: "appStoreVersionLocalizations",
+          id: existing.id,
+          attributes: { whatsNew: entry.whatsNew },
+        },
+      },
+    });
+  }
+
+  console.log(`Uploaded only What's New for iOS ${version}.`);
+  console.log(`Version localizations updated: ${updates.length}`);
+  console.log(`Version localizations unchanged: ${notes.locales.size - updates.length}`);
 }
 
 function createAppStoreConnectToken() {
