@@ -1,5 +1,7 @@
 import { Capacitor, registerPlugin } from "@capacitor/core";
 
+const GAME_CENTER_PLAYER_ID_STORAGE_KEY = "elemental-gold-rush-game-center-player-id";
+
 export type GameCenterLeaderboardScope = "global" | "local";
 export type GameCenterLeaderboardKind = "daily-board" | "daily-compound";
 
@@ -194,8 +196,36 @@ export async function authenticateGameCenter(): Promise<GameCenterPlayer> {
   if (!isGameCenterAvailable()) {
     return { authenticated: false };
   }
+  const rememberedPlayerId = (() => {
+    try {
+      return window.localStorage.getItem(GAME_CENTER_PLAYER_ID_STORAGE_KEY)?.trim() ?? "";
+    } catch {
+      return "";
+    }
+  })();
+  const currentPlayer = await GameCenterNative.getCurrentPlayer();
+  if (
+    currentPlayer.authenticated &&
+    currentPlayer.gamePlayerId &&
+    (!rememberedPlayerId || rememberedPlayerId === currentPlayer.gamePlayerId)
+  ) {
+    cachedGameCenterPlayer = currentPlayer;
+    try {
+      window.localStorage.setItem(GAME_CENTER_PLAYER_ID_STORAGE_KEY, currentPlayer.gamePlayerId);
+    } catch {
+      // Authentication still works if local persistence is unavailable.
+    }
+    return currentPlayer;
+  }
   const player = await GameCenterNative.authenticate();
   cachedGameCenterPlayer = player;
+  if (player.authenticated && player.gamePlayerId) {
+    try {
+      window.localStorage.setItem(GAME_CENTER_PLAYER_ID_STORAGE_KEY, player.gamePlayerId);
+    } catch {
+      // Authentication still works if local persistence is unavailable.
+    }
+  }
   return player;
 }
 
@@ -243,7 +273,9 @@ export async function submitDailyGameCenterScore(
   const normalizedScore = Math.max(0, Math.floor(score));
   if (normalizedScore <= 0) return false;
   const normalizedShots = Math.max(0, Math.floor(shots));
-  await authenticateGameCenter();
+  // Background score submission must not open Apple's sign-in UI.
+  const currentPlayer = await getCurrentGameCenterPlayer();
+  if (!currentPlayer.authenticated) return false;
   const leaderboardIds = getSubmitLeaderboardIds(kind);
   if (!leaderboardIds.length) return false;
   const results = await Promise.allSettled(

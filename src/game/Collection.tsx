@@ -509,6 +509,7 @@ export function Collection({ onBack }: { onBack: () => void }) {
               padding: 24,
               maxWidth: isTabletLayout ? 560 : 380,
               width: "100%",
+              boxSizing: "border-box",
               animation: "pop-in 240ms ease-out",
               position: "relative",
               maxHeight: "calc(100vh - 48px)",
@@ -667,6 +668,7 @@ export function Collection({ onBack }: { onBack: () => void }) {
               padding: 24,
               maxWidth: isTabletLayout ? 560 : 380,
               width: "100%",
+              boxSizing: "border-box",
               animation: "pop-in 240ms ease-out",
               position: "relative",
             }}
@@ -847,12 +849,13 @@ const collectionExpandBtn: CSSProperties = {
 };
 
 const collectionModalCloseBtn: CSSProperties = {
-  position: "absolute",
-  top: 12,
-  right: 12,
-  width: 32,
+  display: "block",
+  marginLeft: "auto",
+  marginBottom: 8,
+  minWidth: 60,
   height: 32,
-  borderRadius: 999,
+  padding: "0 10px",
+  borderRadius: 10,
   border: "1px solid var(--border)",
   background: "var(--surface-high)",
   color: "var(--foreground)",

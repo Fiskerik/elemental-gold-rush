@@ -1294,7 +1294,7 @@ export function PeriodicGuardianBoard({
                         cursor: "pointer",
                       }}
                     >
-                      {nextLevel ? "Continue" : "Finish"}
+                      {nextLevel ? "Next level" : "Finish"}
                     </button>
                   )}
                 </div>

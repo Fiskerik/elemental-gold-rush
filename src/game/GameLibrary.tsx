@@ -3,10 +3,17 @@ import { Atom, Clock, Eye, FlaskConical, LockKeyhole, Map, Orbit, RotateCcw, Shi
 import { GAME_MODES } from "./challenges";
 import { BOSSES, type BossId } from "./bosses";
 import { PowerUpBadge } from "./PowerUpLibrary";
-import { POWER_UPS } from "./powerUps";
-import { useProgress } from "./store";
+import { POWER_UPS, POWER_UP_UNLOCK_LEVELS } from "./powerUps";
+import {
+  LAB_UPGRADE_COSTS,
+  LAB_UPGRADE_IDS,
+  getLabUpgradeLevelCap,
+  type LabUpgradeId,
+  useProgress,
+} from "./store";
 import { useIsTabletLayout } from "./responsive";
 import { t } from "./localization";
+import { LAB_UPGRADE_META } from "./labUpgradeMeta";
 
 interface Props {
   onBack: () => void;
@@ -16,11 +23,18 @@ export function GameLibrary({ onBack }: Props) {
   const isTabletLayout = useIsTabletLayout();
   const unlockedLevel = useProgress((s) => s.unlockedLevel);
   const levelStats = useProgress((s) => s.levelStats);
+  const hasProPack = useProgress((s) => s.hasProPack);
+  const goldCoins = useProgress((s) => s.goldCoins);
+  const labUpgradeLevels = useProgress((s) => s.labUpgradeLevels);
+  const labUpgradeEnabled = useProgress((s) => s.labUpgradeEnabled);
+  const upgradeLabPowerUp = useProgress((s) => s.upgradeLabPowerUp);
+  const toggleLabUpgrade = useProgress((s) => s.toggleLabUpgrade);
   const appLanguage = useProgress((s) => s.appLanguage);
   const [tab, setTab] = useState<"challenges" | "powerups" | "bosses">("powerups");
   const [selectedPowerUpId, setSelectedPowerUpId] = useState(POWER_UPS[0]?.icon ?? "molecule");
   const [selectedChallengeId, setSelectedChallengeId] = useState("daily-board");
   const [selectedBossId, setSelectedBossId] = useState<BossId>("elemental-boss");
+  const [upgradeMessage, setUpgradeMessage] = useState<string | null>(null);
   const tr = (text: string) => t(text, appLanguage);
   const powerUpsByOccurrence = [...POWER_UPS].sort(
     (a, b) => POWER_UP_OCCURRENCE[a.icon] - POWER_UP_OCCURRENCE[b.icon],
@@ -31,9 +45,35 @@ export function GameLibrary({ onBack }: Props) {
   const selectedPowerUp =
     powerUpsByOccurrence.find((powerUp) => powerUp.icon === selectedPowerUpId) ??
     powerUpsByOccurrence[0];
+  const selectedLabUpgradeId = LAB_UPGRADE_IDS.find((id) => id === selectedPowerUp?.icon);
   const selectedChallenge = challengeModes.find((mode) => mode.id === selectedChallengeId);
   const selectedBoss = BOSS_LIBRARY.find((boss) => boss.id === selectedBossId) ?? BOSS_LIBRARY[0];
   const selectedBossConfig = selectedBoss ? BOSSES[selectedBoss.id] : null;
+  const labLevelCap = hasProPack ? 5 : getLabUpgradeLevelCap(unlockedLevel);
+
+  function attemptUpgrade(id: LabUpgradeId) {
+    if (unlockedLevel < POWER_UP_UNLOCK_LEVELS[id]) {
+      setUpgradeMessage(`Reach campaign level ${POWER_UP_UNLOCK_LEVELS[id]} to unlock this power-up.`);
+      return;
+    }
+    const level = labUpgradeLevels[id] ?? 0;
+    const nextCost = LAB_UPGRADE_COSTS[level];
+    if (level >= LAB_UPGRADE_COSTS.length || nextCost == null) return;
+    if (!hasProPack && labLevelCap <= level) {
+      const requiredLevel = [5, 10, 20, 35, 50][level] ?? 50;
+      setUpgradeMessage(
+        `Reach campaign level ${requiredLevel} to unlock the next tier, or activate Lab Pro Pack.`,
+      );
+      return;
+    }
+    if (goldCoins < nextCost) {
+      setUpgradeMessage(`You need ${nextCost - goldCoins} more coins to upgrade this power-up.`);
+      return;
+    }
+    setUpgradeMessage(
+      upgradeLabPowerUp(id) ? null : "This power-up cannot be upgraded yet.",
+    );
+  }
 
   return (
     <div className="app-shell" style={{ padding: isTabletLayout ? 28 : 20, paddingTop: isTabletLayout ? 36 : 32, minHeight: "100dvh" }}>
@@ -82,7 +122,10 @@ export function GameLibrary({ onBack }: Props) {
               label: tr(powerUp.name),
               active: powerUp.icon === selectedPowerUp.icon,
               icon: <PowerUpBadge icon={powerUp.icon} size={44} />,
-              onClick: () => setSelectedPowerUpId(powerUp.icon),
+              onClick: () => {
+                setSelectedPowerUpId(powerUp.icon);
+                setUpgradeMessage(null);
+              },
             }))}
             reader={
               <>
@@ -93,6 +136,73 @@ export function GameLibrary({ onBack }: Props) {
                   <span>{tr("Unlocked at level:")} {selectedPowerUp.unlock.replace(/^Level /, "").split(" /")[0]}</span>
                   <span>{tr("Obtained by")} {tr(selectedPowerUp.obtainedBy)}</span>
                 </div>
+                {selectedLabUpgradeId && (() => {
+                  const id = selectedLabUpgradeId;
+                  const level = labUpgradeLevels[id] ?? 0;
+                  const nextCost = LAB_UPGRADE_COSTS[level];
+                  const active = labUpgradeEnabled[id] ?? true;
+                  const discovered = unlockedLevel >= POWER_UP_UNLOCK_LEVELS[id];
+                  return (
+                    <div style={powerUpLevels}>
+                      <div style={powerUpLevelsHeader}>
+                        <div style={powerUpLevelsTitle}>{tr("Power-up levels")}</div>
+                        <span style={coinBalanceChip}>{`${goldCoins} ${tr("coins")}`}</span>
+                      </div>
+                      {LAB_UPGRADE_META[id].bonuses.map((bonus, index) => {
+                        const bonusLevel = index + 1;
+                        const researched = level >= bonusLevel;
+                        return (
+                          <div
+                            key={bonus}
+                            style={{
+                              ...powerUpLevelRow,
+                              borderColor: researched
+                                ? "color-mix(in oklch, var(--success, var(--accent)) 48%, var(--border))"
+                                : "var(--border)",
+                            }}
+                          >
+                            <span style={{ ...powerUpLevelNumber, opacity: researched ? 1 : 0.65 }}>
+                              {bonusLevel}
+                            </span>
+                            <span>{tr(bonus)}</span>
+                            {researched && <span style={researchedPill}>{tr("Researched")}</span>}
+                          </div>
+                        );
+                      })}
+                      <div style={researchActions}>
+                        {level > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => toggleLabUpgrade(id)}
+                            style={secondaryActionBtn}
+                          >
+                            {tr(active ? "Active" : "Off")}
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          disabled={level >= 5}
+                          onClick={() => attemptUpgrade(id)}
+                          style={{
+                            ...upgradeActionBtn,
+                            opacity: discovered && level < 5 ? 1 : 0.55,
+                          }}
+                        >
+                          {level >= 5
+                            ? tr("Maxed")
+                            : !discovered
+                              ? tr("Locked")
+                              : `${tr("Upgrade")} - ${nextCost ?? 0} ${tr("coins")}`}
+                        </button>
+                      </div>
+                      {upgradeMessage && (
+                        <div role="status" style={upgradeStatus}>
+                          {tr(upgradeMessage)}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </>
             }
             isTabletLayout={isTabletLayout}
@@ -545,6 +655,111 @@ const unlockDetails: React.CSSProperties = {
   fontWeight: 900,
   letterSpacing: 0.35,
   lineHeight: 1.3,
+};
+
+const powerUpLevels: React.CSSProperties = {
+  display: "grid",
+  gap: 6,
+  marginTop: 16,
+};
+
+const powerUpLevelsTitle: React.CSSProperties = {
+  color: "var(--foreground)",
+  fontSize: 11,
+  fontWeight: 950,
+  letterSpacing: 1.2,
+  textTransform: "uppercase",
+};
+
+const powerUpLevelsHeader: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 8,
+};
+
+const coinBalanceChip: React.CSSProperties = {
+  flexShrink: 0,
+  padding: "4px 8px",
+  borderRadius: 999,
+  border: "1px solid color-mix(in oklch, var(--accent) 45%, var(--border))",
+  background: "color-mix(in oklch, var(--accent) 12%, var(--surface))",
+  color: "var(--accent)",
+  fontSize: 9,
+  fontWeight: 950,
+};
+
+const powerUpLevelRow: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "24px minmax(0, 1fr) auto",
+  alignItems: "center",
+  gap: 7,
+  minHeight: 32,
+  padding: "5px 7px",
+  border: "1px solid var(--border)",
+  borderRadius: 10,
+  background: "color-mix(in oklch, var(--surface-high) 74%, transparent)",
+  color: "var(--muted-foreground)",
+  fontSize: 10,
+  fontWeight: 750,
+  lineHeight: 1.25,
+};
+
+const powerUpLevelNumber: React.CSSProperties = {
+  width: 22,
+  height: 22,
+  display: "grid",
+  placeItems: "center",
+  borderRadius: 999,
+  background: "var(--surface-elevated)",
+  color: "var(--accent)",
+  fontWeight: 950,
+};
+
+const researchedPill: React.CSSProperties = {
+  color: "var(--success, var(--accent))",
+  fontSize: 8,
+  fontWeight: 950,
+  letterSpacing: 0.4,
+  textTransform: "uppercase",
+};
+
+const researchActions: React.CSSProperties = {
+  display: "flex",
+  gap: 7,
+  marginTop: 4,
+};
+
+const upgradeActionBtn: React.CSSProperties = {
+  flex: 1,
+  minHeight: 36,
+  border: "1px solid color-mix(in oklch, var(--accent) 55%, var(--border))",
+  borderRadius: 10,
+  background: "linear-gradient(135deg, var(--primary), var(--accent))",
+  color: "var(--primary-foreground)",
+  fontFamily: "inherit",
+  fontSize: 11,
+  fontWeight: 900,
+  cursor: "pointer",
+};
+
+const secondaryActionBtn: React.CSSProperties = {
+  minWidth: 68,
+  minHeight: 36,
+  border: "1px solid var(--border)",
+  borderRadius: 10,
+  background: "var(--surface-elevated)",
+  color: "var(--accent)",
+  fontFamily: "inherit",
+  fontSize: 10,
+  fontWeight: 900,
+  cursor: "pointer",
+};
+
+const upgradeStatus: React.CSSProperties = {
+  color: "var(--warning)",
+  fontSize: 10,
+  lineHeight: 1.35,
 };
 
 const tabBar: React.CSSProperties = {

@@ -17,12 +17,23 @@ import { ElementBall } from "./ElementBall";
 import { AtomSkinPicker, BoardThemePicker } from "./Settings";
 import { COSMETIC_THEME_PURCHASES_ENABLED, PRODUCT_IDS, THEME_BUNDLE_PRODUCT_IDS } from "./products";
 import { restorePurchases } from "./purchases";
+import { syncCloudProgressNow } from "./cloudSync";
 import {
   authenticateGameCenter,
+  getCurrentGameCenterPlayer,
   getCachedGameCenterPlayerName,
   isGameCenterAvailable,
   showGameCenterLeaderboards,
 } from "./gameCenter";
+import {
+  copyReferralCode,
+  getStoredReferralCode,
+  isReferralAvailable,
+  promptForReferralCode,
+  redeemReferralCode,
+  registerReferralCode,
+  shareReferralText,
+} from "./referrals";
 import {
   DAILY_BOARD_LEADERBOARD_ACHIEVEMENTS,
   type DailyBoardLeaderboardAchievementId,
@@ -33,6 +44,7 @@ import {
   BadgeCheck,
   CalendarDays,
   Coins,
+  Copy,
   Crown,
   FlaskConical,
   Gamepad2,
@@ -62,6 +74,10 @@ export function Profile({ onBack, onOpenShop }: Props) {
   const [gameCenterBusy, setGameCenterBusy] = useState(false);
   const [gameCenterStatus, setGameCenterStatus] = useState<string | null>(null);
   const [gameCenterName, setGameCenterName] = useState(() => getCachedGameCenterPlayerName());
+  const [referralCode, setReferralCode] = useState(() => getStoredReferralCode());
+  const [referralInput, setReferralInput] = useState("");
+  const [referralBusy, setReferralBusy] = useState(false);
+  const [referralStatus, setReferralStatus] = useState<string | null>(null);
   const {
     unlockedLevel,
     highestElement,
@@ -176,6 +192,7 @@ export function Profile({ onBack, onOpenShop }: Props) {
       const player = await authenticateGameCenter();
       const authenticatedName = player.displayName?.trim() || player.alias?.trim() || "";
       setGameCenterName(authenticatedName || getCachedGameCenterPlayerName());
+      if (player.authenticated) void syncCloudProgressNow();
       setGameCenterStatus(
         player.authenticated
           ? `${tr("Signed in as")} ${player.displayName || player.alias || tr("Player")}`
@@ -208,6 +225,68 @@ export function Profile({ onBack, onOpenShop }: Props) {
     } finally {
       setGameCenterBusy(false);
     }
+  }
+
+  async function getReferralPlayerId() {
+    const player = await getCurrentGameCenterPlayer();
+    return player.authenticated && player.gamePlayerId ? player.gamePlayerId : "";
+  }
+
+  async function handleShareReferral() {
+    if (referralBusy || !isReferralAvailable()) return;
+    setReferralBusy(true);
+    try {
+      const playerId = await getReferralPlayerId();
+      if (!playerId) throw new Error(tr("Sign in to Game Center first."));
+      const code = await registerReferralCode(playerId);
+      setReferralCode(code);
+      const shared = await shareReferralText(`${tr("Join me in Atomic Fusion Rush")}: ${code}`);
+      setReferralStatus(
+        shared
+          ? tr("Referral code shared. You both receive 20 gold after their first completed game.")
+          : tr("Sharing cancelled. Your referral code is ready above."),
+      );
+    } catch (error) {
+      setReferralStatus(
+        error instanceof Error ? tr(error.message) : tr("Referral sharing failed."),
+      );
+    } finally {
+      setReferralBusy(false);
+    }
+  }
+
+  async function handleRedeemReferral() {
+    if (referralBusy || !isReferralAvailable()) return;
+    setReferralBusy(true);
+    try {
+      const playerId = await getReferralPlayerId();
+      const redeemed = await redeemReferralCode(referralInput, playerId);
+      setReferralStatus(redeemed ? tr("Code accepted. Complete your first game to receive 20 gold.") : tr("Referral code was not accepted."));
+      if (redeemed) setReferralInput("");
+    } finally {
+      setReferralBusy(false);
+    }
+  }
+
+  async function handleEnterReferralCode() {
+    if (referralBusy || !isReferralAvailable()) return;
+    try {
+      const code = await promptForReferralCode(referralInput, {
+        title: tr("Referral code"),
+        cancel: tr("Cancel"),
+        confirm: tr("Use code"),
+      });
+      if (code != null) setReferralInput(code);
+    } catch (error) {
+      console.warn("[referral] Native code entry failed", error);
+      setReferralStatus(tr("Referral code entry is unavailable. Please try again."));
+    }
+  }
+
+  async function handleCopyReferralCode() {
+    if (!referralCode) return;
+    const copied = await copyReferralCode(referralCode);
+    setReferralStatus(tr(copied ? "Friend code copied." : "Friend code could not be copied."));
   }
 
   async function handleRestorePurchases() {
@@ -341,6 +420,55 @@ export function Profile({ onBack, onOpenShop }: Props) {
                 {tr("Open")}
               </button>
             </div>
+          </section>
+        )}
+        {isReferralAvailable() && (
+          <section style={card}>
+            <div style={sectionHeading}>{tr("Invite a friend")}</div>
+            <p style={gameCenterCopy}>{tr("Share your code. You both receive 20 gold after your friend completes their first game.")}</p>
+            <div style={gameCenterActions}>
+              <button type="button" onClick={handleShareReferral} disabled={referralBusy} style={gameCenterButton}>
+                {tr(referralBusy ? "Working..." : "Share referral code")}
+              </button>
+            </div>
+            {referralCode && (
+              <div style={referralCodeRow}>
+                <small style={referralCodeText}>{`${tr("Your code")}: ${referralCode}`}</small>
+                <button
+                  type="button"
+                  onClick={() => void handleCopyReferralCode()}
+                  aria-label={tr("Copy friend code")}
+                  title={tr("Copy friend code")}
+                  style={referralCopyButton}
+                >
+                  <Copy size={15} aria-hidden="true" />
+                </button>
+              </div>
+            )}
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                void handleRedeemReferral();
+              }}
+              style={{ ...referralRedeemRow, marginTop: referralCode ? 0 : 14 }}
+            >
+              <button
+                type="button"
+                aria-label={tr("Referral code")}
+                onClick={() => void handleEnterReferralCode()}
+                style={referralInputField}
+              >
+                {referralInput || "AFR-XXXXXXX"}
+              </button>
+              <button
+                type="submit"
+                disabled={referralBusy || !referralInput}
+                style={gameCenterButton}
+              >
+                {tr("Redeem")}
+              </button>
+            </form>
+            {referralStatus && <small style={referralStatusText}>{referralStatus}</small>}
           </section>
         )}
         <section style={card} aria-label="Daily Board placement badges">
@@ -1002,6 +1130,64 @@ const gameCenterActions: React.CSSProperties = {
   justifyContent: "flex-end",
   gap: 8,
   flexWrap: "wrap",
+};
+
+const referralStatusText: React.CSSProperties = {
+  display: "block",
+  marginTop: 14,
+  lineHeight: 1.5,
+};
+
+const referralCodeText: React.CSSProperties = {
+  display: "block",
+  lineHeight: 1.4,
+};
+
+const referralCodeRow: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 7,
+  marginTop: 12,
+  marginBottom: 14,
+};
+
+const referralCopyButton: React.CSSProperties = {
+  width: 30,
+  height: 30,
+  display: "grid",
+  placeItems: "center",
+  flex: "0 0 auto",
+  padding: 0,
+  borderRadius: 9,
+  border: "1px solid color-mix(in oklch, var(--primary) 48%, var(--border))",
+  background: "color-mix(in oklch, var(--primary) 12%, var(--surface))",
+  color: "var(--primary)",
+  cursor: "pointer",
+};
+
+const referralRedeemRow: React.CSSProperties = {
+  display: "flex",
+  alignItems: "stretch",
+  gap: 10,
+};
+
+const referralInputField: React.CSSProperties = {
+  flex: "1 1 0",
+  minWidth: 0,
+  minHeight: 40,
+  boxSizing: "border-box",
+  border: "1px solid var(--border)",
+  borderRadius: 12,
+  padding: "9px 12px",
+  background: "var(--surface)",
+  color: "var(--foreground)",
+  caretColor: "var(--accent)",
+  fontFamily: "inherit",
+  fontSize: 16,
+  fontWeight: 750,
+  outline: "none",
+  textAlign: "left",
+  opacity: 1,
 };
 
 const gameCenterButton: React.CSSProperties = {

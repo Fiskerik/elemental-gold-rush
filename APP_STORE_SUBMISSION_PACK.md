@@ -1,4 +1,4 @@
-# App Store Submission Pack (iOS 1.1.2, build 170)
+# App Store Submission Pack (iOS 1.1.3)
 
 ## Metadata limits to follow
 
@@ -12,7 +12,7 @@
 
 ### Promotional Text (170 max)
 
-Discover new elements and compounds with shimmering Library cues, plus a tighter web layout that feels closer to the mobile Atomic Fusion Rush experience.
+Invite friends, earn 20 gold together, and enjoy smoother Game Center sign-in in Atomic Fusion Rush.
 
 ### Description
 
@@ -57,9 +57,9 @@ puzzle,chemistry,element,merge,atom,science,strategy,brain,logic,compound,period
 
 ### App Store localization coverage
 
-Metadata and 1.1.2 release notes are prepared for these 27 App Store locales:
+Metadata and 1.1.3 release notes are prepared for these 29 App Store locales:
 
-`ar`, `zh-Hans`, `zh-Hant`, `cs`, `da`, `nl-NL`, `en-US`, `fi`, `fr-FR`, `de-DE`, `hi`, `id`, `it`, `ja`, `ko`, `ms`, `no`, `pl`, `pt-BR`, `ru`, `es-ES`, `sv`, `ta`, `th`, `tr`, `uk`, `vi`.
+`en-GB`, `en-AU`, `ar-SA`, `zh-Hans`, `zh-Hant`, `cs`, `da`, `nl-NL`, `en-US`, `fi`, `fr-FR`, `de-DE`, `hi`, `id`, `it`, `ja`, `ko`, `ms`, `no`, `pl`, `pt-BR`, `ru`, `es-ES`, `sv`, `ta-IN`, `th`, `tr`, `uk`, `vi`.
 
 ### App Review Notes
 
@@ -83,7 +83,7 @@ Privacy policy: https://atomic-fusion.lovable.app/privacy
 
 ## Left-sidebar checklist before submit
 
-- iOS App Version 1.1.2 (build 170)
+- iOS App Version 1.1.3
   - Attach build
   - Upload required screenshot sets
   - Fill promo text, description, keywords, support URL, copyright

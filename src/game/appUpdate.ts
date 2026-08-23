@@ -1,10 +1,14 @@
-export const CURRENT_APP_VERSION = "1.1.2";
+import { compareVersions, shouldOfferAppUpdate } from "@/game/appUpdateVersion";
+
+export const CURRENT_APP_VERSION = String(import.meta.env.VITE_APP_VERSION || "").trim();
 export const APP_STORE_URL = "itms-apps://itunes.apple.com/app/id6771701538";
 
 const APP_STORE_LOOKUP_URL =
   "https://itunes.apple.com/lookup?bundleId=com.eaconsulting.atomicfusion&country=us";
+const DISMISSED_APP_UPDATE_VERSION_KEY = "atomic-fusion-dismissed-app-update-version";
+let dismissedAppUpdateVersionForSession: string | null = null;
 
-export type RequiredAppUpdate = {
+export type AppUpdate = {
   currentVersion: string;
   storeVersion: string;
   storeUrl: string;
@@ -18,8 +22,9 @@ type AppStoreLookupResponse = {
   }>;
 };
 
-export async function checkForRequiredAppUpdate(): Promise<RequiredAppUpdate | null> {
-  if (typeof window === "undefined") return null;
+export async function checkForAppUpdate(): Promise<AppUpdate | null> {
+  // An unavailable build version must never prevent the player from entering the game.
+  if (typeof window === "undefined" || !CURRENT_APP_VERSION) return null;
 
   const controller = new AbortController();
   const timeoutId = window.setTimeout(() => controller.abort(), 5000);
@@ -35,7 +40,12 @@ export async function checkForRequiredAppUpdate(): Promise<RequiredAppUpdate | n
     const result = payload.results?.[0];
     if (!result) return null;
     const storeVersion = result?.version?.trim();
-    if (!storeVersion || compareVersions(storeVersion, CURRENT_APP_VERSION) <= 0) return null;
+    if (
+      !storeVersion ||
+      !shouldOfferAppUpdate(storeVersion, CURRENT_APP_VERSION, readDismissedAppUpdateVersion())
+    ) {
+      return null;
+    }
 
     return {
       currentVersion: CURRENT_APP_VERSION,
@@ -52,22 +62,25 @@ export async function checkForRequiredAppUpdate(): Promise<RequiredAppUpdate | n
   }
 }
 
-export function compareVersions(left: string, right: string): number {
-  const leftParts = normalizeVersion(left);
-  const rightParts = normalizeVersion(right);
-  const length = Math.max(leftParts.length, rightParts.length);
-
-  for (let index = 0; index < length; index += 1) {
-    const difference = (leftParts[index] ?? 0) - (rightParts[index] ?? 0);
-    if (difference !== 0) return difference;
+export function dismissAppUpdate(storeVersion: string): void {
+  dismissedAppUpdateVersionForSession = storeVersion;
+  try {
+    window.localStorage.setItem(DISMISSED_APP_UPDATE_VERSION_KEY, storeVersion);
+  } catch {
+    // Storage may be unavailable; the notice is still dismissible for this session.
   }
-  return 0;
 }
 
-function normalizeVersion(version: string): number[] {
-  return version
-    .split(/[+-]/, 1)[0]
-    .split(".")
-    .map((part) => Number.parseInt(part, 10))
-    .map((part) => (Number.isFinite(part) ? part : 0));
+function readDismissedAppUpdateVersion(): string | null {
+  if (dismissedAppUpdateVersionForSession) return dismissedAppUpdateVersionForSession;
+  try {
+    dismissedAppUpdateVersionForSession = window.localStorage.getItem(
+      DISMISSED_APP_UPDATE_VERSION_KEY,
+    );
+    return dismissedAppUpdateVersionForSession;
+  } catch {
+    return null;
+  }
 }
+
+export { compareVersions, shouldOfferAppUpdate } from "@/game/appUpdateVersion";

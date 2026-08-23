@@ -8,6 +8,8 @@ const API_ROOT = "https://api.appstoreconnect.apple.com/v1";
 const PROMOTIONAL_TEXT_LIMIT = 170;
 const WHATS_NEW_LIMIT = 4000;
 const DESCRIPTION_LIMIT = 4000;
+const DESCRIPTION_SECTION_COUNT = 5;
+const DESCRIPTION_BULLET_COUNT = 13;
 const KEYWORDS_LIMIT = 100;
 
 const CONFIG_PATH = path.join(ROOT, "localization", "app-store", "appstore.config.json");
@@ -19,6 +21,14 @@ const sourceMetadata = JSON.parse(
 const args = process.argv.slice(2);
 const command = args[0] ?? "validate";
 const options = parseOptions(args.slice(1));
+if (options.onlyWhatsNew && options.onlyReleaseText) {
+  fail('Use either "--only-whats-new" or "--only-release-text", not both.');
+}
+const restrictedVersionFields = options.onlyReleaseText
+  ? ["promotionalText", "whatsNew"]
+  : options.onlyWhatsNew
+    ? ["whatsNew"]
+    : null;
 
 if (!["validate", "upload"].includes(command)) {
   fail(`Unknown command "${command}". Use "validate" or "upload".`);
@@ -41,11 +51,14 @@ if (!validation.ok) {
   process.exitCode = 1;
 } else if (command === "validate") {
   printValidation(notes, notesPath);
-} else if (options.dryRun) {
+} else if (options.dryRun && !restrictedVersionFields) {
   printValidation(notes, notesPath);
   console.log(`DRY RUN: would upload ${notes.locales.size} locale(s) for iOS ${version}.`);
 } else {
-  await uploadMetadata(notes, version);
+  await uploadMetadata(notes, version, {
+    restrictedVersionFields,
+    dryRun: options.dryRun,
+  });
 }
 
 function parseOptions(values) {
@@ -54,8 +67,13 @@ function parseOptions(values) {
     const value = values[index];
     if (!value.startsWith("--")) fail(`Unexpected argument "${value}".`);
     const name = value.slice(2);
-    if (name === "dry-run") {
-      parsed.dryRun = true;
+    if (name === "dry-run" || name === "only-whats-new" || name === "only-release-text") {
+      const optionName = {
+        "dry-run": "dryRun",
+        "only-whats-new": "onlyWhatsNew",
+        "only-release-text": "onlyReleaseText",
+      }[name];
+      parsed[optionName] = true;
       continue;
     }
     const next = values[index + 1];
@@ -123,7 +141,9 @@ function validateNotes(notes, metadata) {
   for (const locale of actualLocales) {
     if (!expectedSet.has(locale)) errors.push(`Unexpected locale section: ${locale}`);
   }
-  if (actualLocales.length !== actualSet.size) errors.push("Duplicate locale sections found.");
+  if (notes.order.length !== new Set(notes.order).size) {
+    errors.push("Duplicate locale sections found.");
+  }
 
   const configuredOrder = config.releaseNotesLocaleOrder ?? [];
   const expectedOrder = configuredOrder.length
@@ -132,12 +152,16 @@ function validateNotes(notes, metadata) {
         .slice()
         .sort((a, b) => displayName(metadata, a).localeCompare(displayName(metadata, b)));
   if (configuredOrder.some((locale) => !expectedSet.has(locale))) {
-    errors.push("appstore.config.json contains a release-notes locale that is missing from packages.json.");
+    errors.push(
+      "appstore.config.json contains a release-notes locale that is missing from packages.json.",
+    );
   }
   if (expectedOrder.length !== expectedLocales.length) {
-    errors.push("appstore.config.json releaseNotesLocaleOrder must include every packages.json locale exactly once.");
+    errors.push(
+      "appstore.config.json releaseNotesLocaleOrder must include every packages.json locale exactly once.",
+    );
   }
-  if (actualLocales.join("\n") !== expectedOrder.join("\n")) {
+  if (notes.order.join("\n") !== expectedOrder.join("\n")) {
     errors.push(
       `Locale sections must be alphabetical by display name: ${expectedOrder.join(", ")}`,
     );
@@ -156,20 +180,40 @@ function validateNotes(notes, metadata) {
       errors.push(`${locale}: What's New is empty or still a placeholder.`);
     }
     if (promotionalLength > PROMOTIONAL_TEXT_LIMIT) {
-      errors.push(`${locale}: Promotional Text is ${promotionalLength}/${PROMOTIONAL_TEXT_LIMIT} characters.`);
+      errors.push(
+        `${locale}: Promotional Text is ${promotionalLength}/${PROMOTIONAL_TEXT_LIMIT} characters.`,
+      );
     }
     if (whatsNewLength > WHATS_NEW_LIMIT) {
       errors.push(`${locale}: What's New is ${whatsNewLength}/${WHATS_NEW_LIMIT} characters.`);
     }
     if (!description || description.startsWith("<")) {
       errors.push(`${locale}: Description is empty or still a placeholder.`);
-    } else if (characterCount(description) > DESCRIPTION_LIMIT) {
-      errors.push(`${locale}: Description is ${characterCount(description)}/${DESCRIPTION_LIMIT} characters.`);
+    } else {
+      if (characterCount(description) > DESCRIPTION_LIMIT) {
+        errors.push(
+          `${locale}: Description is ${characterCount(description)}/${DESCRIPTION_LIMIT} characters.`,
+        );
+      }
+      const sectionCount = description.split(/\n\n/).filter(Boolean).length;
+      if (sectionCount !== DESCRIPTION_SECTION_COUNT) {
+        errors.push(
+          `${locale}: Description must contain ${DESCRIPTION_SECTION_COUNT} sections; found ${sectionCount}.`,
+        );
+      }
+      const bulletCount = description.split("\n").filter((line) => line.startsWith("• ")).length;
+      if (bulletCount !== DESCRIPTION_BULLET_COUNT) {
+        errors.push(
+          `${locale}: Description must contain ${DESCRIPTION_BULLET_COUNT} bullet points; found ${bulletCount}.`,
+        );
+      }
     }
     if (!keywords || keywords.startsWith("<")) {
       errors.push(`${locale}: Keywords are empty or still a placeholder.`);
     } else if (characterCount(keywords) > KEYWORDS_LIMIT) {
-      errors.push(`${locale}: Keywords are ${characterCount(keywords)}/${KEYWORDS_LIMIT} characters.`);
+      errors.push(
+        `${locale}: Keywords are ${characterCount(keywords)}/${KEYWORDS_LIMIT} characters.`,
+      );
     }
   }
 
@@ -194,10 +238,16 @@ function metadataForLocale(metadata, locale) {
 }
 
 function normalizeMetadataText(value) {
-  return String(value ?? "").replace(/\\n/g, "\n").replace(/\r\n?/g, "\n");
+  return String(value ?? "")
+    .replace(/\\n/g, "\n")
+    .replace(/\r\n?/g, "\n");
 }
 
-async function uploadMetadata(notes, version) {
+async function uploadMetadata(
+  notes,
+  version,
+  { restrictedVersionFields = null, dryRun = false } = {},
+) {
   const token = createAppStoreConnectToken();
   const appId = await resolveAppId(token);
   const versionResource = await resolveVersion(token, appId, version);
@@ -206,9 +256,35 @@ async function uploadMetadata(notes, version) {
     token,
     `/appStoreVersions/${versionId}/appStoreVersionLocalizations?limit=200`,
   );
+  const versionLocalizationRecords = versionLocalizations.data;
+
+  if (
+    !Array.isArray(versionLocalizationRecords) ||
+    versionLocalizationRecords.some(
+      (item) => !item?.id || typeof item.attributes?.locale !== "string",
+    )
+  ) {
+    fail(
+      `Cannot safely upload iOS ${version} metadata: App Store Connect returned an invalid locale record. No metadata was changed.`,
+    );
+  }
+
   const existingVersionLocalizations = new Map(
-    versionLocalizations.data.map((item) => [item.attributes.locale, item]),
+    versionLocalizationRecords.map((item) => [item.attributes.locale, item]),
   );
+
+  if (restrictedVersionFields) {
+    if (versionLocalizationRecords.length !== existingVersionLocalizations.size) {
+      fail(
+        `Cannot safely upload restricted release text for iOS ${version}: App Store Connect returned duplicate locale records. No metadata was changed.`,
+      );
+    }
+    await uploadVersionTextOnly(token, notes, version, existingVersionLocalizations, {
+      fields: restrictedVersionFields,
+      dryRun,
+    });
+    return;
+  }
 
   const appInfo = await resolveAppInfo(token, appId, versionResource);
   const appInfoLocalizations = await apiRequest(
@@ -220,15 +296,19 @@ async function uploadMetadata(notes, version) {
   );
 
   let createdAppInfo = 0;
+  let updatedAppInfo = 0;
+  let existingAppInfoConflicts = 0;
   let createdVersion = 0;
   let updatedVersion = 0;
   let unchangedVersion = 0;
 
   for (const [locale, entry] of notes.locales) {
-    if (!existingAppInfoLocalizations.has(locale)) {
-      const appLocale = sourceMetadata.locales[locale];
-      await apiRequest(token, "/appInfoLocalizations", {
+    const appLocale = sourceMetadata.locales[locale];
+    const existingAppInfo = existingAppInfoLocalizations.get(locale);
+    if (!existingAppInfo) {
+      const createResult = await apiRequest(token, "/appInfoLocalizations", {
         method: "POST",
+        allowConflict: true,
         body: {
           data: {
             type: "appInfoLocalizations",
@@ -244,14 +324,37 @@ async function uploadMetadata(notes, version) {
           },
         },
       });
-      createdAppInfo += 1;
+      if (createResult.conflict) {
+        // App Store Connect can keep the locale on another App Info record
+        // (for example, the live record) and still enforce locale uniqueness.
+        // The version metadata below is independent and must still be uploaded.
+        existingAppInfoConflicts += 1;
+        console.warn(
+          `App Info ${locale} already exists in App Store Connect; leaving its name and subtitle unchanged.`,
+        );
+      } else {
+        createdAppInfo += 1;
+      }
+    } else {
+      const attributes = {};
+      if (existingAppInfo.attributes.name !== appLocale.appName)
+        attributes.name = appLocale.appName;
+      if (existingAppInfo.attributes.subtitle !== appLocale.subtitle)
+        attributes.subtitle = appLocale.subtitle;
+      if (Object.keys(attributes).length > 0) {
+        await apiRequest(token, `/appInfoLocalizations/${existingAppInfo.id}`, {
+          method: "PATCH",
+          body: { data: { type: "appInfoLocalizations", id: existingAppInfo.id, attributes } },
+        });
+        updatedAppInfo += 1;
+      }
     }
 
-    const existing = existingVersionLocalizations.get(locale);
+    let existing = existingVersionLocalizations.get(locale);
     if (!existing) {
-      const appLocale = sourceMetadata.locales[locale];
-      await apiRequest(token, "/appStoreVersionLocalizations", {
+      const createResult = await apiRequest(token, "/appStoreVersionLocalizations", {
         method: "POST",
+        allowConflict: true,
         body: {
           data: {
             type: "appStoreVersionLocalizations",
@@ -268,12 +371,26 @@ async function uploadMetadata(notes, version) {
           },
         },
       });
-      createdVersion += 1;
-      continue;
+      if (!createResult.conflict) {
+        createdVersion += 1;
+        continue;
+      }
+
+      // Recover from stale/incomplete relationship results by reading the
+      // version localizations again and updating the record Apple says exists.
+      const refreshed = await apiRequest(
+        token,
+        `/appStoreVersions/${versionId}/appStoreVersionLocalizations?limit=200`,
+      );
+      existing = refreshed.data.find((item) => item.attributes.locale === locale);
+      if (!existing) {
+        fail(
+          `App Store Connect reports that version locale ${locale} already exists, but it was not returned for iOS ${version}.`,
+        );
+      }
     }
 
     const attributes = {};
-    const appLocale = sourceMetadata.locales[locale];
     const description = normalizeMetadataText(appLocale.description);
     const keywords = normalizeMetadataText(appLocale.keywords);
     if (existing.attributes.description !== description) {
@@ -307,9 +424,64 @@ async function uploadMetadata(notes, version) {
 
   console.log(`Uploaded metadata for iOS ${version}.`);
   console.log(`App-info localizations created: ${createdAppInfo}`);
+  console.log(`App-info localizations updated: ${updatedAppInfo}`);
+  console.log(`Existing App-info locales skipped: ${existingAppInfoConflicts}`);
   console.log(`Version localizations created: ${createdVersion}`);
   console.log(`Version localizations updated: ${updatedVersion}`);
   console.log(`Version localizations unchanged: ${unchangedVersion}`);
+}
+
+async function uploadVersionTextOnly(
+  token,
+  notes,
+  version,
+  existingVersionLocalizations,
+  { fields, dryRun = false },
+) {
+  const missingLocales = [...notes.locales.keys()].filter(
+    (locale) => !existingVersionLocalizations.has(locale),
+  );
+  if (missingLocales.length > 0) {
+    fail(
+      `Cannot safely upload restricted release text for iOS ${version}: App Store Connect is missing version localizations for ${missingLocales.join(", ")}. No metadata was changed.`,
+    );
+  }
+
+  const updates = [...notes.locales].flatMap(([locale, entry]) => {
+    const existing = existingVersionLocalizations.get(locale);
+    const attributes = {};
+    for (const field of fields) {
+      if (existing.attributes[field] !== entry[field]) attributes[field] = entry[field];
+    }
+    return Object.keys(attributes).length > 0 ? [{ locale, existing, attributes }] : [];
+  });
+
+  console.log(`Preflight passed: all ${notes.locales.size} iOS ${version} locale records exist.`);
+  console.log(
+    `Upload scope: only ${fields.map((field) => `appStoreVersionLocalizations.attributes.${field}`).join(" and ")}.`,
+  );
+
+  if (dryRun) {
+    console.log(`DRY RUN: would update ${updates.length} locale(s); no metadata was changed.`);
+    return;
+  }
+
+  for (const { existing, attributes } of updates) {
+    await apiRequest(token, `/appStoreVersionLocalizations/${existing.id}`, {
+      method: "PATCH",
+      body: {
+        data: {
+          type: "appStoreVersionLocalizations",
+          id: existing.id,
+          attributes,
+        },
+      },
+    });
+  }
+
+  console.log(`Uploaded restricted release text for iOS ${version}.`);
+  console.log(`Version localizations updated: ${updates.length}`);
+  console.log(`Version localizations unchanged: ${notes.locales.size - updates.length}`);
 }
 
 function createAppStoreConnectToken() {
@@ -351,7 +523,8 @@ async function resolveAppId(token) {
 async function resolveVersion(token, appId, version) {
   const response = await apiRequest(token, `/apps/${appId}/appStoreVersions?limit=200`);
   const matches = response.data.filter(
-    (item) => item.attributes.versionString === version && item.attributes.platform === config.platform,
+    (item) =>
+      item.attributes.versionString === version && item.attributes.platform === config.platform,
   );
   if (matches.length !== 1) {
     fail(
@@ -380,20 +553,16 @@ async function resolveAppInfo(token, appId, versionResource) {
       : matches.filter((item) => item.attributes.appStoreState !== "READY_FOR_SALE");
   if (preferred.length === 1) return preferred[0];
 
-  const exactState = matches.filter(
-    (item) => item.attributes.appStoreState === versionState,
-  );
+  const exactState = matches.filter((item) => item.attributes.appStoreState === versionState);
   if (exactState.length === 1) return exactState[0];
 
-  const states = matches
-    .map((item) => `${item.id}:${item.attributes.appStoreState}`)
-    .join(", ");
+  const states = matches.map((item) => `${item.id}:${item.attributes.appStoreState}`).join(", ");
   fail(
     `Could not uniquely select the App Info record for iOS ${versionResource.attributes?.versionString ?? "the requested version"}. Found ${matches.length}: ${states}. Set ASC_APP_INFO_ID to override.`,
   );
 }
 
-async function apiRequest(token, endpoint, { method = "GET", body } = {}) {
+async function apiRequest(token, endpoint, { method = "GET", body, allowConflict = false } = {}) {
   const response = await fetch(`${API_ROOT}${endpoint}`, {
     method,
     headers: {
@@ -410,11 +579,17 @@ async function apiRequest(token, endpoint, { method = "GET", body } = {}) {
   } catch {
     payload = { raw: text };
   }
+  if (response.status === 409 && allowConflict) {
+    return { conflict: true, payload };
+  }
   if (!response.ok) {
-    const detail = payload?.errors?.map((error) => error.detail).filter(Boolean).join("; ");
+    const detail = payload?.errors
+      ?.map((error) => error.detail)
+      .filter(Boolean)
+      .join("; ");
     fail(`App Store Connect API ${response.status}: ${detail || text || response.statusText}`);
   }
-  return payload;
+  return { conflict: false, ...payload };
 }
 
 function displayName(metadata, locale) {

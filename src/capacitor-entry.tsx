@@ -183,7 +183,7 @@ createRoot(rootElement).render(
 );
 
 if (Capacitor.getPlatform() === "ios") {
-  void Keyboard.setResizeMode({ mode: KeyboardResize.Body }).catch(() => {});
+  void Keyboard.setResizeMode({ mode: KeyboardResize.Native }).catch(() => {});
   void Keyboard.setStyle({ style: KeyboardStyle.Default }).catch(() => {});
   void Keyboard.setAccessoryBarVisible({ isVisible: false }).catch(() => {});
   void Keyboard.setScroll({ isDisabled: false }).catch(() => {});

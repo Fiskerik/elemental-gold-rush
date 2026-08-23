@@ -1,6 +1,6 @@
 {
   "name": "tanstack_start_ts",
-  "version": "1.1.2",
+  "version": "1.1.4",
   "private": true,
   "sideEffects": false,
   "type": "module",
@@ -21,6 +21,7 @@
     "cap:sync": "npm run cap:prepare && cap sync ios",
     "cap:open:ios": "cap open ios",
     "lint": "eslint .",
+    "test:app-update": "node --test tests/appUpdateVersion.test.ts",
     "format": "prettier --write ."
   },
   "dependencies": {

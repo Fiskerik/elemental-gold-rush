@@ -1210,6 +1210,7 @@ export function ElementalBossBoard({
                   background: "rgba(4,6,16,0.7)",
                   display: "grid",
                   placeItems: "center",
+                  zIndex: 7,
                   padding: 20,
                 }}
               >
@@ -1339,7 +1340,7 @@ export function ElementalBossBoard({
                           cursor: "pointer",
                         }}
                       >
-                        {nextLevel ? "Continue" : "Finish"}
+                        {nextLevel ? "Next" : "Finish"}
                       </button>
                     )}
                   </div>

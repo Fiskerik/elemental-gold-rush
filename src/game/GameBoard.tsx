@@ -143,6 +143,81 @@ const MERGE_COMBO_SOUND_STEP_MS = 130;
 const MERGE_BURST_LIFETIME_MS = 980;
 const SCORE_POPUP_LIFETIME_MS = 1050;
 const MERGE_PULSE_LIFETIME_MS = 520;
+
+type GravityDirection = "up" | "northwest" | "northeast" | "east" | "west";
+
+const GRAVITY_DIRECTION_VECTORS: Record<GravityDirection, { x: number; y: number }> = {
+  up: { x: 0, y: -1 },
+  northwest: { x: -Math.SQRT1_2, y: -Math.SQRT1_2 },
+  northeast: { x: Math.SQRT1_2, y: -Math.SQRT1_2 },
+  east: { x: 1, y: 0 },
+  west: { x: -1, y: 0 },
+};
+
+const GRAVITY_DIRECTION_LABELS: Record<GravityDirection, string> = {
+  up: "Up",
+  northwest: "Northwest",
+  northeast: "Northeast",
+  east: "East",
+  west: "West",
+};
+
+function gravityDirectionFromDrag(dx: number, dy: number): GravityDirection {
+  if (Math.hypot(dx, dy) < 18) return "up";
+  if (dy < -8 && Math.abs(dx) > 8) return dx < 0 ? "northwest" : "northeast";
+  if (Math.abs(dx) > Math.abs(dy) * 0.55) return dx < 0 ? "west" : "east";
+  return "up";
+}
+
+function settleAtomsToward(
+  atoms: Ball[],
+  direction: GravityDirection,
+  boardWidth: number,
+  boardHeight: number,
+  topPad: number,
+  sidePad: number,
+): Ball[] {
+  const vector = GRAVITY_DIRECTION_VECTORS[direction];
+  const ordered = [...atoms].sort(
+    (left, right) =>
+      right.x * vector.x + right.y * vector.y - (left.x * vector.x + left.y * vector.y),
+  );
+  const settled: Ball[] = [];
+
+  for (const atom of ordered) {
+    let travel = Number.POSITIVE_INFINITY;
+    const minX = sidePad + atom.r;
+    const maxX = boardWidth - sidePad - atom.r;
+    const minY = topPad + atom.r;
+    const maxY = boardHeight - sidePad - atom.r;
+
+    if (vector.x < 0) travel = Math.min(travel, (atom.x - minX) / -vector.x);
+    if (vector.x > 0) travel = Math.min(travel, (maxX - atom.x) / vector.x);
+    if (vector.y < 0) travel = Math.min(travel, (atom.y - minY) / -vector.y);
+    if (vector.y > 0) travel = Math.min(travel, (maxY - atom.y) / vector.y);
+
+    for (const placed of settled) {
+      const offsetX = atom.x - placed.x;
+      const offsetY = atom.y - placed.y;
+      const radius = atom.r + placed.r + 0.5;
+      const alongRay = offsetX * vector.x + offsetY * vector.y;
+      const discriminant =
+        alongRay * alongRay - (offsetX * offsetX + offsetY * offsetY - radius * radius);
+      if (discriminant < 0) continue;
+      const contact = -alongRay - Math.sqrt(discriminant);
+      if (contact >= 0) travel = Math.min(travel, contact);
+    }
+
+    const safeTravel = Number.isFinite(travel) ? Math.max(0, travel) : 0;
+    settled.push({
+      ...atom,
+      x: Math.max(minX, Math.min(maxX, atom.x + vector.x * safeTravel)),
+      y: Math.max(minY, Math.min(maxY, atom.y + vector.y * safeTravel)),
+    });
+  }
+
+  return settled;
+}
 const CHALLENGE_CLEAR_SCORE = 5000;
 const POWER_UP_CLEAR_DELAY_MS = 2000;
 const DAILY_COMPOUND_GRID_COLS = 10;
@@ -799,6 +874,7 @@ function DailyCompoundGridBoard({
   const isCampaignSearchFind =
     getCompoundChallengeKind(levelId) === "search-find" &&
     MOLECULE_CHALLENGE_BY_LEVEL[levelId] === secretCompoundId;
+  const nextCampaignLevel = isCampaignSearchFind ? getNextLevel(levelId) : undefined;
   const compound = useMemo(
     () => COMPOUNDS.find((item) => item.id === secretCompoundId) ?? null,
     [secretCompoundId],
@@ -1150,20 +1226,34 @@ function DailyCompoundGridBoard({
               {result.wasNew ? tr("Added to collection") : `${tr("Collection count")} ${result.count}`}
               {result.awarded ? ` - ${tr("Daily reward")} +${DAILY_FEATURE_REWARD_COINS} ${tr("coins")}` : ""}
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                if (isCampaignSearchFind) {
-                  if (onMap) onMap();
-                  else onWin(getNextLevel(levelId)?.id ?? null);
-                  return;
-                }
-                onExit();
-              }}
-              style={{ ...modalBtn, width: "100%" }}
-            >
-              {isCampaignSearchFind ? tr("Map") : tr("Back to Menu")}
-            </button>
+            {isCampaignSearchFind ? (
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => (onMap ? onMap() : onExit())}
+                  style={{
+                    ...modalBtn,
+                    background: "var(--surface-high)",
+                    color: "var(--foreground)",
+                  }}
+                >
+                  {tr("Map")}
+                </button>
+                {nextCampaignLevel && (
+                  <button
+                    type="button"
+                    onClick={() => onWin(nextCampaignLevel.id)}
+                    style={modalBtn}
+                  >
+                    {tr("Next level")}
+                  </button>
+                )}
+              </div>
+            ) : (
+              <button type="button" onClick={onExit} style={{ ...modalBtn, width: "100%" }}>
+                {tr("Back to Menu")}
+              </button>
+            )}
           </div>
         </Modal>
       )}
@@ -1316,6 +1406,7 @@ function StandardGameBoard({
   const wideBoard = useWideBoardLayout();
   const level = getLevelById(levelId) ?? LEVELS[0];
   const gameMode = getGameMode(mode);
+  const nextCampaignLevel = mode === "campaign" ? getNextLevel(levelId) : undefined;
   const powerUpStage = !preview && mode === "campaign" && !secretCompoundId ? level.powerUpStage : undefined;
   const isPowerUpStage = powerUpStage != null;
   const compoundEnabled = !preview && mode === "campaign" && !isPowerUpStage;
@@ -1550,6 +1641,12 @@ function StandardGameBoard({
   const [projectile, setProjectile] = useState<{ x: number; y: number } | null>(null);
   const [eGunBeamPath, setEGunBeamPath] = useState<{ x: number; y: number }[] | null>(null);
   const [gravityFxId, setGravityFxId] = useState<number | null>(null);
+  const [gravityAimMode, setGravityAimMode] = useState(false);
+  const [gravityAimDrag, setGravityAimDrag] = useState<{
+    startX: number;
+    startY: number;
+    direction: GravityDirection;
+  } | null>(null);
   const [fusionJumpFx, setFusionJumpFx] = useState<{ id: number; x: number; y: number } | null>(
     null,
   );
@@ -2218,6 +2315,8 @@ function StandardGameBoard({
         setWiggleIds(new Set());
         setProjectile(null);
         setGravityFxId(null);
+        setGravityAimMode(false);
+        setGravityAimDrag(null);
         setGammaImpactFx(null);
         setBusy(false);
         setAimDeg(0);
@@ -2406,6 +2505,8 @@ function StandardGameBoard({
     setWiggleIds(new Set());
     setProjectile(null);
     setGravityFxId(null);
+    setGravityAimMode(false);
+    setGravityAimDrag(null);
     setGammaImpactFx(null);
     setBusy(false);
     setAimDeg(0);
@@ -5660,8 +5761,28 @@ function StandardGameBoard({
     if (powerUpStage === "emission") completePowerUpStageAfterDelay("emission", score);
   }
 
-  function triggerGravityPowerUp() {
+  function activateGravityPowerUp() {
     if (busy || gameOver || won || gravityCharges <= 0) return;
+    if (labUpgradeLevel("gravity") < 5) {
+      triggerGravityPowerUp("up");
+      return;
+    }
+    if (gravityAimMode) {
+      setGravityAimMode(false);
+      setGravityAimDrag(null);
+      spawnPopup("GRAVITY CANCELED");
+      return;
+    }
+    setGravityAimMode(true);
+    setGravityAimDrag(null);
+    spawnPopup("SLIDE GRAVITY DIRECTION");
+    haptic(20);
+  }
+
+  function triggerGravityPowerUp(direction: GravityDirection) {
+    if (busy || gameOver || won || gravityCharges <= 0) return;
+    setGravityAimMode(false);
+    setGravityAimDrag(null);
     setBusy(true);
     const fxId = Date.now();
     setGravityFxId(fxId);
@@ -5670,38 +5791,9 @@ function StandardGameBoard({
     runPowerUpsUsedRef.current += 1;
     const atoms = balls.filter((b) => b.stoneHp == null).map((b) => ({ ...b }));
     const stones = balls.filter((b) => b.stoneHp != null).map((b) => ({ ...b }));
-    atoms.sort((a, b) => a.y - b.y);
-    const settled: Ball[] = [];
-    for (const atom of atoms) {
-      let y = TOP_PAD + atom.r;
-      for (const placed of settled) {
-        const dx = atom.x - placed.x;
-        const min = atom.r + placed.r;
-        if (Math.abs(dx) < min) {
-          const verticalGap = Math.sqrt(Math.max(0, min * min - dx * dx));
-          y = Math.max(y, placed.y + verticalGap + 0.5);
-        }
-      }
-      settled.push({
-        ...atom,
-        x: Math.max(SIDE_PAD + atom.r, Math.min(boardW - SIDE_PAD - atom.r, atom.x)),
-        y,
-      });
-    }
+    const settled = settleAtomsToward(atoms, direction, boardW, boardH, TOP_PAD, SIDE_PAD);
 
-    let gravityBoard: Board = [...stones, ...settled];
-    let crushStoneBonus = 0;
-    if (labUpgradeLevel("gravity") >= 5 && stones.length > 0) {
-      const crushed = damageStones(gravityBoard, new Map(stones.map((stone) => [stone.id, 1])));
-      gravityBoard = crushed.balls;
-      crushStoneBonus = crushed.bonus;
-      if (crushed.bonus > 0)
-        grantFusionJump(fusionJumpRewardForStoneDestroy(crushed.destroyedCount));
-      if (crushed.hitIds.size > 0) {
-        setStoneHitIds(crushed.hitIds);
-        setTimeout(() => setStoneHitIds(new Set()), 380);
-      }
-    }
+    const gravityBoard: Board = [...stones, ...settled];
     let result = mergeSettledBoard(gravityBoard, geo, target, 118, undefined, false, 0, {
       unstableScoreMultiplier,
       chainShimmer: labUpgradeLevel("shimmer") >= 5,
@@ -5755,8 +5847,7 @@ function StandardGameBoard({
 
     setBalls(result.balls.map((b) => (b.stoneHp != null ? b : { ...b, r: radiusFor(b.atom) })));
     setHighlightId(result.finalBallId);
-    const gained =
-      Math.floor(result.scoreGained * level.scoreMultiplier) + mergeStoneBonus + crushStoneBonus;
+    const gained = Math.floor(result.scoreGained * level.scoreMultiplier) + mergeStoneBonus;
     if (!isPowerUpStage) {
       setScore((s) => s + gained);
       addScore(gained);
@@ -5765,8 +5856,8 @@ function StandardGameBoard({
       shot: shots,
       action:
         result.merges.length > 0
-          ? `Gravity caused ${result.merges.length} merge${result.merges.length === 1 ? "" : "s"}`
-          : "Gravity shifted the board",
+          ? `Gravity ${GRAVITY_DIRECTION_LABELS[direction]} caused ${result.merges.length} merge${result.merges.length === 1 ? "" : "s"}`
+          : `Gravity shifted the board ${GRAVITY_DIRECTION_LABELS[direction]}`,
       points: gained,
       powerUp: result.merges.some((merge) => merge.stabilizedIsotope)
         ? "Gravity, Isotope ×2"
@@ -5796,10 +5887,9 @@ function StandardGameBoard({
         }, mergeComboCueDelay(i));
       });
     } else {
-      spawnPopup("🌀 Gravity shift");
+      spawnPopup(`GRAVITY ${GRAVITY_DIRECTION_LABELS[direction].toUpperCase()}`);
     }
-    if (mergeStoneBonus + crushStoneBonus > 0)
-      spawnPopup(`⛰ +${formatScore(mergeStoneBonus + crushStoneBonus)}`);
+    if (mergeStoneBonus > 0) spawnPopup(`⛰ +${formatScore(mergeStoneBonus)}`);
     reportQuestProgress({
       merges: result.merges.length,
       discoveries: getCollectibleDiscoveries(undiscovered),
@@ -6259,6 +6349,11 @@ function StandardGameBoard({
     onMap();
   }
 
+  async function handleWonNext() {
+    await runAttemptAdIfDue();
+    onWin(nextCampaignLevel?.id ?? null);
+  }
+
   async function handleGameOverMain() {
     await runAttemptAdIfDue();
     onExit();
@@ -6702,6 +6797,15 @@ function StandardGameBoard({
           ref={boardRef}
           onPointerDown={(e) => {
             (e.target as Element).setPointerCapture?.(e.pointerId);
+            if (gravityAimMode) {
+              const rect = boardRef.current!.getBoundingClientRect();
+              setGravityAimDrag({
+                startX: e.clientX - rect.left,
+                startY: e.clientY - rect.top,
+                direction: "up",
+              });
+              return;
+            }
             if (compoundMode) {
               handleCompoundBoardTap(e.clientX, e.clientY);
               return;
@@ -6729,6 +6833,17 @@ function StandardGameBoard({
             updateAimFromPointer(e.clientX, e.clientY);
           }}
           onPointerMove={(e) => {
+            if (gravityAimMode && gravityAimDrag) {
+              const rect = boardRef.current!.getBoundingClientRect();
+              setGravityAimDrag({
+                ...gravityAimDrag,
+                direction: gravityDirectionFromDrag(
+                  e.clientX - rect.left - gravityAimDrag.startX,
+                  e.clientY - rect.top - gravityAimDrag.startY,
+                ),
+              });
+              return;
+            }
             if (grabbing) {
               const rect = boardRef.current!.getBoundingClientRect();
               setGrabbing({
@@ -6748,6 +6863,17 @@ function StandardGameBoard({
             updateAimFromPointer(e.clientX, e.clientY);
           }}
           onPointerUp={(e) => {
+            if (gravityAimMode) {
+              const rect = boardRef.current!.getBoundingClientRect();
+              const direction = gravityAimDrag
+                ? gravityDirectionFromDrag(
+                    e.clientX - rect.left - gravityAimDrag.startX,
+                    e.clientY - rect.top - gravityAimDrag.startY,
+                  )
+                : "up";
+              triggerGravityPowerUp(direction);
+              return;
+            }
             if (grabbing) {
               const rect = boardRef.current!.getBoundingClientRect();
               dropGrabbed(e.clientX - rect.left, e.clientY - rect.top);
@@ -6760,6 +6886,7 @@ function StandardGameBoard({
             updateAimFromPointer(e.clientX, e.clientY);
             if (shootingStyle === "hold") shoot();
           }}
+          onPointerCancel={() => setGravityAimDrag(null)}
           className={
             dangerFeedbackState === "high"
               ? "game-board-surface danger-high"
@@ -6780,7 +6907,7 @@ function StandardGameBoard({
             display: "flex",
             flexDirection: "column",
             touchAction: "none",
-            cursor: compoundMode ? "pointer" : "crosshair",
+            cursor: gravityAimMode || compoundMode ? "pointer" : "crosshair",
             userSelect: "none",
           }}
         >
@@ -6817,6 +6944,37 @@ function StandardGameBoard({
               zIndex: 0,
             }}
           />
+
+          {gravityAimMode && (
+            <div
+              aria-live="polite"
+              style={{
+                position: "absolute",
+                left: "50%",
+                top: 16,
+                zIndex: 12,
+                transform: "translateX(-50%)",
+                width: "max-content",
+                maxWidth: "calc(100% - 24px)",
+                padding: "9px 12px",
+                borderRadius: 12,
+                border: "1px solid var(--accent)",
+                background: "color-mix(in oklch, var(--surface) 92%, transparent)",
+                boxShadow: "0 8px 24px rgba(0,0,0,0.4), 0 0 18px var(--accent-glow)",
+                textAlign: "center",
+                pointerEvents: "none",
+              }}
+            >
+              <div style={{ color: "var(--accent)", fontSize: 18, letterSpacing: 6 }}>
+                ← ↖ ↑ ↗ →
+              </div>
+              <div style={{ marginTop: 2, fontSize: 10, fontWeight: 900 }}>
+                {gravityAimDrag
+                  ? `${tr("Release for")} ${tr(GRAVITY_DIRECTION_LABELS[gravityAimDrag.direction])}`
+                  : tr("Slide in a Gravity direction")}
+              </div>
+            </div>
+          )}
 
           {/* BALLS — absolutely positioned in pixel space */}
           {compoundMode && (
@@ -7635,20 +7793,30 @@ function StandardGameBoard({
               <button
                 type="button"
                 className={powerUpStage === "gravity" ? "target-claim-flash" : undefined}
-                title="Gravity: make all atoms fall upward. Combos count toward Grab progress."
+                title={
+                  labUpgradeLevel("gravity") >= 5
+                    ? "Gravity: tap to activate, then slide Up, Northwest, Northeast, East, or West."
+                    : "Gravity: make all atoms fall upward. Combos count toward Grab progress."
+                }
                 aria-label={`Use Gravity power-up (${gravityCharges} available)`}
-                onClick={triggerGravityPowerUp}
+                onClick={activateGravityPowerUp}
                 {...powerUpInfoHandlers(
                   "🌀 Gravity",
-                  "Immediately lifts all atoms upward and resolves any new fusions. Because it changes the board right away, it cannot be canceled after use.",
+                  labUpgradeLevel("gravity") >= 5
+                    ? "Tap to activate, then slide on the board toward Up, Northwest, Northeast, East, or West. Release to move the atoms and resolve new fusions."
+                    : "Immediately lifts all atoms upward and resolves any new fusions. Because it changes the board right away, it cannot be canceled after use.",
                 )}
                 disabled={busy}
                 style={{
                   ...powerUpIconBtn,
-                  border: "1px solid var(--accent)",
-                  background: "linear-gradient(135deg, oklch(0.55 0.16 260), var(--primary))",
+                  border: `1px solid ${gravityAimMode ? "var(--success, var(--accent))" : "var(--accent)"}`,
+                  background: gravityAimMode
+                    ? "linear-gradient(135deg, var(--accent), oklch(0.55 0.16 260))"
+                    : "linear-gradient(135deg, oklch(0.55 0.16 260), var(--primary))",
                   color: "var(--primary-foreground)",
-                  boxShadow: "0 0 14px var(--accent-glow)",
+                  boxShadow: gravityAimMode
+                    ? "0 0 22px var(--accent-glow)"
+                    : "0 0 14px var(--accent-glow)",
                   opacity: busy ? 0.65 : 1,
                   cursor: busy ? "not-allowed" : "pointer",
                 }}
@@ -8001,8 +8169,10 @@ function StandardGameBoard({
             onClaimPowerUp={claimResultPowerUp}
             onDiscoveryClick={setDiscoveryEl}
             onMain={handleWonMain}
-            onNext={handleWonMap}
-            nextLabel="Map"
+            onSecondary={nextCampaignLevel ? handleWonMap : undefined}
+            secondaryLabel="Map"
+            onNext={nextCampaignLevel ? handleWonNext : handleWonMap}
+            nextLabel={nextCampaignLevel ? "Next level" : "Map"}
           />
         )}
         {gameOverContinueOpen && !won && !gameOver && (
@@ -9244,6 +9414,8 @@ function ResultModal({
   onClaimPowerUp,
   onDiscoveryClick,
   onMain,
+  onSecondary,
+  secondaryLabel,
   onNext,
   nextLabel,
 }: {
@@ -9266,6 +9438,8 @@ function ResultModal({
   onClaimPowerUp?: (powerUp: InventoryPowerUpId) => void;
   onDiscoveryClick?: (atomicNumber: number) => void;
   onMain: () => void;
+  onSecondary?: () => void;
+  secondaryLabel?: string;
   onNext: () => void;
   nextLabel?: string;
 }) {
@@ -9722,6 +9896,14 @@ function ResultModal({
         >
           {tr("Menu")}
         </button>
+        {onSecondary && (
+          <button
+            onClick={onSecondary}
+            style={{ ...modalBtn, background: "var(--surface-high)", color: "var(--foreground)" }}
+          >
+            {secondaryLabel ? tr(secondaryLabel) : tr("Map")}
+          </button>
+        )}
         <button onClick={onNext} style={modalBtn}>
           {nextLabel ? tr(nextLabel) : tr("Next")}
         </button>

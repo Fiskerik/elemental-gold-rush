@@ -16,7 +16,10 @@ const config: CapacitorConfig = {
   },
   plugins: {
     Keyboard: {
-      resize: KeyboardResize.Body,
+      // Let WKWebView resize its viewport. Body resizing fights the app shell's
+      // 100dvh layout and can enter a reflow loop when a low-page input opens
+      // the iOS keyboard.
+      resize: KeyboardResize.Native,
       style: KeyboardStyle.Default,
     },
     SplashScreen: {

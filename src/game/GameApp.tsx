@@ -2,7 +2,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { StatusBar, Style } from "@capacitor/status-bar";
-import { Coins } from "lucide-react";
+import { Coins, X } from "lucide-react";
 import { MainMenu } from "@/game/MainMenu";
 import { openAppStoreReview } from "@/game/appReview";
 import { startCloudProgressSync } from "@/game/cloudSync";
@@ -21,11 +21,22 @@ import { getTodayQuestDate } from "@/game/quests";
 import { GameModeId } from "@/game/challenges";
 import { MOLECULE_CHALLENGE_BY_LEVEL, getCompoundChallengeKind, getLevelById } from "@/game/levels";
 import type { HowToPlayMode } from "@/game/HowToPlay";
-import { APP_STORE_URL, checkForRequiredAppUpdate, type RequiredAppUpdate } from "@/game/appUpdate";
+import {
+  APP_STORE_URL,
+  checkForAppUpdate,
+  dismissAppUpdate,
+  type AppUpdate,
+} from "@/game/appUpdate";
 import { consumePendingPushRoute, recordPushActivity } from "@/game/pushNotifications";
 import { useProgress } from "@/game/store";
 import { useDomLocalization } from "@/game/useDomLocalization";
 import { t, type AppLanguage } from "@/game/localization";
+import { getCurrentGameCenterPlayer } from "@/game/gameCenter";
+import {
+  REFERRAL_REWARD_COINS,
+  isReferralAvailable,
+  settleCompletedReferral,
+} from "@/game/referrals";
 
 const FIRST_ENTRY_TUTORIAL_TIP_IDS: Record<HowToPlayMode, string> = {
   normal: "onboarding-normal-game",
@@ -63,13 +74,13 @@ export function GameApp() {
   const appReviewMilestonePromptSeen = useProgress((s) => s.appReviewMilestonePromptSeen);
   const appReviewMilestoneRewardClaimed = useProgress((s) => s.appReviewMilestoneRewardClaimed);
   const refreshDailyFeatures = useProgress((s) => s.refreshDailyFeatures);
+  const grantGoldCoins = useProgress((s) => s.grantGoldCoins);
   const markAppReviewMilestonePromptSeen = useProgress((s) => s.markAppReviewMilestonePromptSeen);
   const claimAppReviewMilestoneReward = useProgress((s) => s.claimAppReviewMilestoneReward);
   const [screen, setScreen] = useState<Screen>({ name: "menu" });
   const [gameRunNonce, setGameRunNonce] = useState(0);
   const [showLaunchScreen, setShowLaunchScreen] = useState(true);
-  const [appUpdateCheckComplete, setAppUpdateCheckComplete] = useState(false);
-  const [requiredAppUpdate, setRequiredAppUpdate] = useState<RequiredAppUpdate | null>(null);
+  const [appUpdate, setAppUpdate] = useState<AppUpdate | null>(null);
   const [resumePrompt, setResumePrompt] = useState<ReturnType<typeof getSavedRunSummary>>(null);
   const [appReviewMilestonePromptOpen, setAppReviewMilestonePromptOpen] = useState(false);
   const [appReviewRequested, setAppReviewRequested] = useState(false);
@@ -77,6 +88,25 @@ export function GameApp() {
   const isNativeIos = Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios";
 
   useDomLocalization(appLanguage);
+
+  useEffect(() => {
+    if (!isReferralAvailable() || completedGameCount <= 0) return;
+    let active = true;
+    void (async () => {
+      const player = await getCurrentGameCenterPlayer();
+      if (!player.authenticated || !player.gamePlayerId) return;
+      const result = await settleCompletedReferral(player.gamePlayerId);
+      if (!active) return;
+      if (result.referredAwarded) {
+        grantGoldCoins(REFERRAL_REWARD_COINS, "Referral reward");
+      } else if (result.referrerCoins > 0) {
+        grantGoldCoins(result.referrerCoins, "Referral reward");
+      }
+    })().catch((error) => console.warn("[referral] Could not settle reward", error));
+    return () => {
+      active = false;
+    };
+  }, [completedGameCount, grantGoldCoins]);
 
   useEffect(() => {
     if (!isNativeIos) return;
@@ -93,26 +123,13 @@ export function GameApp() {
   }, [isNativeIos]);
 
   useEffect(() => {
-    if (!isNativeIos) {
-      setAppUpdateCheckComplete(true);
-      return;
-    }
+    if (!isNativeIos) return;
 
     let active = true;
-    const safetyTimeoutId = window.setTimeout(() => {
-      if (active) {
-        console.warn(
-          "[app-update] Store version check timed out; continuing with the current build.",
-        );
-        setAppUpdateCheckComplete(true);
-      }
-    }, 6500);
     const refreshAppUpdate = async () => {
-      const update = await checkForRequiredAppUpdate();
+      const update = await checkForAppUpdate();
       if (!active) return;
-      setRequiredAppUpdate(update);
-      setAppUpdateCheckComplete(true);
-      window.clearTimeout(safetyTimeoutId);
+      setAppUpdate(update);
     };
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") void refreshAppUpdate();
@@ -122,7 +139,6 @@ export function GameApp() {
     document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => {
       active = false;
-      window.clearTimeout(safetyTimeoutId);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [isNativeIos]);
@@ -177,7 +193,7 @@ export function GameApp() {
     if (route === "daily-compound") startSecretCompound();
   }, []);
 
-  if (showLaunchScreen || !appUpdateCheckComplete) return <LaunchScreen />;
+  if (showLaunchScreen) return <LaunchScreen />;
 
   const shouldShowAppReviewMilestone =
     completedGameCount >= 4 && !appReviewMilestonePromptSeen && !appReviewMilestoneRewardClaimed;
@@ -206,12 +222,18 @@ export function GameApp() {
       <>
         {content}
         {appReviewMilestonePrompt}
-        {requiredAppUpdate && (
-          <RequiredAppUpdatePrompt
+        {appUpdate && (
+          <AppUpdateNotice
             language={appLanguage}
-            update={requiredAppUpdate}
+            update={appUpdate}
             onUpdate={() => {
-              window.location.href = requiredAppUpdate.storeUrl || APP_STORE_URL;
+              dismissAppUpdate(appUpdate.storeVersion);
+              setAppUpdate(null);
+              window.location.href = appUpdate.storeUrl || APP_STORE_URL;
+            }}
+            onDismiss={() => {
+              dismissAppUpdate(appUpdate.storeVersion);
+              setAppUpdate(null);
             }}
           />
         )}
@@ -616,8 +638,12 @@ function AppReviewMilestonePrompt({
         </h2>
         <p style={{ margin: "0 0 16px", color: "var(--muted-foreground)", fontSize: 13 }}>
           {showRating
-            ? tr("Your milestone bonus is in your wallet. If Atomic Fusion Rush is hitting the spot, a quick App Store rating helps a lot.")
-            : tr("Your milestone bonus is in your wallet. Keep building cleaner chains and pushing the next element.")}
+            ? tr(
+                "Your milestone bonus is in your wallet. If Atomic Fusion Rush is hitting the spot, a quick App Store rating helps a lot.",
+              )
+            : tr(
+                "Your milestone bonus is in your wallet. Keep building cleaner chains and pushing the next element.",
+              )}
         </p>
         <div style={{ display: "grid", gap: 8 }}>
           {showRating && (
@@ -637,59 +663,78 @@ function AppReviewMilestonePrompt({
   );
 }
 
-function RequiredAppUpdatePrompt({
+function AppUpdateNotice({
   update,
   language,
   onUpdate,
+  onDismiss,
 }: {
-  update: RequiredAppUpdate;
+  update: AppUpdate;
   language: AppLanguage;
   onUpdate: () => void;
+  onDismiss: () => void;
 }) {
   const tr = (text: string) => t(text, language);
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label={tr("App update required")}
+    <aside
+      aria-label={tr("App update available")}
+      aria-live="polite"
       style={{
         position: "fixed",
-        inset: 0,
+        left: "50%",
+        bottom: "max(14px, env(safe-area-inset-bottom))",
+        transform: "translateX(-50%)",
         zIndex: 2400,
-        display: "grid",
-        placeItems: "center",
-        padding: 20,
-        background: "rgba(0,0,0,0.78)",
-        backdropFilter: "blur(7px)",
+        width: "calc(100% - 28px)",
+        maxWidth: 390,
+        padding: "18px 18px 16px",
+        borderRadius: 18,
+        border: "1px solid var(--accent)",
+        background: "var(--surface-elevated)",
+        boxShadow: "0 16px 50px rgba(0,0,0,0.55), 0 0 24px var(--accent-glow)",
       }}
     >
-      <div
+      <button
+        type="button"
+        onClick={onDismiss}
+        aria-label={tr("Close")}
         style={{
-          width: "100%",
-          maxWidth: 360,
-          padding: 22,
-          borderRadius: 18,
-          border: "1px solid var(--accent)",
-          background: "var(--surface-elevated)",
-          boxShadow: "0 20px 60px rgba(0,0,0,0.6), 0 0 28px var(--accent-glow)",
-          textAlign: "center",
+          position: "absolute",
+          top: 10,
+          right: 10,
+          display: "grid",
+          placeItems: "center",
+          width: 34,
+          height: 34,
+          padding: 0,
+          border: "1px solid var(--border)",
+          borderRadius: 10,
+          background: "var(--surface)",
+          color: "var(--muted-foreground)",
+          cursor: "pointer",
         }}
       >
-        <div style={{ fontSize: 11, letterSpacing: 3, color: "var(--accent)", fontWeight: 900 }}>
-          {tr("UPDATE REQUIRED")}
+        <X size={18} aria-hidden="true" />
+      </button>
+      <div style={{ paddingRight: 36 }}>
+        <div style={{ fontSize: 11, letterSpacing: 2.4, color: "var(--accent)", fontWeight: 900 }}>
+          {tr("UPDATE AVAILABLE")}
         </div>
-        <h2 style={{ margin: "7px 0 8px", fontSize: 23 }}>{tr("New version available")}</h2>
-        <p style={{ margin: "0 0 8px", color: "var(--foreground)", fontSize: 14, fontWeight: 750 }}>
-          {tr("Update the app to continue playing.")}
+        <h2 style={{ margin: "6px 0 7px", fontSize: 21 }}>{tr("New version available")}</h2>
+        <p style={{ margin: "0 0 15px", color: "var(--muted-foreground)", fontSize: 13 }}>
+          {tr("Version")} {update.storeVersion} {tr("is available in the App Store.")}{" "}
+          {tr("You can keep playing and update whenever you are ready.")}
         </p>
-        <p style={{ margin: "0 0 18px", color: "var(--muted-foreground)", fontSize: 12 }}>
-          {tr("Version")} {update.storeVersion} {tr("is available in the App Store.")}
-        </p>
-        <button type="button" onClick={onUpdate} style={{ ...promptPrimaryBtn, width: "100%" }}>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+        <button type="button" onClick={onUpdate} style={promptPrimaryBtn}>
           {tr("Update in App Store")}
         </button>
+        <button type="button" onClick={onDismiss} style={promptSecondaryBtn}>
+          {tr("Later")}
+        </button>
       </div>
-    </div>
+    </aside>
   );
 }
 
