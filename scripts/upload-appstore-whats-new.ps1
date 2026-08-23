@@ -4,6 +4,7 @@ param(
   [string]$IssuerId,
   [string]$KeyId,
   [string]$PrivateKeyPath,
+  [switch]$IncludePromotionalText,
   [switch]$DryRun,
   [switch]$Force
 )
@@ -43,16 +44,18 @@ try {
     & $node.Source $uploaderPath validate --version $Version
     if ($LASTEXITCODE -ne 0) { throw "The $Version release notes did not pass validation." }
 
-    $uploadArguments = @($uploaderPath, "upload", "--version", $Version, "--only-whats-new")
+    $scopeArgument = if ($IncludePromotionalText) { "--only-release-text" } else { "--only-whats-new" }
+    $uploadArguments = @($uploaderPath, "upload", "--version", $Version, $scopeArgument)
     if ($DryRun) {
       $uploadArguments += "--dry-run"
     } elseif (-not $Force) {
       Write-Host ""
-      Write-Host "This will PATCH only the What's New field for all configured locales on iOS $Version."
+      $scopeLabel = if ($IncludePromotionalText) { "Promotional Text and What's New fields" } else { "What's New field" }
+      Write-Host "This will PATCH only the $scopeLabel for all configured locales on iOS $Version."
       $confirmation = Read-Host "Type $Version to confirm"
       if ($confirmation -ne $Version) {
         Write-Host "Upload cancelled."
-        exit 0
+        return
       }
     }
 
