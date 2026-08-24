@@ -3,7 +3,7 @@ import UIKit
 import UnityAds
 
 @objc(UnityAdsPlugin)
-public class UnityAdsPlugin: CAPPlugin, CAPBridgedPlugin, UADSInterstitialShowDelegate, UADSRewardedShowDelegate {
+public class UnityAdsPlugin: CAPPlugin, CAPBridgedPlugin {
     public let identifier = "UnityAdsPlugin"
     public let jsName = "UnityAdsPlugin"
     public let pluginMethods: [CAPPluginMethod] = [
@@ -23,11 +23,11 @@ public class UnityAdsPlugin: CAPPlugin, CAPBridgedPlugin, UADSInterstitialShowDe
     private var interstitialAds: [String: UADSInterstitialAd] = [:]
     private var loadingRewardedPlacements = Set<String>()
     private var loadingInterstitialPlacements = Set<String>()
-    private var pendingRewardedPlacementId: String?
-    private var pendingInterstitialPlacementId: String?
     private var initializationStarted = false
     private var initialized = false
     private var rewardedEarned = false
+    private lazy var interstitialShowDelegate = UnityInterstitialShowDelegate(owner: self)
+    private lazy var rewardedShowDelegate = UnityRewardedShowDelegate(owner: self)
 
     @objc func initializeAds(_ call: CAPPluginCall) {
         guard let gameId = call.getString("gameId"), !gameId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
@@ -154,10 +154,9 @@ public class UnityAdsPlugin: CAPPlugin, CAPBridgedPlugin, UADSInterstitialShowDe
                 return
             }
 
-            self.pendingInterstitialPlacementId = placementId
             self.pendingInterstitialShowCall = call
             let configuration = UADSShowConfigurationBuilder().with(viewController: viewController).build()
-            ad.show(configuration, delegate: self)
+            ad.show(configuration, delegate: self.interstitialShowDelegate)
         }
     }
 
@@ -180,48 +179,38 @@ public class UnityAdsPlugin: CAPPlugin, CAPBridgedPlugin, UADSInterstitialShowDe
             }
 
             self.rewardedEarned = false
-            self.pendingRewardedPlacementId = placementId
             self.pendingRewardedShowCall = call
             let configuration = UADSShowConfigurationBuilder().with(viewController: viewController).build()
-            ad.show(configuration, delegate: self)
+            ad.show(configuration, delegate: self.rewardedShowDelegate)
         }
     }
 
-    public func showDidStart(_ unityAd: UADSInterstitialAd) {}
-    public func showDidClick(_ unityAd: UADSInterstitialAd) {}
-    public func showDidStart(_ unityAd: UADSRewardedAd) {}
-    public func showDidClick(_ unityAd: UADSRewardedAd) {}
-
-    public func showDidFailed(_ unityAd: UADSInterstitialAd, error: UnityAdsError) {
+    func handleInterstitialShowFailed(_ error: UnityAdsError) {
         pendingInterstitialShowCall?.reject("Unity Ads interstitial show failed: \(error.message)")
         pendingInterstitialShowCall = nil
-        pendingInterstitialPlacementId = nil
     }
 
-    public func showDidFailed(_ unityAd: UADSRewardedAd, error: UnityAdsError) {
+    func handleRewardedShowFailed(_ error: UnityAdsError) {
         pendingRewardedShowCall?.reject("Unity Ads rewarded show failed: \(error.message)")
         pendingRewardedShowCall = nil
-        pendingRewardedPlacementId = nil
         rewardedEarned = false
     }
 
-    public func showDidReceiveReward(_ unityAd: UADSRewardedAd) {
+    func handleRewardedShowReceivedReward() {
         rewardedEarned = true
     }
 
-    public func showDidComplete(_ unityAd: UADSInterstitialAd, with state: UADSShowFinishState) {
+    func handleInterstitialShowComplete(_ state: UADSShowFinishState) {
         pendingInterstitialShowCall?.resolve(["completed": state == .completed])
         pendingInterstitialShowCall = nil
-        pendingInterstitialPlacementId = nil
     }
 
-    public func showDidComplete(_ unityAd: UADSRewardedAd, with state: UADSShowFinishState) {
+    func handleRewardedShowComplete(_ state: UADSShowFinishState) {
         pendingRewardedShowCall?.resolve([
             "completed": state == .completed,
             "rewarded": rewardedEarned && state == .completed
         ])
         pendingRewardedShowCall = nil
-        pendingRewardedPlacementId = nil
         rewardedEarned = false
     }
 
@@ -259,5 +248,47 @@ public class UnityAdsPlugin: CAPPlugin, CAPBridgedPlugin, UADSInterstitialShowDe
     private func rejectInterstitialLoadCalls(for placementId: String, message: String) {
         let calls = pendingInterstitialLoadCalls.removeValue(forKey: placementId) ?? []
         calls.forEach { $0.reject(message, "UNITY_ADS_INTERSTITIAL_LOAD_FAILED") }
+    }
+}
+
+private final class UnityInterstitialShowDelegate: NSObject, UADSInterstitialShowDelegate {
+    weak var owner: UnityAdsPlugin?
+
+    init(owner: UnityAdsPlugin) {
+        self.owner = owner
+    }
+
+    func showDidStart(_ unityAd: UADSInterstitialAd) {}
+    func showDidClick(_ unityAd: UADSInterstitialAd) {}
+
+    func showDidComplete(_ unityAd: UADSInterstitialAd, with state: UADSShowFinishState) {
+        owner?.handleInterstitialShowComplete(state)
+    }
+
+    func showDidFailed(_ unityAd: UADSInterstitialAd, error: UnityAdsError) {
+        owner?.handleInterstitialShowFailed(error)
+    }
+}
+
+private final class UnityRewardedShowDelegate: NSObject, UADSRewardedShowDelegate {
+    weak var owner: UnityAdsPlugin?
+
+    init(owner: UnityAdsPlugin) {
+        self.owner = owner
+    }
+
+    func showDidStart(_ unityAd: UADSRewardedAd) {}
+    func showDidClick(_ unityAd: UADSRewardedAd) {}
+
+    func showDidComplete(_ unityAd: UADSRewardedAd, with state: UADSShowFinishState) {
+        owner?.handleRewardedShowComplete(state)
+    }
+
+    func showDidFailed(_ unityAd: UADSRewardedAd, error: UnityAdsError) {
+        owner?.handleRewardedShowFailed(error)
+    }
+
+    func showDidReceiveReward(_ unityAd: UADSRewardedAd) {
+        owner?.handleRewardedShowReceivedReward()
     }
 }
