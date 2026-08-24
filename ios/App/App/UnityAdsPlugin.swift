@@ -265,7 +265,7 @@ private final class UnityInterstitialShowDelegate: NSObject, UADSInterstitialSho
         owner?.handleInterstitialShowComplete(state)
     }
 
-    func showDidFailed(_ unityAd: UADSInterstitialAd, error: UnityAdsError) {
+    func showDidFail(_ unityAd: UADSInterstitialAd, error: UnityAdsError) {
         owner?.handleInterstitialShowFailed(error)
     }
 }
@@ -284,7 +284,7 @@ private final class UnityRewardedShowDelegate: NSObject, UADSRewardedShowDelegat
         owner?.handleRewardedShowComplete(state)
     }
 
-    func showDidFailed(_ unityAd: UADSRewardedAd, error: UnityAdsError) {
+    func showDidFail(_ unityAd: UADSRewardedAd, error: UnityAdsError) {
         owner?.handleRewardedShowFailed(error)
     }
 
