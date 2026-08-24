@@ -10,7 +10,7 @@
 		2FAD9763203C412B000D30F8 /* config.xml in Resources */ = {isa = PBXBuildFile; fileRef = 2FAD9762203C412B000D30F8 /* config.xml */; };
 		50379B232058CBB4000EE86E /* capacitor.config.json in Resources */ = {isa = PBXBuildFile; fileRef = 50379B222058CBB4000EE86E /* capacitor.config.json */; };
 		504EC3081FED79650016851F /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC3071FED79650016851F /* AppDelegate.swift */; };
-		LP1000020000000000000000 /* LevelPlayPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = LP1000010000000000000000 /* LevelPlayPlugin.swift */; };
+		UA1000020000000000000000 /* UnityAdsPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = UA1000010000000000000000 /* UnityAdsPlugin.swift */; };
 		BV1000020000000000000000 /* BridgeViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BV1000010000000000000000 /* BridgeViewController.swift */; };
 		AR1000020000000000000000 /* AppReviewPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = AR1000010000000000000000 /* AppReviewPlugin.swift */; };
 		GC1000020000000000000000 /* GameCenterPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = GC1000010000000000000000 /* GameCenterPlugin.swift */; };
@@ -29,7 +29,7 @@
 		50379B222058CBB4000EE86E /* capacitor.config.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = capacitor.config.json; sourceTree = "<group>"; };
 		504EC3041FED79650016851F /* App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = App.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		504EC3071FED79650016851F /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
-		LP1000010000000000000000 /* LevelPlayPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LevelPlayPlugin.swift; sourceTree = "<group>"; };
+		UA1000010000000000000000 /* UnityAdsPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnityAdsPlugin.swift; sourceTree = "<group>"; };
 		BV1000010000000000000000 /* BridgeViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeViewController.swift; sourceTree = "<group>"; };
 		AR1000010000000000000000 /* AppReviewPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppReviewPlugin.swift; sourceTree = "<group>"; };
 		GC1000010000000000000000 /* GameCenterPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameCenterPlugin.swift; sourceTree = "<group>"; };
@@ -104,7 +104,7 @@
 			children = (
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
-				LP1000010000000000000000 /* LevelPlayPlugin.swift */,
+				UA1000010000000000000000 /* UnityAdsPlugin.swift */,
 				BV1000010000000000000000 /* BridgeViewController.swift */,
 				AR1000010000000000000000 /* AppReviewPlugin.swift */,
 				GC1000010000000000000000 /* GameCenterPlugin.swift */,
@@ -271,7 +271,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
-				LP1000020000000000000000 /* LevelPlayPlugin.swift in Sources */,
+				UA1000020000000000000000 /* UnityAdsPlugin.swift in Sources */,
 				BV1000020000000000000000 /* BridgeViewController.swift in Sources */,
 				AR1000020000000000000000 /* AppReviewPlugin.swift in Sources */,
 				GC1000020000000000000000 /* GameCenterPlugin.swift in Sources */,

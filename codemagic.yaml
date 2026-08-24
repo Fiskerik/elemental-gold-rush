@@ -20,10 +20,10 @@ workflows:
         VITE_REVENUECAT_DEBUG_LOGS: "false"
         # Temporary diagnostics UI so Unity Ads logs can be copied from TestFlight on Windows.
         VITE_PURCHASE_DEBUG_UI: "true"
-        # Atomic Fusion Rush LevelPlay ad units. The app key must be added
-        # separately from Unity Dashboard -> LevelPlay -> SDK integration.
-        VITE_LEVELPLAY_IOS_INTERSTITIAL_ID: "ctz0jlk6mnbenvh0"
-        VITE_LEVELPLAY_IOS_REWARDED_ID: "g3kygievi8izpje1"
+        # Direct Unity Ads iOS configuration.
+        VITE_UNITY_ADS_IOS_GAME_ID: "800005365"
+        VITE_UNITY_ADS_IOS_INTERSTITIAL_ID: "Interstitial_iOS"
+        VITE_UNITY_ADS_IOS_REWARDED_ID: "Rewarded_iOS"
         VITE_UNITY_ADS_TEST_MODE: "true"
         VITE_GAME_CENTER_DAILY_BOARD_GLOBAL_LEADERBOARD_ID: "daily_leaderboard_global"
         VITE_GAME_CENTER_DAILY_COMPOUND_GLOBAL_LEADERBOARD_ID: "daily_compound_fastest"
@@ -75,9 +75,9 @@ workflows:
           RC_KEY="${VITE_REVENUECAT_IOS_API_KEY:-${REVENUECAT_IOS_API_KEY:-${VITE_REVENUECAT_API_KEY:-${VITE_RC_IOS_API_KEY:-}}}}"
           RC_ENTITLEMENT="${VITE_REVENUECAT_ENTITLEMENT_ID:-${REVENUECAT_ENTITLEMENT_ID:-atomic_fusion_lifetime}}"
           RC_OFFERING="${VITE_REVENUECAT_OFFERING_ID:-${REVENUECAT_OFFERING_ID:-default}}"
-          LEVELPLAY_APP_ID="${VITE_LEVELPLAY_IOS_APP_ID:-}"
-          LEVELPLAY_INTERSTITIAL="${VITE_LEVELPLAY_IOS_INTERSTITIAL_ID:-ctz0jlk6mnbenvh0}"
-          LEVELPLAY_REWARDED="${VITE_LEVELPLAY_IOS_REWARDED_ID:-g3kygievi8izpje1}"
+          UNITY_GAME_ID="${VITE_UNITY_ADS_IOS_GAME_ID:-800005365}"
+          UNITY_INTERSTITIAL="${VITE_UNITY_ADS_IOS_INTERSTITIAL_ID:-Interstitial_iOS}"
+          UNITY_REWARDED="${VITE_UNITY_ADS_IOS_REWARDED_ID:-Rewarded_iOS}"
           UNITY_TEST_MODE="${VITE_UNITY_ADS_TEST_MODE:-false}"
           GC_DAILY_BOARD_GLOBAL="${VITE_GAME_CENTER_DAILY_BOARD_GLOBAL_LEADERBOARD_ID:-${GAME_CENTER_DAILY_BOARD_GLOBAL_LEADERBOARD_ID:-daily_leaderboard_global}}"
           GC_DAILY_COMPOUND_GLOBAL="${VITE_GAME_CENTER_DAILY_COMPOUND_GLOBAL_LEADERBOARD_ID:-${GAME_CENTER_DAILY_COMPOUND_GLOBAL_LEADERBOARD_ID:-daily_compound_fastest}}"
@@ -92,9 +92,9 @@ workflows:
             printf 'VITE_REVENUECAT_OFFERING_ID=%s\n' "$RC_OFFERING"
             printf 'VITE_REVENUECAT_DEBUG_LOGS=%s\n' "$RC_DEBUG_LOGS"
             printf 'VITE_PURCHASE_DEBUG_UI=%s\n' "$PURCHASE_DEBUG_UI"
-            printf 'VITE_LEVELPLAY_IOS_APP_ID=%s\n' "$LEVELPLAY_APP_ID"
-            printf 'VITE_LEVELPLAY_IOS_INTERSTITIAL_ID=%s\n' "$LEVELPLAY_INTERSTITIAL"
-            printf 'VITE_LEVELPLAY_IOS_REWARDED_ID=%s\n' "$LEVELPLAY_REWARDED"
+            printf 'VITE_UNITY_ADS_IOS_GAME_ID=%s\n' "$UNITY_GAME_ID"
+            printf 'VITE_UNITY_ADS_IOS_INTERSTITIAL_ID=%s\n' "$UNITY_INTERSTITIAL"
+            printf 'VITE_UNITY_ADS_IOS_REWARDED_ID=%s\n' "$UNITY_REWARDED"
             printf 'VITE_UNITY_ADS_TEST_MODE=%s\n' "$UNITY_TEST_MODE"
             printf 'VITE_GAME_CENTER_DAILY_BOARD_GLOBAL_LEADERBOARD_ID=%s\n' "$GC_DAILY_BOARD_GLOBAL"
             printf 'VITE_GAME_CENTER_DAILY_COMPOUND_GLOBAL_LEADERBOARD_ID=%s\n' "$GC_DAILY_COMPOUND_GLOBAL"
@@ -112,18 +112,18 @@ workflows:
             exit 1
           fi
 
-          if [ -z "$LEVELPLAY_APP_ID" ]; then
-            echo "ERROR: LevelPlay iOS app key is missing."
+          if [ -z "$UNITY_GAME_ID" ]; then
+            echo "ERROR: Unity Ads iOS game ID is missing."
             exit 1
           fi
 
-          if [ -z "$LEVELPLAY_INTERSTITIAL" ]; then
-            echo "ERROR: LevelPlay iOS interstitial ad unit ID is missing."
+          if [ -z "$UNITY_INTERSTITIAL" ]; then
+            echo "ERROR: Unity Ads iOS interstitial placement ID is missing."
             exit 1
           fi
 
-          if [ -z "$LEVELPLAY_REWARDED" ]; then
-            echo "ERROR: LevelPlay iOS rewarded ad unit ID is missing."
+          if [ -z "$UNITY_REWARDED" ]; then
+            echo "ERROR: Unity Ads iOS rewarded placement ID is missing."
             exit 1
           fi
       - name: Build web + sync Capacitor iOS
@@ -162,13 +162,13 @@ workflows:
         script: |
           /usr/libexec/PlistBuddy -c "Set :UIRequiresFullScreen true" ios/App/App/Info.plist \
             || /usr/libexec/PlistBuddy -c "Add :UIRequiresFullScreen bool true" ios/App/App/Info.plist
-          echo "Using Unity LevelPlay integration"
+          echo "Using direct Unity Ads integration"
       - name: Install CocoaPods
         script: |
           cd ios/App
           pod install --repo-update --clean-install
-          if ! grep -q "IronSourceSDK (9.4.0.0)" Podfile.lock; then
-            echo "ERROR: IronSourceSDK was not installed by CocoaPods. Current Podfile:"
+          if ! grep -q "UnityAds (4.19.0)" Podfile.lock; then
+            echo "ERROR: UnityAds was not installed by CocoaPods. Current Podfile:"
             cat Podfile
             exit 1
           fi
