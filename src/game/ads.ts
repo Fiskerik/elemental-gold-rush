@@ -1,14 +1,22 @@
-import { Capacitor } from "@capacitor/core";
-import { AdMob } from "@capacitor-community/admob";
+import { Capacitor, registerPlugin } from "@capacitor/core";
 
 export type RewardedAdResult = {
   rewarded: boolean;
   reason?: string;
 };
 
+type UnityAdsPlugin = {
+  initializeAds(options: { gameId: string; testMode: boolean }): Promise<{ initialized: boolean }>;
+  loadInterstitial(options: { placementId: string }): Promise<{ loaded: boolean }>;
+  loadRewarded(options: { placementId: string }): Promise<{ loaded: boolean }>;
+  showInterstitial(options: { placementId: string }): Promise<{ completed: boolean }>;
+  showRewarded(options: { placementId: string }): Promise<{ rewarded: boolean; completed: boolean }>;
+};
+
+const UnityAds = registerPlugin<UnityAdsPlugin>("UnityAdsPlugin");
+
 let initialized = false;
 let initFailed = false;
-let canRequestAds = false;
 let interstitialReady = false;
 let interstitialLoading = false;
 let rewardedReady = false;
@@ -18,8 +26,6 @@ let lastRewardedError = "";
 let initializationPromise: Promise<void> | null = null;
 let rewardedLoadPromise: Promise<void> | null = null;
 let interstitialLoadPromise: Promise<void> | null = null;
-
-const consentRetryDelaysMs = [0, 1200, 3000];
 
 function configuredEnvValue(value: unknown): string {
   if (typeof value !== "string") return "";
@@ -31,19 +37,19 @@ function envFlagEnabled(value: unknown): boolean {
   return ["1", "true", "yes", "on"].includes(configuredEnvValue(value).toLowerCase());
 }
 
-function getInterstitialAdUnitId(): string {
-  return configuredEnvValue(import.meta.env.VITE_ADMOB_IOS_INTERSTITIAL_ID);
+function getGameId(): string {
+  return configuredEnvValue(import.meta.env.VITE_UNITY_ADS_IOS_GAME_ID);
 }
 
-function getRewardedAdUnitId(): string {
-  return configuredEnvValue(import.meta.env.VITE_ADMOB_IOS_REWARDED_ID);
+function getInterstitialPlacementId(): string {
+  return configuredEnvValue(import.meta.env.VITE_UNITY_ADS_IOS_INTERSTITIAL_ID);
 }
 
-function isTestingEnabled(): boolean {
-  return envFlagEnabled(import.meta.env.VITE_ADMOB_TEST_MODE);
+function getRewardedPlacementId(): string {
+  return configuredEnvValue(import.meta.env.VITE_UNITY_ADS_IOS_REWARDED_ID);
 }
 
-function isAdMobAvailable(): boolean {
+function isUnityAdsAvailable(): boolean {
   return Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios";
 }
 
@@ -52,80 +58,38 @@ function describeAdError(error: unknown): string {
   if (typeof error === "string") return error;
   if (!error || typeof error !== "object") return "";
 
-  const details = error as {
-    code?: unknown;
-    error?: unknown;
-    errorMessage?: unknown;
-    message?: unknown;
-  };
-  const code =
-    typeof details.code === "number" || typeof details.code === "string"
-      ? String(details.code)
-      : "";
-  const message =
-    configuredEnvValue(details.message) ||
-    configuredEnvValue(details.errorMessage) ||
-    configuredEnvValue(details.error);
-  return [code, message].filter(Boolean).join(": ");
-}
-
-function isConsentRequestFailure(reason: string): boolean {
-  return reason.toLowerCase().includes("request consent info failed");
-}
-
-async function requestConsentInfoWithRetry() {
-  let lastError: unknown;
-
-  for (const delayMs of consentRetryDelaysMs) {
-    if (delayMs > 0) {
-      await new Promise((resolve) => window.setTimeout(resolve, delayMs));
-    }
-
-    try {
-      return await AdMob.requestConsentInfo();
-    } catch (error) {
-      lastError = error;
-    }
-  }
-
-  throw lastError;
+  const details = error as { message?: unknown; errorMessage?: unknown };
+  return configuredEnvValue(details.message) || configuredEnvValue(details.errorMessage);
 }
 
 export async function initAds(hasProPack: boolean): Promise<void> {
-  if (hasProPack || initialized || !isAdMobAvailable()) return;
+  if (hasProPack || initialized || !isUnityAdsAvailable()) return;
   if (initializationPromise) {
     await initializationPromise;
     return;
   }
 
+  const gameId = getGameId();
+  if (!gameId) {
+    initFailureReason = "Unity Ads game ID is missing from this build.";
+    initFailed = true;
+    return;
+  }
+
   initializationPromise = (async () => {
     try {
-      initFailureReason = "";
-      await AdMob.initialize({ initializeForTesting: isTestingEnabled() });
-
-      let consentInfo = await requestConsentInfoWithRetry();
-      if (!consentInfo.canRequestAds && consentInfo.isConsentFormAvailable) {
-        consentInfo = await AdMob.showConsentForm();
-      }
-
-      if (!consentInfo.canRequestAds) {
-        initFailureReason = "Ad consent is required before ads can be requested.";
-        initFailed = true;
-        return;
-      }
-
-      canRequestAds = true;
+      await UnityAds.initializeAds({
+        gameId,
+        testMode: envFlagEnabled(import.meta.env.VITE_UNITY_ADS_TEST_MODE),
+      });
       initialized = true;
       initFailed = false;
+      initFailureReason = "";
     } catch (error) {
-      const reason = describeAdError(error);
-      initFailureReason = isConsentRequestFailure(reason)
-        ? "Ad consent could not be loaded. Check your connection and try again."
-        : reason || "AdMob initialization failed.";
+      initFailureReason = describeAdError(error) || "Unity Ads could not initialize.";
       console.warn(`[ads] ${initFailureReason}`);
-      initFailed = true;
       initialized = false;
-      canRequestAds = false;
+      initFailed = true;
     } finally {
       initializationPromise = null;
     }
@@ -135,19 +99,19 @@ export async function initAds(hasProPack: boolean): Promise<void> {
 }
 
 export async function preloadInterstitial(): Promise<void> {
-  if (interstitialReady || !initialized || !canRequestAds || !isAdMobAvailable()) return;
+  if (interstitialReady || !initialized || !isUnityAdsAvailable()) return;
   if (interstitialLoading && interstitialLoadPromise) {
     await interstitialLoadPromise;
     return;
   }
 
-  const adId = getInterstitialAdUnitId();
-  if (!adId) return;
+  const placementId = getInterstitialPlacementId();
+  if (!placementId) return;
 
   interstitialLoading = true;
   interstitialLoadPromise = (async () => {
     try {
-      await AdMob.prepareInterstitial({ adId, isTesting: isTestingEnabled() });
+      await UnityAds.loadInterstitial({ placementId });
       interstitialReady = true;
     } catch {
       interstitialReady = false;
@@ -160,15 +124,15 @@ export async function preloadInterstitial(): Promise<void> {
 }
 
 export async function preloadRewarded(): Promise<void> {
-  if (rewardedReady || !initialized || !canRequestAds || !isAdMobAvailable()) return;
+  if (rewardedReady || !initialized || !isUnityAdsAvailable()) return;
   if (rewardedLoading && rewardedLoadPromise) {
     await rewardedLoadPromise;
     return;
   }
 
-  const adId = getRewardedAdUnitId();
-  if (!adId) {
-    lastRewardedError = "AdMob rewarded ad unit ID is missing from this build.";
+  const placementId = getRewardedPlacementId();
+  if (!placementId) {
+    lastRewardedError = "Unity Ads rewarded placement ID is missing from this build.";
     return;
   }
 
@@ -176,7 +140,7 @@ export async function preloadRewarded(): Promise<void> {
   lastRewardedError = "";
   rewardedLoadPromise = (async () => {
     try {
-      await AdMob.prepareRewardVideoAd({ adId, isTesting: isTestingEnabled() });
+      await UnityAds.loadRewarded({ placementId });
       rewardedReady = true;
     } catch (error) {
       rewardedReady = false;
@@ -190,10 +154,12 @@ export async function preloadRewarded(): Promise<void> {
 }
 
 export async function showInterstitialIfReady(hasProPack: boolean): Promise<boolean> {
-  if (hasProPack || !isAdMobAvailable()) return false;
+  if (hasProPack || !isUnityAdsAvailable()) return false;
   if (!initialized) await initAds(false);
-  if (initFailed || !canRequestAds) return false;
+  if (initFailed) return false;
 
+  const placementId = getInterstitialPlacementId();
+  if (!placementId) return false;
   if (!interstitialReady) {
     await preloadInterstitial();
     if (!interstitialReady) return false;
@@ -201,9 +167,9 @@ export async function showInterstitialIfReady(hasProPack: boolean): Promise<bool
 
   interstitialReady = false;
   try {
-    await AdMob.showInterstitial();
+    const result = await UnityAds.showInterstitial({ placementId });
     void preloadInterstitial();
-    return true;
+    return result.completed;
   } catch {
     void preloadInterstitial();
     return false;
@@ -211,18 +177,22 @@ export async function showInterstitialIfReady(hasProPack: boolean): Promise<bool
 }
 
 export async function showRewardedForCoin(_hasProPack: boolean): Promise<RewardedAdResult> {
-  if (!isAdMobAvailable()) {
+  if (!isUnityAdsAvailable()) {
     return { rewarded: false, reason: "Rewarded ads are available in the iPhone app." };
   }
 
   if (!initialized) await initAds(false);
-  if (initFailed || !canRequestAds) {
+  if (initFailed) {
     return {
       rewarded: false,
-      reason: initFailureReason || "AdMob could not initialize in this build.",
+      reason: initFailureReason || "Unity Ads could not initialize in this build.",
     };
   }
 
+  const placementId = getRewardedPlacementId();
+  if (!placementId) {
+    return { rewarded: false, reason: "Unity Ads rewarded placement ID is missing from this build." };
+  }
   if (!rewardedReady) {
     await preloadRewarded();
     if (!rewardedReady) {
@@ -235,9 +205,9 @@ export async function showRewardedForCoin(_hasProPack: boolean): Promise<Rewarde
 
   rewardedReady = false;
   try {
-    await AdMob.showRewardVideoAd();
+    const result = await UnityAds.showRewarded({ placementId });
     void preloadRewarded();
-    return { rewarded: true };
+    return { rewarded: result.rewarded };
   } catch (error) {
     const reason = describeAdError(error) || "Rewarded ad could not be shown.";
     lastRewardedError = reason;

@@ -1,9 +1,9 @@
 import Capacitor
-import IronSource
 import UIKit
+import UnityAds
 
 @objc(UnityAdsPlugin)
-public class UnityAdsPlugin: CAPPlugin, CAPBridgedPlugin, LPMRewardedAdDelegate, LPMInterstitialAdDelegate {
+public class UnityAdsPlugin: CAPPlugin, CAPBridgedPlugin, UADSInterstitialShowDelegate, UADSRewardedShowDelegate {
     public let identifier = "UnityAdsPlugin"
     public let jsName = "UnityAdsPlugin"
     public let pluginMethods: [CAPPluginMethod] = [
@@ -15,21 +15,23 @@ public class UnityAdsPlugin: CAPPlugin, CAPBridgedPlugin, LPMRewardedAdDelegate,
     ]
 
     private var pendingInitializationCalls: [CAPPluginCall] = []
-    private var pendingRewardedLoadCalls: [CAPPluginCall] = []
-    private var pendingInterstitialLoadCalls: [CAPPluginCall] = []
+    private var pendingRewardedLoadCalls: [String: [CAPPluginCall]] = [:]
+    private var pendingInterstitialLoadCalls: [String: [CAPPluginCall]] = [:]
     private var pendingRewardedShowCall: CAPPluginCall?
     private var pendingInterstitialShowCall: CAPPluginCall?
-    private var rewardedAd: LPMRewardedAd?
-    private var interstitialAd: LPMInterstitialAd?
-    private var rewardedAdUnitId: String?
-    private var interstitialAdUnitId: String?
+    private var rewardedAds: [String: UADSRewardedAd] = [:]
+    private var interstitialAds: [String: UADSInterstitialAd] = [:]
+    private var loadingRewardedPlacements = Set<String>()
+    private var loadingInterstitialPlacements = Set<String>()
+    private var pendingRewardedPlacementId: String?
+    private var pendingInterstitialPlacementId: String?
     private var initializationStarted = false
     private var initialized = false
     private var rewardedEarned = false
 
     @objc func initializeAds(_ call: CAPPluginCall) {
-        guard let appKey = call.getString("appKey"), !appKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            call.reject("Missing LevelPlay iOS app key")
+        guard let gameId = call.getString("gameId"), !gameId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            call.reject("Missing Unity Ads iOS game ID")
             return
         }
 
@@ -44,245 +46,218 @@ public class UnityAdsPlugin: CAPPlugin, CAPBridgedPlugin, LPMRewardedAdDelegate,
         }
 
         initializationStarted = true
-
+        let testMode = call.getBool("testMode", false)
         DispatchQueue.main.async {
-            NSLog("LevelPlayPlugin initializing appKey=%@", appKey)
-            let requestBuilder = LPMInitRequestBuilder(appKey: appKey)
-            let initRequest = requestBuilder.build()
-            LevelPlay.initWith(initRequest) { _, error in
-                if let error = error {
-                    self.initializationStarted = false
-                    self.initialized = false
-                    NSLog("LevelPlayPlugin initialization failed error=%@", error.localizedDescription)
+            NSLog("UnityAdsPlugin initializing gameId=%@ testMode=%@", gameId, String(testMode))
+            let configuration = UADSInitializationConfigurationBuilder(gameId: gameId)
+                .with(testMode: testMode)
+                .build()
+            UnityAds.initialize(configuration) { error in
+                DispatchQueue.main.async {
+                    if let error = error {
+                        self.initializationStarted = false
+                        self.initialized = false
+                        NSLog("UnityAdsPlugin initialization failed error=%@", error.message)
+                        let calls = self.pendingInitializationCalls
+                        self.pendingInitializationCalls.removeAll()
+                        calls.forEach {
+                            $0.reject("Unity Ads initialization failed: \(error.message)", "UNITY_ADS_INIT_FAILED")
+                        }
+                        return
+                    }
+
+                    NSLog("UnityAdsPlugin initialization complete")
+                    self.initialized = true
                     let calls = self.pendingInitializationCalls
                     self.pendingInitializationCalls.removeAll()
-                    calls.forEach {
-                        $0.reject(
-                            "LevelPlay initialization failed: \(error.localizedDescription)",
-                            "LEVELPLAY_INIT_FAILED"
-                        )
-                    }
-                    return
+                    calls.forEach { $0.resolve(["initialized": true]) }
                 }
-
-                NSLog("LevelPlayPlugin initialization complete")
-                self.initialized = true
-                let calls = self.pendingInitializationCalls
-                self.pendingInitializationCalls.removeAll()
-                calls.forEach { $0.resolve(["initialized": true]) }
             }
         }
     }
 
     @objc func loadInterstitial(_ call: CAPPluginCall) {
-        guard ensureInitialized(call) else { return }
-        guard let adUnitId = getAdUnitId(call) else { return }
+        guard ensureInitialized(call), let placementId = getPlacementId(call) else { return }
 
         DispatchQueue.main.async {
-            self.prepareInterstitialAd(adUnitId)
-            if self.interstitialAd?.isAdReady() == true {
+            if self.interstitialAds[placementId] != nil {
                 call.resolve(["loaded": true])
                 return
             }
 
-            NSLog("LevelPlayPlugin loading interstitial adUnitId=%@", adUnitId)
-            self.pendingInterstitialLoadCalls.append(call)
-            if self.pendingInterstitialLoadCalls.count == 1 {
-                self.interstitialAd?.loadAd()
+            self.pendingInterstitialLoadCalls[placementId, default: []].append(call)
+            if self.loadingInterstitialPlacements.insert(placementId).inserted {
+                let configuration = UADSLoadConfigurationBuilder(placementId: placementId).build()
+                UADSInterstitialAd.load(configuration) { ad, error in
+                    DispatchQueue.main.async {
+                        self.loadingInterstitialPlacements.remove(placementId)
+                        if let ad = ad {
+                            self.interstitialAds[placementId] = ad
+                            self.resolveInterstitialLoadCalls(for: placementId)
+                        } else {
+                            self.rejectInterstitialLoadCalls(
+                                for: placementId,
+                                message: "Unity Ads interstitial load failed: \(error?.message ?? "Unknown error")"
+                            )
+                        }
+                    }
+                }
             }
         }
     }
 
     @objc func loadRewarded(_ call: CAPPluginCall) {
-        guard ensureInitialized(call) else { return }
-        guard let adUnitId = getAdUnitId(call) else { return }
+        guard ensureInitialized(call), let placementId = getPlacementId(call) else { return }
 
         DispatchQueue.main.async {
-            self.prepareRewardedAd(adUnitId)
-            if self.rewardedAd?.isAdReady() == true {
+            if self.rewardedAds[placementId] != nil {
                 call.resolve(["loaded": true])
                 return
             }
 
-            NSLog("LevelPlayPlugin loading rewarded adUnitId=%@", adUnitId)
-            self.pendingRewardedLoadCalls.append(call)
-            if self.pendingRewardedLoadCalls.count == 1 {
-                self.rewardedAd?.loadAd()
+            self.pendingRewardedLoadCalls[placementId, default: []].append(call)
+            if self.loadingRewardedPlacements.insert(placementId).inserted {
+                let configuration = UADSLoadConfigurationBuilder(placementId: placementId).build()
+                UADSRewardedAd.load(configuration) { ad, error in
+                    DispatchQueue.main.async {
+                        self.loadingRewardedPlacements.remove(placementId)
+                        if let ad = ad {
+                            self.rewardedAds[placementId] = ad
+                            self.resolveRewardedLoadCalls(for: placementId)
+                        } else {
+                            self.rejectRewardedLoadCalls(
+                                for: placementId,
+                                message: "Unity Ads rewarded load failed: \(error?.message ?? "Unknown error")"
+                            )
+                        }
+                    }
+                }
             }
         }
     }
 
     @objc func showInterstitial(_ call: CAPPluginCall) {
-        guard ensureInitialized(call) else { return }
-        guard let adUnitId = getAdUnitId(call) else { return }
+        guard ensureInitialized(call), let placementId = getPlacementId(call) else { return }
 
         DispatchQueue.main.async {
-            self.prepareInterstitialAd(adUnitId)
             guard self.pendingInterstitialShowCall == nil else {
-                call.reject("LevelPlay interstitial is already showing")
+                call.reject("Unity Ads interstitial is already showing")
+                return
+            }
+            guard let ad = self.interstitialAds.removeValue(forKey: placementId) else {
+                call.reject("Unity Ads interstitial is not ready")
                 return
             }
             guard let viewController = self.bridge?.viewController else {
-                call.reject("Could not find a view controller for LevelPlay")
-                return
-            }
-            guard self.interstitialAd?.isAdReady() == true else {
-                call.reject("LevelPlay interstitial is not ready")
+                self.interstitialAds[placementId] = ad
+                call.reject("Could not find a view controller for Unity Ads")
                 return
             }
 
-            NSLog("LevelPlayPlugin showing interstitial adUnitId=%@", adUnitId)
+            self.pendingInterstitialPlacementId = placementId
             self.pendingInterstitialShowCall = call
-            self.interstitialAd?.showAd(viewController: viewController, placementName: nil)
+            let configuration = UADSShowConfigurationBuilder().with(viewController: viewController).build()
+            ad.show(configuration, delegate: self)
         }
     }
 
     @objc func showRewarded(_ call: CAPPluginCall) {
-        guard ensureInitialized(call) else { return }
-        guard let adUnitId = getAdUnitId(call) else { return }
+        guard ensureInitialized(call), let placementId = getPlacementId(call) else { return }
 
         DispatchQueue.main.async {
-            self.prepareRewardedAd(adUnitId)
             guard self.pendingRewardedShowCall == nil else {
-                call.reject("LevelPlay rewarded ad is already showing")
+                call.reject("Unity Ads rewarded ad is already showing")
+                return
+            }
+            guard let ad = self.rewardedAds.removeValue(forKey: placementId) else {
+                call.reject("Unity Ads rewarded ad is not ready")
                 return
             }
             guard let viewController = self.bridge?.viewController else {
-                call.reject("Could not find a view controller for LevelPlay")
-                return
-            }
-            guard self.rewardedAd?.isAdReady() == true else {
-                call.reject("LevelPlay rewarded ad is not ready")
+                self.rewardedAds[placementId] = ad
+                call.reject("Could not find a view controller for Unity Ads")
                 return
             }
 
-            NSLog("LevelPlayPlugin showing rewarded adUnitId=%@", adUnitId)
             self.rewardedEarned = false
+            self.pendingRewardedPlacementId = placementId
             self.pendingRewardedShowCall = call
-            self.rewardedAd?.showAd(viewController: viewController, placementName: nil)
+            let configuration = UADSShowConfigurationBuilder().with(viewController: viewController).build()
+            ad.show(configuration, delegate: self)
         }
     }
 
-    public func didLoadAd(with adInfo: LPMAdInfo) {
-        if !pendingRewardedLoadCalls.isEmpty, rewardedAd?.isAdReady() == true {
-            NSLog("LevelPlayPlugin rewarded loaded")
-            resolveRewardedLoadCalls()
-            return
-        }
+    public func showDidStart(_ unityAd: UADSInterstitialAd) {}
+    public func showDidClick(_ unityAd: UADSInterstitialAd) {}
+    public func showDidStart(_ unityAd: UADSRewardedAd) {}
+    public func showDidClick(_ unityAd: UADSRewardedAd) {}
 
-        if !pendingInterstitialLoadCalls.isEmpty, interstitialAd?.isAdReady() == true {
-            NSLog("LevelPlayPlugin interstitial loaded")
-            resolveInterstitialLoadCalls()
-        }
+    public func showDidFailed(_ unityAd: UADSInterstitialAd, error: UnityAdsError) {
+        pendingInterstitialShowCall?.reject("Unity Ads interstitial show failed: \(error.message)")
+        pendingInterstitialShowCall = nil
+        pendingInterstitialPlacementId = nil
     }
 
-    public func didFailToLoadAd(withAdUnitId adUnitId: String, error: Error) {
-        NSLog("LevelPlayPlugin load failed adUnitId=%@ error=%@", adUnitId, error.localizedDescription)
-        if adUnitId == rewardedAdUnitId {
-            rejectRewardedLoadCalls("LevelPlay rewarded load failed: \(error.localizedDescription)")
-            return
-        }
-        if adUnitId == interstitialAdUnitId {
-            rejectInterstitialLoadCalls("LevelPlay interstitial load failed: \(error.localizedDescription)")
-        }
+    public func showDidFailed(_ unityAd: UADSRewardedAd, error: UnityAdsError) {
+        pendingRewardedShowCall?.reject("Unity Ads rewarded show failed: \(error.message)")
+        pendingRewardedShowCall = nil
+        pendingRewardedPlacementId = nil
+        rewardedEarned = false
     }
 
-    public func didDisplayAd(with adInfo: LPMAdInfo) {}
-
-    public func didFailToDisplayAd(with adInfo: LPMAdInfo, error: Error) {
-        NSLog("LevelPlayPlugin display failed error=%@", error.localizedDescription)
-        if let call = pendingRewardedShowCall {
-            pendingRewardedShowCall = nil
-            call.reject("LevelPlay rewarded show failed: \(error.localizedDescription)")
-            return
-        }
-        if let call = pendingInterstitialShowCall {
-            pendingInterstitialShowCall = nil
-            call.reject("LevelPlay interstitial show failed: \(error.localizedDescription)")
-        }
-    }
-
-    public func didClickAd(with adInfo: LPMAdInfo) {}
-
-    public func didCloseAd(with adInfo: LPMAdInfo) {
-        if let call = pendingRewardedShowCall {
-            pendingRewardedShowCall = nil
-            call.resolve([
-                "completed": rewardedEarned,
-                "skipped": !rewardedEarned
-            ])
-            rewardedEarned = false
-            return
-        }
-
-        if let call = pendingInterstitialShowCall {
-            pendingInterstitialShowCall = nil
-            call.resolve(["completed": true])
-        }
-    }
-
-    public func didRewardAd(with adInfo: LPMAdInfo, reward: LPMReward) {
-        NSLog("LevelPlayPlugin rewarded reward=%ld %@", reward.amount, reward.name)
+    public func showDidReceiveReward(_ unityAd: UADSRewardedAd) {
         rewardedEarned = true
     }
 
-    public func didChangeAdInfo(_ adInfo: LPMAdInfo) {}
+    public func showDidComplete(_ unityAd: UADSInterstitialAd, with state: UADSShowFinishState) {
+        pendingInterstitialShowCall?.resolve(["completed": state == .completed])
+        pendingInterstitialShowCall = nil
+        pendingInterstitialPlacementId = nil
+    }
+
+    public func showDidComplete(_ unityAd: UADSRewardedAd, with state: UADSShowFinishState) {
+        pendingRewardedShowCall?.resolve([
+            "completed": state == .completed,
+            "rewarded": rewardedEarned && state == .completed
+        ])
+        pendingRewardedShowCall = nil
+        pendingRewardedPlacementId = nil
+        rewardedEarned = false
+    }
 
     private func ensureInitialized(_ call: CAPPluginCall) -> Bool {
         guard initialized else {
-            call.reject("LevelPlay is not initialized")
+            call.reject("Unity Ads is not initialized")
             return false
         }
         return true
     }
 
-    private func getAdUnitId(_ call: CAPPluginCall) -> String? {
-        guard let adUnitId = call.getString("adUnitId"), !adUnitId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            call.reject("Missing LevelPlay ad unit ID")
+    private func getPlacementId(_ call: CAPPluginCall) -> String? {
+        guard let placementId = call.getString("placementId"), !placementId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            call.reject("Missing Unity Ads placement ID")
             return nil
         }
-        return adUnitId
+        return placementId
     }
 
-    private func prepareRewardedAd(_ adUnitId: String) {
-        if rewardedAdUnitId == adUnitId, rewardedAd != nil {
-            return
-        }
-        rewardedAdUnitId = adUnitId
-        rewardedAd = LPMRewardedAd(adUnitId: adUnitId)
-        rewardedAd?.setDelegate(self)
-    }
-
-    private func prepareInterstitialAd(_ adUnitId: String) {
-        if interstitialAdUnitId == adUnitId, interstitialAd != nil {
-            return
-        }
-        interstitialAdUnitId = adUnitId
-        interstitialAd = LPMInterstitialAd(adUnitId: adUnitId)
-        interstitialAd?.setDelegate(self)
-    }
-
-    private func resolveRewardedLoadCalls() {
-        let calls = pendingRewardedLoadCalls
-        pendingRewardedLoadCalls.removeAll()
+    private func resolveRewardedLoadCalls(for placementId: String) {
+        let calls = pendingRewardedLoadCalls.removeValue(forKey: placementId) ?? []
         calls.forEach { $0.resolve(["loaded": true]) }
     }
 
-    private func resolveInterstitialLoadCalls() {
-        let calls = pendingInterstitialLoadCalls
-        pendingInterstitialLoadCalls.removeAll()
+    private func resolveInterstitialLoadCalls(for placementId: String) {
+        let calls = pendingInterstitialLoadCalls.removeValue(forKey: placementId) ?? []
         calls.forEach { $0.resolve(["loaded": true]) }
     }
 
-    private func rejectRewardedLoadCalls(_ message: String) {
-        let calls = pendingRewardedLoadCalls
-        pendingRewardedLoadCalls.removeAll()
-        calls.forEach { $0.reject(message, "LEVELPLAY_REWARDED_LOAD_FAILED") }
+    private func rejectRewardedLoadCalls(for placementId: String, message: String) {
+        let calls = pendingRewardedLoadCalls.removeValue(forKey: placementId) ?? []
+        calls.forEach { $0.reject(message, "UNITY_ADS_REWARDED_LOAD_FAILED") }
     }
 
-    private func rejectInterstitialLoadCalls(_ message: String) {
-        let calls = pendingInterstitialLoadCalls
-        pendingInterstitialLoadCalls.removeAll()
-        calls.forEach { $0.reject(message, "LEVELPLAY_INTERSTITIAL_LOAD_FAILED") }
+    private func rejectInterstitialLoadCalls(for placementId: String, message: String) {
+        let calls = pendingInterstitialLoadCalls.removeValue(forKey: placementId) ?? []
+        calls.forEach { $0.reject(message, "UNITY_ADS_INTERSTITIAL_LOAD_FAILED") }
     }
 }

@@ -25,9 +25,9 @@ Set `VITE_REVENUECAT_IOS_API_KEY` to the iOS `appl_...` public API key for iOS b
 
 ## Ads
 
-- AdMob interstitials and rewarded ads are loaded through `src/game/ads.ts`.
-- Set `VITE_ADMOB_IOS_INTERSTITIAL_ID` and `VITE_ADMOB_IOS_REWARDED_ID` for production.
-- Set `VITE_ADMOB_TEST_MODE=true` only for controlled QA builds; keep it `false` for production.
+- Unity Ads interstitials and rewarded ads are loaded directly through the native iOS bridge in `ios/App/App/UnityAdsPlugin.swift`.
+- Set `VITE_UNITY_ADS_IOS_GAME_ID`, `VITE_UNITY_ADS_IOS_INTERSTITIAL_ID`, and `VITE_UNITY_ADS_IOS_REWARDED_ID` in Codemagic.
+- Set `VITE_UNITY_ADS_TEST_MODE=true` only for controlled QA builds; keep it `false` for production.
 - Forced ads are skipped for users with the `pro` entitlement.
 - Ads are only attempted after a cleared-stage result action, never during active gameplay.
 
@@ -35,5 +35,5 @@ Set `VITE_REVENUECAT_IOS_API_KEY` to the iOS `appl_...` public API key for iOS b
 
 - Add a privacy policy URL and support URL before App Store submission.
 - Configure App Privacy labels for purchases, ads, diagnostics, and any analytics/crash reporting added later.
-- Add GDPR/EEA consent messaging before production AdMob traffic.
+- Add GDPR/EEA consent messaging before production Unity Ads traffic.
 - Use TestFlight sandbox accounts to verify Pro purchase, restore, coin pack delivery, and ad removal.
