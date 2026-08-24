@@ -23,8 +23,8 @@ end
 target 'App' do
   capacitor_pods
   # Add your Pods here
-  # Ads are served directly by Unity Ads; AdMob and LevelPlay mediation are not used.
-  pod 'UnityAds', '4.19.0'
+  # Match the working TrimSwipe integration: Unity LevelPlay mediation.
+  pod 'IronSourceSDK', '9.4.0.0'
   pod 'CapacitorFirebaseAnalytics/Analytics', :path => '../../node_modules/@capacitor-firebase/analytics'
 end
 
