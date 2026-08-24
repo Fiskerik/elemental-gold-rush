@@ -11,7 +11,8 @@ public class UnityAdsPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "loadInterstitial", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "loadRewarded", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "showInterstitial", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "showRewarded", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "showRewarded", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getDiagnostics", returnType: CAPPluginReturnPromise)
     ]
 
     private var pendingInitializationCalls: [CAPPluginCall] = []
@@ -26,20 +27,27 @@ public class UnityAdsPlugin: CAPPlugin, CAPBridgedPlugin {
     private var initializationStarted = false
     private var initialized = false
     private var rewardedEarned = false
+    private let diagnosticsStorageKey = "UnityAdsPlugin.diagnostics"
+    private var diagnostics: [String] = (UserDefaults.standard.array(forKey: "UnityAdsPlugin.diagnostics") as? [String]) ?? []
     private lazy var interstitialShowDelegate = UnityInterstitialShowDelegate(owner: self)
     private lazy var rewardedShowDelegate = UnityRewardedShowDelegate(owner: self)
 
     fileprivate func log(_ message: String) {
+        let line = "[\(Date())] \(message)"
+        diagnostics.append(line)
+        if diagnostics.count > 120 {
+            diagnostics.removeFirst(diagnostics.count - 120)
+        }
+        UserDefaults.standard.set(diagnostics, forKey: diagnosticsStorageKey)
         NSLog("[UnityAdsPlugin] %@", message)
     }
 
     fileprivate func log(_ error: UnityAdsError, context: String) {
-        NSLog(
-            "[UnityAdsPlugin] %@ code=%@ message=%@",
-            context,
-            String(error.code),
-            error.message
-        )
+        log("\(context) code=\(error.code) message=\(error.message)")
+    }
+
+    @objc func getDiagnostics(_ call: CAPPluginCall) {
+        call.resolve(["logs": diagnostics])
     }
 
     @objc func initializeAds(_ call: CAPPluginCall) {
@@ -75,7 +83,7 @@ public class UnityAdsPlugin: CAPPlugin, CAPBridgedPlugin {
                         let calls = self.pendingInitializationCalls
                         self.pendingInitializationCalls.removeAll()
                         calls.forEach {
-                            $0.reject("Unity Ads initialization failed: \(error.message)", "UNITY_ADS_INIT_FAILED")
+                            $0.reject("Unity Ads initialization failed [\(error.code)]: \(error.message)", "UNITY_ADS_INIT_FAILED")
                         }
                         return
                     }
@@ -125,7 +133,7 @@ public class UnityAdsPlugin: CAPPlugin, CAPBridgedPlugin {
                             }
                             self.rejectInterstitialLoadCalls(
                                 for: placementId,
-                                message: "Unity Ads interstitial load failed: \(error?.message ?? "Unknown error")"
+                                message: error.map { "Unity Ads interstitial load failed [\($0.code)]: \($0.message)" } ?? "Unity Ads interstitial load failed: Unknown error"
                             )
                         }
                     }
@@ -169,7 +177,7 @@ public class UnityAdsPlugin: CAPPlugin, CAPBridgedPlugin {
                             }
                             self.rejectRewardedLoadCalls(
                                 for: placementId,
-                                message: "Unity Ads rewarded load failed: \(error?.message ?? "Unknown error")"
+                                message: error.map { "Unity Ads rewarded load failed [\($0.code)]: \($0.message)" } ?? "Unity Ads rewarded load failed: Unknown error"
                             )
                         }
                     }
@@ -239,13 +247,13 @@ public class UnityAdsPlugin: CAPPlugin, CAPBridgedPlugin {
 
     func handleInterstitialShowFailed(_ error: UnityAdsError) {
         log(error, context: "interstitial show failed")
-        pendingInterstitialShowCall?.reject("Unity Ads interstitial show failed: \(error.message)")
+        pendingInterstitialShowCall?.reject("Unity Ads interstitial show failed [\(error.code)]: \(error.message)")
         pendingInterstitialShowCall = nil
     }
 
     func handleRewardedShowFailed(_ error: UnityAdsError) {
         log(error, context: "rewarded show failed")
-        pendingRewardedShowCall?.reject("Unity Ads rewarded show failed: \(error.message)")
+        pendingRewardedShowCall?.reject("Unity Ads rewarded show failed [\(error.code)]: \(error.message)")
         pendingRewardedShowCall = nil
         rewardedEarned = false
     }

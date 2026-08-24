@@ -26,7 +26,7 @@ import {
   restorePurchases,
   setCustomerInfoListener,
 } from "./purchases";
-import { initAds, showRewardedForCoin } from "./ads";
+import { getUnityAdsDiagnostics, initAds, showRewardedForCoin } from "./ads";
 import { useIsTabletLayout } from "./responsive";
 import { t } from "./localization";
 import { clearLogs, copyDebugReport, getDebugReport, getLogs, logDebug } from "../lib/debugLogger";
@@ -1055,6 +1055,7 @@ export function Shop({
     setMessage(tr("Checking purchase diagnostics..."));
     logDebug("Manual purchase diagnostics started.");
     try {
+      await getUnityAdsDiagnostics();
       const snapshot = await debugNativePurchases((statusMessage) => setMessage(statusMessage));
       const details = [
         `Platform: ${snapshot.platform}`,
@@ -1079,6 +1080,19 @@ export function Shop({
       window.alert(`Purchase diagnostics failed.\n\n${message}`);
       setMessage(message);
       refreshPurchaseDebugLogs(true);
+    } finally {
+      setPurchaseDebugBusy(false);
+    }
+  }
+
+  async function handleUnityAdsDiagnostics() {
+    setPurchaseDebugBusy(true);
+    setMessage("Reading Unity Ads diagnostics...");
+    try {
+      const logs = await getUnityAdsDiagnostics();
+      refreshPurchaseDebugLogs(true);
+      setPurchaseReport(getDebugReport());
+      setMessage(logs.length ? "Unity Ads diagnostics loaded." : "No Unity Ads diagnostics recorded yet.");
     } finally {
       setPurchaseDebugBusy(false);
     }
@@ -1112,6 +1126,7 @@ export function Shop({
   }
 
   async function handleCopyPurchaseDiagnostics() {
+    await getUnityAdsDiagnostics();
     const copied = await copyDebugReport();
     setPurchaseReport(getDebugReport());
     setPurchaseSupportMessage(
@@ -1176,6 +1191,14 @@ export function Shop({
                 style={secondaryShopButton}
               >
                 {tr("Show Logs")}
+              </button>
+              <button
+                type="button"
+                onClick={handleUnityAdsDiagnostics}
+                disabled={purchaseDebugBusy}
+                style={secondaryShopButton}
+              >
+                {tr("Unity Ads Logs")}
               </button>
               <button type="button" onClick={handleClearPurchaseLogs} style={secondaryShopButton}>
                 {tr("Clear Logs")}

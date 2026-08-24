@@ -1,4 +1,5 @@
 import { Capacitor, registerPlugin } from "@capacitor/core";
+import { logDebug } from "../lib/debugLogger";
 
 export type RewardedAdResult = {
   rewarded: boolean;
@@ -11,6 +12,7 @@ type UnityAdsPlugin = {
   loadRewarded(options: { placementId: string }): Promise<{ loaded: boolean }>;
   showInterstitial(options: { placementId: string }): Promise<{ completed: boolean }>;
   showRewarded(options: { placementId: string }): Promise<{ rewarded: boolean; completed: boolean }>;
+  getDiagnostics(): Promise<{ logs?: unknown }>;
 };
 
 const UnityAds = registerPlugin<UnityAdsPlugin>("UnityAdsPlugin");
@@ -78,15 +80,19 @@ export async function initAds(hasProPack: boolean): Promise<void> {
 
   initializationPromise = (async () => {
     try {
+      const testMode = envFlagEnabled(import.meta.env.VITE_UNITY_ADS_TEST_MODE);
+      logDebug("Unity Ads initialization requested.", { gameId, testMode });
       await UnityAds.initializeAds({
         gameId,
-        testMode: envFlagEnabled(import.meta.env.VITE_UNITY_ADS_TEST_MODE),
+        testMode,
       });
       initialized = true;
       initFailed = false;
       initFailureReason = "";
+      logDebug("Unity Ads initialization completed.");
     } catch (error) {
       initFailureReason = describeAdError(error) || "Unity Ads could not initialize.";
+      logDebug("Unity Ads initialization failed.", { reason: initFailureReason });
       console.warn(`[ads] ${initFailureReason}`);
       initialized = false;
       initFailed = true;
@@ -140,11 +146,14 @@ export async function preloadRewarded(): Promise<void> {
   lastRewardedError = "";
   rewardedLoadPromise = (async () => {
     try {
+      logDebug("Unity Ads rewarded load requested.", { placementId });
       await UnityAds.loadRewarded({ placementId });
       rewardedReady = true;
+      logDebug("Unity Ads rewarded load completed.", { placementId });
     } catch (error) {
       rewardedReady = false;
       lastRewardedError = describeAdError(error) || "Rewarded ad failed to load.";
+      logDebug("Unity Ads rewarded load failed.", { placementId, reason: lastRewardedError });
     } finally {
       rewardedLoading = false;
       rewardedLoadPromise = null;
@@ -205,13 +214,34 @@ export async function showRewardedForCoin(_hasProPack: boolean): Promise<Rewarde
 
   rewardedReady = false;
   try {
+    logDebug("Unity Ads rewarded show requested.", { placementId });
     const result = await UnityAds.showRewarded({ placementId });
+    logDebug("Unity Ads rewarded show completed.", { placementId, result });
     void preloadRewarded();
     return { rewarded: result.rewarded };
   } catch (error) {
     const reason = describeAdError(error) || "Rewarded ad could not be shown.";
     lastRewardedError = reason;
+    logDebug("Unity Ads rewarded show failed.", { placementId, reason });
     void preloadRewarded();
     return { rewarded: false, reason };
+  }
+}
+
+export async function getUnityAdsDiagnostics(): Promise<string[]> {
+  if (!isUnityAdsAvailable()) return [];
+
+  try {
+    const result = await UnityAds.getDiagnostics();
+    const logs = Array.isArray(result.logs)
+      ? result.logs.filter((entry): entry is string => typeof entry === "string")
+      : [];
+    logs.forEach((entry) => logDebug(`Unity Ads native: ${entry}`));
+    return logs;
+  } catch (error) {
+    logDebug("Unity Ads diagnostics could not be read.", {
+      reason: describeAdError(error) || String(error),
+    });
+    return [];
   }
 }

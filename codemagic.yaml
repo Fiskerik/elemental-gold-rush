@@ -18,7 +18,8 @@ workflows:
         APP_MARKETING_VERSION: "1.1.5"
         VITE_REVENUECAT_IOS_API_KEY: "appl_wleIrbzZnDKaUaQgnbmYbTYVxfX"
         VITE_REVENUECAT_DEBUG_LOGS: "false"
-        VITE_PURCHASE_DEBUG_UI: "false"
+        # Temporary diagnostics UI so Unity Ads logs can be copied from TestFlight on Windows.
+        VITE_PURCHASE_DEBUG_UI: "true"
         VITE_UNITY_ADS_TEST_MODE: "false"
         VITE_GAME_CENTER_DAILY_BOARD_GLOBAL_LEADERBOARD_ID: "daily_leaderboard_global"
         VITE_GAME_CENTER_DAILY_COMPOUND_GLOBAL_LEADERBOARD_ID: "daily_compound_fastest"
