@@ -29,6 +29,19 @@ public class UnityAdsPlugin: CAPPlugin, CAPBridgedPlugin {
     private lazy var interstitialShowDelegate = UnityInterstitialShowDelegate(owner: self)
     private lazy var rewardedShowDelegate = UnityRewardedShowDelegate(owner: self)
 
+    fileprivate func log(_ message: String) {
+        NSLog("[UnityAdsPlugin] %@", message)
+    }
+
+    fileprivate func log(_ error: UnityAdsError, context: String) {
+        NSLog(
+            "[UnityAdsPlugin] %@ code=%@ message=%@",
+            context,
+            String(error.code),
+            error.message
+        )
+    }
+
     @objc func initializeAds(_ call: CAPPluginCall) {
         guard let gameId = call.getString("gameId"), !gameId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             call.reject("Missing Unity Ads iOS game ID")
@@ -48,16 +61,17 @@ public class UnityAdsPlugin: CAPPlugin, CAPBridgedPlugin {
         initializationStarted = true
         let testMode = call.getBool("testMode", false)
         DispatchQueue.main.async {
-            NSLog("UnityAdsPlugin initializing gameId=%@ testMode=%@", gameId, String(testMode))
+            self.log("initialize start gameId=\(gameId) testMode=\(testMode)")
             let configuration = UADSInitializationConfigurationBuilder(gameId: gameId)
                 .with(testMode: testMode)
+                .with(logLevel: UADSLogLevel.debug)
                 .build()
             UnityAds.initialize(configuration) { error in
                 DispatchQueue.main.async {
                     if let error = error {
                         self.initializationStarted = false
                         self.initialized = false
-                        NSLog("UnityAdsPlugin initialization failed error=%@", error.message)
+                        self.log(error, context: "initialize failed")
                         let calls = self.pendingInitializationCalls
                         self.pendingInitializationCalls.removeAll()
                         calls.forEach {
@@ -66,7 +80,7 @@ public class UnityAdsPlugin: CAPPlugin, CAPBridgedPlugin {
                         return
                     }
 
-                    NSLog("UnityAdsPlugin initialization complete")
+                    self.log("initialize complete")
                     self.initialized = true
                     let calls = self.pendingInitializationCalls
                     self.pendingInitializationCalls.removeAll()
@@ -80,7 +94,9 @@ public class UnityAdsPlugin: CAPPlugin, CAPBridgedPlugin {
         guard ensureInitialized(call), let placementId = getPlacementId(call) else { return }
 
         DispatchQueue.main.async {
+            self.log("interstitial load requested placement=\(placementId)")
             if self.interstitialAds[placementId] != nil {
+                self.log("interstitial already loaded placement=\(placementId)")
                 call.resolve(["loaded": true])
                 return
             }
@@ -92,9 +108,21 @@ public class UnityAdsPlugin: CAPPlugin, CAPBridgedPlugin {
                     DispatchQueue.main.async {
                         self.loadingInterstitialPlacements.remove(placementId)
                         if let ad = ad {
+                            self.log("interstitial load success placement=\(placementId)")
+                            ad.onAdExpired = { [weak self] _ in
+                                DispatchQueue.main.async {
+                                    self?.interstitialAds.removeValue(forKey: placementId)
+                                    self?.log("interstitial expired placement=\(placementId)")
+                                }
+                            }
                             self.interstitialAds[placementId] = ad
                             self.resolveInterstitialLoadCalls(for: placementId)
                         } else {
+                            if let error = error {
+                                self.log(error, context: "interstitial load failed placement=\(placementId)")
+                            } else {
+                                self.log("interstitial load failed placement=\(placementId) error=unknown")
+                            }
                             self.rejectInterstitialLoadCalls(
                                 for: placementId,
                                 message: "Unity Ads interstitial load failed: \(error?.message ?? "Unknown error")"
@@ -110,7 +138,9 @@ public class UnityAdsPlugin: CAPPlugin, CAPBridgedPlugin {
         guard ensureInitialized(call), let placementId = getPlacementId(call) else { return }
 
         DispatchQueue.main.async {
+            self.log("rewarded load requested placement=\(placementId)")
             if self.rewardedAds[placementId] != nil {
+                self.log("rewarded already loaded placement=\(placementId)")
                 call.resolve(["loaded": true])
                 return
             }
@@ -122,9 +152,21 @@ public class UnityAdsPlugin: CAPPlugin, CAPBridgedPlugin {
                     DispatchQueue.main.async {
                         self.loadingRewardedPlacements.remove(placementId)
                         if let ad = ad {
+                            self.log("rewarded load success placement=\(placementId)")
+                            ad.onAdExpired = { [weak self] _ in
+                                DispatchQueue.main.async {
+                                    self?.rewardedAds.removeValue(forKey: placementId)
+                                    self?.log("rewarded expired placement=\(placementId)")
+                                }
+                            }
                             self.rewardedAds[placementId] = ad
                             self.resolveRewardedLoadCalls(for: placementId)
                         } else {
+                            if let error = error {
+                                self.log(error, context: "rewarded load failed placement=\(placementId)")
+                            } else {
+                                self.log("rewarded load failed placement=\(placementId) error=unknown")
+                            }
                             self.rejectRewardedLoadCalls(
                                 for: placementId,
                                 message: "Unity Ads rewarded load failed: \(error?.message ?? "Unknown error")"
@@ -140,15 +182,19 @@ public class UnityAdsPlugin: CAPPlugin, CAPBridgedPlugin {
         guard ensureInitialized(call), let placementId = getPlacementId(call) else { return }
 
         DispatchQueue.main.async {
+            self.log("interstitial show requested placement=\(placementId)")
             guard self.pendingInterstitialShowCall == nil else {
+                self.log("interstitial show rejected: another ad is showing")
                 call.reject("Unity Ads interstitial is already showing")
                 return
             }
             guard let ad = self.interstitialAds.removeValue(forKey: placementId) else {
+                self.log("interstitial show rejected: ad is not ready placement=\(placementId)")
                 call.reject("Unity Ads interstitial is not ready")
                 return
             }
             guard let viewController = self.bridge?.viewController else {
+                self.log("interstitial show rejected: view controller unavailable")
                 self.interstitialAds[placementId] = ad
                 call.reject("Could not find a view controller for Unity Ads")
                 return
@@ -156,6 +202,7 @@ public class UnityAdsPlugin: CAPPlugin, CAPBridgedPlugin {
 
             self.pendingInterstitialShowCall = call
             let configuration = UADSShowConfigurationBuilder().with(viewController: viewController).build()
+            self.log("interstitial show starting placement=\(placementId) viewController=\(type(of: viewController))")
             ad.show(configuration, delegate: self.interstitialShowDelegate)
         }
     }
@@ -164,15 +211,19 @@ public class UnityAdsPlugin: CAPPlugin, CAPBridgedPlugin {
         guard ensureInitialized(call), let placementId = getPlacementId(call) else { return }
 
         DispatchQueue.main.async {
+            self.log("rewarded show requested placement=\(placementId)")
             guard self.pendingRewardedShowCall == nil else {
+                self.log("rewarded show rejected: another ad is showing")
                 call.reject("Unity Ads rewarded ad is already showing")
                 return
             }
             guard let ad = self.rewardedAds.removeValue(forKey: placementId) else {
+                self.log("rewarded show rejected: ad is not ready placement=\(placementId)")
                 call.reject("Unity Ads rewarded ad is not ready")
                 return
             }
             guard let viewController = self.bridge?.viewController else {
+                self.log("rewarded show rejected: view controller unavailable")
                 self.rewardedAds[placementId] = ad
                 call.reject("Could not find a view controller for Unity Ads")
                 return
@@ -181,31 +232,37 @@ public class UnityAdsPlugin: CAPPlugin, CAPBridgedPlugin {
             self.rewardedEarned = false
             self.pendingRewardedShowCall = call
             let configuration = UADSShowConfigurationBuilder().with(viewController: viewController).build()
+            self.log("rewarded show starting placement=\(placementId) viewController=\(type(of: viewController))")
             ad.show(configuration, delegate: self.rewardedShowDelegate)
         }
     }
 
     func handleInterstitialShowFailed(_ error: UnityAdsError) {
+        log(error, context: "interstitial show failed")
         pendingInterstitialShowCall?.reject("Unity Ads interstitial show failed: \(error.message)")
         pendingInterstitialShowCall = nil
     }
 
     func handleRewardedShowFailed(_ error: UnityAdsError) {
+        log(error, context: "rewarded show failed")
         pendingRewardedShowCall?.reject("Unity Ads rewarded show failed: \(error.message)")
         pendingRewardedShowCall = nil
         rewardedEarned = false
     }
 
     func handleRewardedShowReceivedReward() {
+        log("rewarded show received reward")
         rewardedEarned = true
     }
 
     func handleInterstitialShowComplete(_ state: UADSShowFinishState) {
+        log("interstitial show complete state=\(state)")
         pendingInterstitialShowCall?.resolve(["completed": state == .completed])
         pendingInterstitialShowCall = nil
     }
 
     func handleRewardedShowComplete(_ state: UADSShowFinishState) {
+        log("rewarded show complete state=\(state) earned=\(rewardedEarned)")
         pendingRewardedShowCall?.resolve([
             "completed": state == .completed,
             "rewarded": rewardedEarned && state == .completed
@@ -216,6 +273,7 @@ public class UnityAdsPlugin: CAPPlugin, CAPBridgedPlugin {
 
     private func ensureInitialized(_ call: CAPPluginCall) -> Bool {
         guard initialized else {
+            log("call rejected: Unity Ads is not initialized")
             call.reject("Unity Ads is not initialized")
             return false
         }
@@ -224,6 +282,7 @@ public class UnityAdsPlugin: CAPPlugin, CAPBridgedPlugin {
 
     private func getPlacementId(_ call: CAPPluginCall) -> String? {
         guard let placementId = call.getString("placementId"), !placementId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            log("call rejected: placement ID is missing")
             call.reject("Missing Unity Ads placement ID")
             return nil
         }
@@ -258,14 +317,21 @@ private final class UnityInterstitialShowDelegate: NSObject, UADSInterstitialSho
         self.owner = owner
     }
 
-    func showDidStart(_ unityAd: UADSInterstitialAd) {}
-    func showDidClick(_ unityAd: UADSInterstitialAd) {}
+    func showDidStart(_ unityAd: UADSInterstitialAd) {
+        owner?.log("interstitial callback showDidStart")
+    }
+
+    func showDidClick(_ unityAd: UADSInterstitialAd) {
+        owner?.log("interstitial callback showDidClick")
+    }
 
     func showDidComplete(_ unityAd: UADSInterstitialAd, with state: UADSShowFinishState) {
+        owner?.log("interstitial callback showDidComplete state=\(state)")
         owner?.handleInterstitialShowComplete(state)
     }
 
     func showDidFail(_ unityAd: UADSInterstitialAd, error: UnityAdsError) {
+        owner?.log(error, context: "interstitial callback showDidFail")
         owner?.handleInterstitialShowFailed(error)
     }
 }
@@ -277,18 +343,26 @@ private final class UnityRewardedShowDelegate: NSObject, UADSRewardedShowDelegat
         self.owner = owner
     }
 
-    func showDidStart(_ unityAd: UADSRewardedAd) {}
-    func showDidClick(_ unityAd: UADSRewardedAd) {}
+    func showDidStart(_ unityAd: UADSRewardedAd) {
+        owner?.log("rewarded callback showDidStart")
+    }
+
+    func showDidClick(_ unityAd: UADSRewardedAd) {
+        owner?.log("rewarded callback showDidClick")
+    }
 
     func showDidComplete(_ unityAd: UADSRewardedAd, with state: UADSShowFinishState) {
+        owner?.log("rewarded callback showDidComplete state=\(state)")
         owner?.handleRewardedShowComplete(state)
     }
 
     func showDidFail(_ unityAd: UADSRewardedAd, error: UnityAdsError) {
+        owner?.log(error, context: "rewarded callback showDidFail")
         owner?.handleRewardedShowFailed(error)
     }
 
     func showDidReceiveReward(_ unityAd: UADSRewardedAd) {
+        owner?.log("rewarded callback showDidReceiveReward")
         owner?.handleRewardedShowReceivedReward()
     }
 }
