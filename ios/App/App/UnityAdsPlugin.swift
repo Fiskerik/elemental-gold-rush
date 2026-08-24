@@ -201,7 +201,7 @@ public class UnityAdsPlugin: CAPPlugin, CAPBridgedPlugin {
                 call.reject("Unity Ads interstitial is not ready")
                 return
             }
-            guard let viewController = self.bridge?.viewController else {
+            guard let viewController = self.activeViewController() else {
                 self.log("interstitial show rejected: view controller unavailable")
                 self.interstitialAds[placementId] = ad
                 call.reject("Could not find a view controller for Unity Ads")
@@ -230,7 +230,7 @@ public class UnityAdsPlugin: CAPPlugin, CAPBridgedPlugin {
                 call.reject("Unity Ads rewarded ad is not ready")
                 return
             }
-            guard let viewController = self.bridge?.viewController else {
+            guard let viewController = self.activeViewController() else {
                 self.log("rewarded show rejected: view controller unavailable")
                 self.rewardedAds[placementId] = ad
                 call.reject("Could not find a view controller for Unity Ads")
@@ -286,6 +286,26 @@ public class UnityAdsPlugin: CAPPlugin, CAPBridgedPlugin {
             return false
         }
         return true
+    }
+
+    private func activeViewController() -> UIViewController? {
+        guard let rootViewController = bridge?.viewController else { return nil }
+        return topViewController(from: rootViewController)
+    }
+
+    private func topViewController(from viewController: UIViewController) -> UIViewController {
+        if let presented = viewController.presentedViewController, !presented.isBeingDismissed {
+            return topViewController(from: presented)
+        }
+        if let navigationController = viewController as? UINavigationController,
+           let visible = navigationController.visibleViewController {
+            return topViewController(from: visible)
+        }
+        if let tabBarController = viewController as? UITabBarController,
+           let selected = tabBarController.selectedViewController {
+            return topViewController(from: selected)
+        }
+        return viewController
     }
 
     private func getPlacementId(_ call: CAPPluginCall) -> String? {

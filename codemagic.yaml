@@ -20,7 +20,8 @@ workflows:
         VITE_REVENUECAT_DEBUG_LOGS: "false"
         # Temporary diagnostics UI so Unity Ads logs can be copied from TestFlight on Windows.
         VITE_PURCHASE_DEBUG_UI: "true"
-        VITE_UNITY_ADS_TEST_MODE: "false"
+        # Force a known Unity test creative while diagnosing the iOS renderer.
+        VITE_UNITY_ADS_TEST_MODE: "true"
         VITE_GAME_CENTER_DAILY_BOARD_GLOBAL_LEADERBOARD_ID: "daily_leaderboard_global"
         VITE_GAME_CENTER_DAILY_COMPOUND_GLOBAL_LEADERBOARD_ID: "daily_compound_fastest"
       xcode: latest
