@@ -7,5 +7,6 @@ open class BridgeViewController: CAPBridgeViewController {
         bridge?.registerPluginInstance(AppReviewPlugin())
         bridge?.registerPluginInstance(GameCenterPlugin())
         bridge?.registerPluginInstance(ReferralSharePlugin())
+        bridge?.registerPluginInstance(UnityAdsPlugin())
     }
 }
