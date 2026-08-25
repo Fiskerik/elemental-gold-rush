@@ -7,7 +7,7 @@ Use this workflow for every Atomic Fusion Rush release.
 1. Copy `release-notes/TEMPLATE.md` to `release-notes/<version>.md`.
 2. Compare against the previous App Store version and record meaningful gameplay, rewards, progression, leaderboard, purchase, localization, accessibility, performance, and major UI changes.
 3. Provide both fields for all 29 configured locales:
-   - Promotional Text: maximum 170 characters.
+   - Promotional Text: reuse the exact localized text from the previous release unless a change is explicitly requested; maximum 170 characters.
    - What's New: maximum 4,000 characters.
 4. Keep sections in the exact order used by `appstore.config.json`.
 5. Keep product names unchanged, omit quotation marks around store copy, and review every translation before upload.
@@ -16,6 +16,14 @@ Use this workflow for every Atomic Fusion Rush release.
 ```bash
 npm run appstore:validate -- --version <version>
 ```
+
+7. On Windows, upload both localized release-text fields with:
+
+```powershell
+.\scripts\upload-appstore-whats-new.ps1 -Version <version>
+```
+
+The script uploads Promotional Text and What's New by default. Use `-WhatsNewOnly` only when Promotional Text must intentionally remain untouched.
 
 ## Supported locale codes
 

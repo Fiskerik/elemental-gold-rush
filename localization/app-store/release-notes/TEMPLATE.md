@@ -7,7 +7,7 @@ Copy the following section once for each locale, in the order configured in `../
 ## <display name> — <locale code>
 
 Promotional Text:
-<maximum 170 characters>
+<copy this locale's exact Promotional Text from the previous release unless explicitly changed; maximum 170 characters>
 
 What's New:
 <maximum 4,000 characters>

@@ -18,18 +18,16 @@ import {
 } from "./products";
 import {
   clearCustomerInfoListener,
-  debugNativePurchases,
-  isPurchaseDebugUiEnabled,
   purchaseGoldCoinPack,
   purchaseProductWithResult,
   redeemOfferCode,
   restorePurchases,
   setCustomerInfoListener,
 } from "./purchases";
-import { getLevelPlayDiagnostics, initAds, showRewardedForCoin } from "./ads";
+import { initAds, showRewardedForCoin } from "./ads";
 import { useIsTabletLayout } from "./responsive";
 import { t } from "./localization";
-import { clearLogs, copyDebugReport, getDebugReport, getLogs, logDebug } from "../lib/debugLogger";
+import { logDebug } from "../lib/debugLogger";
 
 const SHOP_POWER_UPS: Array<{
   id: InventoryPowerUpId;
@@ -118,24 +116,21 @@ type ThemeBundleVisual = {
 const THEME_BUNDLE_VISUALS: Partial<Record<ProductId, ThemeBundleVisual>> = {
   [PRODUCT_IDS.themeGoldLab]: {
     board: "url('/themes/gummy-lab.webp') center / cover no-repeat",
-    atom:
-      "linear-gradient(132deg, transparent 32%, rgba(255,255,255,.75) 34%, transparent 39%), radial-gradient(circle at 30% 25%, #ffe5a1, #d26c32 58%, #4d1e1e)",
+    atom: "linear-gradient(132deg, transparent 32%, rgba(255,255,255,.75) 34%, transparent 39%), radial-gradient(circle at 30% 25%, #ffe5a1, #d26c32 58%, #4d1e1e)",
     skin: "Gummy atoms",
     theme: "goldLab",
     atomSkins: ["chrome"],
   },
   [PRODUCT_IDS.themeNeonPeriodic]: {
     board: "url('/themes/cloud-nine.webp') center / cover no-repeat",
-    atom:
-      "linear-gradient(165deg, rgba(88,239,255,.35), transparent 42%, rgba(238,92,255,.3)), radial-gradient(circle at 30% 25%, #ffe5a1, #d26c32 58%, #4d1e1e)",
+    atom: "linear-gradient(165deg, rgba(88,239,255,.35), transparent 42%, rgba(238,92,255,.3)), radial-gradient(circle at 30% 25%, #ffe5a1, #d26c32 58%, #4d1e1e)",
     skin: "Cloud Glass atoms",
     theme: "neonPeriodic",
     atomSkins: ["hologram"],
   },
   [PRODUCT_IDS.themeQuantumVoid]: {
     board: "url('/themes/crystal-cove.webp') center / cover no-repeat",
-    atom:
-      "conic-gradient(from 25deg, transparent, rgba(255,255,255,.42), transparent 28% 62%, rgba(255,255,255,.28), transparent 78%), radial-gradient(circle at 30% 25%, #ffe5a1, #d26c32 58%, #4d1e1e)",
+    atom: "conic-gradient(from 25deg, transparent, rgba(255,255,255,.42), transparent 28% 62%, rgba(255,255,255,.28), transparent 78%), radial-gradient(circle at 30% 25%, #ffe5a1, #d26c32 58%, #4d1e1e)",
     skin: "Mineral atoms",
     theme: "quantumVoid",
     atomSkins: ["mineral"],
@@ -143,24 +138,21 @@ const THEME_BUNDLE_VISUALS: Partial<Record<ProductId, ThemeBundleVisual>> = {
   [PRODUCT_IDS.themeVerdantCrystal]: {
     board:
       "radial-gradient(circle at 14% 5%, rgba(255,255,255,.9), transparent 24%), radial-gradient(circle at 88% 24%, rgba(105,224,170,.42), transparent 32%), linear-gradient(180deg, #effff7, #a9e8cb 58%, #397e72)",
-    atom:
-      "linear-gradient(55deg, transparent 42%, rgba(255,255,255,.72) 44% 48%, transparent 50%), radial-gradient(circle at 28% 20%, #ffffff, #65cda7 58%, #1c5e56)",
+    atom: "linear-gradient(55deg, transparent 42%, rgba(255,255,255,.72) 44% 48%, transparent 50%), radial-gradient(circle at 28% 20%, #ffffff, #65cda7 58%, #1c5e56)",
     skin: "Verdant Glass atoms",
     theme: "verdantCrystal",
     atomSkins: ["verdantCrystal"],
   },
   [PRODUCT_IDS.themeBiohazard]: {
     board: "url('/themes/radioactive-reactor.webp') center / cover no-repeat",
-    atom:
-      "radial-gradient(circle at 68% 66%, rgba(255,255,255,.5) 0 7%, transparent 8%), radial-gradient(circle at 42% 72%, rgba(255,255,255,.35) 0 5%, transparent 6%), radial-gradient(circle at 30% 25%, #ffe5a1, #d26c32 58%, #4d1e1e)",
+    atom: "radial-gradient(circle at 68% 66%, rgba(255,255,255,.5) 0 7%, transparent 8%), radial-gradient(circle at 42% 72%, rgba(255,255,255,.35) 0 5%, transparent 6%), radial-gradient(circle at 30% 25%, #ffe5a1, #d26c32 58%, #4d1e1e)",
     skin: "Irradiated atoms",
     theme: "biohazard",
     atomSkins: ["toxic"],
   },
   [PRODUCT_IDS.themeMossHollow]: {
     board: "url('/themes/moss-hollow.png') center / cover no-repeat",
-    atom:
-      "radial-gradient(circle at 28% 20%, rgba(226,255,176,.72) 0 6%, transparent 17%), radial-gradient(circle at 70% 72%, rgba(176,224,101,.4) 0 10%, transparent 13%), radial-gradient(circle at 32% 28%, #d9f4a2, #6f9c42 62%, #17351f)",
+    atom: "radial-gradient(circle at 28% 20%, rgba(226,255,176,.72) 0 6%, transparent 17%), radial-gradient(circle at 70% 72%, rgba(176,224,101,.4) 0 10%, transparent 13%), radial-gradient(circle at 32% 28%, #d9f4a2, #6f9c42 62%, #17351f)",
     skin: "Moss Velvet atoms",
     theme: "mossHollow",
     atomSkins: ["moss"],
@@ -199,11 +191,7 @@ function withTimeout<T>(
   ]);
 }
 
-function BundlePreview({
-  visual,
-}: {
-  visual: ThemeBundleVisual;
-}) {
+function BundlePreview({ visual }: { visual: ThemeBundleVisual }) {
   return (
     <div
       aria-label={`${visual.skin} preview with eight atoms`}
@@ -428,7 +416,8 @@ function LegacyThemePreviewModal({
         atomicNumber: ball.atom,
         x: Math.max(7, Math.min(93, ball.x)),
         y: Math.max(7, Math.min(90, ball.y)),
-        atomSkin: skins.get(ball.id) ?? visual.atomSkins[ball.id % visual.atomSkins.length] ?? "classic",
+        atomSkin:
+          skins.get(ball.id) ?? visual.atomSkins[ball.id % visual.atomSkins.length] ?? "classic",
         isShot: ball.id === incoming.id,
       }));
       setAtoms(nextAtoms);
@@ -477,9 +466,13 @@ function LegacyThemePreviewModal({
           boxShadow: "0 18px 70px rgba(0,0,0,.5)",
         }}
       >
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "start" }}>
+        <div
+          style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "start" }}
+        >
           <div>
-            <div style={{ color: "var(--accent)", fontSize: 11, letterSpacing: 2, fontWeight: 900 }}>
+            <div
+              style={{ color: "var(--accent)", fontSize: 11, letterSpacing: 2, fontWeight: 900 }}
+            >
               THEME PREVIEW
             </div>
             <h2 id="theme-preview-title" style={{ margin: "4px 0 2px", fontSize: 22 }}>
@@ -541,10 +534,36 @@ function LegacyThemePreviewModal({
             boxShadow: "inset 0 0 0 1px rgba(0,0,0,.22), inset 0 -80px 120px rgba(0,0,0,.18)",
           }}
         >
-          <div aria-hidden="true" style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(255,255,255,.12), transparent 28%, rgba(0,0,0,.12))", pointerEvents: "none" }} />
+          <div
+            aria-hidden="true"
+            style={{
+              position: "absolute",
+              inset: 0,
+              background:
+                "linear-gradient(180deg, rgba(255,255,255,.12), transparent 28%, rgba(0,0,0,.12))",
+              pointerEvents: "none",
+            }}
+          />
           {!busy && shotsUsed < 10 && (
-            <svg aria-hidden="true" viewBox="0 0 100 100" preserveAspectRatio="none" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }}>
-              <polyline points={previewPath.path.map((point) => `${point.x},${point.y}`).join(" ")} fill="none" stroke="rgba(255,255,255,.72)" strokeWidth="0.45" strokeDasharray="1.4 1.7" />
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 100 100"
+              preserveAspectRatio="none"
+              style={{
+                position: "absolute",
+                inset: 0,
+                width: "100%",
+                height: "100%",
+                pointerEvents: "none",
+              }}
+            >
+              <polyline
+                points={previewPath.path.map((point) => `${point.x},${point.y}`).join(" ")}
+                fill="none"
+                stroke="rgba(255,255,255,.72)"
+                strokeWidth="0.45"
+                strokeDasharray="1.4 1.7"
+              />
             </svg>
           )}
           {atoms.map((atom) => (
@@ -582,7 +601,12 @@ function LegacyThemePreviewModal({
                 filter: "drop-shadow(0 4px 5px rgba(0,0,0,.5))",
               }}
             >
-              <ElementBall atomicNumber={projectile.atomicNumber} size={46} glow atomSkin={projectile.atomSkin} />
+              <ElementBall
+                atomicNumber={projectile.atomicNumber}
+                size={46}
+                glow
+                atomSkin={projectile.atomSkin}
+              />
             </div>
           )}
           <button
@@ -603,7 +627,8 @@ function LegacyThemePreviewModal({
               display: "grid",
               placeItems: "center",
               color: "var(--foreground)",
-              background: "radial-gradient(circle at 30% 24%, rgba(255,255,255,.8), rgba(80,160,240,.75) 42%, rgba(20,35,85,.95))",
+              background:
+                "radial-gradient(circle at 30% 24%, rgba(255,255,255,.8), rgba(80,160,240,.75) 42%, rgba(20,35,85,.95))",
               border: "2px solid rgba(255,255,255,.65)",
               boxShadow: "0 0 18px rgba(100,190,255,.55)",
               fontSize: 10,
@@ -734,12 +759,15 @@ function GameBoardThemePreviewModal({
               boxShadow: "0 18px 60px rgba(0,0,0,.5)",
             }}
           >
-            <div style={{ color: "var(--accent)", fontSize: 11, letterSpacing: 2, fontWeight: 900 }}>
+            <div
+              style={{ color: "var(--accent)", fontSize: 11, letterSpacing: 2, fontWeight: 900 }}
+            >
               PREVIEW COMPLETE
             </div>
             <h2 style={{ margin: "6px 0 8px", fontSize: 24 }}>10 shots played</h2>
             <p style={{ margin: "0 0 16px", color: "var(--muted-foreground)", fontSize: 13 }}>
-              This preview used the regular shooting, collision, merge, and combo systems. No power-ups or progress were saved.
+              This preview used the regular shooting, collision, merge, and combo systems. No
+              power-ups or progress were saved.
             </p>
             <button type="button" onClick={onClose} style={{ ...shopButton, width: "100%" }}>
               Back to shop
@@ -780,26 +808,14 @@ export function Shop({
   const [proPackMessage, setProPackMessage] = useState("");
   const [cosmeticMessage, setCosmeticMessage] = useState("");
   const [proPackBusy, setProPackBusy] = useState<"purchase" | "restore" | "redeem" | "">("");
-  const [purchaseDebugBusy, setPurchaseDebugBusy] = useState(false);
-  const [purchaseDebugOpen, setPurchaseDebugOpen] = useState(false);
-  const [purchaseDebugLogs, setPurchaseDebugLogs] = useState<string[]>([]);
-  const [purchaseSupportBusy, setPurchaseSupportBusy] = useState(false);
-  const [purchaseSupportMessage, setPurchaseSupportMessage] = useState("");
-  const [purchaseReport, setPurchaseReport] = useState("");
   const [coinToast, setCoinToast] = useState<{ id: number; text: string } | null>(null);
   const coinToastTimeoutRef = useRef<number | null>(null);
   const themesSectionRef = useRef<HTMLElement | null>(null);
   const proPack = getProductById(PRODUCT_IDS.proLabPack);
   const isNativeIos = Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios";
-  const purchaseDebugEnabled = isPurchaseDebugUiEnabled();
-  const purchaseDebugLocked = purchaseDebugEnabled && purchaseDebugBusy;
   const appStorePurchaseBusy = Boolean(proPackBusy) || Boolean(pendingProductId);
   const previewProduct = previewProductId ? getProductById(previewProductId) : undefined;
   const previewVisual = previewProductId ? THEME_BUNDLE_VISUALS[previewProductId] : undefined;
-  const showPurchaseSupport =
-    isNativeIos &&
-    purchaseDebugEnabled &&
-    Boolean(proPackMessage || message || purchaseSupportMessage || purchaseReport);
 
   useEffect(() => {
     if (initialSection !== "themes") return;
@@ -853,11 +869,6 @@ export function Shop({
     }, 1800);
   }
 
-  function refreshPurchaseDebugLogs(open = purchaseDebugOpen) {
-    setPurchaseDebugLogs(getLogs());
-    if (open) setPurchaseDebugOpen(true);
-  }
-
   function handlePowerUpPurchase(
     powerUp: InventoryPowerUpId,
     coinCost: number,
@@ -896,7 +907,9 @@ export function Shop({
         setProPackMessage(tr("Pro Lab Pack unlocked."));
         return;
       }
-      setProPackMessage(result.reason ? tr(result.reason) : tr("Pro Lab Pack is not available right now."));
+      setProPackMessage(
+        result.reason ? tr(result.reason) : tr("Pro Lab Pack is not available right now."),
+      );
     } catch (error) {
       setProPackMessage(
         error instanceof Error ? error.message : "App Store purchase could not be started.",
@@ -904,7 +917,6 @@ export function Shop({
     } finally {
       logDebug("Product purchase UI flow ended.", { productId: PRODUCT_IDS.proLabPack });
       setProPackBusy("");
-      if (purchaseDebugEnabled) refreshPurchaseDebugLogs();
     }
   }
 
@@ -926,7 +938,6 @@ export function Shop({
       );
     } finally {
       setProPackBusy("");
-      if (purchaseDebugEnabled) refreshPurchaseDebugLogs();
     }
   }
 
@@ -945,14 +956,10 @@ export function Shop({
         setProPackMessage(tr("Pro Lab Pack unlocked from offer code."));
         return;
       }
-      setProPackMessage(
-        result.reason ?? "Offer code redemption could not be completed right now.",
-      );
+      setProPackMessage(result.reason ?? "Offer code redemption could not be completed right now.");
     } catch (error) {
       setProPackMessage(
-        error instanceof Error
-          ? error.message
-          : "App Store code redemption could not be started.",
+        error instanceof Error ? error.message : "App Store code redemption could not be started.",
       );
     } finally {
       setProPackBusy("");
@@ -978,15 +985,20 @@ export function Shop({
         );
         return;
       }
-      setMessage(result.reason ? tr(result.reason) : tr("App Store coin purchase is not available right now."));
+      setMessage(
+        result.reason
+          ? tr(result.reason)
+          : tr("App Store coin purchase is not available right now."),
+      );
     } catch (error) {
       setMessage(
-        error instanceof Error ? tr(error.message) : tr("App Store coin purchase could not be started."),
+        error instanceof Error
+          ? tr(error.message)
+          : tr("App Store coin purchase could not be started."),
       );
     } finally {
       logDebug("Coin purchase UI flow ended.", { productId });
       setPendingProductId(null);
-      if (purchaseDebugEnabled) refreshPurchaseDebugLogs();
     }
   }
 
@@ -1017,14 +1029,15 @@ export function Shop({
         });
         return;
       }
-      setCosmeticMessage(result.reason ? tr(result.reason) : tr("This cosmetic bundle is not available right now."));
+      setCosmeticMessage(
+        result.reason ? tr(result.reason) : tr("This cosmetic bundle is not available right now."),
+      );
     } catch (error) {
       setCosmeticMessage(
         error instanceof Error ? tr(error.message) : tr("App Store purchase could not be started."),
       );
     } finally {
       setPendingProductId(null);
-      if (purchaseDebugEnabled) refreshPurchaseDebugLogs();
     }
   }
 
@@ -1041,103 +1054,17 @@ export function Shop({
         return;
       }
       setMessage(
-        result.reason ? tr(result.reason) : tr("Rewarded ad not completed or not available yet. Try again shortly."),
+        result.reason
+          ? tr(result.reason)
+          : tr("Rewarded ad not completed or not available yet. Try again shortly."),
       );
     } catch (error) {
-      setMessage(error instanceof Error ? tr(error.message) : tr("Rewarded ad could not be started."));
+      setMessage(
+        error instanceof Error ? tr(error.message) : tr("Rewarded ad could not be started."),
+      );
     } finally {
       setPendingProductId(null);
     }
-  }
-
-  async function handlePurchaseDebug() {
-    setPurchaseDebugBusy(true);
-    setMessage(tr("Checking purchase diagnostics..."));
-    logDebug("Manual purchase diagnostics started.");
-    try {
-      await getLevelPlayDiagnostics();
-      const snapshot = await debugNativePurchases((statusMessage) => setMessage(statusMessage));
-      const details = [
-        `Platform: ${snapshot.platform}`,
-        `Configured: ${String(snapshot.isConfigured ?? snapshot.configured)}`,
-        `Can make payments: ${String(snapshot.canMakePayments ?? "unknown")}`,
-        `Offering: ${snapshot.offeringId}`,
-        `Entitlement: ${snapshot.entitlementId}`,
-        `Active entitlements: ${snapshot.activeEntitlements.join(", ") || "none"}`,
-        `Packages: ${snapshot.packageIdentifiers.join(", ") || "none"}`,
-        `Store products: ${snapshot.storeProductIdentifiers.join(", ") || "none"}`,
-        snapshot.reason ? `Reason: ${snapshot.reason}` : "",
-      ]
-        .filter(Boolean)
-        .join("\n");
-      console.log("RevenueCat diagnostics", snapshot);
-      window.alert(details);
-      setMessage(snapshot.reason ? tr(snapshot.reason) : tr("Purchase diagnostics complete."));
-      refreshPurchaseDebugLogs(true);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      logDebug("Manual purchase diagnostics failed.", { message });
-      window.alert(`Purchase diagnostics failed.\n\n${message}`);
-      setMessage(message);
-      refreshPurchaseDebugLogs(true);
-    } finally {
-      setPurchaseDebugBusy(false);
-    }
-  }
-
-  async function handleLevelPlayDiagnostics() {
-    setPurchaseDebugBusy(true);
-    setMessage("Reading LevelPlay diagnostics...");
-    try {
-      const logs = await getLevelPlayDiagnostics();
-      refreshPurchaseDebugLogs(true);
-      setPurchaseReport(getDebugReport());
-      setMessage(logs.length ? "LevelPlay diagnostics loaded." : "No LevelPlay diagnostics recorded yet.");
-    } finally {
-      setPurchaseDebugBusy(false);
-    }
-  }
-
-  function handleClearPurchaseLogs() {
-    clearLogs();
-    setPurchaseDebugLogs([]);
-    setPurchaseReport("");
-    setMessage(tr("Purchase debug logs cleared."));
-  }
-
-  async function handlePurchaseSupportCheck() {
-    setPurchaseSupportBusy(true);
-    setPurchaseSupportMessage("Checking purchase setup...");
-    logDebug("Manual purchase support check started.");
-    try {
-      const snapshot = await debugNativePurchases((statusMessage) =>
-        setPurchaseSupportMessage(statusMessage),
-      );
-      setPurchaseSupportMessage(snapshot.reason ?? "Purchase setup check complete.");
-      setPurchaseReport(getDebugReport());
-    } catch (error) {
-      const supportMessage = error instanceof Error ? error.message : String(error);
-      logDebug("Manual purchase support check failed.", { message: supportMessage });
-      setPurchaseSupportMessage(supportMessage);
-      setPurchaseReport(getDebugReport());
-    } finally {
-      setPurchaseSupportBusy(false);
-    }
-  }
-
-  async function handleCopyPurchaseDiagnostics() {
-    await getLevelPlayDiagnostics();
-    const copied = await copyDebugReport();
-    setPurchaseReport(getDebugReport());
-    setPurchaseSupportMessage(
-      copied
-        ? "Purchase diagnostics copied. Paste them into your support note."
-        : "Clipboard copy was not available. Select and copy the report below.",
-    );
-  }
-
-  function handleTogglePurchaseReport() {
-    setPurchaseReport((current) => (current ? "" : getDebugReport()));
   }
 
   return (
@@ -1158,7 +1085,7 @@ export function Shop({
       >
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <button onClick={onBack} style={smallButton}>
-          ← {tr("Back")}
+            ← {tr("Back")}
           </button>
           <div>
             <h1 style={{ fontSize: 22, margin: 0, fontWeight: 800 }}>{tr("Shop")}</h1>
@@ -1169,111 +1096,6 @@ export function Shop({
             {message}
           </p>
         )}
-        {purchaseDebugEnabled && (
-          <section style={debugPanel}>
-            <div style={debugActions}>
-              <button
-                type="button"
-                onClick={handlePurchaseDebug}
-                disabled={purchaseDebugBusy || Boolean(proPackBusy) || Boolean(pendingProductId)}
-                style={{
-                  ...secondaryShopButton,
-                  opacity: purchaseDebugBusy ? 0.7 : 1,
-                }}
-              >
-                {purchaseDebugBusy ? tr("Checking...") : tr("Debug RevenueCat")}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  refreshPurchaseDebugLogs(true);
-                }}
-                style={secondaryShopButton}
-              >
-                {tr("Show Logs")}
-              </button>
-              <button
-                type="button"
-                onClick={handleLevelPlayDiagnostics}
-                disabled={purchaseDebugBusy}
-                style={secondaryShopButton}
-              >
-                {tr("LevelPlay Logs")}
-              </button>
-              <button type="button" onClick={handleClearPurchaseLogs} style={secondaryShopButton}>
-                {tr("Clear Logs")}
-              </button>
-            </div>
-            {purchaseDebugOpen && (
-              <div style={debugLogBox}>
-                {purchaseDebugLogs.length ? (
-                  purchaseDebugLogs.map((entry, index) => (
-                    <div key={`${index}-${entry}`} style={debugLogLine}>
-                      {entry}
-                    </div>
-                  ))
-                ) : (
-                  <div style={debugLogLine}>{tr("No purchase logs yet.")}</div>
-                )}
-              </div>
-            )}
-          </section>
-        )}
-
-        {showPurchaseSupport && (
-          <section style={purchaseSupportPanel}>
-            <div>
-              <div style={purchaseSupportTitle}>{tr("Purchase Support")}</div>
-              <p style={purchaseSupportCopy}>
-                If the App Store sheet does not appear, run a check and copy diagnostics from this
-                TestFlight build.
-              </p>
-            </div>
-            <div style={purchaseSupportActions}>
-              <button
-                type="button"
-                onClick={handlePurchaseSupportCheck}
-                disabled={purchaseSupportBusy || Boolean(proPackBusy) || Boolean(pendingProductId)}
-                style={{
-                  ...secondaryShopButton,
-                  opacity:
-                    purchaseSupportBusy || Boolean(proPackBusy) || Boolean(pendingProductId)
-                      ? 0.6
-                      : 1,
-                }}
-              >
-                {purchaseSupportBusy ? tr("Checking...") : tr("Run Check")}
-              </button>
-              <button
-                type="button"
-                onClick={handleCopyPurchaseDiagnostics}
-                style={secondaryShopButton}
-              >
-                {tr("Copy Diagnostics")}
-              </button>
-              <button
-                type="button"
-                onClick={handleTogglePurchaseReport}
-                style={secondaryShopButton}
-              >
-                {purchaseReport ? tr("Hide Report") : tr("Show Report")}
-              </button>
-            </div>
-            {purchaseSupportMessage && (
-              <p style={purchaseSupportStatus}>{purchaseSupportMessage}</p>
-            )}
-            {purchaseReport && (
-              <textarea
-                readOnly
-                value={purchaseReport}
-                onFocus={(event) => event.currentTarget.select()}
-                style={purchaseReportBox}
-                aria-label="Purchase diagnostics report"
-              />
-            )}
-          </section>
-        )}
-
         {isNativeIos && proPack && (
           <section
             style={{
@@ -1332,7 +1154,11 @@ export function Shop({
                   <Benefit text={tr("Unlock the Pro Lab profile badge.")} />
                   <Benefit text={tr("Daily quest claims pay 10 gold coins instead of 3.")} />
                   <Benefit text={tr("Daily challenges award 5 gold coins each instead of 3.")} />
-                  <Benefit text={tr("Level 1 upgrade to all power-ups (10 coin refund each for already upgraded).")} />
+                  <Benefit
+                    text={tr(
+                      "Level 1 upgrade to all power-ups (10 coin refund each for already upgraded).",
+                    )}
+                  />
                 </div>
               </>
             )}
@@ -1352,13 +1178,10 @@ export function Shop({
                 <button
                   type="button"
                   onClick={handleOfferCodeRedeem}
-                  disabled={appStorePurchaseBusy || purchaseDebugLocked}
+                  disabled={appStorePurchaseBusy}
                   style={{
                     ...secondaryShopButton,
-                    opacity:
-                      purchaseDebugLocked || (appStorePurchaseBusy && proPackBusy !== "redeem")
-                        ? 0.55
-                        : 1,
+                    opacity: appStorePurchaseBusy && proPackBusy !== "redeem" ? 0.55 : 1,
                   }}
                 >
                   {proPackBusy === "redeem" ? tr("Opening...") : tr("Redeem Code")}
@@ -1367,13 +1190,10 @@ export function Shop({
                   <button
                     type="button"
                     onClick={handleProPackRestore}
-                    disabled={appStorePurchaseBusy || purchaseDebugLocked}
+                    disabled={appStorePurchaseBusy}
                     style={{
                       ...secondaryShopButton,
-                      opacity:
-                        purchaseDebugLocked || (appStorePurchaseBusy && proPackBusy !== "restore")
-                          ? 0.55
-                          : 1,
+                      opacity: appStorePurchaseBusy && proPackBusy !== "restore" ? 0.55 : 1,
                     }}
                   >
                     {proPackBusy === "restore" ? tr("Checking...") : tr("Restore")}
@@ -1381,13 +1201,10 @@ export function Shop({
                   <button
                     type="button"
                     onClick={handleProPackPurchase}
-                    disabled={appStorePurchaseBusy || purchaseDebugLocked}
+                    disabled={appStorePurchaseBusy}
                     style={{
                       ...shopButton,
-                      opacity:
-                        purchaseDebugLocked || (appStorePurchaseBusy && proPackBusy !== "purchase")
-                          ? 0.55
-                          : 1,
+                      opacity: appStorePurchaseBusy && proPackBusy !== "purchase" ? 0.55 : 1,
                     }}
                   >
                     {proPackBusy === "purchase" ? tr("Opening...") : tr("Unlock Pack")}
@@ -1444,7 +1261,9 @@ export function Shop({
               />
             </div>
             <p style={{ margin: "0 0 14px", color: "var(--muted-foreground)", fontSize: 13 }}>
-              {tr("Buy extra gold coins for power-ups and experiments. Purchases are processed securely by the App Store.")}
+              {tr(
+                "Buy extra gold coins for power-ups and experiments. Purchases are processed securely by the App Store.",
+              )}
             </p>
             <button
               type="button"
@@ -1488,21 +1307,18 @@ export function Shop({
                     key={productId}
                     type="button"
                     onClick={() => handleNativeCoinPurchase(productId)}
-                    disabled={appStorePurchaseBusy || purchaseDebugLocked}
+                    disabled={appStorePurchaseBusy}
                     style={{
                       ...coinPackButton,
-                      opacity:
-                        purchaseDebugLocked ||
-                        (appStorePurchaseBusy && pendingProductId !== productId)
-                          ? 0.55
-                          : 1,
-                      cursor:
-                        appStorePurchaseBusy || purchaseDebugLocked ? "not-allowed" : "pointer",
+                      opacity: appStorePurchaseBusy && pendingProductId !== productId ? 0.55 : 1,
+                      cursor: appStorePurchaseBusy ? "not-allowed" : "pointer",
                     }}
                   >
                     <GoldCoinIcon size={28} />
                     <strong style={coinPackAmount}>{product.coins}x</strong>
-                    <span>{pendingProductId === productId ? tr("Opening...") : tr("App Store")}</span>
+                    <span>
+                      {pendingProductId === productId ? tr("Opening...") : tr("App Store")}
+                    </span>
                   </button>
                 );
               })}
@@ -1551,7 +1367,9 @@ export function Shop({
               </div>
             </div>
             <p style={{ margin: "0 0 14px", color: "var(--muted-foreground)", fontSize: 13 }}>
-              {tr("Support the developer by purchasing custom skins. Each one-time purchase unlocks a board and its matching atom finish; element colors and gameplay remain unchanged.")}
+              {tr(
+                "Support the developer by purchasing custom skins. Each one-time purchase unlocks a board and its matching atom finish; element colors and gameplay remain unchanged.",
+              )}
             </p>
             <div
               style={{
@@ -1567,7 +1385,7 @@ export function Shop({
                 const owned =
                   !COSMETIC_THEME_PURCHASES_ENABLED || ownedThemeProducts.includes(productId);
                 const pending = pendingProductId === productId;
-                const disabled = owned || appStorePurchaseBusy || purchaseDebugLocked;
+                const disabled = owned || appStorePurchaseBusy;
                 return (
                   <article
                     key={productId}
@@ -1619,7 +1437,9 @@ export function Shop({
                     </button>
                     <div style={{ minWidth: 0, display: "grid", gap: 7 }}>
                       <div>
-                        <strong style={{ display: "block", fontSize: 15 }}>{tr(product.name)}</strong>
+                        <strong style={{ display: "block", fontSize: 15 }}>
+                          {tr(product.name)}
+                        </strong>
                         <span style={{ color: "var(--accent)", fontSize: 11, fontWeight: 800 }}>
                           {tr(visual.skin)}
                         </span>
@@ -1718,9 +1538,11 @@ export function Shop({
                   marginBottom: 6,
                 }}
               >
-                  {tr("INVENTORY POWER-UPS")}
+                {tr("INVENTORY POWER-UPS")}
               </div>
-              <h2 style={{ margin: 0, fontSize: 22, fontWeight: 900 }}>{tr("Stock your next run")}</h2>
+              <h2 style={{ margin: 0, fontSize: 22, fontWeight: 900 }}>
+                {tr("Stock your next run")}
+              </h2>
             </div>
             <div style={walletWrap}>
               <WalletPill
@@ -1732,7 +1554,9 @@ export function Shop({
             </div>
           </div>
           <p style={{ margin: "0 0 14px", color: "var(--muted-foreground)", fontSize: 13 }}>
-            {tr("Buy extra inventory copies with gold coins. Before each level, you can choose up to 3 inventory power-ups to start with.")}
+            {tr(
+              "Buy extra inventory copies with gold coins. Before each level, you can choose up to 3 inventory power-ups to start with.",
+            )}
           </p>
           <div
             style={{
@@ -1759,7 +1583,10 @@ export function Shop({
                     background: "var(--surface)",
                   }}
                 >
-                  <span style={shopPowerUpIconWrap} aria-label={isUnlocked ? `Owned ${powerUpInventory[powerUp.id]}` : undefined}>
+                  <span
+                    style={shopPowerUpIconWrap}
+                    aria-label={isUnlocked ? `Owned ${powerUpInventory[powerUp.id]}` : undefined}
+                  >
                     <PowerUpBadge icon={powerUp.id} size={34} />
                     {isUnlocked && (
                       <span style={shopPowerUpCountPill} aria-hidden="true">
@@ -1899,15 +1726,6 @@ function Benefit({ text }: { text: string }) {
   );
 }
 
-const purchaseSupportPanel: React.CSSProperties = {
-  padding: 12,
-  borderRadius: 14,
-  background: "var(--surface)",
-  border: "1px solid var(--border)",
-  display: "grid",
-  gap: 10,
-};
-
 const shopCoinToast: React.CSSProperties = {
   position: "fixed",
   top: "calc(env(safe-area-inset-top, 0px) + 18px)",
@@ -1924,82 +1742,6 @@ const shopCoinToast: React.CSSProperties = {
   fontWeight: 900,
   boxShadow: "0 10px 26px var(--accent-glow)",
   animation: "coin-toast-rise 1800ms ease-out forwards",
-};
-
-const purchaseSupportTitle: React.CSSProperties = {
-  fontSize: 11,
-  letterSpacing: 1.6,
-  color: "var(--accent)",
-  fontWeight: 900,
-  textTransform: "uppercase",
-};
-
-const purchaseSupportCopy: React.CSSProperties = {
-  margin: "4px 0 0",
-  color: "var(--muted-foreground)",
-  fontSize: 12,
-  lineHeight: 1.4,
-};
-
-const purchaseSupportActions: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(112px, 1fr))",
-  gap: 8,
-};
-
-const purchaseSupportStatus: React.CSSProperties = {
-  margin: 0,
-  color: "var(--muted-foreground)",
-  fontSize: 12,
-  lineHeight: 1.4,
-};
-
-const purchaseReportBox: React.CSSProperties = {
-  width: "100%",
-  minHeight: 160,
-  resize: "vertical",
-  borderRadius: 10,
-  padding: 10,
-  background: "oklch(0.12 0.02 250)",
-  color: "oklch(0.86 0.18 145)",
-  border: "1px solid var(--border)",
-  fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
-  fontSize: 10,
-  lineHeight: 1.45,
-};
-
-const debugPanel: React.CSSProperties = {
-  padding: 12,
-  borderRadius: 14,
-  background: "var(--surface)",
-  border: "1px solid color-mix(in oklch, var(--accent) 45%, var(--border))",
-  display: "grid",
-  gap: 10,
-};
-
-const debugActions: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
-  gap: 8,
-};
-
-const debugLogBox: React.CSSProperties = {
-  maxHeight: 220,
-  overflow: "auto",
-  borderRadius: 10,
-  padding: 10,
-  background: "oklch(0.12 0.02 250)",
-  color: "oklch(0.86 0.18 145)",
-  border: "1px solid var(--border)",
-  fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
-  fontSize: 10,
-  lineHeight: 1.45,
-  whiteSpace: "pre-wrap",
-  wordBreak: "break-word",
-};
-
-const debugLogLine: React.CSSProperties = {
-  marginBottom: 6,
 };
 
 const walletWrap: React.CSSProperties = {

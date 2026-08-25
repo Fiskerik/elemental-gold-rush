@@ -4,7 +4,7 @@ param(
   [string]$IssuerId,
   [string]$KeyId,
   [string]$PrivateKeyPath,
-  [switch]$IncludePromotionalText,
+  [switch]$WhatsNewOnly,
   [switch]$DryRun,
   [switch]$Force
 )
@@ -44,13 +44,15 @@ try {
     & $node.Source $uploaderPath validate --version $Version
     if ($LASTEXITCODE -ne 0) { throw "The $Version release notes did not pass validation." }
 
-    $scopeArgument = if ($IncludePromotionalText) { "--only-release-text" } else { "--only-whats-new" }
+    # New App Store versions do not inherit Promotional Text. Upload both
+    # localized release-text fields by default so a version is never left blank.
+    $scopeArgument = if ($WhatsNewOnly) { "--only-whats-new" } else { "--only-release-text" }
     $uploadArguments = @($uploaderPath, "upload", "--version", $Version, $scopeArgument)
     if ($DryRun) {
       $uploadArguments += "--dry-run"
     } elseif (-not $Force) {
       Write-Host ""
-      $scopeLabel = if ($IncludePromotionalText) { "Promotional Text and What's New fields" } else { "What's New field" }
+      $scopeLabel = if ($WhatsNewOnly) { "What's New field" } else { "Promotional Text and What's New fields" }
       Write-Host "This will PATCH only the $scopeLabel for all configured locales on iOS $Version."
       $confirmation = Read-Host "Type $Version to confirm"
       if ($confirmation -ne $Version) {
