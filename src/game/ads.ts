@@ -6,16 +6,21 @@ export type RewardedAdResult = {
   reason?: string;
 };
 
-type UnityAdsPlugin = {
-  initializeAds(options: { gameId: string; testMode: boolean }): Promise<{ initialized: boolean }>;
-  loadInterstitial(options: { placementId: string }): Promise<{ loaded: boolean }>;
-  loadRewarded(options: { placementId: string }): Promise<{ loaded: boolean }>;
-  showInterstitial(options: { placementId: string }): Promise<{ completed: boolean }>;
-  showRewarded(options: { placementId: string }): Promise<{ rewarded: boolean; completed: boolean }>;
+type LevelPlayPlugin = {
+  initializeAds(options: {
+    appKey: string;
+    adapterDebug: boolean;
+  }): Promise<{ initialized: boolean }>;
+  loadInterstitial(options: { adUnitId: string }): Promise<{ loaded: boolean }>;
+  loadRewarded(options: { adUnitId: string }): Promise<{ loaded: boolean }>;
+  showInterstitial(options: { adUnitId: string }): Promise<{ completed: boolean }>;
+  showRewarded(options: { adUnitId: string }): Promise<{ rewarded: boolean; completed: boolean }>;
   getDiagnostics(): Promise<{ logs?: unknown }>;
 };
 
-const UnityAds = registerPlugin<UnityAdsPlugin>("UnityAdsPlugin");
+// Keep the native plugin registration name for upgrade compatibility while
+// routing every ad request through Unity LevelPlay mediation.
+const LevelPlayAds = registerPlugin<LevelPlayPlugin>("UnityAdsPlugin");
 
 let initialized = false;
 let initFailed = false;
@@ -39,19 +44,19 @@ function envFlagEnabled(value: unknown): boolean {
   return ["1", "true", "yes", "on"].includes(configuredEnvValue(value).toLowerCase());
 }
 
-function getGameId(): string {
-  return configuredEnvValue(import.meta.env.VITE_UNITY_ADS_IOS_GAME_ID);
+function getLevelPlayAppId(): string {
+  return configuredEnvValue(import.meta.env.VITE_LEVELPLAY_IOS_APP_ID);
 }
 
-function getInterstitialPlacementId(): string {
-  return configuredEnvValue(import.meta.env.VITE_UNITY_ADS_IOS_INTERSTITIAL_ID);
+function getInterstitialAdUnitId(): string {
+  return configuredEnvValue(import.meta.env.VITE_LEVELPLAY_IOS_INTERSTITIAL_ID);
 }
 
-function getRewardedPlacementId(): string {
-  return configuredEnvValue(import.meta.env.VITE_UNITY_ADS_IOS_REWARDED_ID);
+function getRewardedAdUnitId(): string {
+  return configuredEnvValue(import.meta.env.VITE_LEVELPLAY_IOS_REWARDED_ID);
 }
 
-function isUnityAdsAvailable(): boolean {
+function isLevelPlayAvailable(): boolean {
   return Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios";
 }
 
@@ -65,34 +70,34 @@ function describeAdError(error: unknown): string {
 }
 
 export async function initAds(hasProPack: boolean): Promise<void> {
-  if (hasProPack || initialized || !isUnityAdsAvailable()) return;
+  if (hasProPack || initialized || !isLevelPlayAvailable()) return;
   if (initializationPromise) {
     await initializationPromise;
     return;
   }
 
-  const gameId = getGameId();
-  if (!gameId) {
-    initFailureReason = "Unity Ads iOS game ID is missing from this build.";
+  const appKey = getLevelPlayAppId();
+  if (!appKey) {
+    initFailureReason = "LevelPlay iOS app key is missing from this build.";
     initFailed = true;
     return;
   }
 
   initializationPromise = (async () => {
     try {
-      const testMode = envFlagEnabled(import.meta.env.VITE_UNITY_ADS_TEST_MODE);
-      logDebug("Unity Ads initialization requested.", { gameId, testMode });
-      await UnityAds.initializeAds({
-        gameId,
-        testMode,
+      const adapterDebug = envFlagEnabled(import.meta.env.VITE_LEVELPLAY_ADAPTER_DEBUG);
+      logDebug("LevelPlay initialization requested.", { appKey, adapterDebug });
+      await LevelPlayAds.initializeAds({
+        appKey,
+        adapterDebug,
       });
       initialized = true;
       initFailed = false;
       initFailureReason = "";
-      logDebug("Unity Ads initialization completed.");
+      logDebug("LevelPlay initialization completed.");
     } catch (error) {
-      initFailureReason = describeAdError(error) || "Unity Ads could not initialize.";
-      logDebug("Unity Ads initialization failed.", { reason: initFailureReason });
+      initFailureReason = describeAdError(error) || "LevelPlay could not initialize.";
+      logDebug("LevelPlay initialization failed.", { reason: initFailureReason });
       console.warn(`[ads] ${initFailureReason}`);
       initialized = false;
       initFailed = true;
@@ -105,19 +110,19 @@ export async function initAds(hasProPack: boolean): Promise<void> {
 }
 
 export async function preloadInterstitial(): Promise<void> {
-  if (interstitialReady || !initialized || !isUnityAdsAvailable()) return;
+  if (interstitialReady || !initialized || !isLevelPlayAvailable()) return;
   if (interstitialLoading && interstitialLoadPromise) {
     await interstitialLoadPromise;
     return;
   }
 
-  const placementId = getInterstitialPlacementId();
-  if (!placementId) return;
+  const adUnitId = getInterstitialAdUnitId();
+  if (!adUnitId) return;
 
   interstitialLoading = true;
   interstitialLoadPromise = (async () => {
     try {
-      await UnityAds.loadInterstitial({ placementId });
+      await LevelPlayAds.loadInterstitial({ adUnitId });
       interstitialReady = true;
     } catch {
       interstitialReady = false;
@@ -130,15 +135,15 @@ export async function preloadInterstitial(): Promise<void> {
 }
 
 export async function preloadRewarded(): Promise<void> {
-  if (rewardedReady || !initialized || !isUnityAdsAvailable()) return;
+  if (rewardedReady || !initialized || !isLevelPlayAvailable()) return;
   if (rewardedLoading && rewardedLoadPromise) {
     await rewardedLoadPromise;
     return;
   }
 
-  const placementId = getRewardedPlacementId();
-  if (!placementId) {
-    lastRewardedError = "Unity Ads iOS rewarded placement ID is missing from this build.";
+  const adUnitId = getRewardedAdUnitId();
+  if (!adUnitId) {
+    lastRewardedError = "LevelPlay iOS rewarded ad-unit ID is missing from this build.";
     return;
   }
 
@@ -146,14 +151,14 @@ export async function preloadRewarded(): Promise<void> {
   lastRewardedError = "";
   rewardedLoadPromise = (async () => {
     try {
-      logDebug("Unity Ads rewarded load requested.", { placementId });
-      await UnityAds.loadRewarded({ placementId });
+      logDebug("LevelPlay rewarded load requested.", { adUnitId });
+      await LevelPlayAds.loadRewarded({ adUnitId });
       rewardedReady = true;
-      logDebug("Unity Ads rewarded load completed.", { placementId });
+      logDebug("LevelPlay rewarded load completed.", { adUnitId });
     } catch (error) {
       rewardedReady = false;
       lastRewardedError = describeAdError(error) || "Rewarded ad failed to load.";
-      logDebug("Unity Ads rewarded load failed.", { placementId, reason: lastRewardedError });
+      logDebug("LevelPlay rewarded load failed.", { adUnitId, reason: lastRewardedError });
     } finally {
       rewardedLoading = false;
       rewardedLoadPromise = null;
@@ -163,12 +168,12 @@ export async function preloadRewarded(): Promise<void> {
 }
 
 export async function showInterstitialIfReady(hasProPack: boolean): Promise<boolean> {
-  if (hasProPack || !isUnityAdsAvailable()) return false;
+  if (hasProPack || !isLevelPlayAvailable()) return false;
   if (!initialized) await initAds(false);
   if (initFailed) return false;
 
-  const placementId = getInterstitialPlacementId();
-  if (!placementId) return false;
+  const adUnitId = getInterstitialAdUnitId();
+  if (!adUnitId) return false;
   if (!interstitialReady) {
     await preloadInterstitial();
     if (!interstitialReady) return false;
@@ -176,7 +181,7 @@ export async function showInterstitialIfReady(hasProPack: boolean): Promise<bool
 
   interstitialReady = false;
   try {
-    const result = await UnityAds.showInterstitial({ placementId });
+    const result = await LevelPlayAds.showInterstitial({ adUnitId });
     void preloadInterstitial();
     return result.completed;
   } catch {
@@ -186,7 +191,7 @@ export async function showInterstitialIfReady(hasProPack: boolean): Promise<bool
 }
 
 export async function showRewardedForCoin(_hasProPack: boolean): Promise<RewardedAdResult> {
-  if (!isUnityAdsAvailable()) {
+  if (!isLevelPlayAvailable()) {
     return { rewarded: false, reason: "Rewarded ads are available in the iPhone app." };
   }
 
@@ -194,13 +199,16 @@ export async function showRewardedForCoin(_hasProPack: boolean): Promise<Rewarde
   if (initFailed) {
     return {
       rewarded: false,
-      reason: initFailureReason || "Unity Ads could not initialize in this build.",
+      reason: initFailureReason || "LevelPlay could not initialize in this build.",
     };
   }
 
-  const placementId = getRewardedPlacementId();
-  if (!placementId) {
-    return { rewarded: false, reason: "Unity Ads iOS rewarded placement ID is missing from this build." };
+  const adUnitId = getRewardedAdUnitId();
+  if (!adUnitId) {
+    return {
+      rewarded: false,
+      reason: "LevelPlay iOS rewarded ad-unit ID is missing from this build.",
+    };
   }
   if (!rewardedReady) {
     await preloadRewarded();
@@ -214,32 +222,32 @@ export async function showRewardedForCoin(_hasProPack: boolean): Promise<Rewarde
 
   rewardedReady = false;
   try {
-    logDebug("Unity Ads rewarded show requested.", { placementId });
-    const result = await UnityAds.showRewarded({ placementId });
-    logDebug("Unity Ads rewarded show completed.", { placementId, result });
+    logDebug("LevelPlay rewarded show requested.", { adUnitId });
+    const result = await LevelPlayAds.showRewarded({ adUnitId });
+    logDebug("LevelPlay rewarded show completed.", { adUnitId, result });
     void preloadRewarded();
     return { rewarded: result.rewarded };
   } catch (error) {
     const reason = describeAdError(error) || "Rewarded ad could not be shown.";
     lastRewardedError = reason;
-    logDebug("Unity Ads rewarded show failed.", { placementId, reason });
+    logDebug("LevelPlay rewarded show failed.", { adUnitId, reason });
     void preloadRewarded();
     return { rewarded: false, reason };
   }
 }
 
-export async function getUnityAdsDiagnostics(): Promise<string[]> {
-  if (!isUnityAdsAvailable()) return [];
+export async function getLevelPlayDiagnostics(): Promise<string[]> {
+  if (!isLevelPlayAvailable()) return [];
 
   try {
-    const result = await UnityAds.getDiagnostics();
+    const result = await LevelPlayAds.getDiagnostics();
     const logs = Array.isArray(result.logs)
       ? result.logs.filter((entry): entry is string => typeof entry === "string")
       : [];
-    logs.forEach((entry) => logDebug(`Unity Ads native: ${entry}`));
+    logs.forEach((entry) => logDebug(`LevelPlay native: ${entry}`));
     return logs;
   } catch (error) {
-    logDebug("Unity Ads diagnostics could not be read.", {
+    logDebug("LevelPlay diagnostics could not be read.", {
       reason: describeAdError(error) || String(error),
     });
     return [];

@@ -26,7 +26,7 @@ import {
   restorePurchases,
   setCustomerInfoListener,
 } from "./purchases";
-import { getUnityAdsDiagnostics, initAds, showRewardedForCoin } from "./ads";
+import { getLevelPlayDiagnostics, initAds, showRewardedForCoin } from "./ads";
 import { useIsTabletLayout } from "./responsive";
 import { t } from "./localization";
 import { clearLogs, copyDebugReport, getDebugReport, getLogs, logDebug } from "../lib/debugLogger";
@@ -1055,7 +1055,7 @@ export function Shop({
     setMessage(tr("Checking purchase diagnostics..."));
     logDebug("Manual purchase diagnostics started.");
     try {
-      await getUnityAdsDiagnostics();
+      await getLevelPlayDiagnostics();
       const snapshot = await debugNativePurchases((statusMessage) => setMessage(statusMessage));
       const details = [
         `Platform: ${snapshot.platform}`,
@@ -1085,14 +1085,14 @@ export function Shop({
     }
   }
 
-  async function handleUnityAdsDiagnostics() {
+  async function handleLevelPlayDiagnostics() {
     setPurchaseDebugBusy(true);
-    setMessage("Reading Unity Ads diagnostics...");
+    setMessage("Reading LevelPlay diagnostics...");
     try {
-      const logs = await getUnityAdsDiagnostics();
+      const logs = await getLevelPlayDiagnostics();
       refreshPurchaseDebugLogs(true);
       setPurchaseReport(getDebugReport());
-      setMessage(logs.length ? "Unity Ads diagnostics loaded." : "No Unity Ads diagnostics recorded yet.");
+      setMessage(logs.length ? "LevelPlay diagnostics loaded." : "No LevelPlay diagnostics recorded yet.");
     } finally {
       setPurchaseDebugBusy(false);
     }
@@ -1126,7 +1126,7 @@ export function Shop({
   }
 
   async function handleCopyPurchaseDiagnostics() {
-    await getUnityAdsDiagnostics();
+    await getLevelPlayDiagnostics();
     const copied = await copyDebugReport();
     setPurchaseReport(getDebugReport());
     setPurchaseSupportMessage(
@@ -1194,11 +1194,11 @@ export function Shop({
               </button>
               <button
                 type="button"
-                onClick={handleUnityAdsDiagnostics}
+                onClick={handleLevelPlayDiagnostics}
                 disabled={purchaseDebugBusy}
                 style={secondaryShopButton}
               >
-                {tr("Unity Ads Logs")}
+                {tr("LevelPlay Logs")}
               </button>
               <button type="button" onClick={handleClearPurchaseLogs} style={secondaryShopButton}>
                 {tr("Clear Logs")}

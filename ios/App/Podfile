@@ -23,8 +23,10 @@ end
 target 'App' do
   capacitor_pods
   # Add your Pods here
-  # Direct Unity Ads iOS integration.
-  pod 'UnityAds', '4.20.0'
+  # Unity LevelPlay mediation. The Unity Ads adapter brings Unity Ads 4.20.0
+  # into the LevelPlay auction alongside the built-in ironSource Ads source.
+  pod 'IronSourceSDK', '9.6.0.0'
+  pod 'IronSourceUnityAdsAdapter', '5.10.0.0'
   pod 'CapacitorFirebaseAnalytics/Analytics', :path => '../../node_modules/@capacitor-firebase/analytics'
 end
 
