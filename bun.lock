@@ -7,6 +7,7 @@
       "dependencies": {
         "@capacitor-community/admob": "^7.0.3",
         "@capacitor-firebase/analytics": "^7.1.0",
+        "@capacitor-firebase/messaging": "^7.5.0",
         "@capacitor/cli": "^7.4.4",
         "@capacitor/core": "^7.4.4",
         "@capacitor/haptics": "^7.0.2",
@@ -143,6 +144,8 @@
     "@capacitor-community/admob": ["@capacitor-community/admob@7.2.0", "https://europe-west4-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/@capacitor-community/admob/-/admob-7.2.0.tgz", { "dependencies": { "@capacitor/core": "^7.0.0", "@rdlabo/capacitor-docgen": "^0.4.1" } }, "sha512-ejRd0CkiHq15F0XvHXPhk9gKIlYy7lj0hxCP+XUMqXwEoX8HN0BFE7bp3QvXKI/4FtjKMD8KF++e6sYMoKpwvA=="],
 
     "@capacitor-firebase/analytics": ["@capacitor-firebase/analytics@7.5.0", "https://europe-west1-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/@capacitor-firebase/analytics/-/analytics-7.5.0.tgz", { "peerDependencies": { "@capacitor/core": ">=7.0.0", "firebase": "^11.2.0" }, "optionalPeers": ["firebase"] }, "sha512-PxMTltu0wa7uT/tpXEPos8mentU4kDoU7yJeSzLIeO6ysB2Qp7N2/4GamKP1ITpZ0OvUuU7fjG5zqAQj5xX2jg=="],
+
+    "@capacitor-firebase/messaging": ["@capacitor-firebase/messaging@7.5.0", "https://europe-west1-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/@capacitor-firebase/messaging/-/messaging-7.5.0.tgz", { "peerDependencies": { "@capacitor/core": ">=7.0.0", "firebase": "^11.2.0" }, "optionalPeers": ["firebase"] }, "sha512-mQ4542IX7HWyGnHZLAkOvqzYYpaH47v6ijOsBO/CdyA5hfTdGc5fbxzdS5xMYKTxfpFiecb1qgEDmB5XFWvWOA=="],
 
     "@capacitor/cli": ["@capacitor/cli@7.6.5", "https://europe-west4-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/@capacitor/cli/-/cli-7.6.5.tgz", { "dependencies": { "@ionic/cli-framework-output": "^2.2.8", "@ionic/utils-subprocess": "^3.0.1", "@ionic/utils-terminal": "^2.3.5", "commander": "^12.1.0", "debug": "^4.4.0", "env-paths": "^2.2.0", "fs-extra": "^11.2.0", "kleur": "^4.1.5", "native-run": "^2.0.3", "open": "^8.4.0", "plist": "^3.1.0", "prompts": "^2.4.2", "rimraf": "^6.0.1", "semver": "^7.6.3", "tar": "^7.5.3", "tslib": "^2.8.1", "xml2js": "^0.6.2" }, "bin": { "cap": "bin/capacitor", "capacitor": "bin/capacitor" } }, "sha512-nlhNoWZIL7YcV1JgNP8+p7WAVIG+zwsY20ZQJ0zd+2lLeCx9MijfELLhLzMCq33c2pILwOvLww8HUqZ5uYCvHg=="],
 
