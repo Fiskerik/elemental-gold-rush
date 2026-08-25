@@ -20,7 +20,8 @@ workflows:
         VITE_REVENUECAT_DEBUG_LOGS: "false"
         # Temporary diagnostics UI so LevelPlay logs can be copied from TestFlight on Windows.
         VITE_PURCHASE_DEBUG_UI: "true"
-        # The LevelPlay app key and ad-unit IDs come from the "Env variables" group.
+        # Adapter diagnostics only. Atomic's public LevelPlay identifiers are
+        # pinned in the environment preparation step to prevent UI typos.
         VITE_LEVELPLAY_ADAPTER_DEBUG: "true"
         VITE_GAME_CENTER_DAILY_BOARD_GLOBAL_LEADERBOARD_ID: "daily_leaderboard_global"
         VITE_GAME_CENTER_DAILY_COMPOUND_GLOBAL_LEADERBOARD_ID: "daily_compound_fastest"
@@ -72,15 +73,28 @@ workflows:
           RC_KEY="${VITE_REVENUECAT_IOS_API_KEY:-${REVENUECAT_IOS_API_KEY:-${VITE_REVENUECAT_API_KEY:-${VITE_RC_IOS_API_KEY:-}}}}"
           RC_ENTITLEMENT="${VITE_REVENUECAT_ENTITLEMENT_ID:-${REVENUECAT_ENTITLEMENT_ID:-atomic_fusion_lifetime}}"
           RC_OFFERING="${VITE_REVENUECAT_OFFERING_ID:-${REVENUECAT_OFFERING_ID:-default}}"
-          LEVELPLAY_APP_ID="${VITE_LEVELPLAY_IOS_APP_ID:-}"
-          LEVELPLAY_INTERSTITIAL="${VITE_LEVELPLAY_IOS_INTERSTITIAL_ID:-}"
-          LEVELPLAY_REWARDED="${VITE_LEVELPLAY_IOS_REWARDED_ID:-}"
+          # These identifiers are app-specific but not secrets; they are shipped
+          # in the application binary. Keep the authoritative values here so a
+          # mistyped Codemagic UI variable cannot produce an invalid-ad-unit build.
+          LEVELPLAY_APP_ID="26b8f239d"
+          LEVELPLAY_INTERSTITIAL="czf0jlk6mnbenyh0"
+          LEVELPLAY_REWARDED="g3kygieiv8izpje1"
           LEVELPLAY_ADAPTER_DEBUG="${VITE_LEVELPLAY_ADAPTER_DEBUG:-false}"
           GC_DAILY_BOARD_GLOBAL="${VITE_GAME_CENTER_DAILY_BOARD_GLOBAL_LEADERBOARD_ID:-${GAME_CENTER_DAILY_BOARD_GLOBAL_LEADERBOARD_ID:-daily_leaderboard_global}}"
           GC_DAILY_COMPOUND_GLOBAL="${VITE_GAME_CENTER_DAILY_COMPOUND_GLOBAL_LEADERBOARD_ID:-${GAME_CENTER_DAILY_COMPOUND_GLOBAL_LEADERBOARD_ID:-daily_compound_fastest}}"
           FIREBASE_FUNCTIONS_BASE_URL="${VITE_FIREBASE_FUNCTIONS_BASE_URL:-https://europe-west1-atomicfusionrush.cloudfunctions.net}"
           PURCHASE_DEBUG_UI="${VITE_PURCHASE_DEBUG_UI:-false}"
           RC_DEBUG_LOGS="${VITE_REVENUECAT_DEBUG_LOGS:-false}"
+
+          if [ -n "${VITE_LEVELPLAY_IOS_APP_ID:-}" ] && [ "$VITE_LEVELPLAY_IOS_APP_ID" != "$LEVELPLAY_APP_ID" ]; then
+            echo "WARNING: Ignoring mismatched VITE_LEVELPLAY_IOS_APP_ID from Codemagic."
+          fi
+          if [ -n "${VITE_LEVELPLAY_IOS_INTERSTITIAL_ID:-}" ] && [ "$VITE_LEVELPLAY_IOS_INTERSTITIAL_ID" != "$LEVELPLAY_INTERSTITIAL" ]; then
+            echo "WARNING: Ignoring mismatched VITE_LEVELPLAY_IOS_INTERSTITIAL_ID from Codemagic."
+          fi
+          if [ -n "${VITE_LEVELPLAY_IOS_REWARDED_ID:-}" ] && [ "$VITE_LEVELPLAY_IOS_REWARDED_ID" != "$LEVELPLAY_REWARDED" ]; then
+            echo "WARNING: Ignoring mismatched VITE_LEVELPLAY_IOS_REWARDED_ID from Codemagic."
+          fi
 
           {
             printf 'VITE_REVENUECAT_IOS_API_KEY=%s\n' "$RC_KEY"
@@ -110,17 +124,17 @@ workflows:
           fi
 
           if [ -z "$LEVELPLAY_APP_ID" ]; then
-            echo "ERROR: LevelPlay iOS app key is missing. Set VITE_LEVELPLAY_IOS_APP_ID in the Codemagic Env variables group."
+            echo "ERROR: Atomic LevelPlay iOS app key is missing from codemagic.yaml."
             exit 1
           fi
 
           if [ -z "$LEVELPLAY_INTERSTITIAL" ]; then
-            echo "ERROR: LevelPlay iOS interstitial ad-unit ID is missing. Set VITE_LEVELPLAY_IOS_INTERSTITIAL_ID."
+            echo "ERROR: Atomic LevelPlay iOS interstitial ad-unit ID is missing from codemagic.yaml."
             exit 1
           fi
 
           if [ -z "$LEVELPLAY_REWARDED" ]; then
-            echo "ERROR: LevelPlay iOS rewarded ad-unit ID is missing. Set VITE_LEVELPLAY_IOS_REWARDED_ID."
+            echo "ERROR: Atomic LevelPlay iOS rewarded ad-unit ID is missing from codemagic.yaml."
             exit 1
           fi
       - name: Build web + sync Capacitor iOS
