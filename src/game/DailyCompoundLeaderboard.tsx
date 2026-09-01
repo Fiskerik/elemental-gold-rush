@@ -23,7 +23,7 @@ import { t } from "./localization";
 export function Leaderboard({ onBack }: { onBack: () => void }) {
   const isTabletLayout = useIsTabletLayout();
   const [kind, setKind] = useState<LeaderboardKind>("daily-board");
-  const scope = "global";
+  const scope = isGameCenterAvailable() ? "global" : "local";
   const [board, setBoard] = useState<LeaderboardBoard>(() => getDailyLeaderboard(kind, scope));
   const [loading, setLoading] = useState(false);
   const [gameCenterBusy, setGameCenterBusy] = useState(false);
@@ -51,7 +51,7 @@ export function Leaderboard({ onBack }: { onBack: () => void }) {
     return () => {
       cancelled = true;
     };
-  }, [kind]);
+  }, [kind, scope]);
 
   useEffect(() => {
     if (scope !== "global" || board.player.rank <= 0) return;
@@ -66,7 +66,7 @@ export function Leaderboard({ onBack }: { onBack: () => void }) {
     recordDailyBoardLeaderboardPlacement,
   ]);
 
-  const currentPrize = getDailyLeaderboardReward(board.player.rank);
+  const currentPrize = scope === "global" ? getDailyLeaderboardReward(board.player.rank) : 0;
   const rewardKey = getDailyLeaderboardRewardKey(kind, getTodayQuestDate());
   const awardedPrize = dailyLeaderboardRewardClaims[rewardKey] ?? 0;
 
@@ -101,6 +101,7 @@ export function Leaderboard({ onBack }: { onBack: () => void }) {
           <div style={{ minWidth: 0 }}>
             <div style={kicker}>{leaderboardLabel.toUpperCase()}</div>
             <h1 style={title}>{tr("Leaderboard")}</h1>
+            <div style={{ fontSize: 11, color: "var(--muted-foreground)", marginTop: 3 }}>{scope === "local" ? tr("On this device") : tr("Game Center")}</div>
           </div>
           <PodiumMark />
         </header>
@@ -154,7 +155,7 @@ export function Leaderboard({ onBack }: { onBack: () => void }) {
                 {awardedPrize >= currentPrize ? ` (${tr("awarded")})` : ""}.
               </>
             ) : (
-              tr("Finish a run to enter today’s leaderboard.")
+                scope === "local" ? tr("On this device — global placement rewards are unavailable.") : tr("Finish a run to enter today’s leaderboard.")
             )}
           </div>
         </section>

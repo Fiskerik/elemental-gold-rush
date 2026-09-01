@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { ELEMENTS } from "./elements";
 import { useProgress } from "./store";
 import { ElementBall } from "./ElementBall";
@@ -9,6 +9,10 @@ import { MoleculeVisual } from "./MoleculeVisual";
 import { useIsTabletLayout } from "./responsive";
 import { getElementCollectionDetails } from "./elementDetails";
 import { t } from "./localization";
+import { PeriodicTableGrid } from "./PeriodicTableGrid";
+import { getNextDiscoveryTarget } from "./researchProject";
+import { LEVELS } from "./levels";
+import { trackElementDetailOpen, trackPeriodicTableOpen } from "./analytics";
 
 const BADGE_TONES = [
   "oklch(0.9 0.18 88)",
@@ -24,7 +28,7 @@ function badgeTone(id: string): string {
   return BADGE_TONES[value % BADGE_TONES.length] ?? BADGE_TONES[0];
 }
 
-export function Collection({ onBack }: { onBack: () => void }) {
+export function Collection({ onBack, onResearch }: { onBack: () => void; onResearch?: (levelId: number) => void }) {
   const isTabletLayout = useIsTabletLayout();
   const {
     discoveredElements,
@@ -40,6 +44,7 @@ export function Collection({ onBack }: { onBack: () => void }) {
     unlockLockedCompoundsForCoins,
     markElementDiscoveryViewed,
     markCompoundDiscoveryViewed,
+    unlockedLevel,
   } = useProgress();
   const tr = (text: string) => t(text, appLanguage);
   const [selected, setSelected] = useState<number | null>(null);
@@ -47,6 +52,9 @@ export function Collection({ onBack }: { onBack: () => void }) {
   const [purchaseMessage, setPurchaseMessage] = useState("");
   const [showUndiscoveredCompounds, setShowUndiscoveredCompounds] = useState(false);
   const [expandedBadgeGroups, setExpandedBadgeGroups] = useState<Record<string, boolean>>({});
+  const [activeTab, setActiveTab] = useState<"elements" | "compounds" | "badges">("elements");
+  const [overview, setOverview] = useState(false);
+  useEffect(() => { trackPeriodicTableOpen({ source_mode: "screen" }); }, []);
   const found = new Set(discoveredElements);
   const foundCompounds = new Set(discoveredCompounds);
   const viewedElements = new Set(viewedElementDiscoveries);
@@ -89,12 +97,18 @@ export function Collection({ onBack }: { onBack: () => void }) {
 
   function openElement(atomicNumber: number) {
     setSelected(atomicNumber);
+    trackElementDetailOpen({ atomic_number: atomicNumber, source_mode: "periodic-table" });
     if (found.has(atomicNumber)) markElementDiscoveryViewed(atomicNumber);
   }
 
   function openCompound(compound: CompoundDefinition) {
     setSelectedCompound(compound);
     if (foundCompounds.has(compound.id)) markCompoundDiscoveryViewed(compound.id);
+  }
+
+  function researchLevelForElement(atomicNumber: number): number | null {
+    const level = LEVELS.find((candidate) => candidate.targetElement === atomicNumber);
+    return level ? Math.min(unlockedLevel, level.id) : unlockedLevel;
   }
 
   return (
@@ -126,7 +140,7 @@ export function Collection({ onBack }: { onBack: () => void }) {
             ← {tr("Back")}
           </button>
           <div style={{ flex: 1 }}>
-            <h1 style={{ fontSize: 22, margin: 0, fontWeight: 800 }}>{tr("Collection")}</h1>
+            <h1 style={{ fontSize: 22, margin: 0, fontWeight: 800 }}>{tr("Periodic Table")}</h1>
             <div style={{ fontSize: 12, color: "var(--muted-foreground)" }}>
               {`${discoveredElements.length} / 118 ${tr("elements discovered")}`}
             </div>
@@ -134,7 +148,13 @@ export function Collection({ onBack }: { onBack: () => void }) {
           <div style={collectionWalletPill}>{goldCoins} {tr("gold")}</div>
         </div>
 
-        <section style={collectionUnlockPanel}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginBottom: 12 }} role="tablist" aria-label={tr("Periodic Table sections")}>
+          {(["elements", "compounds", "badges"] as const).map((tab) => (
+            <button key={tab} type="button" role="tab" aria-selected={activeTab === tab} onClick={() => setActiveTab(tab)} style={{ padding: "9px 6px", borderRadius: 9, border: `1px solid ${activeTab === tab ? "var(--accent)" : "var(--border)"}`, background: activeTab === tab ? "color-mix(in oklch, var(--accent) 16%, var(--surface))" : "var(--surface)", color: "var(--foreground)", fontWeight: 800, cursor: "pointer", textTransform: "capitalize" }}>{tr(tab)}</button>
+          ))}
+        </div>
+
+        <section style={{ ...collectionUnlockPanel, display: activeTab === "elements" ? "grid" : "none" }}>
           <div>
             <div style={{ fontSize: 12, fontWeight: 900 }}>{tr("Unlock collection entries")}</div>
             <div style={{ fontSize: 11, color: "var(--muted-foreground)", marginTop: 2 }}>
@@ -169,7 +189,24 @@ export function Collection({ onBack }: { onBack: () => void }) {
         </section>
 
         {/* Real periodic-table layout: 18 columns × 7 periods + lanthanide/actinide rows */}
-        <div style={{ paddingBottom: 8 }}>
+        <div style={{ paddingBottom: 8, display: activeTab === "elements" ? "block" : "none" }}>
+          <button type="button" onClick={() => setOverview((value) => !value)} style={{ marginBottom: 8, background: "none", border: "1px solid var(--border)", borderRadius: 8, color: "var(--muted-foreground)", padding: "6px 10px", fontSize: 11, cursor: "pointer" }}>{overview ? tr("Scroll table") : tr("Overview")}</button>
+          <PeriodicTableGrid
+            discoveredElements={discoveredElements}
+            newlyDiscovered={discoveredElements.filter((atomicNumber) => !viewedElements.has(atomicNumber))}
+            onSelect={openElement}
+            mode="full"
+            overview={overview || isTabletLayout}
+          />
+          <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap", fontSize: 11, color: "var(--muted-foreground)" }}>
+            {BADGE_GROUPS.filter((group) => group.id === "families" || group.id === "periods").map((group) => {
+              const badges = BADGES.filter((badge) => badge.group === group.id);
+              const complete = badges.filter((badge) => earned.has(badge.id)).length;
+              return <span key={group.id} style={{ padding: "5px 8px", borderRadius: 999, border: "1px solid var(--border)" }}>{tr(group.title)} {complete}/{badges.length}</span>;
+            })}
+          </div>
+        </div>
+        <div style={{ paddingBottom: 8, display: "none" }}>
           <div
             style={{
               display: "grid",
@@ -261,7 +298,7 @@ export function Collection({ onBack }: { onBack: () => void }) {
           </div>
         </div>
 
-        <section style={{ marginTop: 18 }}>
+        <section style={{ marginTop: 18, display: activeTab === "compounds" ? "block" : "none" }}>
           <div
             style={{
               fontSize: 11,
@@ -347,7 +384,7 @@ export function Collection({ onBack }: { onBack: () => void }) {
         </section>
 
         {/* Badges */}
-        <div style={{ marginTop: 20 }}>
+        <div style={{ marginTop: 20, display: activeTab === "badges" ? "block" : "none" }}>
           <div
             style={{
               fontSize: 11,
@@ -623,6 +660,9 @@ export function Collection({ onBack }: { onBack: () => void }) {
                 >
                   {tr("Locked. Discover this element through fusion to unlock its facts.")}
                 </p>
+                <div style={{ fontSize: 12, color: "var(--accent)", fontWeight: 800 }}>
+                  {(() => { const level = LEVELS.find((candidate) => candidate.targetElement === el.atomicNumber); const away = level ? Math.max(1, level.id - unlockedLevel + 1) : 1; return `${away} ${away === 1 ? tr("stage") : tr("stages")} ${tr("remaining")} · ${tr("Immediate prerequisite")} ${Math.min(unlockedLevel, level?.id ?? unlockedLevel)}`; })()}
+                </div>
                 <button
                   type="button"
                   onClick={() => {
@@ -638,6 +678,11 @@ export function Collection({ onBack }: { onBack: () => void }) {
                 >
                   {tr("Unlock this element")} - 50
                 </button>
+                {onResearch && (
+                  <button type="button" onClick={() => { const levelId = researchLevelForElement(el.atomicNumber); if (levelId) { onResearch(levelId); setSelected(null); } }} style={{ ...collectionUnlockBtn, borderColor: "var(--accent)", color: "var(--accent)" }}>
+                    {tr("Continue research")} →
+                  </button>
+                )}
               </div>
             )}
           </div>

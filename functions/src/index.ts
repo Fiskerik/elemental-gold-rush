@@ -24,12 +24,12 @@ type Registration = {
   locale?: string;
   timeZone?: string;
   notificationsEnabled: boolean;
-  dailyBoardReminders: boolean;
-  dailyCompoundReminders: boolean;
-  streakReminders: boolean;
+  researchReminders: boolean;
+  reminderHour?: number;
+  lastResearchDate?: string;
   lastSeenAt: Timestamp;
   lastPlayedAt: Timestamp;
-  lastStreakReminderAt?: Timestamp;
+  lastResearchReminderAt?: Timestamp;
 };
 
 function validId(value: unknown): value is string {
@@ -47,6 +47,25 @@ function bool(value: unknown, fallback: boolean): boolean {
 function timestamp(value: unknown): Timestamp {
   const date = typeof value === "string" ? new Date(value) : new Date();
   return Timestamp.fromDate(Number.isNaN(date.getTime()) ? new Date() : date);
+}
+
+function localHour(timeZone = "Europe/Stockholm"): number {
+  try {
+    const value = new Intl.DateTimeFormat("en-US", { timeZone, hour: "2-digit", hourCycle: "h23" }).formatToParts(new Date()).find((part) => part.type === "hour")?.value;
+    return Number(value ?? 19);
+  } catch {
+    return 19;
+  }
+}
+
+function localDate(timeZone = "Europe/Stockholm"): string {
+  try {
+    const parts = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
+    const values = Object.fromEntries(parts.filter((part) => part.type !== "literal").map((part) => [part.type, part.value]));
+    return `${values.year}-${values.month}-${values.day}`;
+  } catch {
+    return new Date().toISOString().slice(0, 10);
+  }
 }
 
 type JsonResponse = {
@@ -76,9 +95,9 @@ export const registerFcmToken = onRequest({ cors: true, region: FUNCTION_REGION 
     locale: typeof body.locale === "string" ? body.locale.slice(0, 20) : undefined,
     timeZone: typeof body.timeZone === "string" ? body.timeZone.slice(0, 80) : undefined,
     notificationsEnabled: bool(body.notificationsEnabled, true),
-    dailyBoardReminders: bool(body.dailyBoardReminders, true),
-    dailyCompoundReminders: bool(body.dailyCompoundReminders, true),
-    streakReminders: bool(body.streakReminders, true),
+    researchReminders: bool(body.researchReminders, false),
+    reminderHour: typeof body.reminderHour === "number" ? Math.max(0, Math.min(23, Math.floor(body.reminderHour))) : 19,
+    ...(typeof body.lastResearchDate === "string" ? { lastResearchDate: body.lastResearchDate.slice(0, 20) } : {}),
     lastSeenAt: timestamp(body.lastSeenAt),
     lastPlayedAt: timestamp(body.lastPlayedAt),
   };
@@ -100,6 +119,7 @@ export const recordPlayerActivity = onRequest({ cors: true, region: FUNCTION_REG
     {
       lastSeenAt: timestamp(body.lastSeenAt),
       lastPlayedAt: timestamp(body.lastPlayedAt),
+      ...(typeof body.lastResearchDate === "string" ? { lastResearchDate: body.lastResearchDate.slice(0, 20) } : {}),
     },
     { merge: true },
   );
@@ -191,56 +211,29 @@ const iosNotification = (title: string, body: string, route: string): Omit<Multi
   apns: { payload: { aps: { sound: "default" } } },
 });
 
-export const sendDailyBoardReminder = onSchedule(
-  { schedule: "0 9 * * *", timeZone: "Europe/Stockholm", region: FUNCTION_REGION },
-  async () => {
-    const snapshot = await db
-      .collection(REGISTRATION_COLLECTION)
-      .where("notificationsEnabled", "==", true)
-      .where("dailyBoardReminders", "==", true)
-      .get();
-    await sendToRegistrations(
-      snapshot.docs,
-      iosNotification("A new Daily Board is ready", "Can you beat yesterday’s score?", "daily-board"),
-    );
-  },
-);
-
-export const sendDailyCompoundReminder = onSchedule(
-  { schedule: "0 18 * * *", timeZone: "Europe/Stockholm", region: FUNCTION_REGION },
-  async () => {
-    const snapshot = await db
-      .collection(REGISTRATION_COLLECTION)
-      .where("notificationsEnabled", "==", true)
-      .where("dailyCompoundReminders", "==", true)
-      .get();
-    await sendToRegistrations(
-      snapshot.docs,
-      iosNotification("Today’s Daily Compound is waiting", "Find the hidden molecule before the timer runs out.", "daily-compound"),
-    );
-  },
-);
-
-export const sendStreakReminders = onSchedule(
-  { schedule: "every 60 minutes", timeZone: "Europe/Stockholm", region: FUNCTION_REGION },
+export const sendResearchReminder = onSchedule(
+  { schedule: "0 * * * *", timeZone: "Europe/Stockholm", region: FUNCTION_REGION },
   async () => {
     const cutoff = Timestamp.fromMillis(Date.now() - 24 * 60 * 60 * 1000);
     const snapshot = await db
       .collection(REGISTRATION_COLLECTION)
       .where("notificationsEnabled", "==", true)
-      .where("streakReminders", "==", true)
+      .where("researchReminders", "==", true)
       .where("lastPlayedAt", "<", cutoff)
       .get();
     const eligible = snapshot.docs.filter((doc) => {
-      const lastReminder = doc.data().lastStreakReminderAt as Timestamp | undefined;
+      const data = doc.data() as Registration;
+      if (data.lastResearchDate === localDate(data.timeZone)) return false;
+      if (localHour(data.timeZone) !== Math.max(0, Math.min(23, Math.floor(data.reminderHour ?? 19)))) return false;
+      const lastReminder = doc.data().lastResearchReminderAt as Timestamp | undefined;
       return !lastReminder || lastReminder.toMillis() < Date.now() - 24 * 60 * 60 * 1000;
     });
     await sendToRegistrations(
       eligible,
-      iosNotification("Keep your fusion streak alive", "Your lab is ready for another short run.", "menu"),
+      iosNotification("Your research project is waiting", "Complete today’s research day to keep the table moving.", "menu"),
     );
     await Promise.all(
-      eligible.map((doc) => doc.ref.set({ lastStreakReminderAt: Timestamp.now() }, { merge: true })),
+      eligible.map((doc) => doc.ref.set({ lastResearchReminderAt: Timestamp.now() }, { merge: true })),
     );
   },
 );

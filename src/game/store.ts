@@ -40,6 +40,13 @@ import {
   type ProductId,
 } from "./products";
 import { getDailyLeaderboardReward, getDailyLeaderboardRewardKey } from "./dailyLeaderboardRewards";
+import {
+  createResearchProject,
+  normalizeResearchProject,
+  recordResearchProjectDay,
+  type ResearchProgressSource,
+  type ResearchProjectState,
+} from "./researchProject";
 
 export const INVENTORY_POWER_UPS = [
   "transmute",
@@ -394,6 +401,10 @@ interface ProgressState {
   dailyStreak: number;
   claimedDailyReward: boolean;
   weeklyPlayBonus: WeeklyPlayBonusState;
+  researchProject: ResearchProjectState;
+  firstPlayDate: string | null;
+  researchRemindersEnabled: boolean;
+  researchReminderPromptSeen: boolean;
   bestCombo: number;
   bestComboDate: string | null;
   earnedBadges: string[];
@@ -428,6 +439,13 @@ interface ProgressState {
   completeDailyChallenge: (score: number) => boolean;
   revealSecretCompound: () => void;
   completeSecretCompound: (compoundIds: string[], score?: number) => boolean;
+  recordResearchProgress: (date?: string, source?: ResearchProgressSource) => {
+    recorded: boolean;
+    projectCompleted: boolean;
+    coinsAwarded: number;
+  };
+  setResearchRemindersEnabled: (enabled: boolean) => void;
+  markResearchReminderPromptSeen: () => void;
   upgradeLabPowerUp: (id: LabUpgradeId) => boolean;
   toggleLabUpgrade: (id: LabUpgradeId) => void;
   unlockLevel: (id: number) => void;
@@ -509,6 +527,17 @@ const initialWeeklyPlayBonus = createWeeklyPlayBonus();
 const initialDailyChallenge = createDailyChallenge(initialQuestDate);
 const initialSecretCompound = createSecretCompound(initialQuestDate);
 
+function getDailyQuestContext(state: Pick<ProgressState, "unlockedLevel" | "goldCoins" | "hasProPack" | "discoveredElements">) {
+  return {
+    unlockedLevel: state.unlockedLevel,
+    goldCoins: state.goldCoins,
+    hasProPack: state.hasProPack,
+    discoveredElements: state.discoveredElements,
+    isNativeIos: false,
+  };
+}
+const initialResearchProject = createResearchProject();
+
 export const useProgress = create<ProgressState>()(
   persist(
     (set) => ({
@@ -544,6 +573,10 @@ export const useProgress = create<ProgressState>()(
       dailyStreak: 0,
       claimedDailyReward: false,
       weeklyPlayBonus: initialWeeklyPlayBonus,
+      researchProject: initialResearchProject,
+      firstPlayDate: null,
+      researchRemindersEnabled: false,
+      researchReminderPromptSeen: false,
       bestCombo: 0,
       bestComboDate: null,
       earnedBadges: [],
@@ -587,6 +620,7 @@ export const useProgress = create<ProgressState>()(
             s.dailyQuestDate,
             s.dailyQuests,
             s.claimedDailyReward,
+            getDailyQuestContext(s),
           );
           const dailyChallenge = refreshDailyChallengeState(s.dailyChallenge);
           awarded = !dailyChallenge.rewardClaimed;
@@ -605,6 +639,8 @@ export const useProgress = create<ProgressState>()(
             dailyBoardRuns: s.dailyBoardRuns + 1,
             dailyBoardBestScore: Math.max(s.dailyBoardBestScore, nextChallenge.bestScore),
             completedGameCount: s.completedGameCount + 1,
+            clearedStagesSinceAd: s.clearedStagesSinceAd + 1,
+            firstPlayDate: s.firstPlayDate ?? getTodayQuestDate(),
             dailyQuests: applyQuestProgress(refreshed.dailyQuests, {
               levelCleared: true,
               runScore: nextChallenge.bestScore,
@@ -645,7 +681,7 @@ export const useProgress = create<ProgressState>()(
             },
             dailyCompoundRuns: s.dailyCompoundRuns + (scoredRun ? 1 : 0),
             dailyCompoundBestScore:
-              scoredRun && awarded
+              scoredRun
                 ? Math.max(s.dailyCompoundBestScore, Math.max(0, Math.floor(score)))
                 : s.dailyCompoundBestScore,
             goldCoins: balanceAfter,
@@ -663,6 +699,35 @@ export const useProgress = create<ProgressState>()(
         });
         return awarded;
       },
+      recordResearchProgress: (date = getTodayQuestDate(), source = "campaign") => {
+        let result = { recorded: false, projectCompleted: false, coinsAwarded: 0 };
+        set((s) => {
+          const outcome = recordResearchProjectDay(s.researchProject, date, source);
+          result = {
+            recorded: outcome.recorded,
+            projectCompleted: outcome.projectCompleted,
+            coinsAwarded: outcome.coinsAwarded,
+          };
+          if (!outcome.recorded && outcome.coinsAwarded <= 0) return s;
+          const balanceAfter = s.goldCoins + outcome.coinsAwarded;
+          return {
+            researchProject: outcome.state,
+            goldCoins: balanceAfter,
+            coinTransactions:
+              outcome.coinsAwarded > 0
+                ? appendCoinTransaction(
+                    s.coinTransactions,
+                    outcome.coinsAwarded,
+                    balanceAfter,
+                    "Research Project complete",
+                  )
+                : s.coinTransactions,
+          };
+        });
+        return result;
+      },
+      setResearchRemindersEnabled: (enabled) => set({ researchRemindersEnabled: enabled }),
+      markResearchReminderPromptSeen: () => set({ researchReminderPromptSeen: true }),
       upgradeLabPowerUp: (id) => {
         let upgraded = false;
         set((s) => {
@@ -680,6 +745,7 @@ export const useProgress = create<ProgressState>()(
             s.dailyQuestDate,
             s.dailyQuests,
             s.claimedDailyReward,
+            getDailyQuestContext(s),
           );
           const balanceAfter = s.goldCoins - cost;
           return {
@@ -726,12 +792,21 @@ export const useProgress = create<ProgressState>()(
         }),
       recordDiscovery: (nums) =>
         set((s) => {
+          if (!nums.length) return s;
           const next = new Set(s.discoveredElements);
           nums.forEach((n) => next.add(n));
           const discoveredElements = Array.from(next).sort((a, b) => a - b);
+          const research = recordResearchProjectDay(s.researchProject, getTodayQuestDate(), "challenge");
+          const balanceAfter = s.goldCoins + research.coinsAwarded;
           return {
             discoveredElements,
             earnedBadges: getEarnedBadgeIds(discoveredElements, s.shopSpendCents),
+            researchProject: research.state,
+            goldCoins: balanceAfter,
+            coinTransactions:
+              research.coinsAwarded > 0
+                ? appendCoinTransaction(s.coinTransactions, research.coinsAwarded, balanceAfter, "Research Project complete")
+                : s.coinTransactions,
           };
         }),
       recordCompoundDiscovery: (compoundId) =>
@@ -776,6 +851,7 @@ export const useProgress = create<ProgressState>()(
             s.dailyQuestDate,
             s.dailyQuests,
             s.claimedDailyReward,
+            getDailyQuestContext(s),
           );
           const balanceAfter = s.goldCoins - normalizedCost;
           return {
@@ -815,6 +891,7 @@ export const useProgress = create<ProgressState>()(
             s.dailyQuestDate,
             s.dailyQuests,
             s.claimedDailyReward,
+            getDailyQuestContext(s),
           );
           const balanceAfter = s.goldCoins - normalizedCost;
           return {
@@ -962,7 +1039,7 @@ export const useProgress = create<ProgressState>()(
           // weekly play-bonus coin. The user must explicitly click today's
           // day on the streak grid to claim it.
           return {
-            ...refreshDailyQuests(s.dailyQuestDate, s.dailyQuests, s.claimedDailyReward),
+            ...refreshDailyQuests(s.dailyQuestDate, s.dailyQuests, s.claimedDailyReward, getDailyQuestContext(s)),
           };
         }),
       claimWeeklyPlayBonus: () => {
@@ -997,6 +1074,7 @@ export const useProgress = create<ProgressState>()(
             s.dailyQuestDate,
             s.dailyQuests,
             s.claimedDailyReward,
+            getDailyQuestContext(s),
           );
           return {
             ...refreshed,
@@ -1009,6 +1087,7 @@ export const useProgress = create<ProgressState>()(
             s.dailyQuestDate,
             s.dailyQuests,
             s.claimedDailyReward,
+            getDailyQuestContext(s),
           );
           if (refreshed.claimedDailyReward || !areDailyQuestsComplete(refreshed.dailyQuests))
             return refreshed;
@@ -1062,6 +1141,7 @@ export const useProgress = create<ProgressState>()(
           // Ad cadence is based on attempts (completed runs), not only clears.
           const attemptIncrement = 1;
           return {
+            firstPlayDate: s.firstPlayDate ?? getTodayQuestDate(),
             clearedStageCount: s.clearedStageCount + (run.won ? 1 : 0),
             completedGameCount: s.completedGameCount + 1,
             clearedStagesSinceAd: s.clearedStagesSinceAd + attemptIncrement,
@@ -1204,6 +1284,7 @@ export const useProgress = create<ProgressState>()(
       toggleProPack: () => set((s) => ({ hasProPack: !s.hasProPack })),
       recordGameAttemptForAd: () =>
         set((s) => ({
+          firstPlayDate: s.firstPlayDate ?? getTodayQuestDate(),
           completedGameCount: s.completedGameCount + 1,
           clearedStagesSinceAd: s.clearedStagesSinceAd + 1,
         })),
@@ -1241,6 +1322,7 @@ export const useProgress = create<ProgressState>()(
             s.dailyQuestDate,
             s.dailyQuests,
             s.claimedDailyReward,
+            getDailyQuestContext(s),
           );
           const balanceAfter = s.goldCoins - normalizedCost;
           return {
@@ -1338,6 +1420,10 @@ export const useProgress = create<ProgressState>()(
           dailyStreak: 0,
           claimedDailyReward: false,
           weeklyPlayBonus: createWeeklyPlayBonus(),
+          researchProject: createResearchProject(),
+          firstPlayDate: s.firstPlayDate,
+          researchRemindersEnabled: s.researchRemindersEnabled,
+          researchReminderPromptSeen: s.researchReminderPromptSeen,
           bestCombo: 0,
           bestComboDate: null,
           earnedBadges: getEarnedBadgeIds([1], s.shopSpendCents),
@@ -1437,6 +1523,12 @@ export const useProgress = create<ProgressState>()(
           dailyStreak: persistedState?.dailyStreak ?? current.dailyStreak,
           claimedDailyReward: persistedState?.claimedDailyReward ?? current.claimedDailyReward,
           weeklyPlayBonus: persistedState?.weeklyPlayBonus ?? current.weeklyPlayBonus,
+          researchProject: normalizeResearchProject(persistedState?.researchProject),
+          firstPlayDate: persistedState?.firstPlayDate ?? current.firstPlayDate,
+          researchRemindersEnabled:
+            persistedState?.researchRemindersEnabled ?? current.researchRemindersEnabled,
+          researchReminderPromptSeen:
+            persistedState?.researchReminderPromptSeen ?? current.researchReminderPromptSeen,
           goldCoins: persistedState?.goldCoins ?? current.goldCoins,
           coinTransactions: normalizeCoinTransactions(persistedState?.coinTransactions),
           soundEnabled: persistedState?.soundEnabled ?? current.soundEnabled,

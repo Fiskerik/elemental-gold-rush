@@ -41,7 +41,8 @@ import {
 import { playShootSound, primeAudio, startAmbientMusic, stopAmbientMusic, vibrate } from "./audio";
 import { playFeedback, type FeedbackEvent } from "./feedback";
 import { GameModeId, getGameMode, getModeLevelLabel } from "./challenges";
-import { trackGameOver, trackGameStart, trackLevelWin, trackMerge, trackShot } from "./analytics";
+import { trackGameOver, trackGameStart, trackLevelWin, trackMerge, trackFirstMerge, trackShot, trackRunEnd, trackResultAction, trackResearchDayComplete, trackResearchProjectComplete, trackInterstitialShown, trackDailyBoardStart, trackDailyBoardEnd, trackDailyCompoundStart, trackDailyCompoundEnd } from "./analytics";
+import { daysBetween } from "./researchProject";
 import {
   COMPOUNDS,
   type CompoundDefinition,
@@ -59,6 +60,7 @@ import { showInterstitialIfReady, showRewardedForCoin } from "./ads";
 import { useIsTabletLayout, useWideBoardLayout } from "./responsive";
 import { t } from "./localization";
 import { ElementalBossBoard } from "./ElementalBossBoard";
+import { PeriodicTableGrid } from "./PeriodicTableGrid";
 import { PeriodicGuardianBoard } from "./PeriodicGuardianBoard";
 import { NucleusCoreBoard } from "./NucleusCoreBoard";
 import { HowToPlay, type HowToPlayMode } from "./HowToPlay";
@@ -74,6 +76,7 @@ interface Props {
   onExit: () => void;
   onWin: (nextId: number | null) => void;
   onMap?: () => void;
+  onCollection?: () => void;
   mode?: GameModeId;
   resumeSavedRun?: boolean;
   secretCompoundId?: string;
@@ -810,6 +813,12 @@ function getShotStarGoal(level: (typeof LEVELS)[0]): number {
 
 export function GameBoard(props: Props) {
   const level = getLevelById(props.levelId);
+  const onSpecialWin = (nextId: number | null) => {
+    if (props.mode === "campaign" || !props.mode) {
+      useProgress.getState().recordResearchProgress(getTodayQuestDate(), "campaign");
+    }
+    props.onWin(nextId);
+  };
   if (props.secretCompoundId) {
     return <DailyCompoundGridBoard {...props} secretCompoundId={props.secretCompoundId} />;
   }
@@ -817,19 +826,19 @@ export function GameBoard(props: Props) {
     !props.secretCompoundId &&
     (props.mode === "elemental-boss" || level?.specialStage === "elemental-boss")
   ) {
-    return <ElementalBossBoard {...props} mode="elemental-boss" />;
+    return <ElementalBossBoard {...props} onWin={onSpecialWin} mode="elemental-boss" />;
   }
   if (
     !props.secretCompoundId &&
     (props.mode === "periodic-guardian" || level?.specialStage === "periodic-guardian")
   ) {
-    return <PeriodicGuardianBoard {...props} mode="periodic-guardian" />;
+    return <PeriodicGuardianBoard {...props} onWin={onSpecialWin} mode="periodic-guardian" />;
   }
   if (
     !props.secretCompoundId &&
     (props.mode === "nucleus-core" || level?.specialStage === "nucleus-core")
   ) {
-    return <NucleusCoreBoard {...props} mode="nucleus-core" />;
+    return <NucleusCoreBoard {...props} onWin={onSpecialWin} mode="nucleus-core" />;
   }
   return <StandardGameBoard {...props} />;
 }
@@ -845,6 +854,7 @@ function DailyCompoundGridBoard({
   secretCompoundId,
   onWin,
   onMap,
+  onCollection,
   onExit,
   initialHowToPlay,
 }: Props & { secretCompoundId: string }) {
@@ -861,11 +871,13 @@ function DailyCompoundGridBoard({
     recordLevelRun,
     reportQuestProgress,
     completeSecretCompound,
+    recordResearchProgress,
     recordGameAttemptForAd,
     hasProPack,
     atomSkin,
     ownedThemeProducts,
     appLanguage,
+    firstPlayDate,
   } = useProgress();
   const tr = (text: string) => t(text, appLanguage);
   const activeAtomSkin = isAtomSkinUnlocked(atomSkin, { hasProPack, ownedThemeProducts })
@@ -897,6 +909,15 @@ function DailyCompoundGridBoard({
     wasNew: boolean;
     count: number;
   }>(null);
+
+  useEffect(() => {
+    if (isCampaignSearchFind) trackDailyCompoundStart({ source_mode: "campaign" });
+    else trackDailyCompoundStart({ source_mode: "daily-compound" });
+  }, [isCampaignSearchFind]);
+
+  useEffect(() => {
+    if (result) trackDailyCompoundEnd({ source_mode: isCampaignSearchFind ? "campaign" : "daily-compound", outcome: "complete" });
+  }, [result, isCampaignSearchFind]);
 
   useEffect(() => {
     if (musicEnabled && !result) startAmbientMusic("default");
@@ -975,9 +996,10 @@ function DailyCompoundGridBoard({
 
   async function exitAfterResult() {
     const progress = useProgress.getState();
-    if (!progress.hasProPack && progress.clearedStagesSinceAd >= 3) {
+    const earlyProtection = !progress.firstPlayDate || daysBetween(progress.firstPlayDate, getTodayQuestDate()) < 7 || progress.completedGameCount < 10;
+    if (!progress.hasProPack && !earlyProtection && progress.clearedStagesSinceAd >= 5 && Date.now() - progress.lastInterstitialAt >= 10 * 60 * 1000) {
       const shown = await showInterstitialIfReady(progress.hasProPack);
-      if (shown) progress.markInterstitialShown();
+      if (shown) { progress.markInterstitialShown(); trackInterstitialShown({ mode: "daily-compound", level_id: levelId }); }
     }
     onExit();
   }
@@ -1031,9 +1053,13 @@ function DailyCompoundGridBoard({
       unlockLevel(getNextLevel(levelId)?.id ?? levelId + 1);
       recordLevelRun(levelId, { score, shots: attempts, powerUpsUsed: 0, won: true });
       reportQuestProgress({ levelCleared: true, runScore: score, starsEarned: stars });
+      const research = recordResearchProgress(getTodayQuestDate(), "campaign");
+      if (research.coinsAwarded > 0) setMessage(tr("Research Project complete — +15 coins"));
     } else {
       recordGameAttemptForAd();
       awarded = completeSecretCompound([compound.id], score);
+      const research = recordResearchProgress(getTodayQuestDate(), "daily-compound");
+      if (research.coinsAwarded > 0) setMessage(tr("Research Project complete — +15 coins"));
       submitDailyCompoundLeaderboardScore(Math.max(1, elapsedSec), attempts);
     }
     const formedIds = selectedCells.map((cell) => cell.id);
@@ -1230,14 +1256,14 @@ function DailyCompoundGridBoard({
               <div style={{ display: "flex", gap: 8 }}>
                 <button
                   type="button"
-                  onClick={() => (onMap ? onMap() : onExit())}
+                  onClick={() => (onCollection ?? onMap ?? onExit)()}
                   style={{
                     ...modalBtn,
                     background: "var(--surface-high)",
                     color: "var(--foreground)",
                   }}
                 >
-                  {tr("Map")}
+                  {tr("View in table")}
                 </button>
                 {nextCampaignLevel && (
                   <button
@@ -1245,14 +1271,15 @@ function DailyCompoundGridBoard({
                     onClick={() => onWin(nextCampaignLevel.id)}
                     style={modalBtn}
                   >
-                    {tr("Next level")}
+                    {tr("Next discovery")}
                   </button>
                 )}
               </div>
             ) : (
-              <button type="button" onClick={onExit} style={{ ...modalBtn, width: "100%" }}>
-                {tr("Back to Menu")}
-              </button>
+              <div style={{ display: "grid", gap: 8 }}>
+                {onCollection && <button type="button" onClick={onCollection} style={{ ...modalBtn, width: "100%", background: "var(--surface-high)", color: "var(--foreground)" }}>{tr("View in table")}</button>}
+                <button type="button" onClick={onExit} style={{ ...modalBtn, width: "100%" }}>{tr("Main menu")}</button>
+              </div>
             )}
           </div>
         </Modal>
@@ -1391,6 +1418,7 @@ function StandardGameBoard({
   onExit,
   onWin,
   onMap = onExit,
+  onCollection,
   mode = "campaign",
   resumeSavedRun = false,
   secretCompoundId,
@@ -1434,6 +1462,7 @@ function StandardGameBoard({
     setChallengeBestScore,
     completeDailyChallenge,
     completeSecretCompound,
+    recordResearchProgress,
     recordGameAttemptForAd,
     labUpgradeLevels,
     labUpgradeEnabled,
@@ -1452,6 +1481,7 @@ function StandardGameBoard({
     atomSkin,
     ownedThemeProducts,
     clearedStagesSinceAd,
+    firstPlayDate,
     markInterstitialShown,
     appLanguage,
   } = useProgress();
@@ -1490,6 +1520,7 @@ function StandardGameBoard({
     (id: LabUpgradeId) => (labUpgradeEnabled[id] ? (labUpgradeLevels[id] ?? 0) : 0),
     [labUpgradeEnabled, labUpgradeLevels],
   );
+  const skipInterstitialAfterRewardRef = useRef(false);
   const initialLabCharge = useCallback(
     (id: LabUpgradeId, minLevel: number) => (labUpgradeLevel(id) >= minLevel ? 1 : 0),
     [labUpgradeLevel],
@@ -2385,7 +2416,10 @@ function StandardGameBoard({
         startTimeRef.current = Date.now() - saved.elapsedMs;
         setElapsedMs(saved.elapsedMs);
         clearSavedRun();
-        if (!preview) trackGameStart(levelId, mode);
+        if (!preview) {
+          trackGameStart(levelId, mode);
+          if (mode === "daily-challenge") trackDailyBoardStart({ level_id: levelId });
+        }
         return;
       }
     }
@@ -2592,7 +2626,10 @@ function StandardGameBoard({
     eGunCooldownSlots.current = 0;
     startTimeRef.current = Date.now();
     setElapsedMs(0);
-    if (!preview) trackGameStart(levelId, mode);
+    if (!preview) {
+      trackGameStart(levelId, mode);
+      if (mode === "daily-challenge") trackDailyBoardStart({ level_id: levelId });
+    }
     // Per-level intro tooltips for newly unlocked features.
     if (canIntroducePowerUps && shimmerEnabled) {
       showTip(
@@ -3101,13 +3138,25 @@ function StandardGameBoard({
       addScore(Math.max(0, finalStats.score - stats.score));
     }
     reportQuestProgress({ runScore: finalStats.score });
+    const projectBeforeDiscovery = useProgress.getState().researchProject;
     commitRunDiscoveries();
+    const projectAfterDiscovery = useProgress.getState().researchProject;
+    const projectCompletedFromDiscovery = !projectBeforeDiscovery.rewardClaimed && projectAfterDiscovery.rewardClaimed;
+    const researchOutcome = mode === "campaign"
+      ? recordResearchProgress(getTodayQuestDate(), "campaign")
+      : { recorded: false, projectCompleted: false, coinsAwarded: 0 };
+    if (researchOutcome.recorded) trackResearchDayComplete({ source_mode: mode, project_day: researchOutcome.projectCompleted ? 5 : undefined });
+    if (researchOutcome.projectCompleted || projectCompletedFromDiscovery) {
+      trackResearchProjectComplete({ source_mode: mode });
+      skipInterstitialAfterRewardRef.current = true;
+    }
+    if (newlyDiscoveredThisRun.length > 0) skipInterstitialAfterRewardRef.current = true;
     // Record the cleared run immediately so campaign-map stats update
     // even if the player exits before the result modal is dismissed.
     if (!runRecordedRef.current) {
       runRecordedRef.current = true;
       if (mode === "daily-challenge") {
-        recordGameAttemptForAd();
+        // completeDailyChallenge records this attempt exactly once.
       } else {
         recordLevelRun(levelId, {
           score: finalStats.score,
@@ -3117,18 +3166,17 @@ function StandardGameBoard({
         });
       }
     }
+    // Clear in-flight score/merge popups before adding result rewards so the
+    // daily and research payouts remain visible.
+    setPopups([]);
     if (mode === "daily-challenge") {
       const awarded = completeDailyChallenge(finalStats.score);
+      trackDailyBoardEnd({ level_id: levelId, outcome: "complete", score: finalStats.score });
       if (awarded) spawnPopup(`Daily reward +${dailyFeatureRewardAmount} coins`);
     }
-    const completedCompoundIds = finalStats.compound
-      ? [...formedCompoundsThisRun, finalStats.compound.id]
-      : formedCompoundsThisRun;
-    const secretAwarded = completeSecretCompound(completedCompoundIds);
-    if (secretAwarded) spawnPopup(`Secret compound +${dailyFeatureRewardAmount} coins`);
-    // Clear any in-flight score/merge popups so they don't bleed into the
-    // win animation or appear behind the result modal.
-    setPopups([]);
+    // Daily Compound is a dedicated grid board; campaign compounds must not
+    // be reported as the daily feature.
+    if (researchOutcome.coinsAwarded > 0 || projectCompletedFromDiscovery) spawnPopup("Research Project +15 coins");
     if (level.powerUpStage) {
       setWon(true);
       setBusy(false);
@@ -5062,7 +5110,10 @@ function StandardGameBoard({
       setScore((currentScore) => currentScore + previewScore);
       setHighest((currentHighest) => Math.max(currentHighest, result.highestElement));
       if (result.merges.length > 0) {
-        recordRunMergeStats(result.merges);
+    recordRunMergeStats(result.merges);
+    if (runMergeCountRef.current === result.merges.length && result.merges.length > 0) {
+      trackFirstMerge(levelId, (Date.now() - startTimeRef.current) / 1000, mode);
+    }
         const comboLabel = getComboLabel(result.merges.length);
         if (comboLabel) spawnPopup(comboLabel);
         showMergeJuice(result.merges, result.balls, result.finalBallId, level.scoreMultiplier);
@@ -6334,32 +6385,51 @@ function StandardGameBoard({
     : winChoice;
 
   async function runAttemptAdIfDue() {
-    if (clearedStagesSinceAd < 3 || hasProPack) return;
+    const earlyProtection = !firstPlayDate || daysBetween(firstPlayDate, getTodayQuestDate()) < 7 || useProgress.getState().completedGameCount < 10;
+    if (earlyProtection || clearedStagesSinceAd < 5 || hasProPack) return;
+    if (skipInterstitialAfterRewardRef.current) {
+      skipInterstitialAfterRewardRef.current = false;
+      return;
+    }
+    if (useProgress.getState().lastInterstitialAt > 0 && Date.now() - useProgress.getState().lastInterstitialAt < 10 * 60 * 1000) return;
     const shown = await showInterstitialIfReady(hasProPack);
-    if (shown) markInterstitialShown();
+    if (shown) {
+      markInterstitialShown();
+      trackInterstitialShown({ mode, level_id: levelId });
+    }
   }
 
   async function handleWonMain() {
+    trackRunEnd({ levelId, mode, outcome: "win", durationSec: elapsedMs / 1000, shots, score, highestElement: highest, bestChain: runBestCombo, boardOccupancy: balls.length });
+    trackResultAction("main_menu", levelId, "win");
     await runAttemptAdIfDue();
     onExit();
   }
 
   async function handleWonMap() {
+    trackRunEnd({ levelId, mode, outcome: "win", durationSec: elapsedMs / 1000, shots, score, highestElement: highest, bestChain: runBestCombo, boardOccupancy: balls.length });
+    trackResultAction("map", levelId, "win");
     await runAttemptAdIfDue();
     onMap();
   }
 
   async function handleWonNext() {
+    trackRunEnd({ levelId, mode, outcome: "win", durationSec: elapsedMs / 1000, shots, score, highestElement: highest, bestChain: runBestCombo, boardOccupancy: balls.length });
+    trackResultAction("next_stage", levelId, "win");
     await runAttemptAdIfDue();
     onWin(nextCampaignLevel?.id ?? null);
   }
 
   async function handleGameOverMain() {
+    trackRunEnd({ levelId, mode, outcome: "game_over", durationSec: elapsedMs / 1000, shots, score, highestElement: highest, bestChain: runBestCombo, boardOccupancy: balls.length });
+    trackResultAction("main_menu", levelId, "game_over");
     await runAttemptAdIfDue();
     onExit();
   }
 
   async function handleGameOverRetry() {
+    trackRunEnd({ levelId, mode, outcome: "game_over", durationSec: elapsedMs / 1000, shots, score, highestElement: highest, bestChain: runBestCombo, boardOccupancy: balls.length });
+    trackResultAction("retry", levelId, "game_over");
     await runAttemptAdIfDue();
     onWin(levelId);
   }
@@ -8169,10 +8239,10 @@ function StandardGameBoard({
             onClaimPowerUp={claimResultPowerUp}
             onDiscoveryClick={setDiscoveryEl}
             onMain={handleWonMain}
-            onSecondary={nextCampaignLevel ? handleWonMap : undefined}
-            secondaryLabel="Map"
+            onSecondary={nextCampaignLevel ? (onCollection ?? handleWonMap) : undefined}
+            secondaryLabel={nextCampaignLevel ? "View in table" : "Map"}
             onNext={nextCampaignLevel ? handleWonNext : handleWonMap}
-            nextLabel={nextCampaignLevel ? "Next level" : "Map"}
+            nextLabel={nextCampaignLevel ? "Next discovery" : "Map"}
           />
         )}
         {gameOverContinueOpen && !won && !gameOver && (
@@ -8211,7 +8281,7 @@ function StandardGameBoard({
             onClaimPowerUp={claimResultPowerUp}
             onMain={handleGameOverMain}
             onNext={handleGameOverRetry}
-            nextLabel="Retry"
+            nextLabel="Retry research"
           />
         )}
       </div>
@@ -8695,7 +8765,7 @@ function InventoryStartModal({
 }
 
 function DiscoveryModal({ atomicNumber, onClose }: { atomicNumber: number; onClose: () => void }) {
-  const { appLanguage } = useProgress();
+  const { appLanguage, discoveredElements } = useProgress();
   const tr = (text: string) => t(text, appLanguage);
   const el = ELEMENTS[atomicNumber - 1];
   if (!el) return null;
@@ -8703,6 +8773,9 @@ function DiscoveryModal({ atomicNumber, onClose }: { atomicNumber: number; onClo
     <Modal zIndex={200}>
       <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--accent)", marginBottom: 8 }}>
         {tr("NEW DISCOVERY")}
+      </div>
+      <div style={{ marginBottom: 14, padding: 8, borderRadius: 12, border: "1px solid var(--border)", background: "var(--surface)" }}>
+        <PeriodicTableGrid discoveredElements={discoveredElements} newlyDiscovered={[atomicNumber]} targetAtomicNumber={atomicNumber} mode="preview" />
       </div>
       <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
         <ElementBall atomicNumber={atomicNumber} size={96} glow />
@@ -9478,6 +9551,7 @@ function ResultModal({
   const timeMet = didComplete && clearTimeMs <= TIME_STAR_LIMIT_SEC * 1000;
   const shotsMet = didComplete && shots <= shotGoal;
   const isCompoundPass = isCompoundFormationLevel(level);
+  const orderedDiscoveries = [...newDiscoveries].sort((a, b) => (a === level.targetElement ? -1 : b === level.targetElement ? 1 : a - b));
   return (
     <Modal>
       <div
@@ -9486,6 +9560,11 @@ function ResultModal({
         {tr(title)}
       </div>
       <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 12 }}>{tr(level.name)}</div>
+      {!didComplete && (
+        <div style={{ margin: "-4px 0 14px", padding: 10, borderRadius: 12, background: "color-mix(in oklch, var(--primary) 10%, var(--surface))", color: "var(--muted-foreground)", fontSize: 12 }}>
+          {`Target in sight: ${ELEMENTS[level.targetElement - 1]?.name ?? "next discovery"} · ${tr("Retry research to close the gap.")}`}
+        </div>
+      )}
       {isPowerUpPass && (
         <div
           style={{
@@ -9659,7 +9738,7 @@ function ResultModal({
           </div>
         </div>
       )}
-      {newDiscoveries.length > 0 && !isPowerUpPass && (
+      {orderedDiscoveries.length > 0 && !isPowerUpPass && (
         <div
           style={{
             background: "var(--surface)",
@@ -9681,8 +9760,9 @@ function ResultModal({
           >
             NEW DISCOVERIES — TAP TO RE-READ
           </div>
+          {orderedDiscoveries.length > 1 && <div style={{ textAlign: "center", fontSize: 11, color: "var(--accent)", marginBottom: 6 }}>{`Target first · +${orderedDiscoveries.length - 1} additional discoveries`}</div>}
           <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
-            {newDiscoveries.map((atomicNumber) => (
+            {orderedDiscoveries.map((atomicNumber) => (
               <ElementBall
                 key={atomicNumber}
                 atomicNumber={atomicNumber}

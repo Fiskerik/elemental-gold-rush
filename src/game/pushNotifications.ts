@@ -7,6 +7,8 @@ const PUSH_FUNCTIONS_BASE_URL = String(import.meta.env.VITE_FIREBASE_FUNCTIONS_B
 const PENDING_PUSH_ROUTE_STORAGE_KEY = "atomic-fusion-pending-push-route";
 
 let initializationPromise: Promise<void> | null = null;
+let researchRemindersPreference = false;
+let lastResearchDatePreference: string | undefined;
 
 function rememberToken(token: string): void {
   try {
@@ -16,7 +18,7 @@ function rememberToken(token: string): void {
   }
 
   console.info("[push] FCM registration token received", token);
-  void syncPushRegistration(token);
+  void syncPushRegistration(token, { researchReminders: researchRemindersPreference, lastResearchDate: lastResearchDatePreference });
 }
 
 function getInstallationId(): string {
@@ -45,28 +47,40 @@ async function postPushBackend(path: string, payload: Record<string, unknown>): 
   }
 }
 
-async function syncPushRegistration(token: string): Promise<void> {
+async function syncPushRegistration(token: string, options: { researchReminders?: boolean; lastResearchDate?: string } = {}): Promise<void> {
   await postPushBackend("/registerFcmToken", {
     installationId: getInstallationId(),
     token,
     platform: "ios",
     locale: navigator.language,
     timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    notificationsEnabled: true,
-    dailyBoardReminders: true,
-    dailyCompoundReminders: true,
-    streakReminders: true,
+    notificationsEnabled: Boolean(options.researchReminders),
+    researchReminders: Boolean(options.researchReminders),
+    reminderHour: 19,
+    lastResearchDate: options.lastResearchDate,
     lastSeenAt: new Date().toISOString(),
     lastPlayedAt: new Date().toISOString(),
   });
 }
 
-export function recordPushActivity(): void {
+export function recordPushActivity(lastResearchDate?: string): void {
   void postPushBackend("/recordPlayerActivity", {
     installationId: getInstallationId(),
     lastSeenAt: new Date().toISOString(),
     lastPlayedAt: new Date().toISOString(),
+    lastResearchDate,
   });
+}
+
+export function updateResearchReminderPreference(enabled: boolean, lastResearchDate?: string): void {
+  researchRemindersPreference = enabled;
+  lastResearchDatePreference = lastResearchDate;
+  try {
+    const token = window.localStorage.getItem(FCM_TOKEN_STORAGE_KEY);
+    if (token) void syncPushRegistration(token, { researchReminders: enabled, lastResearchDate });
+  } catch {
+    // Preference remains local if storage is unavailable.
+  }
 }
 
 export function consumePendingPushRoute(): string | null {
@@ -84,7 +98,7 @@ export function consumePendingPushRoute(): string | null {
  * The native Firebase Messaging plugin performs the APNs registration and maps
  * the APNs token to the FCM registration token.
  */
-export function initializePushNotifications(): Promise<void> {
+export function initializePushNotifications(options: { researchReminders?: boolean; lastResearchDate?: string } = {}): Promise<void> {
   if (Capacitor.getPlatform() !== "ios") {
     return Promise.resolve();
   }
@@ -92,6 +106,9 @@ export function initializePushNotifications(): Promise<void> {
   if (initializationPromise) {
     return initializationPromise;
   }
+
+  researchRemindersPreference = Boolean(options.researchReminders);
+  lastResearchDatePreference = options.lastResearchDate;
 
   initializationPromise = (async () => {
     let tokenListener: { remove: () => Promise<void> } | null = null;
@@ -122,9 +139,9 @@ export function initializePushNotifications(): Promise<void> {
 
       const { token } = await FirebaseMessaging.getToken();
       if (token) {
-        rememberToken(token);
+        await syncPushRegistration(token, options);
       }
-      recordPushActivity();
+      recordPushActivity(lastResearchDatePreference);
     } catch (error) {
       console.warn("[push] Unable to register for Firebase notifications", error);
     } finally {

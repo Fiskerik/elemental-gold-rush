@@ -2,12 +2,22 @@ import { FirebaseAnalytics } from '@capacitor-firebase/analytics';
 import { Capacitor } from '@capacitor/core';
 
 export type AnalyticsPayload = Record<string, string | number | boolean | null | undefined>;
+let analyticsContext: AnalyticsPayload = {};
+
+export function setAnalyticsContext(context: AnalyticsPayload): void {
+  analyticsContext = { ...analyticsContext, ...context };
+}
 
 // Safe internal tracking function that bridges Web/Dev environments with Native Firebase
 async function track(event: string, payload: AnalyticsPayload = {}): Promise<void> {
+  const enrichedPayload: AnalyticsPayload = {
+    app_version: String(import.meta.env.VITE_APP_VERSION ?? "1.1.6"),
+    ...analyticsContext,
+    ...payload,
+  };
   // 1. Log to console during development testing
   if (import.meta.env.DEV) {
-    console.log(`[analytics] ${event}`, payload);
+    console.log(`[analytics] ${event}`, enrichedPayload);
   }
 
   // 2. Send to native Firebase SDK only if running as a compiled app (iOS/Android)
@@ -16,7 +26,7 @@ async function track(event: string, payload: AnalyticsPayload = {}): Promise<voi
       // Firebase analytics demands explicit filtering of null/undefined attributes
       const cleanParams: Record<string, string | number | boolean> = {};
       
-      for (const [key, value] of Object.entries(payload)) {
+      for (const [key, value] of Object.entries(enrichedPayload)) {
         if (value !== null && value !== undefined) {
           cleanParams[key] = value;
         }
@@ -120,3 +130,39 @@ export function trackPurchaseCompleted(productId: string): void {
 export function trackMenuAction(action: string): void {
   track("menu_action", { action });
 }
+
+export function trackNextDiscoveryView(payload: AnalyticsPayload = {}): void {
+  track("next_discovery_view", payload);
+}
+
+export function trackNextDiscoveryStart(payload: AnalyticsPayload = {}): void {
+  track("next_discovery_start", payload);
+}
+
+export function trackPeriodicTableOpen(payload: AnalyticsPayload = {}): void {
+  track("periodic_table_open", payload);
+}
+
+export function trackElementDetailOpen(payload: AnalyticsPayload = {}): void {
+  track("element_detail_open", payload);
+}
+
+export function trackResearchDayComplete(payload: AnalyticsPayload = {}): void {
+  track("research_day_complete", payload);
+}
+
+export function trackResearchProjectComplete(payload: AnalyticsPayload = {}): void {
+  track("research_project_complete", payload);
+}
+
+export function trackInterstitialShown(payload: AnalyticsPayload = {}): void {
+  track("interstitial_shown", payload);
+}
+
+export function trackDailyBoardStart(payload: AnalyticsPayload = {}): void { track("daily_board_start", payload); }
+export function trackDailyBoardEnd(payload: AnalyticsPayload = {}): void { track("daily_board_end", payload); }
+export function trackDailyCompoundStart(payload: AnalyticsPayload = {}): void { track("daily_compound_start", payload); }
+export function trackDailyCompoundEnd(payload: AnalyticsPayload = {}): void { track("daily_compound_end", payload); }
+export function trackNotificationPrompt(payload: AnalyticsPayload = {}): void { track("notification_prompt", payload); }
+export function trackNotificationResult(payload: AnalyticsPayload = {}): void { track("notification_result", payload); }
+export function trackNotificationOpen(payload: AnalyticsPayload = {}): void { track("notification_open", payload); }

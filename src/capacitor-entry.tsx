@@ -1,7 +1,6 @@
 import { Capacitor } from "@capacitor/core";
 import { Keyboard, KeyboardResize, KeyboardStyle } from "@capacitor/keyboard";
 import { StatusBar, Style } from "@capacitor/status-bar";
-import { initializePushNotifications } from "./game/pushNotifications";
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { RouterProvider } from "@tanstack/react-router";
@@ -194,11 +193,4 @@ if (Capacitor.getPlatform() === "ios") {
   void StatusBar.setBackgroundColor({
     color: storedTheme === "light" ? "#f7f5ef" : "#0A0A1A",
   }).catch(() => {});
-  // Keep optional push setup out of the first render. APNs/Firebase can reject
-  // while the native plugin is still being configured.
-  window.setTimeout(() => {
-    void initializePushNotifications().catch((error) => {
-      console.warn("[push] Startup registration failed", error);
-    });
-  }, 1500);
 }

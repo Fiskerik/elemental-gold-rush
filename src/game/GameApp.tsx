@@ -29,9 +29,12 @@ import {
 } from "@/game/appUpdate";
 import { consumePendingPushRoute, recordPushActivity } from "@/game/pushNotifications";
 import { useProgress } from "@/game/store";
+import { getNextDiscoveryTarget } from "@/game/researchProject";
 import { useDomLocalization } from "@/game/useDomLocalization";
 import { t, type AppLanguage } from "@/game/localization";
 import { getCurrentGameCenterPlayer } from "@/game/gameCenter";
+import { setAnalyticsContext, trackNotificationOpen } from "@/game/analytics";
+import { daysBetween } from "@/game/researchProject";
 import {
   REFERRAL_REWARD_COINS,
   isReferralAvailable,
@@ -71,6 +74,9 @@ export function GameApp() {
   const soundVolume = useProgress((s) => s.soundVolume);
   const musicVolume = useProgress((s) => s.musicVolume);
   const completedGameCount = useProgress((s) => s.completedGameCount);
+  const clearedStageCount = useProgress((s) => s.clearedStageCount);
+  const researchProject = useProgress((s) => s.researchProject);
+  const firstPlayDate = useProgress((s) => s.firstPlayDate);
   const appReviewMilestonePromptSeen = useProgress((s) => s.appReviewMilestonePromptSeen);
   const appReviewMilestoneRewardClaimed = useProgress((s) => s.appReviewMilestoneRewardClaimed);
   const refreshDailyFeatures = useProgress((s) => s.refreshDailyFeatures);
@@ -88,6 +94,14 @@ export function GameApp() {
   const isNativeIos = Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios";
 
   useDomLocalization(appLanguage);
+
+  useEffect(() => {
+    setAnalyticsContext({
+      days_since_first_play: firstPlayDate ? daysBetween(firstPlayDate, getTodayQuestDate()) : 0,
+      campaign_level_band: `${Math.floor((Math.max(1, unlockedLevel) - 1) / 10) * 10 + 1}-${Math.min(100, Math.floor((Math.max(1, unlockedLevel) - 1) / 10) * 10 + 10)}`,
+      project_day: researchProject.completedDates.length,
+    });
+  }, [firstPlayDate, researchProject.completedDates.length, unlockedLevel]);
 
   useEffect(() => {
     if (!isReferralAvailable() || completedGameCount <= 0) return;
@@ -116,7 +130,7 @@ export function GameApp() {
   useEffect(() => {
     if (!isNativeIos) return;
     const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") recordPushActivity();
+      if (document.visibilityState === "visible") recordPushActivity(useProgress.getState().researchProject.completedDates.at(-1));
     };
     document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
@@ -189,6 +203,7 @@ export function GameApp() {
 
   useEffect(() => {
     const route = consumePendingPushRoute();
+    if (route) trackNotificationOpen({ route });
     if (route === "daily-board") startDailyChallenge();
     if (route === "daily-compound") startSecretCompound();
   }, []);
@@ -196,7 +211,9 @@ export function GameApp() {
   if (showLaunchScreen) return <LaunchScreen />;
 
   const shouldShowAppReviewMilestone =
-    completedGameCount >= 4 && !appReviewMilestonePromptSeen && !appReviewMilestoneRewardClaimed;
+    (researchProject.completed || clearedStageCount >= 10) &&
+    !appReviewMilestonePromptSeen &&
+    !appReviewMilestoneRewardClaimed;
 
   const appReviewMilestonePrompt = appReviewMilestonePromptOpen ? (
     <AppReviewMilestonePrompt
@@ -287,6 +304,17 @@ export function GameApp() {
     startCampaignLevel(getLevelById(unlockedLevel)?.id ?? 1);
   }
 
+  function startNextDiscovery() {
+    if (getSavedRunSummary()) {
+      startCampaign();
+      return;
+    }
+    const progress = useProgress.getState();
+    const target = getNextDiscoveryTarget(progress);
+    if (target.immediatePrerequisiteLevelId) startCampaignLevel(target.immediatePrerequisiteLevelId);
+    else startCampaign();
+  }
+
   function startDailyChallenge() {
     refreshDailyFeatures();
     const dailyChallenge = useProgress.getState().dailyChallenge;
@@ -340,6 +368,7 @@ export function GameApp() {
             onPlay={startCampaign}
             onLevels={() => setScreen({ name: "levels" })}
             onCollection={() => setScreen({ name: "collection" })}
+            onResearch={startNextDiscovery}
             onSettings={() => setScreen({ name: "settings" })}
             onShop={(section) => setScreen({ name: "shop", section })}
             onLab={() => setScreen({ name: "lab" })}
@@ -348,6 +377,7 @@ export function GameApp() {
             onLeaderboard={() => setScreen({ name: "leaderboard" })}
             onDailyChallenge={startDailyChallenge}
             onSecretCompound={startSecretCompound}
+            hasSavedRun={Boolean(getSavedRunSummary())}
           />
           {resumePrompt && (
             <ResumeRunPrompt
@@ -396,6 +426,7 @@ export function GameApp() {
           initialHowToPlay={screen.initialHowToPlay}
           onExit={() => setScreen({ name: "menu" })}
           onMap={() => setScreen({ name: "levels" })}
+          onCollection={() => setScreen({ name: "collection" })}
           onWin={(nextId) => {
             setGameRunNonce((nonce) => nonce + 1);
             if (!nextId) {
@@ -418,7 +449,7 @@ export function GameApp() {
         />,
       );
     case "collection":
-      return withGlobalModals(<Collection onBack={() => setScreen({ name: "menu" })} />);
+      return withGlobalModals(<Collection onBack={() => setScreen({ name: "menu" })} onResearch={startCampaignLevel} />);
     case "shop":
       return withGlobalModals(
         <Shop initialSection={screen.section} onBack={() => setScreen({ name: "menu" })} />,
@@ -606,7 +637,7 @@ function AppReviewMilestonePrompt({
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={tr("Game 5 bonus")}
+      aria-label={tr("Research milestone bonus")}
       style={{
         position: "fixed",
         inset: 0,
@@ -631,7 +662,7 @@ function AppReviewMilestonePrompt({
         }}
       >
         <div style={{ fontSize: 11, letterSpacing: 3, color: "var(--accent)", fontWeight: 800 }}>
-          {tr("MILESTONE BONUS")}
+          {tr("RESEARCH MILESTONE")}
         </div>
         <h2 style={{ margin: "6px 0 8px", fontSize: 23 }}>
           <CoinAmount amount={5} suffix={tr("coins unlocked")} />

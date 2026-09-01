@@ -27,11 +27,10 @@ import {
 import { useProgress } from "./store";
 import { formatScore } from "./logic";
 import { ELEMENTS } from "./elements";
-import { ElementBall } from "./ElementBall";
 import { COMPOUNDS } from "./compounds";
 import { MoleculeVisual } from "./MoleculeVisual";
 import { PowerUpBadge } from "./PowerUpLibrary";
-import { trackMenuAction } from "./analytics";
+import { trackMenuAction, trackNextDiscoveryStart, trackNextDiscoveryView, trackPeriodicTableOpen, trackNotificationPrompt, trackNotificationResult } from "./analytics";
 import { initAds, showRewardedForCoin } from "./ads";
 import { getWeeklyPlayBonusView } from "./weeklyBonus";
 import { useIsTabletLayout } from "./responsive";
@@ -40,7 +39,10 @@ import { t } from "./localization";
 import { PodiumMark } from "./DailyCompoundLeaderboard";
 import { openAppStoreReview } from "./appReview";
 import { toast } from "sonner";
-import { getTimeUntilDailyResetMs } from "./quests";
+import { getTimeUntilDailyResetMs, getTodayQuestDate } from "./quests";
+import { initializePushNotifications } from "./pushNotifications";
+import { PeriodicTableGrid } from "./PeriodicTableGrid";
+import { getNextDiscoveryTarget } from "./researchProject";
 
 const POWER_UP_STAGE_LABELS: Record<PowerUpStageId, string> = {
   shimmer: "Merge the shimmering queued atom",
@@ -62,6 +64,7 @@ interface Props {
   onPlay: () => void;
   onLevels: () => void;
   onCollection: () => void;
+  onResearch?: () => void;
   onSettings: () => void;
   onShop: (section?: "themes") => void;
   onLab: () => void;
@@ -70,6 +73,7 @@ interface Props {
   onLeaderboard: () => void;
   onDailyChallenge: () => void;
   onSecretCompound: () => void;
+  hasSavedRun?: boolean;
 }
 
 type NextRunGoal =
@@ -108,6 +112,7 @@ export function MainMenu({
   onPlay,
   onLevels,
   onCollection,
+  onResearch,
   onSettings,
   onShop,
   onLab,
@@ -116,6 +121,7 @@ export function MainMenu({
   onLeaderboard,
   onDailyChallenge,
   onSecretCompound,
+  hasSavedRun = false,
 }: Props) {
   const isTabletLayout = useIsTabletLayout();
   const {
@@ -127,6 +133,9 @@ export function MainMenu({
     dailyStreak,
     claimedDailyReward,
     weeklyPlayBonus,
+    discoveredElements,
+    discoveredCompounds,
+    researchProject,
     dailyChallenge,
     secretCompound,
     appLanguage,
@@ -139,11 +148,16 @@ export function MainMenu({
     grantGoldCoins,
     reportQuestProgress,
     revealSecretCompound,
+    researchReminderPromptSeen,
+    markResearchReminderPromptSeen,
+    setResearchRemindersEnabled,
   } = useProgress();
   const highestEl = ELEMENTS[highestElement - 1];
   const tr = (text: string) => t(text, appLanguage);
   const nextLevel = getLevelById(unlockedLevel) ?? LEVELS[LEVELS.length - 1];
   const nextRunGoal = getNextRunGoal(nextLevel);
+  const nextDiscovery = getNextDiscoveryTarget({ unlockedLevel, discoveredElements, discoveredCompounds });
+  const nextElement = nextDiscovery.targetAtomicNumber ? ELEMENTS[nextDiscovery.targetAtomicNumber - 1] : null;
   const completedDailyQuests = dailyQuests.filter((quest) => quest.completed).length;
   const dailyComplete = dailyQuests.length > 0 && completedDailyQuests >= 4;
   const dailyRewardAmount = hasProPack ? 10 : 3;
@@ -159,6 +173,21 @@ export function MainMenu({
   const [rewardedAdMessage, setRewardedAdMessage] = useState<string | null>(null);
   const rewardedAdMessageTimeoutRef = useRef<number | null>(null);
   const [ratePromptOpen, setRatePromptOpen] = useState(false);
+  const [showReminderPrompt, setShowReminderPrompt] = useState(false);
+  const [showMoreChallenges, setShowMoreChallenges] = useState(false);
+  const [showBonusLab, setShowBonusLab] = useState(false);
+
+  useEffect(() => {
+    if (!isNativeIos) return;
+    if (!researchReminderPromptSeen && researchProject.completedDates.length > 0) {
+      setShowReminderPrompt(true);
+      trackNotificationPrompt({ project_day: 1 });
+    }
+  }, [isNativeIos, researchProject.completedDates.length, researchReminderPromptSeen]);
+
+  useEffect(() => {
+    trackNextDiscoveryView({ target_element: nextDiscovery.targetAtomicNumber ?? nextDiscovery.targetElementName, stages_remaining: nextDiscovery.stagesRemaining, discovered_count: discoveredElements.length });
+  }, [nextDiscovery.targetAtomicNumber, nextDiscovery.targetElementName, nextDiscovery.stagesRemaining, discoveredElements.length]);
 
   useEffect(() => {
     const id = window.setInterval(() => {
@@ -321,115 +350,36 @@ export function MainMenu({
         </header>
 
         <section style={{ ...playPanel, padding: isTabletLayout ? 22 : playPanel.padding }}>
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
             <div>
-              <div style={eyebrow}>{tr("NEXT RUN")}</div>
+              <div style={eyebrow}>{tr("NEXT DISCOVERY")}</div>
               <div style={{ fontSize: 22, fontWeight: 900, lineHeight: 1.1 }}>
-                {tr("Level")} {unlockedLevel}
+                {nextElement ? `${tr("Next discovery")}: ${nextElement.name}` : tr("Complete the collection")}
               </div>
-              <div style={{ fontSize: 13, color: "var(--muted-foreground)", marginTop: 4 }}>
-                {nextRunGoal.text}
+              <div style={{ fontSize: 13, color: "var(--muted-foreground)", marginTop: 5 }}>
+                {nextElement
+                  ? `${discoveredElements.length}/118 discovered · ${nextDiscovery.stagesRemaining === 1 ? "1 stage away" : `${nextDiscovery.stagesRemaining} stages to ${nextElement.name}`}`
+                  : `${discoveredElements.length}/118 discovered`}
               </div>
+              {nextDiscovery.immediatePrerequisiteName && nextDiscovery.stagesRemaining > 1 && <div style={{ fontSize: 11, color: "var(--accent)", marginTop: 3 }}>{`${tr("First:")} ${nextDiscovery.immediatePrerequisiteName}`}</div>}
             </div>
             <div style={playPanelActions}>
-              {isNativeIos && (
-                <button
-                  onClick={handleRateApp}
-                  style={{ ...chooseLevelBtn, paddingInline: 9, color: "var(--accent)" }}
-                  aria-label={tr("Rate app")}
-                >
-                  <Star size={18} fill="currentColor" aria-hidden="true" />
-                </button>
-              )}
-              <button
-                onClick={() => {
-                  trackMenuAction("leaderboard");
-                  onLeaderboard();
-                }}
-                style={{ ...chooseLevelBtn, paddingInline: 9 }}
-                aria-label={tr("Open leaderboard")}
-              >
-                <PodiumMark size={20} />
-              </button>
-              <button
-                onClick={() => {
-                  trackMenuAction("levels");
-                  onLevels();
-                }}
-                style={chooseLevelBtn}
-              >
-                <Layers size={16} aria-hidden="true" />
-                {tr("Map")}
-              </button>
+              {isNativeIos && <button onClick={handleRateApp} style={{ ...chooseLevelBtn, paddingInline: 9, color: "var(--accent)" }} aria-label={tr("Rate app")}><Star size={18} fill="currentColor" aria-hidden="true" /></button>}
+              <button onClick={() => { trackMenuAction("leaderboard"); onLeaderboard(); }} style={{ ...chooseLevelBtn, paddingInline: 9 }} aria-label={tr("Open leaderboard")}><PodiumMark size={20} /></button>
+              <button onClick={() => { trackMenuAction("levels"); onLevels(); }} style={chooseLevelBtn}><Layers size={16} aria-hidden="true" />{tr("Map")}</button>
             </div>
           </div>
-          <div style={dailyFeatureGrid}>
-            <button type="button" onClick={onDailyChallenge} style={dailyFeatureBtn}>
-              <span style={dailyFeatureIcon}>
-                <Trophy size={18} aria-hidden="true" />
-              </span>
-              <span style={dailyFeatureText}>
-                <strong style={dailyFeatureTextStrong}>{tr("Daily Board")}</strong>
-                <small>
-                  {tr(
-                    dailyChallenge.completed
-                      ? "Cleared today"
-                      : `Reward +${DAILY_FEATURE_REWARD_COINS}`,
-                  )}
-                </small>
-              </span>
-              <span style={dailyFeatureReward}>
-                {dailyChallenge.completed ? (
-                  <CheckCircle2 size={18} aria-label="Completed" />
-                ) : (
-                  <DailyGoldReward />
-                )}
-              </span>
-            </button>
-            <button type="button" onClick={handleSecretCompoundPress} style={dailyFeatureBtn}>
-              <span style={dailyFeatureIcon}>
-                <CircleQuestionMark size={18} aria-hidden="true" />
-              </span>
-              <span style={dailyFeatureText}>
-                <strong style={dailyFeatureTextStrong}>{tr("Daily Compound")}</strong>
-                <small>
-                  {tr(
-                    secretCompound.completed
-                      ? "Synthesized"
-                      : secretCompound.revealed
-                        ? "Clue unlocked"
-                        : `Reveal clue +${DAILY_FEATURE_REWARD_COINS}`,
-                  )}
-                </small>
-              </span>
-              <span style={dailyFeatureReward}>
-                {secretCompound.completed ? (
-                  <CheckCircle2 size={18} aria-label="Completed" />
-                ) : (
-                  <DailyGoldReward />
-                )}
-              </span>
-            </button>
+          <div style={{ marginTop: 14, borderRadius: 14, padding: 10, background: "linear-gradient(145deg, color-mix(in oklch, var(--surface-high) 82%, var(--primary) 18%), var(--surface))", border: "1px solid var(--border)" }}>
+            <PeriodicTableGrid discoveredElements={discoveredElements} targetAtomicNumber={nextDiscovery.targetAtomicNumber} mode="preview" />
           </div>
-          <button
-            onClick={() => {
-              trackMenuAction("continue");
-              onPlay();
-            }}
-            style={heroPlayBtn}
-          >
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-              <Play size={20} fill="currentColor" aria-hidden="true" />
-              {tr("Continue")}
-            </span>
-            {nextRunGoal.kind === "compound" ? (
-              <MoleculeVisual compound={nextRunGoal.compound} size={54} />
-            ) : nextRunGoal.kind === "powerup" ? (
-              <PowerUpBadge icon={nextRunGoal.powerUp} size={54} />
-            ) : (
-              <ElementBall atomicNumber={nextLevel?.targetElement ?? 1} size={54} glow />
-            )}
+          <button onClick={() => { trackMenuAction("continue"); trackNextDiscoveryStart({ target_element: nextDiscovery.targetAtomicNumber ?? nextDiscovery.targetElementName, stages_remaining: nextDiscovery.stagesRemaining }); (onResearch ?? onPlay)(); }} style={heroPlayBtn}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}><Play size={20} fill="currentColor" aria-hidden="true" />{hasSavedRun ? `${tr("Resume")} ${nextElement?.name ?? tr("research")}` : nextElement ? `${tr("Discover")} ${nextElement.name}` : tr("Continue research")}</span>
+            <Sparkles size={26} aria-hidden="true" />
           </button>
+          <button type="button" onClick={() => { trackPeriodicTableOpen({ source_mode: "menu" }); onCollection(); }} style={{ alignSelf: "center", background: "none", border: "none", color: "var(--accent)", fontSize: 12, fontWeight: 800, cursor: "pointer" }}>{tr("View full periodic table")} →</button>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--muted-foreground)", marginTop: 8 }}>
+            <span>{`Research Project ${Math.min(researchProject.completedDates.length, 5)}/5 days · ${resetCountdown}`}</span><span>Reward <strong style={{ color: "var(--accent)" }}>+15 coins</strong></span>
+          </div>
           {isNativeIos && (
             <button
               type="button"
@@ -487,6 +437,16 @@ export function MainMenu({
           </button>
         )}
 
+        <section style={{ marginTop: 12 }}>
+          <button type="button" onClick={() => setShowMoreChallenges((value) => !value)} style={{ ...sectionLabel, width: "100%", textAlign: "left", background: "none", border: "none", color: "var(--muted-foreground)", cursor: "pointer", padding: "10px 2px" }}>
+            {showMoreChallenges ? "▾ " : "▸ "}{tr("More challenges")}
+          </button>
+          {showMoreChallenges && <div style={dailyFeatureGrid}>
+            <button type="button" onClick={onDailyChallenge} style={dailyFeatureBtn}><span style={dailyFeatureIcon}><Trophy size={18} aria-hidden="true" /></span><span style={dailyFeatureText}><strong style={dailyFeatureTextStrong}>{tr("Daily Board")}</strong><small>{dailyChallenge.completed ? tr("Cleared today") : `Reward +${DAILY_FEATURE_REWARD_COINS}`}</small></span><span style={dailyFeatureReward}>{dailyChallenge.completed ? <CheckCircle2 size={18} aria-label="Completed" /> : <DailyGoldReward />}</span></button>
+            <button type="button" onClick={handleSecretCompoundPress} style={dailyFeatureBtn}><span style={dailyFeatureIcon}><CircleQuestionMark size={18} aria-hidden="true" /></span><span style={dailyFeatureText}><strong style={dailyFeatureTextStrong}>{tr("Daily Compound")}</strong><small>{secretCompound.completed ? tr("Synthesized") : secretCompound.revealed ? tr("Clue unlocked") : `Reveal clue +${DAILY_FEATURE_REWARD_COINS}`}</small></span><span style={dailyFeatureReward}>{secretCompound.completed ? <CheckCircle2 size={18} aria-label="Completed" /> : <DailyGoldReward />}</span></button>
+          </div>}
+        </section>
+
         <nav
           style={{
             ...subpageRow,
@@ -496,10 +456,11 @@ export function MainMenu({
         >
           <NavPill
             icon={Atom}
-            label={tr("Collection")}
+            label={tr("Periodic Table")}
             tone="collection"
             onClick={() => {
               trackMenuAction("collection");
+              trackPeriodicTableOpen({ source_mode: "menu-nav" });
               onCollection();
             }}
           />
@@ -532,7 +493,7 @@ export function MainMenu({
           />
         </nav>
 
-        <section style={weeklyBonusCard}>
+        {false && <section style={weeklyBonusCard}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
             <div>
               <div style={sectionLabel}>{tr("PLAY A GAME A DAY")}</div>
@@ -606,8 +567,12 @@ export function MainMenu({
           <div style={{ fontSize: 10, color: "var(--muted-foreground)", lineHeight: 1.35 }}>
             {`${tr("1 coin each day you play.")} ${tr(weeklyBonus.nextRewardText)}.`}
           </div>
-        </section>
+        </section>}
 
+        <button type="button" onClick={() => setShowBonusLab((value) => !value)} style={{ ...sectionLabel, width: "100%", textAlign: "left", background: "none", border: "none", color: "var(--muted-foreground)", cursor: "pointer", padding: "10px 2px" }}>
+          {showBonusLab ? "▾ " : "▸ "}{tr("Bonus Lab Tasks")} · {completedDailyQuests}/{dailyQuests.length}
+        </button>
+        {showBonusLab && <>
         <section style={{ ...dailyPanel, padding: isTabletLayout ? 18 : dailyPanel.padding }}>
           {dailyRewardToast && (
             <div style={dailyToast} role="status" aria-live="polite">
@@ -666,11 +631,6 @@ export function MainMenu({
               >
                 {claimedDailyReward ? tr("Claimed") : tr("Claim")}
               </button>
-              <div style={weeklyBonusPill}>
-                {weeklyBonus.todayClaimed
-                  ? `Today +${weeklyBonus.coinsEarnedToday}`
-                  : tr("Play today +1")}
-              </div>
             </div>
           </div>
         </section>
@@ -727,6 +687,7 @@ export function MainMenu({
             ))}
           </div>
         </section>
+        </>}
         {isNativeIos && ratePromptOpen && (
           <div style={modalBackdrop} role="presentation" onClick={() => setRatePromptOpen(false)}>
             <section
@@ -754,6 +715,18 @@ export function MainMenu({
                 <button type="button" onClick={handleRateConfirm} style={ratePrimaryBtn}>
                   {tr("Rate App")}
                 </button>
+              </div>
+            </section>
+          </div>
+        )}
+        {isNativeIos && showReminderPrompt && (
+          <div style={modalBackdrop} role="presentation">
+            <section style={rateModal} role="dialog" aria-modal="true" aria-labelledby="research-reminder-title">
+              <h2 id="research-reminder-title" style={rateTitle}>{tr("Keep your research moving")}</h2>
+              <p style={rateCopy}>{tr("Remind me tomorrow at 19:00 when a research day is still open.")}</p>
+              <div style={rateActions}>
+                <button type="button" onClick={() => { markResearchReminderPromptSeen(); setShowReminderPrompt(false); trackNotificationResult({ result: "declined" }); }} style={rateSecondaryBtn}>{tr("Not now")}</button>
+                <button type="button" onClick={() => { setResearchRemindersEnabled(true); markResearchReminderPromptSeen(); setShowReminderPrompt(false); trackNotificationResult({ result: "accepted", reminder_hour: 19 }); void initializePushNotifications({ researchReminders: true, lastResearchDate: getTodayQuestDate() }); }} style={ratePrimaryBtn}>{tr("Remind me")}</button>
               </div>
             </section>
           </div>

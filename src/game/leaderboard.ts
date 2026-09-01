@@ -504,7 +504,7 @@ export async function settleDailyLeaderboardRewards(date = getTodayQuestDate()):
   for (const kind of ["daily-board", "daily-compound"] as const) {
     try {
       const board = await loadDailyLeaderboard(kind, "global");
-      if (board.player.rank > 0 && board.player.rank <= 3) {
+      if (board.source === "game-center" && board.totalPlayerCount > 1 && board.player.rank > 0 && board.player.rank <= 3) {
         useProgress.getState().claimDailyLeaderboardReward(kind, board.player.rank, date);
       }
     } catch (error) {

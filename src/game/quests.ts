@@ -47,6 +47,15 @@ export interface QuestProgressEvent {
   secretCompoundCleared?: boolean;
 }
 
+export interface DailyQuestGenerationContext {
+  unlockedLevel?: number;
+  goldCoins?: number;
+  hasProPack?: boolean;
+  isNativeIos?: boolean;
+  discoveredElements?: number[];
+  affordableUpgrade?: boolean;
+}
+
 export const DAILY_RESET_TIME_ZONE = "Europe/Stockholm";
 
 const dailyResetDateFormatter = new Intl.DateTimeFormat("en-US", {
@@ -142,6 +151,13 @@ const DAILY_QUEST_POOL: Array<Omit<DailyQuest, "id" | "progress" | "completed"> 
     type: "clear_level",
     title: "Clear 1 stage",
     description: "Complete any campaign level without a game over.",
+    target: 1,
+  },
+  {
+    slug: "secret-compound",
+    type: "secret_compound",
+    title: "Solve today's Daily Compound",
+    description: "Find the hidden molecule in the daily research grid.",
     target: 1,
   },
   {
@@ -249,15 +265,34 @@ function removeRetiredDailyQuests(quests: DailyQuest[]): DailyQuest[] {
   return quests.filter((quest) => !isRemovedDailyQuest(quest));
 }
 
-export function createDailyQuests(dateKey = getTodayQuestDate()): DailyQuest[] {
-  return shuffleForDate(DAILY_QUEST_POOL, dateKey)
+export function createDailyQuests(
+  dateKey = getTodayQuestDate(),
+  context: DailyQuestGenerationContext = {},
+): DailyQuest[] {
+  const level = context.unlockedLevel ?? 1;
+  const affordableUpgrade = context.affordableUpgrade ?? Boolean((context.goldCoins ?? 0) >= 10 && level >= 5);
+  const eligible = DAILY_QUEST_POOL.filter((quest) => {
+    if (quest.type === "watch_ad") return context.isNativeIos ?? false;
+    if (quest.type === "purchase_item") return (context.goldCoins ?? 0) >= 6 && level >= 1;
+    if (quest.type === "upgrade_powerup") return affordableUpgrade;
+    if (quest.type === "use_unique_powerups") return level >= 10;
+    if (quest.type === "destroy_stone") return level >= 30;
+    if (quest.type === "merge_unstable") return level >= 20;
+    if (quest.type === "single_game_score") return level >= 10;
+    if (quest.type === "discover_elements") return (context.discoveredElements?.length ?? 0) < ELEMENTS.length;
+    return true;
+  });
+  const core = eligible.length >= 6 ? eligible : DAILY_QUEST_POOL.filter((quest) => ["clear_level", "secret_compound", "discover_elements", "earn_stars", "chain_merge", "merge_atoms", "combo_reactions"].includes(quest.type) && (quest.type !== "discover_elements" || (context.discoveredElements?.length ?? 0) < ELEMENTS.length));
+  return shuffleForDate(core, dateKey)
     .slice(0, 6)
     .map((quest) => ({
       id: `${dateKey}-${quest.slug}`,
       type: quest.type,
       title: quest.title,
       description: quest.description,
-      target: quest.target,
+      target: quest.type === "single_game_score"
+        ? Math.max(5_000, Math.min(50_000, Math.max(1, level) * 2_500))
+        : quest.target,
       progress: 0,
       completed: false,
       category: quest.category,
@@ -268,20 +303,21 @@ export function refreshDailyQuests(
   dailyQuestDate: string,
   dailyQuests: DailyQuest[],
   claimedDailyReward: boolean,
+  context: DailyQuestGenerationContext = {},
 ) {
   const today = getTodayQuestDate();
   if (dailyQuestDate === today && dailyQuests.length > 0) {
     const current = removeRetiredDailyQuests(dailyQuests);
     return {
       dailyQuestDate,
-      dailyQuests: current.length === 6 ? current : createDailyQuests(today),
+      dailyQuests: current.length === 6 ? current : createDailyQuests(today, context),
       claimedDailyReward,
     };
   }
 
   return {
     dailyQuestDate: today,
-    dailyQuests: createDailyQuests(today),
+    dailyQuests: createDailyQuests(today, context),
     claimedDailyReward: false,
   };
 }

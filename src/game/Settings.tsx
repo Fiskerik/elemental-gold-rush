@@ -12,6 +12,7 @@ import type { ProductId } from "./products";
 import { setMusicVolume, setSfxVolume, startAmbientMusic, stopAmbientMusic } from "./audio";
 import { useIsTabletLayout } from "./responsive";
 import { t } from "./localization";
+import { initializePushNotifications, updateResearchReminderPreference } from "./pushNotifications";
 
 export type ShopSection = "themes";
 
@@ -33,6 +34,8 @@ export function Settings({ onBack }: { onBack: () => void; onOpenShop?: (section
     setMusicVolume: setMusicVolumeStore,
     toggleAppTheme,
     setShootingStyle,
+    researchRemindersEnabled,
+    setResearchRemindersEnabled,
     reset,
   } = useProgress();
   const tr = (text: string) => t(text, appLanguage);
@@ -103,6 +106,11 @@ export function Settings({ onBack }: { onBack: () => void; onOpenShop?: (section
             label={`${tr("Play style")}: ${tr(shootingStyle === "hold" ? "Hold" : "Press")}`}
             value={shootingStyle === "press"}
             onToggle={() => setShootingStyle(shootingStyle === "hold" ? "press" : "hold")}
+          />
+          <Row
+            label={tr("Research reminders")}
+            value={researchRemindersEnabled}
+            onToggle={() => { const enabled = !researchRemindersEnabled; setResearchRemindersEnabled(enabled); updateResearchReminderPreference(enabled); if (enabled) void initializePushNotifications({ researchReminders: true }); }}
           />
           <button
             onClick={() => {
