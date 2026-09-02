@@ -78,6 +78,9 @@ interface Props {
   onMap?: () => void;
   onCollection?: () => void;
   mode?: GameModeId;
+  /** Optional focused run that targets one missing element instead of advancing the map. */
+  discoveryTargetAtomicNumber?: number;
+  discoveryRun?: boolean;
   resumeSavedRun?: boolean;
   secretCompoundId?: string;
   initialHowToPlay?: HowToPlayMode;
@@ -242,6 +245,8 @@ interface SavedRunSnapshot {
   savedAt: number;
   levelId: number;
   mode?: GameModeId;
+  discoveryTargetAtomicNumber?: number;
+  discoveryRun?: boolean;
   balls: Board;
   queue: number[];
   shimmerQueue: boolean[];
@@ -325,6 +330,8 @@ type StageClearStats = {
 export function getSavedRunSummary(): {
   levelId: number;
   mode?: GameModeId;
+  discoveryTargetAtomicNumber?: number;
+  discoveryRun?: boolean;
   score: number;
   shots: number;
   savedAt: number;
@@ -338,6 +345,11 @@ export function getSavedRunSummary(): {
     return {
       levelId: parsed.levelId,
       mode: parsed.mode,
+      discoveryTargetAtomicNumber:
+        typeof parsed.discoveryTargetAtomicNumber === "number"
+          ? parsed.discoveryTargetAtomicNumber
+          : undefined,
+      discoveryRun: Boolean(parsed.discoveryRun),
       score: Math.max(0, Math.floor(parsed.score ?? 0)),
       shots: Math.max(0, Math.floor(parsed.shots ?? 0)),
       savedAt: typeof parsed.savedAt === "number" ? parsed.savedAt : Date.now(),
@@ -814,7 +826,7 @@ function getShotStarGoal(level: (typeof LEVELS)[0]): number {
 export function GameBoard(props: Props) {
   const level = getLevelById(props.levelId);
   const onSpecialWin = (nextId: number | null) => {
-    if (props.mode === "campaign" || !props.mode) {
+    if ((props.mode === "campaign" || !props.mode) && !props.discoveryRun) {
       useProgress.getState().recordResearchProgress(getTodayQuestDate(), "campaign");
     }
     props.onWin(nextId);
@@ -1420,6 +1432,8 @@ function StandardGameBoard({
   onMap = onExit,
   onCollection,
   mode = "campaign",
+  discoveryTargetAtomicNumber,
+  discoveryRun = false,
   resumeSavedRun = false,
   secretCompoundId,
   initialHowToPlay,
@@ -1434,10 +1448,18 @@ function StandardGameBoard({
   const wideBoard = useWideBoardLayout();
   const level = getLevelById(levelId) ?? LEVELS[0];
   const gameMode = getGameMode(mode);
-  const nextCampaignLevel = mode === "campaign" ? getNextLevel(levelId) : undefined;
-  const powerUpStage = !preview && mode === "campaign" && !secretCompoundId ? level.powerUpStage : undefined;
+  const isFocusedElementDiscovery = discoveryRun && discoveryTargetAtomicNumber != null;
+  const target = discoveryTargetAtomicNumber ?? level.targetElement;
+  const runMaxQueueElement = isFocusedElementDiscovery
+    ? Math.min(
+        Math.max(1, target - 1),
+        Math.max(level.maxQueueElement, Math.max(1, target - 3)),
+      )
+    : level.maxQueueElement;
+  const nextCampaignLevel = mode === "campaign" && !isFocusedElementDiscovery ? getNextLevel(levelId) : undefined;
+  const powerUpStage = !preview && mode === "campaign" && !secretCompoundId && !isFocusedElementDiscovery ? level.powerUpStage : undefined;
   const isPowerUpStage = powerUpStage != null;
-  const compoundEnabled = !preview && mode === "campaign" && !isPowerUpStage;
+  const compoundEnabled = !preview && mode === "campaign" && !isPowerUpStage && !isFocusedElementDiscovery;
   const {
     recordDiscovery,
     addScore,
@@ -1613,7 +1635,7 @@ function StandardGameBoard({
   );
   const [balls, setBalls] = useState<Board>(() => createEmptyBoard());
   const [queue, setQueue] = useState<number[]>(() =>
-    generateInitialQueue(level.maxQueueElement, QUEUE_SIZE, level.queueDecay, dailyRandom),
+    generateInitialQueue(runMaxQueueElement, QUEUE_SIZE, level.queueDecay, dailyRandom),
   );
   // Parallel array — true means that queued atom is "shimmering" and will give
   // 2× score and 2× grab-combo progress on a successful merge.
@@ -1909,8 +1931,15 @@ function StandardGameBoard({
     return shuffleDailyAtoms([...highAtoms, ...otherAtoms], `shuffle-start-${level.id}-${target}`);
   }
 
-  const target = level.targetElement;
   const targetEl = ELEMENTS[target - 1];
+  const resultLevel = isFocusedElementDiscovery
+    ? {
+        ...level,
+        name: `${targetEl?.name ?? "Element"} Discovery`,
+        description: `Discover ${targetEl?.name ?? "the next missing element"}.`,
+        targetElement: target,
+      }
+    : level;
   const secretCompoundObjective = useMemo(
     () =>
       secretCompoundId
@@ -1921,11 +1950,11 @@ function StandardGameBoard({
   const moleculeObjective = useMemo(
     () =>
       secretCompoundObjective ??
-      (mode === "campaign"
+      (mode === "campaign" && !isFocusedElementDiscovery
         ? (COMPOUNDS.find((compound) => compound.id === MOLECULE_CHALLENGE_BY_LEVEL[level.id]) ??
           null)
         : null),
-    [level.id, mode, secretCompoundObjective],
+    [level.id, mode, secretCompoundObjective, isFocusedElementDiscovery],
   );
   const isSecretCompoundChallenge = secretCompoundObjective != null;
   const isDailyMoleculeChallenge = false;
@@ -1933,7 +1962,7 @@ function StandardGameBoard({
   const isMoleculeChallenge =
     moleculeObjective != null && (mode === "campaign" || isSecretCompoundChallenge);
   const isAmmoniumChallenge = isMoleculeChallenge && moleculeObjective?.id === "ammonium";
-  const canIntroducePowerUps = !preview && mode === "campaign" && !isMoleculeChallenge && !isPowerUpStage;
+  const canIntroducePowerUps = !preview && mode === "campaign" && !isFocusedElementDiscovery && !isMoleculeChallenge && !isPowerUpStage;
   const unstableEnabled = !preview && progressionPowerUpLevel >= UNSTABLE_UNLOCK_LEVEL;
   const current = queue[0];
   const currentIsEGun = eGunQueue[0] ?? false;
@@ -2211,6 +2240,8 @@ function StandardGameBoard({
       savedAt: Date.now(),
       levelId,
       mode,
+      discoveryTargetAtomicNumber,
+      discoveryRun: isFocusedElementDiscovery,
       balls,
       queue,
       shimmerQueue,
@@ -2467,7 +2498,7 @@ function StandardGameBoard({
       : [
           ...powerUpQueuePrefix,
           ...challengeQueuePrefix,
-          ...generateInitialQueue(level.maxQueueElement, QUEUE_SIZE, currentQueueDecay(), dailyRandom),
+          ...generateInitialQueue(runMaxQueueElement, QUEUE_SIZE, currentQueueDecay(), dailyRandom),
         ].slice(0, QUEUE_SIZE);
     const initialPlannedCount = Math.min(QUEUE_SIZE, challengeQueuePrefix.length);
     const initialEGun = Array.from(
@@ -2662,7 +2693,7 @@ function StandardGameBoard({
     levelId,
     level.gridRows,
     level.gridCols,
-    level.maxQueueElement,
+    runMaxQueueElement,
     mode,
     resumeSavedRun,
     isMoleculeChallenge,
@@ -2783,7 +2814,7 @@ function StandardGameBoard({
   // Capped at target-2 so we never spawn the target or its immediate precursor.
   function dynamicMaxQueue(boardCount: number): number {
     const tierBonus = Math.max(0, Math.floor((boardCount - 5) / 10));
-    return Math.min(level.maxQueueElement + tierBonus, queueSpawnCap());
+    return Math.min(runMaxQueueElement + tierBonus, queueSpawnCap());
   }
 
   function queueSpawnCap(): number {
@@ -3177,7 +3208,7 @@ function StandardGameBoard({
     // Daily Compound is a dedicated grid board; campaign compounds must not
     // be reported as the daily feature.
     if (researchOutcome.coinsAwarded > 0 || projectCompletedFromDiscovery) spawnPopup("Research Project +15 coins");
-    if (level.powerUpStage) {
+    if (powerUpStage) {
       setWon(true);
       setBusy(false);
       stageClearTimeoutRef.current = null;
@@ -4408,7 +4439,7 @@ function StandardGameBoard({
       const timeSec = (Date.now() - startTimeRef.current) / 1000;
       const stars = calculateStars(level, score, nextShots, runBestCombo, timeSec);
       setEarnedStars(stars);
-      if (mode === "campaign") {
+      if (mode === "campaign" && !isFocusedElementDiscovery) {
         setLevelStars(levelId, stars);
         reportQuestProgress({ levelCleared: true, runScore: score, starsEarned: stars });
         unlockLevel(getNextLevel(levelId)?.id ?? levelId + 1);
@@ -5264,7 +5295,7 @@ function StandardGameBoard({
           const timeSec = (Date.now() - startTimeRef.current) / 1000;
           const stars = calculateStars(level, nextScore, nextShots, nextBestCombo, timeSec);
           setEarnedStars(stars);
-          if (mode === "campaign") {
+          if (mode === "campaign" && !isFocusedElementDiscovery) {
             setLevelStars(levelId, stars);
             reportQuestProgress({ levelCleared: true, runScore: nextScore, starsEarned: stars });
             unlockLevel(getNextLevel(levelId)?.id ?? levelId + 1);
@@ -5975,7 +6006,7 @@ function StandardGameBoard({
             timeSec,
           );
           setEarnedStars(stars);
-          if (mode === "campaign") {
+          if (mode === "campaign" && !isFocusedElementDiscovery) {
             setLevelStars(levelId, stars);
             reportQuestProgress({
               levelCleared: true,
@@ -6204,7 +6235,7 @@ function StandardGameBoard({
       const nextBestCombo = Math.max(runBestCombo, result.merges.length);
       const stars = calculateStars(level, nextScore, shots, nextBestCombo, timeSec);
       setEarnedStars(stars);
-      if (mode === "campaign") {
+      if (mode === "campaign" && !isFocusedElementDiscovery) {
         setLevelStars(levelId, stars);
         reportQuestProgress({ levelCleared: true, runScore: nextScore, starsEarned: stars });
         unlockLevel(getNextLevel(levelId)?.id ?? levelId + 1);
@@ -8197,7 +8228,7 @@ function StandardGameBoard({
         )}
         {continueChoiceStats && !won && !gameOver && (
           <ContinueChoiceModal
-            level={level}
+            level={resultLevel}
             score={continueChoiceStats.score}
             shots={continueChoiceStats.shots}
             bestCombo={continueChoiceStats.bestCombo}
@@ -8218,10 +8249,10 @@ function StandardGameBoard({
         )}
         {won && (
           <ResultModal
-            title="LEVEL COMPLETE"
+            title={isFocusedElementDiscovery ? "DISCOVERY COMPLETE" : "LEVEL COMPLETE"}
             accent="var(--success)"
             score={score}
-            level={level}
+            level={resultLevel}
             shots={shots}
             bestCombo={runBestCombo}
             stars={earnedStars}
@@ -8239,10 +8270,10 @@ function StandardGameBoard({
             onClaimPowerUp={claimResultPowerUp}
             onDiscoveryClick={setDiscoveryEl}
             onMain={handleWonMain}
-            onSecondary={nextCampaignLevel ? (onCollection ?? handleWonMap) : undefined}
-            secondaryLabel={nextCampaignLevel ? "View in table" : "Map"}
-            onNext={nextCampaignLevel ? handleWonNext : handleWonMap}
-            nextLabel={nextCampaignLevel ? "Next discovery" : "Map"}
+            onSecondary={isFocusedElementDiscovery || nextCampaignLevel ? (onCollection ?? handleWonMap) : undefined}
+            secondaryLabel={isFocusedElementDiscovery || nextCampaignLevel ? "View in table" : "Map"}
+            onNext={isFocusedElementDiscovery ? handleWonMain : nextCampaignLevel ? handleWonNext : handleWonMap}
+            nextLabel={isFocusedElementDiscovery ? "Main menu" : nextCampaignLevel ? "Next discovery" : "Map"}
           />
         )}
         {gameOverContinueOpen && !won && !gameOver && (
@@ -8263,7 +8294,7 @@ function StandardGameBoard({
             title="GAME OVER"
             accent="var(--destructive)"
             score={score}
-            level={level}
+            level={resultLevel}
             shots={shots}
             bestCombo={runBestCombo}
             stars={0}

@@ -25,7 +25,6 @@ import {
   type PowerUpStageId,
 } from "./levels";
 import { useProgress } from "./store";
-import { formatScore } from "./logic";
 import { ELEMENTS } from "./elements";
 import { COMPOUNDS } from "./compounds";
 import { MoleculeVisual } from "./MoleculeVisual";
@@ -42,7 +41,7 @@ import { toast } from "sonner";
 import { getTimeUntilDailyResetMs, getTodayQuestDate } from "./quests";
 import { initializePushNotifications } from "./pushNotifications";
 import { PeriodicTableGrid } from "./PeriodicTableGrid";
-import { getNextDiscoveryTarget } from "./researchProject";
+import { getLowestUndiscoveredElement, getNextDiscoveryTarget } from "./researchProject";
 
 const POWER_UP_STAGE_LABELS: Record<PowerUpStageId, string> = {
   shimmer: "Merge the shimmering queued atom",
@@ -65,6 +64,7 @@ interface Props {
   onLevels: () => void;
   onCollection: () => void;
   onResearch?: () => void;
+  onElementDiscovery?: () => void;
   onSettings: () => void;
   onShop: (section?: "themes") => void;
   onLab: () => void;
@@ -113,6 +113,7 @@ export function MainMenu({
   onLevels,
   onCollection,
   onResearch,
+  onElementDiscovery,
   onSettings,
   onShop,
   onLab,
@@ -126,8 +127,6 @@ export function MainMenu({
   const isTabletLayout = useIsTabletLayout();
   const {
     unlockedLevel,
-    highestElement,
-    totalScore,
     goldCoins,
     dailyQuests,
     dailyStreak,
@@ -152,12 +151,15 @@ export function MainMenu({
     markResearchReminderPromptSeen,
     setResearchRemindersEnabled,
   } = useProgress();
-  const highestEl = ELEMENTS[highestElement - 1];
   const tr = (text: string) => t(text, appLanguage);
   const nextLevel = getLevelById(unlockedLevel) ?? LEVELS[LEVELS.length - 1];
   const nextRunGoal = getNextRunGoal(nextLevel);
   const nextDiscovery = getNextDiscoveryTarget({ unlockedLevel, discoveredElements, discoveredCompounds });
   const nextElement = nextDiscovery.targetAtomicNumber ? ELEMENTS[nextDiscovery.targetAtomicNumber - 1] : null;
+  const lowestUndiscoveredAtomicNumber = getLowestUndiscoveredElement(discoveredElements);
+  const lowestUndiscoveredElement = lowestUndiscoveredAtomicNumber
+    ? ELEMENTS[lowestUndiscoveredAtomicNumber - 1]
+    : null;
   const completedDailyQuests = dailyQuests.filter((quest) => quest.completed).length;
   const dailyComplete = dailyQuests.length > 0 && completedDailyQuests >= 4;
   const dailyRewardAmount = hasProPack ? 10 : 3;
@@ -174,7 +176,7 @@ export function MainMenu({
   const rewardedAdMessageTimeoutRef = useRef<number | null>(null);
   const [ratePromptOpen, setRatePromptOpen] = useState(false);
   const [showReminderPrompt, setShowReminderPrompt] = useState(false);
-  const [showMoreChallenges, setShowMoreChallenges] = useState(false);
+  const [showMoreChallenges, setShowMoreChallenges] = useState(true);
   const [showBonusLab, setShowBonusLab] = useState(false);
 
   useEffect(() => {
@@ -314,7 +316,7 @@ export function MainMenu({
           flexDirection: "column",
           gap: isTabletLayout ? 22 : 18,
           minHeight: "100dvh",
-          paddingBottom: isTabletLayout ? 36 : 28,
+          paddingBottom: isTabletLayout ? 132 : 112,
         }}
       >
         <header style={topBar}>
@@ -372,10 +374,42 @@ export function MainMenu({
           <div style={{ marginTop: 14, borderRadius: 14, padding: 10, background: "linear-gradient(145deg, color-mix(in oklch, var(--surface-high) 82%, var(--primary) 18%), var(--surface))", border: "1px solid var(--border)" }}>
             <PeriodicTableGrid discoveredElements={discoveredElements} targetAtomicNumber={nextDiscovery.targetAtomicNumber} mode="preview" />
           </div>
-          <button onClick={() => { trackMenuAction("continue"); trackNextDiscoveryStart({ target_element: nextDiscovery.targetAtomicNumber ?? nextDiscovery.targetElementName, stages_remaining: nextDiscovery.stagesRemaining }); (onResearch ?? onPlay)(); }} style={heroPlayBtn}>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}><Play size={20} fill="currentColor" aria-hidden="true" />{hasSavedRun ? `${tr("Resume")} ${nextElement?.name ?? tr("research")}` : nextElement ? `${tr("Discover")} ${nextElement.name}` : tr("Continue research")}</span>
-            <Sparkles size={26} aria-hidden="true" />
-          </button>
+          <div style={discoveryChoiceGrid}>
+            <button
+              type="button"
+              onClick={() => {
+                trackMenuAction("continue");
+                trackNextDiscoveryStart({ target_element: nextDiscovery.targetAtomicNumber ?? nextDiscovery.targetElementName, stages_remaining: nextDiscovery.stagesRemaining, source_mode: "campaign" });
+                (onResearch ?? onPlay)();
+              }}
+              style={{ ...heroPlayBtn, marginTop: 0 }}
+            >
+              <span style={{ display: "grid", gap: 3, textAlign: "left" }}>
+                <span style={discoveryChoiceEyebrow}>{tr("CAMPAIGN")}</span>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}><Play size={18} fill="currentColor" aria-hidden="true" />{hasSavedRun ? `${tr("Resume")} ${nextElement?.name ?? tr("research")}` : tr("Continue campaign")}</span>
+                <small style={discoveryChoiceHint}>{nextElement ? `${tr("Toward")} ${nextElement.name} · ${nextDiscovery.stagesRemaining === 1 ? tr("1 stage away") : `${nextDiscovery.stagesRemaining} stages`}` : tr("Continue research")}</small>
+              </span>
+              <Sparkles size={24} aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (!lowestUndiscoveredElement) return;
+                trackMenuAction("element-discovery");
+                trackNextDiscoveryStart({ target_element: lowestUndiscoveredAtomicNumber, stages_remaining: 1, source_mode: "element-discovery" });
+                onElementDiscovery?.();
+              }}
+              disabled={!lowestUndiscoveredElement || !onElementDiscovery}
+              style={{ ...discoveryChoiceBtn, opacity: lowestUndiscoveredElement && onElementDiscovery ? 1 : 0.55 }}
+            >
+              <span style={{ display: "grid", gap: 3, textAlign: "left" }}>
+                <span style={discoveryChoiceEyebrow}>{tr("FOCUSED DISCOVERY")}</span>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}><Atom size={18} aria-hidden="true" />{lowestUndiscoveredElement ? `${tr("Discover")} ${lowestUndiscoveredElement.name}` : tr("Collection complete")}</span>
+                <small style={discoveryChoiceHint}>{lowestUndiscoveredElement ? `${tr("Lowest missing element")} · #${lowestUndiscoveredElement.atomicNumber}` : tr("All 118 elements discovered")}</small>
+              </span>
+              {lowestUndiscoveredElement && <span style={discoveryAtomicBadge}>{lowestUndiscoveredElement.symbol}</span>}
+            </button>
+          </div>
           <button type="button" onClick={() => { trackPeriodicTableOpen({ source_mode: "menu" }); onCollection(); }} style={{ alignSelf: "center", background: "none", border: "none", color: "var(--accent)", fontSize: 12, fontWeight: 800, cursor: "pointer" }}>{tr("View full periodic table")} →</button>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--muted-foreground)", marginTop: 8 }}>
             <span>{`Research Project ${Math.min(researchProject.completedDates.length, 5)}/5 days · ${resetCountdown}`}</span><span>Reward <strong style={{ color: "var(--accent)" }}>+15 coins</strong></span>
@@ -409,11 +443,6 @@ export function MainMenu({
           )}
           <div style={progressTrack}>
             <div style={{ ...progressFill, width: `${campaignProgress}%` }} />
-          </div>
-          <div style={compactStatRow}>
-            <span>{`${tr("Highest")} ${highestEl?.symbol ?? "H"} #${highestElement}`}</span>
-            <span>{`${formatScore(totalScore)} ${tr("score")}`}</span>
-            <span>{`${campaignProgress}% ${tr("campaign")}`}</span>
           </div>
         </section>
 
@@ -451,6 +480,19 @@ export function MainMenu({
           style={{
             ...subpageRow,
             gap: isTabletLayout ? 14 : subpageRow.gap,
+            position: "fixed",
+            left: "50%",
+            bottom: "calc(env(safe-area-inset-bottom, 0px) + 12px)",
+            transform: "translateX(-50%)",
+            width: `min(calc(100% - 24px), ${isTabletLayout ? 980 : 560}px)`,
+            zIndex: 12,
+            padding: isTabletLayout ? "12px 14px" : "10px 8px",
+            borderRadius: 22,
+            background: "color-mix(in oklch, var(--surface-elevated) 90%, transparent)",
+            backdropFilter: "blur(18px)",
+            WebkitBackdropFilter: "blur(18px)",
+            border: "1px solid color-mix(in oklch, var(--border) 86%, var(--primary) 14%)",
+            boxShadow: "0 14px 38px rgba(0,0,0,0.38), 0 0 24px color-mix(in oklch, var(--primary) 14%, transparent)",
           }}
           aria-label="Main game sections"
         >
@@ -854,6 +896,58 @@ const heroPlayBtn: CSSProperties = {
   marginTop: 16,
 };
 
+const discoveryChoiceGrid: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+  gap: 10,
+  marginTop: 16,
+};
+
+const discoveryChoiceEyebrow: CSSProperties = {
+  color: "color-mix(in oklch, var(--primary-foreground) 76%, transparent)",
+  fontSize: 9,
+  letterSpacing: 1.5,
+  fontWeight: 900,
+};
+
+const discoveryChoiceHint: CSSProperties = {
+  color: "color-mix(in oklch, var(--primary-foreground) 76%, transparent)",
+  fontSize: 11,
+  lineHeight: 1.2,
+};
+
+const discoveryChoiceBtn: CSSProperties = {
+  width: "100%",
+  minWidth: 0,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 8,
+  border: "1px solid color-mix(in oklch, var(--accent) 60%, var(--border))",
+  borderRadius: 14,
+  padding: "13px 12px 13px 15px",
+  background: "linear-gradient(145deg, color-mix(in oklch, var(--accent) 24%, var(--surface)), var(--surface))",
+  color: "var(--foreground)",
+  fontWeight: 900,
+  fontSize: 16,
+  cursor: "pointer",
+  textAlign: "left",
+};
+
+const discoveryAtomicBadge: CSSProperties = {
+  width: 38,
+  height: 38,
+  flexShrink: 0,
+  display: "grid",
+  placeItems: "center",
+  borderRadius: 11,
+  background: "linear-gradient(145deg, var(--accent), var(--primary))",
+  color: "var(--primary-foreground)",
+  fontSize: 15,
+  fontWeight: 1000,
+  boxShadow: "0 0 16px color-mix(in oklch, var(--accent) 55%, transparent)",
+};
+
 const newThemesBanner: CSSProperties = {
   width: "100%",
   display: "flex",
@@ -1055,17 +1149,6 @@ const dailyQuestClaimStep: CSSProperties = {
   border: "1px solid var(--border)",
   transition: "background 180ms ease",
 };
-const compactStatRow: CSSProperties = {
-  display: "flex",
-  justifyContent: "space-between",
-  flexWrap: "wrap",
-  gap: 8,
-  marginTop: 12,
-  color: "var(--muted-foreground)",
-  fontSize: 11,
-  fontWeight: 800,
-};
-
 const subpageRow: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(4, minmax(0, 1fr))",

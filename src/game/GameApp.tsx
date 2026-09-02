@@ -29,7 +29,7 @@ import {
 } from "@/game/appUpdate";
 import { consumePendingPushRoute, recordPushActivity } from "@/game/pushNotifications";
 import { useProgress } from "@/game/store";
-import { getNextDiscoveryTarget } from "@/game/researchProject";
+import { getLowestUndiscoveredElement, getNextDiscoveryTarget } from "@/game/researchProject";
 import { useDomLocalization } from "@/game/useDomLocalization";
 import { t, type AppLanguage } from "@/game/localization";
 import { getCurrentGameCenterPlayer } from "@/game/gameCenter";
@@ -55,6 +55,9 @@ type Screen =
       name: "game";
       levelId: number;
       mode?: GameModeId;
+      /** A focused collection run that targets the lowest missing element. */
+      discoveryTargetAtomicNumber?: number;
+      discoveryRun?: boolean;
       resumeSavedRun?: boolean;
       secretCompoundId?: string;
       initialHowToPlay?: HowToPlayMode;
@@ -315,6 +318,29 @@ export function GameApp() {
     else startCampaign();
   }
 
+  function startElementDiscovery() {
+    if (getSavedRunSummary()) {
+      startCampaign();
+      return;
+    }
+    const progress = useProgress.getState();
+    const targetAtomicNumber = getLowestUndiscoveredElement(progress.discoveredElements);
+    if (!targetAtomicNumber) {
+      startCampaign();
+      return;
+    }
+    startGameWithFirstTutorial(undefined, (initialHowToPlay) =>
+      setScreen({
+        name: "game",
+        levelId: getLevelById(progress.unlockedLevel)?.id ?? 1,
+        mode: "campaign",
+        discoveryTargetAtomicNumber: targetAtomicNumber,
+        discoveryRun: true,
+        initialHowToPlay,
+      }),
+    );
+  }
+
   function startDailyChallenge() {
     refreshDailyFeatures();
     const dailyChallenge = useProgress.getState().dailyChallenge;
@@ -369,6 +395,7 @@ export function GameApp() {
             onLevels={() => setScreen({ name: "levels" })}
             onCollection={() => setScreen({ name: "collection" })}
             onResearch={startNextDiscovery}
+            onElementDiscovery={startElementDiscovery}
             onSettings={() => setScreen({ name: "settings" })}
             onShop={(section) => setScreen({ name: "shop", section })}
             onLab={() => setScreen({ name: "lab" })}
@@ -391,6 +418,8 @@ export function GameApp() {
                     name: "game",
                     levelId: savedRun.levelId,
                     mode: savedRun.mode,
+                    discoveryTargetAtomicNumber: savedRun.discoveryTargetAtomicNumber,
+                    discoveryRun: savedRun.discoveryRun,
                     resumeSavedRun: true,
                   });
                 });
@@ -418,10 +447,12 @@ export function GameApp() {
     case "game":
       return withGlobalModals(
         <GameBoard
-          key={`${screen.mode ?? "campaign"}-${screen.levelId}-${screen.secretCompoundId ?? "standard"}-${screen.resumeSavedRun ? "resume" : "new"}-${gameRunNonce}`}
+          key={`${screen.mode ?? "campaign"}-${screen.levelId}-${screen.discoveryTargetAtomicNumber ?? "standard"}-${screen.secretCompoundId ?? "standard"}-${screen.resumeSavedRun ? "resume" : "new"}-${gameRunNonce}`}
           levelId={screen.levelId}
           mode={screen.mode}
           resumeSavedRun={screen.resumeSavedRun}
+          discoveryTargetAtomicNumber={screen.discoveryTargetAtomicNumber}
+          discoveryRun={screen.discoveryRun}
           secretCompoundId={screen.secretCompoundId}
           initialHowToPlay={screen.initialHowToPlay}
           onExit={() => setScreen({ name: "menu" })}
@@ -429,6 +460,20 @@ export function GameApp() {
           onCollection={() => setScreen({ name: "collection" })}
           onWin={(nextId) => {
             setGameRunNonce((nonce) => nonce + 1);
+            if (screen.discoveryRun) {
+              if (nextId === screen.levelId) {
+                setScreen({
+                  name: "game",
+                  levelId: screen.levelId,
+                  mode: "campaign",
+                  discoveryTargetAtomicNumber: screen.discoveryTargetAtomicNumber,
+                  discoveryRun: true,
+                });
+                return;
+              }
+              setScreen({ name: "menu" });
+              return;
+            }
             if (!nextId) {
               setScreen({ name: "menu" });
               return;
@@ -443,6 +488,8 @@ export function GameApp() {
                 levelId: nextId,
                 mode: screen.mode ?? "campaign",
                 secretCompoundId: nextId === screen.levelId ? screen.secretCompoundId : undefined,
+                discoveryTargetAtomicNumber: screen.discoveryRun ? screen.discoveryTargetAtomicNumber : undefined,
+                discoveryRun: screen.discoveryRun,
               });
             });
           }}

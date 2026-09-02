@@ -115,8 +115,17 @@ export function getNextDiscoveryTarget(progress: {
 }): NextDiscoveryTarget {
   const discovered = new Set(progress.discoveredElements);
   const startLevel = Math.max(1, Math.floor(progress.unlockedLevel));
+  // The campaign map is authoritative for the primary home-card target. A
+  // player may have discovered that element through a daily board already,
+  // but the current campaign stage still needs to be the thing they can
+  // continue toward. Only fall back to a later undiscovered stage when the
+  // current map entry has no element target (for example a compound or boss).
+  const currentLevel = LEVELS.find((level) => level.id === startLevel);
+  const currentCampaignTarget = currentLevel?.targetElement;
   const targetLevel =
-    LEVELS.find((level) => level.id >= startLevel && level.targetElement && !discovered.has(level.targetElement)) ??
+    (currentLevel && currentCampaignTarget
+      ? currentLevel
+      : LEVELS.find((level) => level.id >= startLevel && level.targetElement && !discovered.has(level.targetElement))) ??
     LEVELS.find((level) => level.targetElement && !discovered.has(level.targetElement));
   if (targetLevel?.targetElement) {
     const target = ELEMENTS[targetLevel.targetElement - 1];
@@ -167,4 +176,10 @@ export function getNextDiscoveryTarget(progress: {
     fallbackKind: "challenge",
     fallbackId: null,
   };
+}
+
+/** The lowest atomic number not yet present in the player's collection. */
+export function getLowestUndiscoveredElement(discoveredElements: number[]): number | null {
+  const discovered = new Set(discoveredElements);
+  return ELEMENTS.find((element) => !discovered.has(element.atomicNumber))?.atomicNumber ?? null;
 }
